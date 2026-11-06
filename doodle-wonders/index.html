@@ -72,7 +72,6 @@
 <div id="title">Doodle Wonders<br><span id="badge">shape guessing</span></div>
 <div id="corner">
   <button class="round" id="bSound" title="Sound on/off">🔊</button>
-  <button class="round" id="bVoice" title="Talking on/off">💬</button>
 </div>
 <div id="bubble"></div>
 <div id="tray"></div>
@@ -121,7 +120,7 @@ const RB = ['#ff4d5e', '#ff9a1f', '#ffd21f', '#3fc95a', '#2f9bff', '#6a5cff', '#
    Sound — all synthesized
    ===================================================================== */
 const Snd = {
-  ctx: null, on: true, voice: true,
+  ctx: null, on: true, voice: false,
   init() {
     if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
@@ -1148,7 +1147,6 @@ $('#bClear').addEventListener('click', () => {
   Pip.mood('cheer'); Pip.say(pick(['A fresh new page!', 'All clean! Draw something new!', 'Whoosh! Ready to draw!']));
 });
 $('#bSound').addEventListener('click', () => { Snd.init(); Snd.on = !Snd.on; $('#bSound').classList.toggle('off', !Snd.on); $('#bSound').textContent = Snd.on ? '🔊' : '🔈'; });
-$('#bVoice').addEventListener('click', () => { Snd.voice = !Snd.voice; $('#bVoice').classList.toggle('off', !Snd.voice); if (!Snd.voice && window.speechSynthesis) speechSynthesis.cancel(); });
 
 // crayon tray
 (function () {
