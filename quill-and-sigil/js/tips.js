@@ -174,8 +174,8 @@ const Tips = (() => {
     { id: 'ring.intro', when: () => page() && Game.level && Game.level.combos && D().seal && !D().signs.length, at: () => Grim.anchor('slot:' + ((slotToFont() + 4) % 8)),
       text: 'In this folio a small sigil drawn inside one of these small circles joins your spell. Draw your sign first: the circles then take colours that tell when a sigil in each would act.' },
     ...[['now', 'Red, behind your sign: a sigil here acts at once, as the spell is cast.'],
-        ['along', 'Blue, beside it: a sigil here acts along the way, while what the spell moves is travelling.'],
-        ['arrive', 'Green, ahead of it: a sigil here acts on arrival, where the spell comes to rest.']].map(([rel, text]) => ({
+        ['along', 'Blue, beside your sign: a sigil here acts along the way, while the spell is still moving.'],
+        ['arrive', 'Green, ahead of your sign: a sigil here acts on arrival, where the spell comes to rest.']].map(([rel, text]) => ({
       id: 'ring.' + rel, when: () => page() && Game.level && Game.level.combos && slotOf(rel) != null, at: () => Grim.anchor('slot:' + slotOf(rel)), text })),
     { id: 'ring.placed', when: () => page() && Game.level && Game.level.combos && D().sats.some(x => x.ok), at: () => Grim.anchor('slot:' + D().sats.find(x => x.ok).slot),
       text: () => `The page reads it back${satNow()}. Each small circle holds one mark: a sign or a ring-sigil, never both.` },
