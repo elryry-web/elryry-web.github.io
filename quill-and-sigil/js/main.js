@@ -892,7 +892,10 @@ function tick(now) {
   if (!WORLD_PAUSED.has(Game.state)) {
     acc += dt;
     let n = 0;
-    while (acc >= FIXED && n < 8) { worldStep(FIXED); acc -= FIXED; n++; }
+    while (acc >= FIXED && n < 8) {
+      for (const b of World.bodies) { b._px = b.x; b._py = b.y; b._pz = b.z; }
+      worldStep(FIXED); acc -= FIXED; n++;
+    }
     if (n >= 8) acc = 0;
   }
   for (const S of World.seals) S.t += dt;
@@ -900,7 +903,17 @@ function tick(now) {
   updateParticles(dt); ambient(dt);
   cam.shake = Math.max(0, cam.shake - dt * 1.6);
   wg.setTransform(DPR, 0, 0, DPR, 0, 0);
-  render(wg, innerWidth, innerHeight, t, aimOverlay);
+  // The world moves in fixed 1/120 s steps, but screens refresh at 60, 90 or 120 Hz with a little jitter, so a frame
+  // may hold 0, 1 or 2 steps. Drawn as-is, motion stutters (worst at 90 Hz: steps of 1, 1, 2). So bodies are drawn
+  // between their last two steps, by how far time has run into the next one; a jump (a respawn) is drawn as it is.
+  const k = WORLD_PAUSED.has(Game.state) ? 1 : acc / FIXED, held = [];
+  if (k < 1) for (const b of World.bodies) {
+    if (b._px == null || Math.abs(b.x - b._px) + Math.abs(b.y - b._py) + Math.abs(b.z - b._pz) > 1) continue;
+    held.push(b, b.x, b.y, b.z);
+    b.x = b._px + (b.x - b._px) * k; b.y = b._py + (b.y - b._py) * k; b.z = b._pz + (b.z - b._pz) * k;
+  }
+  try { render(wg, innerWidth, innerHeight, t, aimOverlay); }
+  finally { for (let i = 0; i < held.length; i += 4) { const b = held[i]; b.x = held[i + 1]; b.y = held[i + 2]; b.z = held[i + 3]; } }
   Grim.frame(dt, t);
   Game.update(dt);
   try { Tips.update(dt); } catch (e) { console.error(e); } // a tip must never stop the game
