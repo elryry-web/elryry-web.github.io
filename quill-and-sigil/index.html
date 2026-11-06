@@ -1,0 +1,536 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<title>Quill &amp; Sigil</title>
+<meta name="theme-color" content="#120d26">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="description" content="Draw spell seals in a grimoire and cast them on floating islands to guide the light home.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=Cinzel:wght@400;600&family=IM+Fell+English:ital@0;1&family=Pinyon+Script&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #2a1d3a; --gold: #e8c27a; --gold2: #b8893e; --parch: #f1e4c6; --night: #120d26;
+    --divider: none; --divider-gold: none;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--night); color: #f3e7cc;
+    font-family: 'IM Fell English', Georgia, serif; user-select: none; -webkit-user-select: none; }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #page { display: none; z-index: 20; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+
+  .btn {
+    font-family: Cinzel, serif; font-weight: 600; letter-spacing: .07em; font-size: 14px;
+    color: #3a2414; padding: 9px 16px; border-radius: 3px;
+    background: linear-gradient(#f6ead0, #dcc597); border: 1px solid #8a6a3a;
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,.28), inset 0 -3px 6px rgba(120,80,30,.25), 0 3px 10px rgba(0,0,0,.45);
+    transition: transform .12s, box-shadow .2s, filter .2s;
+  }
+  .btn:hover { transform: translateY(-1px); box-shadow: inset 0 0 0 2px rgba(255,255,255,.35), 0 0 18px rgba(232,194,122,.55), 0 3px 10px rgba(0,0,0,.45); }
+  .btn:active { transform: translateY(1px); }
+  .btn.primary { background: linear-gradient(#ffe7a8, #d9a54e); }
+  .btn.ghost { background: rgba(20,12,36,.55); color: var(--gold); border-color: rgba(232,194,122,.45); box-shadow: 0 2px 10px rgba(0,0,0,.4); }
+  .btn.ghost:hover { background: rgba(40,24,60,.75); }
+  kbd { font-family: Cinzel, serif; font-size: 11px; padding: 1px 6px; border: 1px solid currentColor; border-radius: 3px; opacity: .65; margin-left: 6px; }
+
+  /* ---------- HUD ---------- */
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; opacity: 0; transition: opacity .5s; }
+  #hud.show { opacity: 1; }
+  #hud button { pointer-events: auto; }
+  #lesson { position: absolute; left: 22px; top: 16px; text-shadow: 0 2px 8px rgba(0,0,0,.8); max-width: 46vw; }
+  #lnum { font-family: Cinzel, serif; letter-spacing: .25em; font-size: 12px; color: #d9a54e; }
+  #ltitle { font-family: 'Cinzel Decorative', serif; font-weight: 700; font-size: 30px; color: #fff0cc; line-height: 1.1;
+    background: linear-gradient(#fff5d8, #e8c27a 60%, #b8893e); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  #objs { list-style: none; margin: 8px 0 0; padding: 0; font-style: italic; font-size: 16px; color: #efe2c4; }
+  #objs li { display: flex; align-items: center; gap: 8px; margin: 3px 0; transition: color .4s; }
+  #objs .box { width: 13px; height: 13px; border: 1.5px solid var(--gold); transform: rotate(45deg); display: inline-block; flex: none; }
+  #objs li.done { color: #a8f0c8; }
+  #objs li.done .box { background: var(--gold); box-shadow: 0 0 10px var(--gold); }
+  #tools { position: absolute; right: 18px; top: 16px; display: flex; gap: 8px; }
+  #tools .btn { padding: 7px 11px; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+  #tools .btn span { font-size: 11px; }
+  #bSound.off { opacity: .5; text-decoration: line-through; }
+  #bottom { position: absolute; left: 0; right: 0; bottom: 18px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  #inkline { font-style: italic; color: #e8dcc0; text-shadow: 0 2px 6px #000; font-size: 15px; }
+  #inkline b { font-family: Cinzel, serif; color: var(--gold); font-style: normal; }
+  #inkwell { margin-left: 12px; font-family: Cinzel, serif; font-style: normal; font-size: 12px; letter-spacing: .1em; color: #cfc2ff; }
+  #inkwell i { display: inline-block; width: 10px; height: 13px; margin-left: 4px; vertical-align: -1px; border-radius: 50% 50% 50% 50% / 62% 62% 38% 38%; background: rgba(120,100,160,.35); }
+  #inkwell i.on { background: radial-gradient(circle at 35% 35%, #8a7ae0, #2a1a5a); box-shadow: 0 0 8px #9a8aff; }
+  .chip.ink { font-family: Cinzel, serif; font-size: 13px; padding: 5px 12px; color: #4a3a7a; }
+  .chip small { font-family: 'IM Fell English', serif; font-size: 13px; }
+  #bGrimoire { font-size: 17px; padding: 12px 26px; transition: opacity .3s, transform .2s; }
+  #bGrimoire .q { font-size: 20px; margin-right: 4px; }
+  #bGrimoire.hidden { opacity: 0; pointer-events: none; }
+  #aimbar { position: absolute; left: 50%; bottom: 90px; transform: translate(-50%, 20px); opacity: 0; transition: .3s;
+    background: rgba(18,10,34,.78); border: 1px solid rgba(232,194,122,.5); padding: 10px 20px; border-radius: 3px; text-align: center;
+    box-shadow: 0 0 30px rgba(232,194,122,.2); white-space: nowrap; }
+  #aimbar.show { opacity: 1; transform: translate(-50%, 0); }
+  /* hidden, it must take no taps: on touch its Page / Cast buttons sit right over the kept-spell slots */
+  #hud #aimbar:not(.show) button { pointer-events: none; }
+  #aimDesc { font-family: 'Pinyon Script', cursive; font-size: 24px; color: var(--gold); display: block; }
+  #aimbar small { font-size: 14px; color: #e0d4b8; }
+  #toast { position: absolute; left: 50%; top: 18px; transform: translate(-50%, -10px); opacity: 0; transition: .4s;
+    font-style: italic; font-size: 17px; color: #fff3d6; text-shadow: 0 2px 10px #000; background: rgba(18,10,34,.6);
+    padding: 8px 18px; border-radius: 3px; border: 1px solid rgba(232,194,122,.3); max-width: 80vw; text-align: center; }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  /* ---------- page buttons ---------- */
+  #pagebtns { position: fixed; z-index: 21; display: none; justify-content: center; gap: 8px; flex-wrap: wrap; }
+  #pagebtns { gap: 6px; }
+  #pagebtns .btn { font-size: 12px; padding: 7px 10px; letter-spacing: .04em; }
+  #pagebtns .btn.primary { font-size: 14px; padding: 8px 16px; }
+
+  /* ---------- screens & cards ---------- */
+  .screen, .card { position: fixed; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none; transition: opacity .5s; }
+  .screen.show, .card.show { opacity: 1; pointer-events: auto; }
+  #title { flex-direction: column; justify-content: flex-start; padding-top: 7vh; text-align: center; background: linear-gradient(rgba(10,6,24,.55), rgba(10,6,24,0) 55%); }  #title h1 { margin: 0; font-family: 'Cinzel Decorative', serif; font-weight: 700; font-size: clamp(44px, 9vw, 104px); line-height: 1;
+    background: linear-gradient(#fff8e2, #f0cf86 45%, #b8893e 80%, #8a5a20); -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 4px 18px rgba(0,0,0,.7)) drop-shadow(0 0 30px rgba(232,194,122,.25)); }
+  #title h1 .amp { position: relative; display: inline-block; padding: 0 .06em; }
+  #title h1 .amp .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  #title h1 .ampsvg { height: 1.12em; width: auto; vertical-align: -.2em; overflow: visible; filter: drop-shadow(0 0 8px rgba(255,220,150,.3)); }
+  #title h1 .fl, #title .sub .sfl { display: inline-block; vertical-align: middle; background: center/contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 40'%3E%3Cg fill='none' stroke='%23e8c27a' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M118 20 C96 20 86 6 70 10 C58 13 60 28 72 27 C82 26 80 15 72 16'/%3E%3Cpath d='M70 21 C52 26 34 18 6 20'/%3E%3Cpath d='M40 19 C34 10 24 12 26 18'/%3E%3C/g%3E%3Ccircle cx='4' cy='20' r='3' fill='%23e8c27a'/%3E%3C/svg%3E"); }
+  #title h1 .fl { width: .9em; height: .34em; margin-right: .08em; transform: translateY(-.08em); }
+  #title h1 .fl.r, #title .sub .sfl.r { transform: scaleX(-1) translateY(-.08em); margin: 0 0 0 .08em; }
+  #title .sub .sfl { width: 2.6em; height: .8em; margin: 0 .3em; opacity: .85; }
+  #title .sub .sfl.r { transform: scaleX(-1); }
+  #title h1 .w { white-space: nowrap; }
+  /* narrow screens: QUILL, then the ampersand and its quill centred on a line of their own, then SIGIL */
+  @media (max-width: 720px) {
+    #title h1 { display: flex; flex-direction: column; align-items: center; font-size: clamp(46px, 15vw, 84px); }
+    #title h1 .amp { margin: -.06em 0 -.02em; padding: 0; }
+    #title h1 .ampsvg { height: 1.05em; vertical-align: 0; }
+    #title h1 .fl { width: .7em; }
+    /* the flourishes hang outside their words, so QUILL and SIGIL themselves sit on the centre line */
+    #title h1 .w { position: relative; }
+    #title h1 .fl { position: absolute; top: 46%; right: 100%; margin: 0 .08em 0 0; transform: translateY(-50%); }
+    #title h1 .fl.r { right: auto; left: 100%; margin: 0 0 0 .08em; transform: translateY(-50%) scaleX(-1); }
+  }
+  #title .sub { font-family: 'Pinyon Script', cursive; font-size: clamp(24px, 3.4vw, 40px); color: #f2dfb5; text-shadow: 0 2px 10px #000; margin-top: 4px; }
+  #title .orn { width: min(560px, 80vw); height: 80px; background: var(--divider-gold) center/contain no-repeat; margin: 6px 0 18px; }
+  #title .btns { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  #title .btn { font-size: 17px; padding: 13px 30px; position: relative; border-radius: 4px; }
+  #title .btn.primary { background: linear-gradient(#fff1c4, #e2b765 55%, #b9873a); border: 1px solid #6a4a1e; color: #3a2410;
+    box-shadow: inset 0 0 0 3px rgba(255,248,220,.5), inset 0 0 0 4px #8a5f24, 0 0 24px rgba(232,194,122,.35), 0 4px 12px rgba(0,0,0,.5); }
+  #title .btn.ghost { background: linear-gradient(rgba(18,36,50,.88), rgba(10,18,32,.92)); color: #f0d79a; border: 1px solid #c9a259;
+    box-shadow: inset 0 0 0 3px rgba(10,18,32,.9), inset 0 0 0 4px rgba(201,162,89,.7), 0 4px 12px rgba(0,0,0,.5); }
+  #title .btn::before, #title .btn::after { content: ''; position: absolute; top: 50%; width: 7px; height: 7px; background: #e8c27a; transform: translateY(-50%) rotate(45deg); box-shadow: 0 0 6px rgba(232,194,122,.8); }
+  #title .btn::before { left: -4px; } #title .btn::after { right: -4px; }
+  #title .foot { position: absolute; bottom: 18px; font-style: italic; color: rgba(240,225,190,.6); font-size: 14px; padding: 0 20px; }
+
+  #levels { flex-direction: column; background: rgba(10,6,24,.72); overflow-y: auto; justify-content: flex-start; padding: 4vh 0; }
+  #levels h2 { font-family: 'Cinzel Decorative', serif; font-size: clamp(30px, 5vw, 48px); margin: 0; color: var(--gold); text-shadow: 0 3px 12px #000; }
+  #levels .orn { width: min(520px, 80vw); height: 60px; background: var(--divider-gold) center/contain no-repeat; margin-bottom: 14px; }
+  #lessonGrid { display: grid; grid-template-columns: repeat(3, minmax(150px, 210px)); gap: 14px; padding: 0 16px; }
+  @media (max-width: 640px) { #lessonGrid { grid-template-columns: repeat(2, minmax(130px, 1fr)); } }
+  .lcard { position: relative; border: 1px solid #8a6a3a; border-radius: 3px; padding: 14px 10px 12px; color: #3a2414;
+    background: radial-gradient(ellipse at 50% 40%, #fbf1d8, #e2cc9c); box-shadow: inset 0 0 18px rgba(120,80,30,.35), 0 4px 16px rgba(0,0,0,.5);
+    transition: transform .15s, box-shadow .2s; }
+  .lcard:hover { transform: translateY(-3px) rotate(-.4deg); box-shadow: inset 0 0 18px rgba(120,80,30,.35), 0 0 22px rgba(232,194,122,.5); }
+  .lcard .lr { font-family: 'Cinzel Decorative', serif; font-weight: 700; font-size: 28px; color: #8e2f22; }
+  .lcard .ln { font-family: 'IM Fell English', serif; font-style: italic; font-size: 17px; min-height: 22px; }
+  .lcard .ls { display: flex; justify-content: center; gap: 6px; margin-top: 8px; }
+  .lcard.locked { filter: grayscale(.8) brightness(.55); cursor: default; }
+  .lcard.locked:hover { transform: none; }
+  #lessonGrid .fhead { grid-column: 1 / -1; font-family: 'Cinzel Decorative', serif; font-weight: 700; font-size: 20px; color: var(--gold);
+    text-align: center; text-shadow: 0 2px 8px #000; margin: 14px 0 -2px; }
+  #lessonGrid .fhead:first-child { margin-top: 0; }
+  .ls i, #winStars i { display: inline-block; width: 16px; height: 16px; border-radius: 50%; background: rgba(90,60,40,.25); border: 1px solid rgba(90,60,40,.4); }
+  .ls i.on { background: radial-gradient(circle at 35% 35%, #e05a48, #8e1f18); border-color: #5a120e; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+
+  .card { background: rgba(8,5,18,.55); }
+  .card .sheet, #satchel .sheet { position: relative; width: min(560px, 92vw); max-height: 90vh; overflow: auto; padding: 34px 40px 28px; color: #2e1f14; text-align: center;
+    background: radial-gradient(ellipse at 50% 35%, #fbf2da, #e7d3a6 70%, #d4b880); border-radius: 4px;
+    box-shadow: inset 0 0 40px rgba(120,80,30,.45), inset 0 0 0 1px #8a6a3a, inset 0 0 0 6px rgba(255,255,255,.2), inset 0 0 0 7px rgba(138,106,58,.6), 0 20px 60px rgba(0,0,0,.7);
+    transform: translateY(16px) scale(.98); transition: transform .5s; }
+  .card.show .sheet, #satchel.show .sheet { transform: none; }
+  .sheet .num { font-family: Cinzel, serif; letter-spacing: .3em; color: #8e2f22; font-size: 13px; }
+  .sheet h3 { font-family: 'Cinzel Decorative', serif; font-weight: 700; font-size: 32px; margin: 4px 0 0; color: #2a1830; }
+  .sheet .div { height: 40px; background: var(--divider) center/contain no-repeat; margin: 2px 0 8px; }
+  .sheet p { font-size: 18px; line-height: 1.5; font-style: italic; margin: 0 0 14px; text-align: left; }
+  .sheet p::first-letter { font-family: 'Cinzel Decorative', serif; font-style: normal; font-weight: 700; font-size: 2.6em; float: left; line-height: .9; margin: 4px 8px 0 0; color: #8e2f22; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 6px 0 16px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 12px 3px 4px; border-radius: 20px; border: 1px solid rgba(90,60,40,.4);
+    background: rgba(255,255,255,.35); font-family: 'Pinyon Script', cursive; font-size: 22px; color: #2a1830; }
+  .chip img { width: 26px; height: 26px; border-radius: 50%; background: var(--c); }
+  #noteHint { display: none; font-size: 16px; padding: 10px 14px; border: 1px dashed rgba(90,60,40,.5); background: rgba(255,255,255,.25); text-align: left; margin-bottom: 14px; }
+  #noteHint.show { display: block; }
+  #noteHint::first-letter { all: unset; }
+  .sheet .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .sheet .keys { margin-top: 14px; font-size: 13px; color: #6a4a30; font-style: italic; }
+  #winStars { display: flex; justify-content: center; gap: 14px; margin: 10px 0 16px; }
+  #winStars i { width: 44px; height: 44px; position: relative; }
+  #winStars i.on { background: radial-gradient(circle at 35% 35%, #e86a50, #a0241a 60%, #6a120c); border-color: #4a0e08;
+    box-shadow: 0 3px 8px rgba(0,0,0,.4), inset 0 0 0 4px rgba(0,0,0,.12); animation: stamp .45s cubic-bezier(.3,1.6,.5,1) both; }
+  #winStars i.on::after { content: '✦'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: rgba(255,210,170,.75); font-size: 20px; }
+  #winText::first-letter { all: unset; }
+  #winText { text-align: center !important; }
+  @keyframes stamp { from { transform: scale(2.2) rotate(-25deg); opacity: 0; } to { transform: none; opacity: 1; } }
+  /* ---------- satchel ---------- */
+  #castrow { display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; max-width: 96vw; }
+  #hotbar { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; transition: opacity .3s; }
+  #hotbar:empty { display: none; }
+  body:not([data-state=play]) #hotbar { opacity: 0; pointer-events: none; }
+  .slot { position: relative; width: 50px; height: 50px; padding: 0; border-radius: 50%; border: none; background: none;
+    box-shadow: 0 3px 10px rgba(0,0,0,.5); transition: transform .15s, box-shadow .2s; }
+  .slot img { width: 100%; height: 100%; display: block; border-radius: 50%; }
+  .slot:hover { transform: translateY(-3px) scale(1.06); box-shadow: 0 0 18px var(--c, #e8c27a), 0 3px 10px rgba(0,0,0,.5); }
+  .slot .k { position: absolute; right: -4px; top: -4px; min-width: 19px; height: 19px; border-radius: 10px; font: 600 11px Cinzel, serif;
+    display: flex; align-items: center; justify-content: center; color: #3a2414; background: linear-gradient(#ffe7a8, #d9a54e); border: 1px solid #8a6a3a; }
+  .slot.off { filter: grayscale(1) brightness(.6); }
+  .slot.off:hover { transform: none; box-shadow: 0 3px 10px rgba(0,0,0,.5); }
+  #satchel { position: fixed; inset: 0; z-index: 25; display: flex; align-items: center; justify-content: center; background: rgba(8,5,18,.45);
+    opacity: 0; pointer-events: none; transition: opacity .3s; }
+  #satchel.show { opacity: 1; pointer-events: auto; }
+  #satchel .sheet { width: min(620px, 94vw); }
+  #satList { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 14px 10px; margin: 6px 0 18px; min-height: 60px; }
+  #satList .empty { grid-column: 1 / -1; font-style: italic; color: #6a4a30; font-size: 16px; padding: 10px; }
+  .sat { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .sat .load { position: relative; width: 84px; height: 84px; padding: 0; border: none; background: none; border-radius: 50%;
+    box-shadow: 0 3px 10px rgba(60,30,10,.35); transition: transform .15s, box-shadow .2s; }
+  .sat .load img { width: 100%; height: 100%; border-radius: 50%; display: block; }
+  .sat .load:hover { transform: scale(1.06); box-shadow: 0 0 16px var(--c, #e8c27a); }
+  .sat .k { position: absolute; left: -2px; top: -2px; width: 22px; height: 22px; border-radius: 50%; font: 600 12px Cinzel, serif; color: #fff3d6;
+    background: radial-gradient(circle at 35% 35%, #e05a48, #8e1f18); display: flex; align-items: center; justify-content: center; }
+  .sat .lbl { font-family: 'Pinyon Script', cursive; font-size: 19px; color: #2a1830; line-height: 1; white-space: nowrap; }
+  .sat .lbl.off { opacity: .45; }
+  .sat .del { position: absolute; right: 2px; top: -2px; width: 22px; height: 22px; padding: 0; border-radius: 50%; border: 1px solid rgba(90,60,40,.5);
+    background: #f3e6c8; color: #8e2f22; font-size: 14px; line-height: 1; opacity: .55; }
+  .sat .del:hover { opacity: 1; }
+  .btn.ghost.light { color: #6a3a1a; border-color: rgba(90,60,40,.5); background: rgba(255,255,255,.2); }
+  #satCount:not(:empty)::before { content: '·'; margin: 0 4px; opacity: .6; }
+  #page { cursor: crosshair; }
+  body.aiming #world { cursor: crosshair; }
+  @media (max-width: 700px) {
+    #pagebtns { gap: 5px; } #pagebtns .btn { font-size: 11px; padding: 6px 8px; } #pagebtns .btn.primary { font-size: 12px; padding: 7px 12px; }
+    #ltitle { font-size: 22px; } #tools .btn span { display: none; } #objs { font-size: 14px; }
+    #lesson { max-width: 60vw; } .sheet p { font-size: 16px; } #aimbar { white-space: normal; width: 90vw; }
+  }
+
+  /* ---------- phones & touch ---------- */
+  html, body { overscroll-behavior: none; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; }
+  button, .lcard { touch-action: manipulation; }
+  .touch-only { display: none; }
+  body.touch .touch-only { display: revert; }
+  body.touch .aimbtns.touch-only { display: flex; }
+  body:not(.touch) #tools #bFull { display: none; }
+
+  /* ---------- the Notes leaf: the grimoire's left page, for one-page (phone) layouts ---------- */
+  #pagebtns #pNotes { display: none; }
+  #pagebtns.single #pNotes { display: inline-block; }
+  #pNotes.beckon { animation: beckon 1.8s ease-in-out infinite; }
+  @keyframes beckon { 50% { box-shadow: 0 0 0 2px #ffe7a8, 0 0 22px rgba(255,215,130,.95); } }
+  #notes { position: fixed; inset: 0; z-index: 24; display: flex; align-items: center; justify-content: center; background: rgba(8,5,18,.35);
+    opacity: 0; pointer-events: none; transition: opacity .25s; perspective: 1400px; }
+  #notes.show { opacity: 1; pointer-events: auto; }
+  #notes .sheet { position: relative; width: min(560px, 94vw); max-height: 94vh; overflow: auto; padding: 26px 26px 20px; color: #2e1f14; text-align: center;
+    background: radial-gradient(ellipse at 50% 35%, #fbf2da, #e7d3a6 70%, #d4b880); border-radius: 4px;
+    box-shadow: inset 0 0 40px rgba(120,80,30,.45), inset 0 0 0 1px #8a6a3a, inset 0 0 0 6px rgba(255,255,255,.2), inset 0 0 0 7px rgba(138,106,58,.6), 0 20px 60px rgba(0,0,0,.7);
+    transform-origin: 0 50%; transform: rotateY(-75deg); transition: transform .45s cubic-bezier(.2,.8,.3,1); }
+  #notes.show .sheet { transform: none; }
+  #notes .sheet p { font-size: 16px; }
+  .nhead { font-family: Cinzel, serif; font-size: 11px; letter-spacing: .14em; color: #8e2f22; text-transform: uppercase; margin: 6px 0 4px;
+    padding-top: 8px; border-top: 1px solid rgba(90,60,40,.3); }
+  #nSigils { margin: 0 0 8px; }
+  .nsig { display: flex; gap: 10px; align-items: center; width: 100%; padding: 5px 4px; border: none; border-bottom: 1px solid rgba(90,60,40,.14);
+    background: none; text-align: left; color: #2a1830; border-radius: 3px; }
+  .nsig:active { background: rgba(255,255,255,.35); }
+  .nsig img { width: 38px; height: 38px; border-radius: 50%; flex: none; }
+  .nsig b { font-family: 'Pinyon Script', cursive; font-size: 24px; font-weight: normal; line-height: 1; }
+  .nsig em { font: 600 10px Cinzel, serif; font-style: normal; color: #8e2f22; letter-spacing: .12em; margin-left: 8px; }
+  .nsig span { display: block; font-style: italic; font-size: 14px; line-height: 1.3; }
+  .nsig.off { opacity: .32; }
+  .nsig.on { background: rgba(255,240,200,.55); box-shadow: inset 0 0 0 1px rgba(184,137,62,.6); }
+  #nSigns { font-style: italic; font-size: 15px; line-height: 1.45; text-align: left; margin-bottom: 12px; }
+  #nHint { display: none; font-size: 15px; padding: 10px 14px; border: 1px dashed rgba(90,60,40,.5); background: rgba(255,255,255,.25); text-align: left; margin-bottom: 12px; font-style: italic; }
+  #nHint.show { display: block; }
+
+  /* ---------- desktop phone preview ---------- */
+  #title #bPhone { position: absolute; right: 16px; bottom: 14px; font-size: 12px; padding: 7px 12px; }
+  #title .btn#bPhone::before, #title .btn#bPhone::after { display: none; }
+  body.touch #bPhone, body.framed #bPhone { display: none; }
+  #phoneview { position: fixed; inset: 0; z-index: 60; display: none; flex-direction: column; align-items: center;
+    background: radial-gradient(ellipse at 50% 40%, #241a40, #0a0716 75%); }
+  #phoneview.show { display: flex; }
+  .pv-bar { display: flex; gap: 8px; align-items: center; padding: 12px; flex-wrap: wrap; justify-content: center; }
+  .pv-bar .btn { font-size: 12px; padding: 7px 12px; }
+  .pv-bar .btn.on { background: rgba(232,194,122,.25); }
+  .pv-name { font-family: Cinzel, serif; font-size: 13px; letter-spacing: .08em; color: var(--gold); margin-right: 6px; }
+  .pv-stage { flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .pv-phone { flex: none; padding: 11px; border-radius: 52px; background: linear-gradient(145deg, #3b3d44, #17181c 60%, #2a2b31);
+    box-shadow: 0 0 0 1px #55575f, 0 30px 80px rgba(0,0,0,.7), inset 0 0 0 2px #0c0c0f; transform-origin: center; }
+  .pv-screen { position: relative; display: flex; flex-direction: column; overflow: hidden; border-radius: 42px; background: #000; }
+  .pv-screen iframe { flex: 1; border: 0; display: block; width: 100%; background: var(--night); }
+  .pv-status { height: 30px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 26px; font: 600 12px system-ui, sans-serif; color: #e8e8ee; background: #101014; position: relative; }
+  .pv-cam { position: absolute; left: 50%; top: 9px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: #000; box-shadow: 0 0 0 2px #1d1d22; z-index: 2; }
+  .pv-url { height: 50px; flex: none; display: flex; align-items: center; gap: 12px; padding: 0 14px; background: #1c1b22; color: #c8c8d0; font: 13px system-ui, sans-serif; }
+  .pv-url b { flex: 1; font-weight: 400; background: #2c2b34; border-radius: 22px; padding: 9px 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pv-nav { height: 22px; flex: none; display: flex; align-items: center; justify-content: center; background: #101014; }
+  .pv-nav i { width: 108px; height: 4px; border-radius: 2px; background: #d8d8de; opacity: .8; }
+  .pv-screen.full .pv-status, .pv-screen.full .pv-url, .pv-screen.full .pv-nav { display: none; }
+  .pv-screen.full .pv-cam { display: block; }
+  .pv-screen.full::after { content: ''; position: absolute; left: 50%; top: 9px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: #000; box-shadow: 0 0 0 2px #1d1d22; }
+  .pv-screen.land.full::after { left: 15px; top: 50%; margin: -6px 0 0; }
+  .pv-screen.land .pv-status { display: none; }
+  .pv-screen.land .pv-nav { height: 16px; }
+  .pv-tip { font-style: italic; font-size: 13px; color: rgba(240,225,190,.6); padding: 8px 0 14px; }
+  body.touch .mouse-only, body.touch kbd { display: none; }
+  .aimbtns { gap: 10px; justify-content: center; margin-top: 8px; }
+  .aimbtns .btn { font-size: 15px; padding: 10px 18px; }
+  #aCast:disabled { opacity: .45; filter: grayscale(.6); }
+  body.touch #aimbar { white-space: normal; bottom: calc(16px + env(safe-area-inset-bottom)); }
+  /* a phone upright: a slimmer aim bar, so the world stays in view while aiming (v75) */
+  @media (max-width: 520px) {
+    #aimbar { padding: 7px 14px 9px; }
+    #aimDesc { font-size: 20px; line-height: 1.15; }
+    #aimbar small { font-size: 13px; }
+    .aimbtns { margin-top: 6px; } .aimbtns .btn { padding: 8px 16px; font-size: 14px; }
+  }
+  body.touch[data-state=aim] #bottom { opacity: 0; pointer-events: none; }
+  /* stop hover lifts sticking after a tap */
+  @media (hover: none) {
+    .btn:hover, .slot:hover, .lcard:hover, .sat .load:hover { transform: none; }
+    .btn:active, .slot:active { transform: scale(.96); }
+  }
+  /* notches and rounded corners, once the game fills the screen */
+  #lesson { left: calc(22px + env(safe-area-inset-left)); top: calc(16px + env(safe-area-inset-top)); }
+  #tools { right: calc(18px + env(safe-area-inset-right)); top: calc(16px + env(safe-area-inset-top)); }
+  #bottom { bottom: calc(18px + env(safe-area-inset-bottom)); }
+  /* a phone upright: the tool buttons get their own row above the lesson title */
+  @media (max-width: 520px) {
+    #tools { right: calc(10px + env(safe-area-inset-right)); top: calc(10px + env(safe-area-inset-top)); gap: 6px; }
+    #tools .btn { padding: 8px 11px; font-size: 15px; }
+    #lesson { left: calc(14px + env(safe-area-inset-left)); top: calc(62px + env(safe-area-inset-top)); max-width: calc(100vw - 28px); }
+    #title .btn { font-size: 16px; padding: 12px 22px; }
+  }
+  /* a phone on its side: everything hugs the edges so the islands keep the middle */
+  @media (max-height: 500px) and (orientation: landscape) {
+    #lesson { top: calc(8px + env(safe-area-inset-top)); left: calc(14px + env(safe-area-inset-left)); max-width: 34vw; }
+    #lnum { font-size: 10px; } #ltitle { font-size: 18px; } #objs { font-size: 13px; margin-top: 4px; } #objs li { margin: 1px 0; }
+    #tools { top: calc(8px + env(safe-area-inset-top)); right: calc(10px + env(safe-area-inset-right)); gap: 6px; }
+    #tools .btn span { display: none; } #tools .btn { padding: 7px 10px; font-size: 14px; }
+    #bottom { bottom: calc(6px + env(safe-area-inset-bottom)); gap: 4px; }
+    #inkline { font-size: 12px; }
+    #bGrimoire { font-size: 14px; padding: 8px 18px; } #bGrimoire .q { font-size: 16px; }
+    .slot { width: 40px; height: 40px; }
+    #aimbar { bottom: calc(8px + env(safe-area-inset-bottom)); padding: 6px 14px; width: auto; max-width: 70vw; }
+    #aimDesc { font-size: 19px; } #aimbar small { font-size: 12px; }
+    .aimbtns { margin-top: 4px; } .aimbtns .btn { padding: 7px 14px; font-size: 14px; }
+    #pagebtns .btn { font-size: 12px; padding: 7px 10px; } #pagebtns .btn.primary { font-size: 13px; padding: 8px 14px; }
+    #title { padding-top: 3vh; }
+    #title h1 { font-size: clamp(34px, 13vh, 64px); }
+    #title .sub { font-size: 22px; } #title .orn { height: 36px; margin: 2px 0 8px; }
+    #title .btn { font-size: 15px; padding: 10px 22px; }
+    #title .foot { display: none; }
+    .card .sheet, #satchel .sheet { padding: 18px 24px 16px; max-height: 94vh; }
+    .sheet h3 { font-size: 24px; } .sheet .div { height: 24px; } .sheet p { font-size: 15px; line-height: 1.4; }
+    #winStars i { width: 34px; height: 34px; }
+    #levels { padding: 2vh 0; } #levels .orn { height: 30px; margin-bottom: 6px; }
+  }
+
+  /* ---------- tips: a parchment note pointing at one thing ---------- */
+  #tip { position: fixed; z-index: 27; width: min(300px, calc(100vw - 20px)); padding: 12px 14px 10px; color: #2e1f14; text-align: left;
+    background: radial-gradient(ellipse at 50% 35%, #fbf2da, #ead7ab 80%); border-radius: 4px;
+    box-shadow: inset 0 0 0 1px #8a6a3a, inset 0 0 0 4px rgba(255,255,255,.25), inset 0 0 0 5px rgba(138,106,58,.5), 0 8px 26px rgba(0,0,0,.55);
+    opacity: 0; pointer-events: none; transform: translateY(6px); transition: opacity .3s, transform .3s; }
+  #tip.show { opacity: 1; transform: none; }
+  #tip.show .tiprow button { pointer-events: auto; } /* only the buttons catch a touch: ink drawn under the note still lands */
+  #tip .tiptext { font-style: italic; font-size: 16px; line-height: 1.4; }
+  #tip .tiprow { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 8px; }
+  #tip .tipok { font-size: 12px; padding: 6px 14px; }
+  #tip .tipskip { border: none; background: none; padding: 4px 0; font-size: 12px; font-style: italic; color: #8a6a4a; text-decoration: underline; }
+  #tip .tiparrow { position: absolute; width: 14px; height: 14px; background: #f3e5c2; transform: translate(-50%, -50%) rotate(45deg); }
+  #tip[data-side=below] .tiparrow { top: 0 !important; box-shadow: -1px -1px 0 #8a6a3a; }
+  #tip[data-side=above] .tiparrow { top: 100% !important; box-shadow: 1px 1px 0 #8a6a3a; }
+  #tip[data-side=right] .tiparrow { left: 0 !important; box-shadow: -1px 1px 0 #8a6a3a; }
+  #tip[data-side=left] .tiparrow { left: 100% !important; box-shadow: 1px -1px 0 #8a6a3a; }
+  #tipring { position: fixed; z-index: 26; pointer-events: none; border: 2px solid #ffe2a0; opacity: 0; transition: opacity .3s;
+    box-shadow: 0 0 14px rgba(255,214,130,.85), inset 0 0 10px rgba(255,214,130,.5); }
+  #tipring.show { opacity: 1; animation: tippulse 1.6s ease-in-out infinite; }
+  @keyframes tippulse { 50% { box-shadow: 0 0 26px rgba(255,214,130,1), inset 0 0 16px rgba(255,214,130,.7); border-color: #fff4d6; } }
+  @media (max-height: 500px) and (orientation: landscape) { #tip .tiptext { font-size: 14px; } #tip { padding: 9px 12px 8px; } }
+</style>
+</head>
+<body>
+<canvas id="world"></canvas>
+<canvas id="page"></canvas>
+
+<div id="hud">
+  <div id="lesson">
+    <div id="lnum">Lesson I</div>
+    <div id="ltitle">First Breath</div>
+    <ul id="objs"></ul>
+  </div>
+  <div id="tools">
+    <button class="btn ghost" id="bRewind" title="Undo the last cast (Z)">⟲ <span>Rewind</span></button>
+    <button class="btn ghost" id="bReset" title="Restart the lesson (R)">↻ <span>Restart</span></button>
+    <button class="btn ghost" id="bNote" title="Re-read the lesson">✉ <span>Lesson</span></button>
+    <button class="btn ghost" id="bLessons" title="The folio of lessons">☰ <span>Folio</span></button>
+    <button class="btn ghost" id="bSound" title="Sound on/off">♪</button>
+    <button class="btn ghost touch-only" id="bFull" title="Full screen">⛶</button>
+  </div>
+  <div id="bottom">
+    <div id="inkline">Seals cast <b id="casts">0</b> &nbsp;·&nbsp; the master's mark <b id="par">1</b> <span id="inkwell"></span></div>
+    <div id="castrow">
+      <button class="btn primary" id="bGrimoire"><span class="q">✒</span> Open the Grimoire <kbd>Space</kbd></button>
+      <div id="hotbar"></div>
+    </div>
+  </div>
+  <div id="aimbar"><span id="aimDesc"></span><small class="mouse-only">Choose where the seal shall fall — <b>click</b> to cast · <b>right-click / Esc</b> returns to the page</small><small class="touch-only">Drag on the world to aim the seal</small>
+    <div class="aimbtns touch-only"><button class="btn ghost" id="aBack">↩ Page</button><button class="btn primary" id="aCast" disabled>✦ Cast here</button></div></div>
+  <div id="toast"></div>
+</div>
+
+<div id="pagebtns">
+  <button class="btn" id="pNotes" title="Turn to the lesson notes and the sigils">❦ Notes</button>
+  <button class="btn" id="pUndo" title="Backspace">⌫ Undo</button>
+  <button class="btn" id="pBlot" title="Delete">Blot</button>
+  <button class="btn" id="pRecall" title="Restore your last spell">Recall</button>
+  <button class="btn" id="pKeep" title="Keep this spell in your satchel (K)">✚ Keep</button>
+  <button class="btn" id="pSatchel" title="Your kept spells">Satchel <b id="satCount"></b></button>
+  <button class="btn primary" id="pInscribe" title="Enter">✦ Inscribe</button>
+  <button class="btn" id="pClose" title="Esc">Close</button>
+</div>
+
+<div id="notes">
+  <div class="sheet">
+    <div class="num" id="nNum">Lesson I</div>
+    <h3 id="nTitle">First Breath</h3>
+    <div class="div"></div>
+    <p id="nText"></p>
+    <div class="nhead">Sigils of this folio · tap one to trace it</div>
+    <div id="nSigils"></div>
+    <div class="nhead">Signs &amp; barbs</div>
+    <div id="nSigns"></div>
+    <div id="nHint"></div>
+    <div class="row">
+      <button class="btn ghost light" id="nHintB">The Master's Hint</button>
+      <button class="btn primary" id="nBack">↩ Back to the page</button>
+    </div>
+  </div>
+</div>
+
+<div id="satchel">
+  <div class="sheet">
+    <div class="num">kept spells</div>
+    <h3>Thy Satchel</h3>
+    <div class="div"></div>
+    <div id="satList"></div>
+    <div class="row">
+      <button class="btn primary" id="sKeep">✚ Keep the spell on the page</button>
+      <button class="btn ghost light" id="sClose">Close</button>
+    </div>
+    <div class="keys">Tap a kept spell to lay it on the page · in the world, <span class="mouse-only">press <b>1–9</b> or </span>tap a slot beside the grimoire button to cast it at once.</div>
+  </div>
+</div>
+
+<div id="title" class="screen">
+  <h1><span class="w"><span class="fl"></span>Quill</span> <span class="amp"><span class="sr">&amp;</span><svg class="ampsvg" viewBox="0 0 100 124" aria-hidden="true">
+    <defs>
+      <linearGradient id="ag" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff4d0"/><stop offset=".5" stop-color="#eec97e"/><stop offset="1" stop-color="#a87632"/></linearGradient>
+      <linearGradient id="qg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff6d6"/><stop offset=".5" stop-color="#f0cf86"/><stop offset="1" stop-color="#a87632"/></linearGradient>
+      <!-- where the quill passes behind the ampersand's lower bowl, and the quill's own shape (for the bowl's shadow on it) -->
+      <clipPath id="ampLow"><rect x="30" y="88" width="34" height="28"/></clipPath>
+      <clipPath id="quillShape"><path transform="translate(40 136) rotate(7) scale(1.02 1.22) translate(-17 -128)" d="M29 3 C41 22 38 58 24 94 L20 103 C13 74 10 38 29 3 Z M18.7 96 L20.7 96 L18 129 L16 129 Z"/></clipPath>
+      <filter id="softShade" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation=".9"/></filter>
+    </defs>
+    <g fill="none" stroke="url(#ag)" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M66 36 C64 20 44 14 36 26 C28 38 40 50 56 51 C38 50 18 60 19 80 C20 100 46 108 66 94 C72 90 76 84 78 78" stroke-width="6.5"/>
+      <path d="M66 36 C70 40 74 36 72 32" stroke-width="4"/>
+    </g>
+    <g transform="translate(40 136) rotate(7) scale(1.02 1.22) translate(-17 -128)"><!-- nib below the ampersand, feather laid over its top loop -->
+      <path d="M29 3 C41 22 38 58 24 94 L20 103 C13 74 10 38 29 3 Z" fill="url(#qg)" stroke="#7a5220" stroke-width="1.3"/>
+      <path d="M29 4 C25 40 22 72 17 128" fill="none" stroke="#6e4a1c" stroke-width="2" stroke-linecap="round"/>
+      <path d="M27 20 L35 16 M26 32 L37 27 M25 44 L37 40 M24 56 L35 53 M23 68 L32 66 M21 80 L28 79 M26 26 L17 23 M25 38 L15 37 M24 50 L15 50 M23 62 L16 63" stroke="#8a5e26" stroke-width=".9" fill="none" opacity=".8"/>
+      <path d="M17 128 L15.5 121 L18.8 121 Z" fill="#3a2410"/>
+    </g>
+    <!-- the lower bowl drawn again over the quill, so the shaft passes behind it (the feather stays over the top loop) -->
+    <g clip-path="url(#ampLow)" fill="none" stroke-linecap="round">
+      <g clip-path="url(#quillShape)"><path d="M66 36 C64 20 44 14 36 26 C28 38 40 50 56 51 C38 50 18 60 19 80 C20 100 46 108 66 94 C72 90 76 84 78 78" transform="translate(.6 2.2)" stroke="#1e1006" stroke-opacity=".55" stroke-width="7" filter="url(#softShade)"/></g><!-- the bowl's soft shadow, cast down onto the quill -->
+      <path d="M66 36 C64 20 44 14 36 26 C28 38 40 50 56 51 C38 50 18 60 19 80 C20 100 46 108 66 94 C72 90 76 84 78 78" stroke="url(#ag)" stroke-width="6.5"/>
+    </g>
+  </svg></span> <span class="w">Sigil<span class="fl r"></span></span></h1>
+  <div class="sub"><span class="sfl"></span>a folio of drawn magic<span class="sfl r"></span></div>
+  <div class="orn"></div>
+  <div class="btns">
+    <button class="btn primary" id="bBegin">Begin the Lessons</button>
+    <button class="btn ghost" id="bContinue">Continue</button>
+  </div>
+  <div class="foot">Draw seals with your quill · guide the light home · best with sound</div>
+  <button class="btn ghost" id="bPhone" title="Play the game in a phone-sized frame, as it plays by touch">▯ Phone preview</button>
+</div>
+
+<div id="phoneview">
+  <div class="pv-bar">
+    <span class="pv-name" id="pvName">Pixel Pro</span>
+    <button class="btn ghost" id="pvRotate">⟳ Rotate</button>
+    <button class="btn ghost" id="pvBars">Browser bars</button>
+    <button class="btn ghost" id="pvReload">↻ Reload</button>
+    <button class="btn ghost" id="pvClose">✕ Close</button>
+  </div>
+  <div class="pv-stage">
+    <div class="pv-phone" id="pvPhone">
+      <div class="pv-screen" id="pvScreen">
+        <div class="pv-status"><span>9:41</span><i class="pv-cam"></i><span>▾ ◢ ▮</span></div>
+        <div class="pv-url"><span>⌂</span><b>claude.ai/artifact/…</b><span>⋮</span></div>
+        <iframe id="pvFrame" title="Quill &amp; Sigil on a phone"></iframe>
+        <div class="pv-nav"><i></i></div>
+      </div>
+    </div>
+  </div>
+  <div class="pv-tip">Drag with the mouse as you would with a finger · the game sees a touch screen</div>
+</div>
+
+<div id="levels" class="screen">
+  <h2>The Folio</h2>
+  <div class="orn"></div>
+  <div id="lessonGrid"></div>
+  <div style="margin-top:20px"><button class="btn ghost" id="bBackTitle">← Back</button> <button class="btn ghost" id="bTipsAgain" title="Show every tip again, as if for the first time">↺ Show the tips again</button> <button class="btn ghost" id="bLessonsT" style="display:none">.</button></div>
+</div>
+
+<div id="note" class="card">
+  <div class="sheet">
+    <div class="num" id="noteNum">Lesson I</div>
+    <h3 id="noteTitle">First Breath</h3>
+    <div class="div"></div>
+    <p id="noteText"></p>
+    <div class="chips" id="noteSigils"></div>
+    <div id="noteHint"></div>
+    <div class="row">
+      <button class="btn ghost" id="bHint" style="color:#6a3a1a;border-color:rgba(90,60,40,.5);background:rgba(255,255,255,.2)">The Master's Hint</button>
+      <button class="btn primary" id="bStart">Take up the Quill</button>
+    </div>
+    <div class="keys mouse-only">Space opens the grimoire · Enter inscribes · K keeps a spell · 1–9 casts a kept spell · Z rewinds · R restarts</div>
+  </div>
+</div>
+
+<div id="win" class="card">
+  <div class="sheet">
+    <div class="num">well written</div>
+    <h3 id="winTitle">Lesson Complete</h3>
+    <div class="div"></div>
+    <div id="winStars"></div>
+    <p id="winText"></p>
+    <div class="row">
+      <button class="btn ghost" id="bReplay" style="color:#6a3a1a;border-color:rgba(90,60,40,.5);background:rgba(255,255,255,.2)">Replay</button>
+      <button class="btn ghost" id="bWinMenu" style="color:#6a3a1a;border-color:rgba(90,60,40,.5);background:rgba(255,255,255,.2)">Folio</button>
+      <button class="btn primary" id="bNext">Next Lesson →</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/ink.js?v=75"></script>
+<script src="js/world.js?v=75"></script>
+<script src="js/tips.js?v=75"></script>
+<script src="js/main.js?v=75"></script>
+</body>
+</html>
