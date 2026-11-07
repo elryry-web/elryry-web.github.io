@@ -2864,8 +2864,12 @@ function sheetPattern(g, hU, t) {
   if (!E) E = _sheetC[key] = { c: document.createElement('canvas'), fresh: false, pats: new WeakMap() };
   if (!E.fresh) {
     const S = texSource('fall'), PX = SHEET_PX, period = S.c.width / texUnit('fall'), cw = Math.round(PX * period * 2), ch = Math.max(8, Math.round(PX * key / 10));
-    if (E.c.width !== cw || E.c.height !== ch) { E.c.width = cw; E.c.height = ch; }
+    // (with clear space below the painting as tall again as half of it: Chrome may repeat a 'repeat-x' pattern
+    // downward too, and the strip's bright top would show again below the fall's foot)
+    const chP = ch + Math.ceil(ch * 0.5);
+    if (E.c.width !== cw || E.c.height !== chP) { E.c.width = cw; E.c.height = chP; }
     const og = E.c.getContext('2d'), FP = texPattern(og, 'fall'), k = PX / texUnit('fall'), ra = FALL_ARC * PX;
+    og.clearRect(0, 0, cw, chP);
     og.globalCompositeOperation = 'copy';
     FP.setTransform(new DOMMatrix([k, 0, 0, k, 0, t * 1.7 * PX]));
     og.fillStyle = FP; og.fillRect(0, 0, cw, ch);
