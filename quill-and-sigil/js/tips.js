@@ -92,10 +92,10 @@ const Tips = (() => {
       done: () => !!D().seal },
     { id: 'page.sigil', when: () => page() && D().seal && !(D().sigil && D().sigil.ok), at: () => Grim.anchor('centre'),
       enter: () => { if (lv('First Breath') && !Grim.ghost) { Grim.ghost = 'gale'; Grim.inkDirty = true; } },
-      text: () => lv('First Breath') ? 'Inside the seal, draw the sigil. Ventus is a spiral — follow its faint trace.' : 'Inside the seal, draw a sigil. Tap one you have learned to see its trace.',
+      text: () => lv('First Breath') ? 'Inside the seal, draw the sigil. Ventus is a spiral: follow its faint trace.' : 'Inside the seal, draw a sigil. Tap one you have learned to see its trace.',
       done: () => !!(D().sigil && D().sigil.ok) },
     { id: 'page.sign', when: () => page() && D().sigil && D().sigil.ok && D().sigil.id === 'gale' && !D().signs.length, at: () => Grim.anchor('slot:' + slotToFont()),
-      text: 'Now the sign: one stroke from the ring outward, through one of the small circles. The wind blows that way — here, toward the font.',
+      text: 'Now the sign: one stroke from the ring outward, through one of the small circles. The wind blows that way, so point it toward the font.',
       done: () => D().signs.length > 0 },
     { id: 'page.status', when: () => page() && spell(), at: () => Grim.anchor('status'),
       text: 'The page reads your spell back to you here: what it is, how strong, and which way. Read it before you cast.' },
@@ -118,7 +118,7 @@ const Tips = (() => {
 
     // barbs: The Long Meadow and The Rift
     { id: 'barb', when: () => page() && lv('The Long Meadow') && D().signs.length && D().sigil && D().sigil.id === 'gale' && maxBarbs() === 0, at: () => Grim.anchor('sign'),
-      text: 'Cross the sign with one short stroke — a barb. Each barb makes the wind firmer.',
+      text: 'Cross the sign with one short stroke, a barb. Each barb makes the wind firmer.',
       done: () => maxBarbs() >= 1 },
     { id: 'barb2', when: () => page() && lv('The Rift') && D().signs.length && D().sigil && D().sigil.id === 'gale' && maxBarbs() === 1, at: () => Grim.anchor('sign'),
       text: 'A sign can bear a second barb: the strongest wind of all.',
