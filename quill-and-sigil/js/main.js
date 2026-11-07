@@ -864,6 +864,7 @@ window.addEventListener('keydown', e => {
     else if (k === ' ' || k === 'Tab') { e.preventDefault(); Game.openGrimoire(); }
     else if (k === 'z' || k === 'Z') Game.rewind();
     else if (k === 'r' || k === 'R') Game.reset();
+    else if (k === 'g' || k === 'G') toggleLook();
   } else if (Game.state === 'draw') {
     if (k === 'Enter') { e.preventDefault(); Grim.inscribe(); }
     else if (k === 'Escape' || k === 'Tab') { e.preventDefault(); Game.closeGrimoire(); }
@@ -888,6 +889,14 @@ bind('#bTipsAgain', e => { Tips.reset(); Sfx.play('tick'); e.currentTarget.textC
 bind('#bNote', () => { if (Game.state === 'play') Game.note(); });
 bind('#bLessons', () => { if (Grim.open) Grim.hide(); Game.lessons(); });
 bind('#bSound', () => { Sfx.setMuted(!Sfx.muted); $('#bSound').classList.toggle('off', Sfx.muted); });
+// the look before the paintings and the painted look, side by side in time (button, G, or ?classic in the address)
+function toggleLook(quiet) {
+  setClassic(!CLASSIC.on); SKYP.last = -1e9;
+  $('#bLook').classList.toggle('off', CLASSIC.on);
+  if (!quiet) Game.toast(CLASSIC.on ? 'The old look, before the paintings' : 'The painted look');
+}
+bind('#bLook', () => toggleLook());
+if (/[?&]classic(=|&|$)/.test(location.search)) toggleLook(true);
 bind('#bStart', () => Game.closeNote());
 bind('#bHint', () => { $('#noteHint').classList.add('show'); $('#bHint').style.display = 'none'; });
 bind('#bNext', () => Game.next());

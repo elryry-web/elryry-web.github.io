@@ -902,8 +902,26 @@ const PAINTED = {};
 for (const k of ['wide', 'tall']) {
   if (typeof Image === 'undefined') break;
   const im = new Image();
-  im.onload = () => { PAINTED[k] = im; SKY.base = null; };
+  im.onload = () => { if (CLASSIC.on) CLASSIC.stash.painted[k] = im; else PAINTED[k] = im; SKY.base = null; };
   im.src = `art/sky-${k}.jpg?v=1`;
+}
+/* The look before the paintings, for showing before and after: no painted textures, props or sky, so the land, the
+   brambles, braziers and font, and the sky are drawn as they first were. The paintings are set aside, not unloaded,
+   and put back when it is turned off. */
+const CLASSIC = { on: false, stash: null };
+function setClassic(on) {
+  on = !!on; if (on === CLASSIC.on) return;
+  CLASSIC.on = on;
+  if (on) {
+    CLASSIC.stash = { sprite: { ...SPRITE }, painted: { ...PAINTED }, texOK };
+    for (const k in SPRITE) delete SPRITE[k];
+    for (const k in PAINTED) delete PAINTED[k];
+    texOK = false;
+  } else if (CLASSIC.stash) {
+    Object.assign(SPRITE, CLASSIC.stash.sprite); Object.assign(PAINTED, CLASSIC.stash.painted); texOK = CLASSIC.stash.texOK;
+    CLASSIC.stash = null;
+  }
+  refreshCanvases();
 }
 function paintedSky(w, h) {
   const want = w >= h ? 'wide' : 'tall';
@@ -3151,12 +3169,12 @@ function drawWater(g, c, d, t) {
 const SPRITE = {};
 for (const k of ['bramble1', 'bramble2', 'bramble3', 'brazier', 'goal', 'vine-leafy', 'vine-moss', 'vine-roots', 'ivy1', 'ivy2', 'ivy3', 'moss-drape', 'moss-lip']) {
   if (typeof Image === 'undefined') break;
-  const im = new Image(); im.onload = () => { SPRITE[k] = im; }; im.src = `art/${k}.png?v=7`;
+  const im = new Image(); im.onload = () => { if (CLASSIC.on) CLASSIC.stash.sprite[k] = im; else SPRITE[k] = im; }; im.src = `art/${k}.png?v=7`;
 }
 // the weathering paintings: damp stains (multiplied over stone; white leaves it as it is) and lichen (cut out)
 for (const [k, f] of [['stains', 'tex-stains.jpg'], ['lichen', 'lichen.png']]) {
   if (typeof Image === 'undefined') break;
-  const im = new Image(); im.onload = () => { SPRITE[k] = im; }; im.src = `art/${f}?v=3`;
+  const im = new Image(); im.onload = () => { if (CLASSIC.on) CLASSIC.stash.sprite[k] = im; else SPRITE[k] = im; }; im.src = `art/${f}?v=3`;
 }
 // a painting darkened to sit on a wall in shade (made once each)
 const shadeCache = {};
