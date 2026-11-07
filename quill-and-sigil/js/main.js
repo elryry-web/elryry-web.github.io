@@ -707,15 +707,30 @@ const GAME_VERSION = (() => { const s = document.querySelector('script[src*="mai
 const DBG = { el: null, n: 0, iv: 0, rd: 0, worst: 0, last: 0 };
 function debugFrame(now, renderMs) {
   if (!DEBUG) return;
-  if (!DBG.el) { DBG.el = document.createElement('div'); DBG.el.style.cssText = 'position:fixed;left:6px;bottom:6px;z-index:99;font:11px/1.35 monospace;color:#cfe;background:rgba(0,0,0,.6);padding:4px 6px;border-radius:4px;pointer-events:none;white-space:pre'; document.body.appendChild(DBG.el); }
+  if (!DBG.el) {
+    DBG.el = document.createElement('div'); DBG.el.style.cssText = 'position:fixed;left:6px;bottom:6px;z-index:99;font:11px/1.35 monospace;color:#cfe;background:rgba(0,0,0,.6);padding:4px 6px;border-radius:4px;white-space:pre;cursor:pointer';
+    document.body.appendChild(DBG.el);
+    // tapping the readout leaves out one part of the scene after another, to see what the phone spends its time on
+    const modes = ['all', 'particles', 'sky', 'water', 'vines', 'lights', 'land'];
+    DBG.el.addEventListener('pointerdown', e => {
+      e.stopPropagation(); e.preventDefault();
+      DBG.mode = ((DBG.mode || 0) + 1) % modes.length;
+      for (const k in DBGOFF) DBGOFF[k] = k === modes[DBG.mode];
+      DBG.n = 0; DBG.iv = 0; DBG.rd = 0; DBG.worst = 0; DBG.ops = 0; SKYP.last = -1e9;
+    });
+    // count the drawing calls made on the world's canvas
+    DBG.ops = 0;
+    for (const m of ['fill', 'stroke', 'drawImage', 'fillRect', 'clip', 'fillText']) { const f = wg[m]; wg[m] = function (...a) { DBG.ops++; return f.apply(this, a); }; }
+  }
   const dt = DBG.last ? now - DBG.last : 0; DBG.last = now;
   DBG.n++; DBG.iv += dt; DBG.rd += renderMs; DBG.worst = Math.max(DBG.worst, dt);
   if (DBG.n < 30) return;
   const cached = typeof TC !== 'undefined' ? TC.map.size : 0, tiles = World.cells.filter(c => !c.void).length;
-  DBG.el.textContent = `v${GAME_VERSION}  ${(1000 / (DBG.iv / DBG.n)).toFixed(0)} fps  frame ${(DBG.iv / DBG.n).toFixed(1)}ms  worst ${DBG.worst.toFixed(0)}ms
+  const off = Object.keys(DBGOFF).find(k => DBGOFF[k]);
+  DBG.el.textContent = `v${GAME_VERSION}  ${off ? 'no ' + off : 'all on'}  ops ${Math.round(DBG.ops / DBG.n)}\n${(1000 / (DBG.iv / DBG.n)).toFixed(0)} fps  frame ${(DBG.iv / DBG.n).toFixed(1)}ms  worst ${DBG.worst.toFixed(0)}ms
 draw ${(DBG.rd / DBG.n).toFixed(1)}ms  quality ${qTier}  dpr ${DPR}
 tiles ${cached}/${tiles}  particles ${parts.length}`;
-  DBG.n = 0; DBG.iv = 0; DBG.rd = 0; DBG.worst = 0;
+  DBG.n = 0; DBG.iv = 0; DBG.rd = 0; DBG.worst = 0; DBG.ops = 0;
 }
 // called each frame: `drew` is whether the world was drawn this frame
 function perfWatch(now, drew) {
@@ -740,6 +755,8 @@ function resize() {
   BLOOM.on = Q.bloom;
   DPR = Math.min(Q.dpr, window.devicePixelRatio || 1);
   PARTICLE_CAP = qTier >= 2 ? 120 : qTier >= 1 ? 200 : 3000;
+  // phones paint fewer tiles into the cache per frame (each costs a few ms there)
+  TC_BUILDS = matchMedia('(pointer: coarse)').matches ? 2 : 8;
   SKYP.dpr = Math.min(DPR, 1.25); SKYP.last = -1e9;
   skc.width = Math.round(innerWidth * SKYP.dpr); skc.height = Math.round(innerHeight * SKYP.dpr);
   wc.width = Math.round(innerWidth * DPR); wc.height = Math.round(innerHeight * DPR);
@@ -991,7 +1008,10 @@ function tick(now) {
       held.push(b, b.x, b.y, b.z);
       b.x = b._px + (b.x - b._px) * k; b.y = b._py + (b.y - b._py) * k; b.z = b._pz + (b.z - b._pz) * k;
     }
-    if (now - SKYP.last >= 38) { SKYP.last = now; skg.setTransform(SKYP.dpr, 0, 0, SKYP.dpr, 0, 0); drawSky(skg, innerWidth, innerHeight, t); }
+    if (now - SKYP.last >= (qTier >= 2 ? 66 : 38)) {
+      SKYP.last = now; skg.setTransform(SKYP.dpr, 0, 0, SKYP.dpr, 0, 0);
+      if (DBGOFF.sky) { skg.fillStyle = '#1a1430'; skg.fillRect(0, 0, innerWidth, innerHeight); } else drawSky(skg, innerWidth, innerHeight, t);
+    }
     r0 = DEBUG ? performance.now() : 0;
     try { render(wg, innerWidth, innerHeight, t, aimOverlay); }
     finally { for (let i = 0; i < held.length; i += 4) { const b = held[i]; b.x = held[i + 1]; b.y = held[i + 2]; b.z = held[i + 3]; } }

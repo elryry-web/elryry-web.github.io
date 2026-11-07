@@ -3184,6 +3184,7 @@ let hangAt = 0;
 function flushHang(g, t, upTo) {
   while (hangAt < HANG.length && HANG[hangAt].k <= upTo) {
     const v = HANG[hangAt++];
+    if (DBGOFF.vines) continue;
     if (v.drape) hangDrape(g, v.R, v.p, v.wU, v.hZ, v.flip); else hangVine(g, v.im, v.p, v.len, t, v.ph, v.flip);
   }
   if (hangAt >= HANG.length) { HANG.length = 0; hangAt = 0; }
@@ -3709,11 +3710,12 @@ function drawTile(g, c, t) {
   const still = TC.on && !(c.water != null && c.water > c.h) && !(c.frost > 0) && !c.burn && Math.abs(c.h - c.th) < 1e-3
     && frameNo - (TC.calm.get(c) ?? -99) > 8;
   let e = still ? TC.map.get(c) : null;
-  if (still && !e && TC.built < 8) e = buildTile(c, t); // a few a frame, so settling never makes one long frame
+  if (DBGOFF.water && c.water != null && c.water > c.h) return;
+  if (still && !e && TC.built < TC_BUILDS) e = buildTile(c, t); // a few a frame, so settling never makes one long frame
   else if (e) for (const v of e.hang) HANG.push(v);
   if (!e) { if (XR && XR.set.has(c)) drawXray(g, c, t, XR); else drawCell(g, c, t); return; }
-  g.drawImage(e.cv, e.X0, e.Y0, e.w, e.h);
-  if (!e.xr) tileLights(g, c);
+  if (!DBGOFF.land) g.drawImage(e.cv, e.X0, e.Y0, e.w, e.h);
+  if (!e.xr && !DBGOFF.lights) tileLights(g, c);
   if (e.top) drawCell(g, c, t, 'top');
 }
 /* Chrome on Android may wipe a page's canvases while it is in the background (or short of memory), leaving them
@@ -3730,6 +3732,10 @@ function refreshCanvases() {
   releaseBuffers();
 }
 let frameNo = 0, SKY_LAYER = null, XR = null;
+// ?debug: parts of the scene left out, one at a time (tapping the readout cycles them)
+const DBGOFF = { particles: false, sky: false, water: false, vines: false, lights: false, land: false };
+// how many tiles may be painted into the cache in one frame (main.js lowers it on phones)
+let TC_BUILDS = 8;
 function render(g, w, h, t, overlay) {
   frameNo++;
   // the game's own canvas has its sky on a layer of its own behind it (main.js repaints that a little less often and
@@ -3773,11 +3779,15 @@ function render(g, w, h, t, overlay) {
     drawSeal(g, S.sp, S.x, S.y, S.z + 0.04, S.R * (1 + S.t * 0.15), a, t * 0.6, S.t / 0.4, t);
   }
   g.restore();
+  if (!DBGOFF.particles) {
   drawParticles(g, false);
   g.globalCompositeOperation = 'lighter';
   drawParticles(g, true);
+  }
+  g.globalCompositeOperation = 'lighter';
   // light pass
   const s = cam.s;
+  if (!DBGOFF.lights) {
   for (const b of World.bodies) {
     if (!b.alive || b.kind !== 'orb') continue;
     const [cx, cy] = proj(b.x, b.y, b.z + 0.3), r = 120 * s;
@@ -3805,6 +3815,7 @@ function render(g, w, h, t, overlay) {
         g.globalAlpha = al * 0.5; g.lineWidth = 1 * s; g.beginPath(); g.ellipse(cx, yy, rr * 0.6, rr * 0.3, 0, 0, TAU); g.stroke();
       }
     }
+  }
   }
   g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
   g.restore();
