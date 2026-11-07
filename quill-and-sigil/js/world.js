@@ -2705,7 +2705,9 @@ function drawCellTop(g, c, d, t) {
 const FALL_R = 0.17, FALL_ARC = FALL_R * Math.PI / 2;
 function fallProfile(L) {
   if (L <= FALL_ARC) { const a = L / FALL_R; return [FALL_R * Math.sin(a), FALL_R * (1 - Math.cos(a))]; }
-  const dd = L - FALL_ARC; return [FALL_R + 0.1 * Math.sqrt(dd) + 0.04 * dd, FALL_R + dd];
+  // (then it drops nearly straight: drifting out from the cliff as it fell read, in this view, as the water slanting
+  // sideways, out from each face)
+  const dd = L - FALL_ARC; return [FALL_R + 0.035 * Math.sqrt(dd), FALL_R + dd];
 }
 // Water pours over every edge that opens onto the sky, back edges too, so its top never ends in a bare edge.
 // Edges N (−y), R (+x), L (+y), W (−x) are s = 0..3; corners A, B, C, D are k = 0..3 (edge s runs from corner s to
@@ -2942,7 +2944,9 @@ function drawSheets(g, c, d, t, front) {
       segs.push([q1, q2]);
       g.globalAlpha = ga * al * (front ? 1 : 0.85); g.fillStyle = P;
       {
-        const a0 = at(q1, 0), b0 = at(q2, 0), a1 = at(q1, hU), r1 = hU * PX;
+        // the painting's fall runs straight down the screen (from the lip point to the point right below it), so
+        // its strands drop plumb whichever way the face looks
+        const a0 = at(q1, 0), b0 = at(q2, 0), a1 = proj(q1[0], q1[1], z - fallProfile(hU)[1]), r1 = hU * PX;
         const ax = (b0[0] - a0[0]) / (c2 - c1), ay = (b0[1] - a0[1]) / (c2 - c1), rx = (a1[0] - a0[0]) / r1, ry = (a1[1] - a0[1]) / r1;
         P.setTransform(new DOMMatrix([ax, ay, rx, ry, a0[0] - c1 * ax, a0[1] - c1 * ay]));
         g.beginPath();
