@@ -1519,7 +1519,7 @@ function stoneWallTex(c, R) {
   return st(R ? cellI(c.x, c.y - 1) : cellI(c.x - 1, c.y)) || st(R ? cellI(c.x, c.y + 1) : cellI(c.x + 1, c.y)) ? 'stoneSide' : 'stoneSideStack';
 }
 // how mossy a stone wall is: walls in shade (R) usually, walls in the light now and then; and each block's own tone
-const wallMossy = (x, y, R) => hash2(x * 3.7 + y * 5.3 + (R ? 0 : 9), 4.2) < (R ? 0.78 : 0.38);
+const wallMossy = (x, y, R) => hash2(x * 3.7 + y * 5.3 + (R ? 0 : 9), 4.2) < (R ? 0.6 : 0.25);
 function blockTone(x, y) { const h = hash2(x * 1.31 + 0.7, y * 7.9 + 2.1); return h < 0.34 ? 'rgba(205,165,115,0.09)' : h < 0.67 ? 'rgba(105,115,132,0.1)' : 'rgba(100,122,70,0.08)'; }
 function texSlabs(g, R, wall, U = TEXU, N = TEXN, light = false, bond = false) {
   const n = Math.round(N / U), kk = U / 128;
@@ -2306,7 +2306,7 @@ function drawSideFaces(g, c, d, t) {
         const sd = x * 3.7 + y * 5.3 + (R ? 0 : 9), lip = Math.max(sb, top - 0.04);
         // moss grows where it's damp and shaded: most walls in shade have it at the top and the foot, walls in the
         // light seldom do (the bare edges are what keep it from reading as trim)
-        if (mossy || hash2(sd, 6.6) < 0.22) {
+        if (tall >= 1.4 ? mossy || hash2(sd, 6.6) < 0.15 : !mossy && hash2(sd, 6.6) < 0.3) {
           mossFoot(g, c, R, top, sb, u0, u1);
           // and along the foot of the squared-off wall below a rounded corner
           for (const [k, ua, ub] of [[R ? 1 : 3, 0, u0], [2, u1, 1]]) if (rc && rc[k] && ub - ua > 0.001 && Math.min(cornerBase(c, k), top) > sb + 0.01) mossFoot(g, c, R, top, sb, ua, ub);
@@ -2329,7 +2329,7 @@ function drawSideFaces(g, c, d, t) {
         const vs = x * 2.93 + y * 6.11 + (R ? 1.3 : 4.1), span = u1 - u0;
         const onW = (u, z) => R ? proj(x + 1, y + u, z) : proj(x + u, y + 1, z);
         // a drape of moss toward one end of the wall, an ivy sprig toward the other
-        const drape = mossy && SPRITE['moss-drape'] && hash2(vs, 6.3) < 0.3 && tall > 0.45 && span > 0.5, ivy = hash2(vs, 3.7) < 0.32 && tall > 0.6 ? ivyFor(vs) : null;
+        const drape = mossy && SPRITE['moss-drape'] && hash2(vs, 6.3) < 0.3 && tall > 1.4 && span > 0.5, ivy = !drape && hash2(vs, 3.7) < 0.25 && tall > 1.1 ? ivyFor(vs) : null;
         const side = hash2(vs, 2.7) < 0.5, uD = u0 + span * (side ? 0.3 : 0.7) + (hash2(vs, 2.2) - 0.5) * 0.12 * span;
         const uV = drape ? u0 + span * (side ? 0.78 : 0.22) : u0 + span * (0.2 + 0.6 * hash2(vs, 8.1));
         if (drape) hangDrape(g, R, onW(uD, top + 0.005), Math.min(span * 0.75, 0.42 + 0.2 * hash2(vs, 4.4)), Math.min(tall * 0.8, 0.38 + 0.4 * hash2(vs, 5.7)), hash2(vs, 7.9) < 0.5);
@@ -2522,7 +2522,7 @@ function drawCell(g, c, t, part) {
   texTop(g, c.icy ? 'ice' : c.h >= 1 ? 'stoneTop' : c.h < -0.01 ? 'dirt' : 'grass', z, big);
   if (c.h >= 1 && !c.icy && texOK) {
     g.fillStyle = blockTone(x, y); poly(g, big); g.fill();
-    if (SPRITE.lichen && hash2(x * 3.3 + 1.1, y * 2.7 + 4.4) < 0.3) lichenTop(g, z, big, 0.7);
+    if (SPRITE.lichen && hash2(x * 3.3 + 1.1, y * 2.7 + 4.4) < 0.15) lichenTop(g, z, big, 0.65);
   }
   // the neighbours across each top edge: AB, BC, CD, DA
   const nb = [cellI(x, y - 1), cellI(x + 1, y), cellI(x, y + 1), cellI(x - 1, y)], E = [[A, B], [B, C], [C, D], [D, A]];
@@ -3094,7 +3094,7 @@ function mossTop(g, c, z, top, drops) {
   g.save(); poly(g, top); g.clip();
   for (let i = 0; i < 4; i++) {
     if (!drops[i]) continue;
-    const dep = 0.2 + 0.12 * hash2(c.x * 3.1 + i, c.y * 5.7 + 1.3), UY = (H - LIP_EDGE) / dep;
+    const dep = 0.12 + 0.1 * hash2(c.x * 3.1 + i, c.y * 5.7 + 1.3), UY = (H - LIP_EDGE) / dep;
     const along = i === 0 || i === 2 ? [1, 0] : [0, 1], n = [-EDGE_D[i][0], -EDGE_D[i][1]];
     // a point on the edge line where the along-coordinate is 0, stepped out so the strip's dense edge lies on the edge
     const e = i === 0 ? [0, c.y] : i === 2 ? [0, c.y + 1] : i === 1 ? [c.x + 1, 0] : [c.x, 0];
