@@ -684,7 +684,7 @@ const wc = document.getElementById('world'), wg = wc.getContext('2d');
 // the sky on its own canvas behind the world's: repainted about 25 times a second, at no more than 1.25x resolution
 const skc = document.getElementById('sky'), skg = skc.getContext('2d', { alpha: false });
 const SKYP = { dpr: 1, last: -1e9 };
-const PACE = { last: 0, iv: 16.7, n: 0 };
+const PACE = { last: 0, iv: 16.7, n: 0, full: false, win: 0, wn: 0, probeAt: 0, backoff: 6000 };
 SKY_LAYER = wc;
 let DPR = 1;
 /* Quality steps, tried in turn when frames come too slowly (on phones, mostly): first the soft glow goes, then the
@@ -710,27 +710,58 @@ function debugFrame(now, renderMs) {
   if (!DBG.el) {
     DBG.el = document.createElement('div'); DBG.el.style.cssText = 'position:fixed;left:6px;bottom:6px;z-index:99;font:11px/1.35 monospace;color:#cfe;background:rgba(0,0,0,.6);padding:4px 6px;border-radius:4px;white-space:pre;cursor:pointer';
     document.body.appendChild(DBG.el);
-    // tapping the readout leaves out one part of the scene after another, to see what the phone spends its time on
-    const modes = ['all', 'particles', 'sky', 'water', 'vines', 'lights', 'land'];
+    // tapping the readout leaves out one part of the scene after another, to see what the phone spends its time on;
+    // holding it runs through them all by itself (about 3 s each) and lists what each one costs
     DBG.el.addEventListener('pointerdown', e => {
       e.stopPropagation(); e.preventDefault();
-      DBG.mode = ((DBG.mode || 0) + 1) % modes.length;
-      for (const k in DBGOFF) DBGOFF[k] = k === modes[DBG.mode];
-      DBG.n = 0; DBG.iv = 0; DBG.rd = 0; DBG.worst = 0; DBG.ops = 0; SKYP.last = -1e9;
+      clearTimeout(DBG.press); DBG.long = false;
+      DBG.press = setTimeout(() => { DBG.long = true; benchStart(); }, 650);
     });
-    // count the drawing calls made on the world's canvas
-    DBG.ops = 0;
-    for (const m of ['fill', 'stroke', 'drawImage', 'fillRect', 'clip', 'fillText']) { const f = wg[m]; wg[m] = function (...a) { DBG.ops++; return f.apply(this, a); }; }
+    DBG.el.addEventListener('pointerup', e => {
+      e.stopPropagation(); e.preventDefault(); clearTimeout(DBG.press);
+      if (DBG.long) return;
+      DBG.bench = null; DBG.mode = ((DBG.mode || 0) + 1) % DBG_MODES.length; dbgMode(DBG_MODES[DBG.mode]);
+    });
+    // count the drawing calls (and the clips among them) made on the world's canvas
+    DBG.ops = 0; DBG.clips = 0;
+    for (const m of ['fill', 'stroke', 'drawImage', 'fillRect', 'clip', 'fillText']) { const f = wg[m]; wg[m] = function (...a) { DBG.ops++; if (m === 'clip') DBG.clips++; return f.apply(this, a); }; }
   }
   const dt = DBG.last ? now - DBG.last : 0; DBG.last = now;
+  if (DBG.bench) { benchFrame(now, dt, renderMs); return; }
   DBG.n++; DBG.iv += dt; DBG.rd += renderMs; DBG.worst = Math.max(DBG.worst, dt);
   if (DBG.n < 30) return;
   const cached = typeof TC !== 'undefined' ? TC.map.size : 0, tiles = World.cells.filter(c => !c.void).length;
   const off = Object.keys(DBGOFF).find(k => DBGOFF[k]);
-  DBG.el.textContent = `v${GAME_VERSION}  ${off ? 'no ' + off : 'all on'}  ops ${Math.round(DBG.ops / DBG.n)}\n${(1000 / (DBG.iv / DBG.n)).toFixed(0)} fps  frame ${(DBG.iv / DBG.n).toFixed(1)}ms  worst ${DBG.worst.toFixed(0)}ms
-draw ${(DBG.rd / DBG.n).toFixed(1)}ms  quality ${qTier}  dpr ${DPR}
+  DBG.el.textContent = (DBG.table ? DBG.table + '\n' : '') + `v${GAME_VERSION}  ${off ? 'no ' + off : 'all on'}  ops ${Math.round(DBG.ops / DBG.n)}  clips ${Math.round(DBG.clips / DBG.n)}\n${(1000 / (DBG.iv / DBG.n)).toFixed(0)} fps  frame ${(DBG.iv / DBG.n).toFixed(1)}ms  worst ${DBG.worst.toFixed(0)}ms
+draw ${(DBG.rd / DBG.n).toFixed(1)}ms  quality ${qTier}  dpr ${DPR}  ${PACE.iv < 11 ? (PACE.full ? '120Hz' : '60 of 120Hz') : ''}
 tiles ${cached}/${tiles}  particles ${parts.length}`;
-  DBG.n = 0; DBG.iv = 0; DBG.rd = 0; DBG.worst = 0; DBG.ops = 0;
+  DBG.n = 0; DBG.iv = 0; DBG.rd = 0; DBG.worst = 0; DBG.ops = 0; DBG.clips = 0;
+}
+const DBG_MODES = ['all', 'particles', 'sky', 'water', 'vines', 'lights', 'land', 'world'];
+function dbgMode(m) {
+  for (const k in DBGOFF) DBGOFF[k] = k === m;
+  DBG.n = 0; DBG.iv = 0; DBG.rd = 0; DBG.worst = 0; DBG.ops = 0; DBG.clips = 0; SKYP.last = -1e9;
+}
+// the run-through: each part left out in turn, timed for 2 s after 1 s to settle, then the list stays on screen
+function benchStart() {
+  DBG.bench = { i: 0, t0: performance.now(), n: 0, iv: 0, rd: 0, ops: 0, rows: [] };
+  DBG.table = ''; dbgMode(DBG_MODES[0]);
+  DBG.el.textContent = 'timing each part… (about 25 s)';
+}
+function benchFrame(now, dt, renderMs) {
+  const B = DBG.bench, el = now - B.t0;
+  PERF.hold = Math.max(PERF.hold, now + 3000); // (the quality isn't changed while timing)
+  PACE.full = true; PACE.wn = 0; PACE.win = 0; // (and every refresh is drawn, so each part's real cost shows)
+  if (el > 1000) { B.n++; B.iv += dt; B.rd += renderMs; B.ops += DBG.ops; }
+  DBG.ops = 0; DBG.clips = 0;
+  if (el < 3000) return;
+  const m = DBG_MODES[B.i], fr = B.iv / Math.max(1, B.n);
+  B.rows.push(`${(m === 'all' ? 'all on' : 'no ' + m).padEnd(12)}${(1000 / fr).toFixed(0).padStart(3)} fps ${fr.toFixed(1).padStart(5)}ms  draw ${(B.rd / Math.max(1, B.n)).toFixed(1)}  ops ${Math.round(B.ops / Math.max(1, B.n))}`);
+  B.i++; B.t0 = now; B.n = 0; B.iv = 0; B.rd = 0; B.ops = 0;
+  DBG.el.textContent = B.rows.join('\n') + '\ntiming each part…';
+  if (B.i < DBG_MODES.length) { dbgMode(DBG_MODES[B.i]); return; }
+  DBG.table = `v${GAME_VERSION} q${qTier} dpr ${DPR}  ${Game.state} ${Game.idx}\n` + B.rows.join('\n');
+  DBG.bench = null; DBG.mode = 0; dbgMode('all'); PACE.probeAt = 0;
 }
 // called each frame: `drew` is whether the world was drawn this frame
 function perfWatch(now, drew) {
@@ -755,8 +786,8 @@ function resize() {
   BLOOM.on = Q.bloom;
   DPR = Math.min(Q.dpr, window.devicePixelRatio || 1);
   PARTICLE_CAP = qTier >= 2 ? 120 : qTier >= 1 ? 200 : 3000;
-  // phones paint fewer tiles into the cache per frame (each costs a few ms there)
-  TC_BUILDS = matchMedia('(pointer: coarse)').matches ? 2 : 8;
+  // phones spend less of a frame painting tiles into the cache
+  TC_BUDGET = matchMedia('(pointer: coarse)').matches ? 5 : 10;
   SKYP.dpr = Math.min(DPR, 1.25); SKYP.last = -1e9;
   skc.width = Math.round(innerWidth * SKYP.dpr); skc.height = Math.round(innerHeight * SKYP.dpr);
   wc.width = Math.round(innerWidth * DPR); wc.height = Math.round(innerHeight * DPR);
@@ -995,12 +1026,26 @@ function tick(now) {
   if (covered && Game.coverAt && !Game.released) { Game.released = true; releaseBuffers(); Grim.releaseLayers(); }
   if (!covered) Game.released = false;
   let r0 = 0;
-  // On a 120 Hz screen the world is drawn every other refresh (60 a second): a frame that can't be made in 8 ms
-  // otherwise drops Chrome to a steady 30. The world still steps every refresh, so motion keeps its pace.
+  // On a 120 Hz screen the world is drawn on every refresh while the phone keeps up; when it can't (a frame that
+  // misses 8 ms drops Chrome toward a ragged 30-60) it is drawn every other refresh, a steady 60, and full speed is
+  // tried again a while later (less often each time it fails). The world steps every refresh either way.
   const rdt = now - PACE.last; PACE.last = now;
-  if (rdt > 0 && rdt < 250) PACE.iv = PACE.iv * 0.95 + rdt * 0.05;
+  // (the screen's own rate is read while every other frame is skipped, when the refreshes come unhindered)
+  if (!PACE.full && rdt > 0 && rdt < 250) PACE.iv = PACE.iv * 0.95 + rdt * 0.05;
   PACE.n++;
-  const skipDraw = PACE.iv < 11 && PACE.n % 2 === 1;
+  let skipDraw = false;
+  if (PACE.iv < 11) {
+    if (PACE.full) {
+      if (rdt > 0 && rdt < 250) { PACE.win += rdt; PACE.wn++; }
+      if (PACE.wn >= 40) {
+        const avg = PACE.win / PACE.wn; PACE.win = 0; PACE.wn = 0;
+        if (avg > PACE.iv * 1.3) { PACE.full = false; PACE.probeAt = now + PACE.backoff; PACE.backoff = Math.min(PACE.backoff * 2, 60000); }
+      }
+    } else {
+      skipDraw = PACE.n % 2 === 1;
+      if (now > PACE.probeAt && !covered && !skipDraw) { PACE.full = true; PACE.win = 0; PACE.wn = 0; }
+    }
+  } else PACE.full = false;
   if (!covered && !skipDraw) {
     const k = WORLD_PAUSED.has(Game.state) ? 1 : acc / FIXED, held = [];
     if (k < 1) for (const b of World.bodies) {

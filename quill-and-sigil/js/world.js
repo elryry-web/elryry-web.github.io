@@ -1451,12 +1451,32 @@ function lightTop(g, c, z, quad) {
   for (const l of lightList()) {
     const dh = l.z - z; if (dh < -0.2) continue;
     const dx = c.x + 0.5 - l.x, dy = c.y + 0.5 - l.y; if (dx * dx + dy * dy > (l.r + 0.8) ** 2) continue;
-    if (!on) { g.save(); poly(g, quad); g.clip(); g.globalCompositeOperation = 'lighter'; on = true; }
+    if (!on) { g.save(); poly(g, quad); g.globalCompositeOperation = 'lighter'; on = true; }
     const [px, py] = proj(l.x, l.y, z), R = l.r * TW * 0.7071 * cam.s;
     g.globalAlpha = l.a * clamp(1.15 - dh / 3, 0.3, 1);
-    g.drawImage(lightSprite(l.col), px - R, py - R * 0.5, R * 2, R);
+    lightFill(g, l.col, px - R, py - R * 0.5, R * 2, R);
   }
   if (on) g.restore();
+}
+/* A pool of light laid on the face whose outline is the current path: the face is filled with the light's sprite as
+   a pattern (one fill). Clipping to the face and drawing the sprite inside it looks the same but costs a phone far
+   more: every clip to an outline is a mask the GPU must make first. The sprite sits in the middle of a canvas three
+   times its size, so even a browser that repeats the pattern puts no second pool anywhere near. */
+const lightPadCache = {};
+function lightPadded(col) {
+  if (lightPadCache[col]) return lightPadCache[col];
+  const c = document.createElement('canvas'); c.width = c.height = 384;
+  c.getContext('2d').drawImage(lightSprite(col), 128, 128);
+  return lightPadCache[col] = c;
+}
+function lightFill(g, col, x, y, w, h) {
+  if (!texOK) { g.save(); g.clip(); g.drawImage(lightSprite(col), x, y, w, h); g.restore(); return; }
+  let M = texPats.get(g); if (!M) texPats.set(g, M = {});
+  const S = lightPadded(col), key = 'light|' + col;
+  if (!M[key] || M[key].src !== S) M[key] = { src: S, p: g.createPattern(S, 'repeat') };
+  const P = M[key].p, a = w / 128, d = h / 128;
+  P.setTransform(new DOMMatrix([a, 0, 0, d, x - 128 * a, y - 128 * d]));
+  g.fillStyle = P; g.fill();
 }
 // and on a side face (R: the plane x = c.x + 1, L: the plane y = c.y + 1), lit only from in front of it
 function lightSide(g, c, R, za, zb, quad) {
@@ -1466,10 +1486,10 @@ function lightSide(g, c, R, za, zb, quad) {
     const d = R ? l.x - (c.x + 1) : l.y - (c.y + 1); if (d < 0.05 || d > l.r) continue;
     const u = R ? l.y - (c.y + 0.5) : l.x - (c.x + 0.5); if (Math.abs(u) > (l.r - d) * 1.2 + 0.55) continue;
     if (l.z < zb - 0.2) continue;
-    if (!on) { g.save(); poly(g, quad); g.clip(); g.globalCompositeOperation = 'lighter'; on = true; }
+    if (!on) { g.save(); poly(g, quad); g.globalCompositeOperation = 'lighter'; on = true; }
     const zc = clamp(l.z, zb, za), [px, py] = R ? proj(c.x + 1, l.y, zc) : proj(l.x, c.y + 1, zc), Rr = (l.r - d) * TW * 0.6 * cam.s;
     g.globalAlpha = l.a * 0.8;
-    g.drawImage(lightSprite(l.col), px - Rr, py - Rr, Rr * 2, Rr * 2);
+    lightFill(g, l.col, px - Rr, py - Rr, Rr * 2, Rr * 2);
   }
   if (on) g.restore();
 }
@@ -2516,7 +2536,7 @@ function drawCell(g, c, t, part) {
   const x = c.x, y = c.y, s = cam.s;
   const rc = stoneCorners(c), sj = stoneJoins(c, rc), sc = soilCorners(c);
   if (rc) for (let k = 0; k < 4; k++) if (rc[k]) cornerGround(g, c, k);
-  if (c.water != null && c.water > c.h && !c.ice && sheetsOn()) drawSheets(g, c, d, t, false);
+  if (c.water != null && c.water > c.h && !c.ice && sheetsOn() && WATER_PART !== 'still') drawSheets(g, c, d, t, false);
   drawSideFaces(g, c, d, t);
   const z = c.h;
   const A = proj(x, y, z), B = proj(x + 1, y, z), C = proj(x + 1, y + 1, z), D = proj(x, y + 1, z);
@@ -2654,7 +2674,7 @@ function drawCellTop(g, c, d, t) {
   const x = c.x, y = c.y, z = c.h, s = cam.s;
   if (texOK && !isPool(c)) landShoreWater(g, c, t);
   // water / ice
-  if (c.water != null && c.water > c.h) drawWater(g, c, d, t);
+  if (c.water != null && c.water > c.h) { if (WATER_PART === 'live') waterLive(g, c, t); else drawWater(g, c, d, t); }
   // features
   switch (c.feat) {
     case 'bramble': drawBramble(g, c, d, t); break;
@@ -2729,25 +2749,41 @@ function shoreAt(c, k, pc) {
   return null;
 }
 // the band of pale light along a curved shore, round centre (cx, cy) at radius r: inside it (the water within a
-// pool's rounded corner) or outside it (the water round a land tile's rounded corner); clipped to `clip`
+// pool's rounded corner) or outside it (the water round a land tile's rounded corner), filling the region `clip`
+// (the path is laid before the band's own squashed frame is set, so it stays where it is)
 function shoreBand(g, cx, cy, z, r, inside, clip) {
   const [px, py] = proj(cx, cy, z), K = TW * 0.7071 * cam.s, w = 0.2;
-  g.save(); poly(g, clip); g.clip(); g.translate(px, py); g.scale(1, 0.5);
+  g.save(); poly(g, clip); g.translate(px, py); g.scale(1, 0.5);
   const gr = inside ? g.createRadialGradient(0, 0, (r - w) * K, 0, 0, r * K) : g.createRadialGradient(0, 0, r * K, 0, 0, (r + w) * K);
   if (inside) { gr.addColorStop(0, 'rgba(200,238,255,0)'); gr.addColorStop(0.65, 'rgba(200,238,255,0.18)'); gr.addColorStop(1, 'rgba(230,248,255,0.55)'); }
   else { gr.addColorStop(0, 'rgba(230,248,255,0.55)'); gr.addColorStop(0.35, 'rgba(200,238,255,0.18)'); gr.addColorStop(1, 'rgba(200,238,255,0)'); }
-  const R = (r + w) * K; g.fillStyle = gr; g.fillRect(-R, -R, 2 * R, 2 * R);
+  g.fillStyle = gr; g.fill();
   g.restore();
 }
-// the painted water laid on a polygon P at height z, moving with the current fl, lit like a pool
+// the painted water laid on a polygon P at height z, moving with the current fl, lit like a pool.
+// WATER_PART 'still': only what holds still (painted into the tile cache); 'live': only what moves (over the cache)
+let WATER_PART = null;
 function waterSurface(g, c, P, z, fl, t) {
-  g.fillStyle = '#4b98d2'; poly(g, P); g.fill();
-  texTop(g, 'water', z, P);
-  const sp = fl ? fl.s * 0.35 : 0, ox = fl ? fl.x * t * sp : t * 0.05, oy = fl ? fl.y * t * sp : t * 0.03;
-  const gk = texSource('water').drawn ? 1 : 0.55;
-  texTop(g, 'ripple', z, P, (0.5 + 0.12 * Math.sin(t * 0.9)) * gk, ox, oy);
-  texTop(g, 'ripple', z, P, 0.3 * gk, -oy * 0.8 + 0.37, ox * 0.7 + 0.61);
-  lightTop(g, c, z, P);
+  if (WATER_PART !== 'live') { g.fillStyle = '#4b98d2'; poly(g, P); g.fill(); texTop(g, 'water', z, P); }
+  if (WATER_PART !== 'still') {
+    const sp = fl ? fl.s * 0.35 : 0, ox = fl ? fl.x * t * sp : t * 0.05, oy = fl ? fl.y * t * sp : t * 0.03;
+    const gk = texSource('water').drawn ? 1 : 0.55;
+    texTop(g, 'ripple', z, P, (0.5 + 0.12 * Math.sin(t * 0.9)) * gk, ox, oy);
+    texTop(g, 'ripple', z, P, 0.3 * gk, -oy * 0.8 + 0.37, ox * 0.7 + 0.61);
+  }
+  if (WATER_PART === 'live') { LIGHT_ONLY = 'moving'; try { lightTop(g, c, z, P); } finally { LIGHT_ONLY = null; } }
+  else lightTop(g, c, z, P);
+}
+// a still pool tile (no fall) is painted into the tile cache with its water; this is what moves on it, drawn over
+// (a tile at a fall too: its curtains are drawn live, the back ones before its bitmap, the front ones over it)
+const waterCached = c => texOK && !c.ice && (sheetsOn() || ![0, 1, 2, 3].some(k => pours(c, k)));
+function waterLive(g, c, t) {
+  const x = c.x, y = c.y, z = c.water, pc = poolCorners(c), wr = waterRound(c);
+  if (sheetsOn()) drawSheets(g, c, World.deco[y * World.W + x], t, true);
+  const rr = wr || pc ? [0, 1, 2, 3].map(k => Math.max(wr ? wr[k] : 0, pc ? pc[k] : 0)) : null;
+  const big = rr ? growPoly(roundedOutline(rr).map(([u, v]) => proj(x + u, y + v, z)), 0.6)
+    : growQuad([proj(x, y, z), proj(x + 1, y, z), proj(x + 1, y + 1, z), proj(x, y + 1, z)], 0.6);
+  waterSurface(g, c, big, z, c.flow, t);
 }
 // a land tile's jutting corners, filled with the water round them (drawn live, over its top)
 function landShoreWater(g, c, t) {
@@ -2757,7 +2793,7 @@ function landShoreWater(g, c, t) {
     const W = cellI(c.x + DIAGK[k][0], c.y + DIAGK[k][1]), z = W.water, A = cornerArc(c.x, c.y, k, lw[k]);
     const P = growPoly([[c.x + CORN[k][0], c.y + CORN[k][1]], ...A.pts].map(([u, v]) => proj(u, v, z)), 0.6);
     waterSurface(g, c, P, z, W.flow, t);
-    shoreBand(g, A.cx, A.cy, z, lw[k], false, P);
+    if (WATER_PART !== 'live') shoreBand(g, A.cx, A.cy, z, lw[k], false, P);
   }
 }
 const pours = (c, e) => { if (!c || c.void || c.ice || c.water == null || c.water <= c.h) return false; const n = cellI(c.x + EDGE_D[e][0], c.y + EDGE_D[e][1]); return !n || n.void; };
@@ -2961,7 +2997,7 @@ function drawWater(g, c, d, t) {
       if (Math.random() < 0.06) emit({ x: px + (R ? 0.25 : 0), y: py + (R ? 0 : 0.25), z: z - 1.4 - Math.random(), vx: R ? 0.15 : 0, vy: R ? 0 : 0.15, vz: -0.25, drag: 0.3, life: 2.2, size: 14, color: '#eef7ff', kind: 'smoke' });
     }
   }
-  if (!c.ice && sheetsOn()) drawSheets(g, c, d, t, true);
+  if (!c.ice && sheetsOn() && WATER_PART !== 'still') drawSheets(g, c, d, t, true);
   if (c.ice && texOK) {
     const big = growQuad([A, B, C, D], 0.6);
     g.fillStyle = '#cdeaf6'; poly(g, big); g.fill();
@@ -3005,8 +3041,10 @@ function drawWater(g, c, d, t) {
       g.restore();
       shores.forEach((sh, k) => {
         if (!sh) return;
+        // (round its own corner, the band lies in the quarter disc inside the curve; round a land tile's, in the square)
         const A2 = cornerArc(sh.X, sh.Y, sh.k, WATER_R);
-        g.save(); poly(g, big); g.clip(); shoreBand(g, A2.cx, A2.cy, z, WATER_R, sh.inside, sq(k)); g.restore();
+        const reg = sh.inside ? growPoly([[A2.cx, A2.cy], ...A2.pts].map(([u, v]) => proj(u, v, z)), 0.6) : sq(k);
+        shoreBand(g, A2.cx, A2.cy, z, WATER_R, sh.inside, reg);
       });
     }
     // behind each of its own rounded corners, the land fills in, level with the land beside it
@@ -3620,11 +3658,11 @@ const TC = { on: true, gkey: '', cells: null, map: new Map(), keys: [], skeys: [
 // tiles round it too; a change of surface (a hedge burning to ash, frost spreading) repaints only the tile itself.
 const cellStateKey = c => c.void ? 'v' : c.h.toFixed(3) + '|' + c.th + '|' + (c.water == null ? '' : c.water.toFixed(3)) + '|' + c.ice + '|' + c.icy;
 const cellSurfaceKey = c => c.void ? '' : c.frost + '|' + (c.wet || 0).toFixed(2) + '|' + (c.ash || 0).toFixed(2) + '|' + c.feat + '|' + c.burn;
-function tileCacheFrame() {
+function tileCacheFrame(t) {
   const D = typeof DPR !== 'undefined' ? DPR : 1;
   const gk = cam.s + '|' + cam.ox.toFixed(2) + '|' + cam.oy.toFixed(2) + '|' + D + '|' + Object.keys(SPRITE).length + '|' + TEX_VER + '|' + texOK + '|' + LIGHT_SIG
     + '|' + (XR ? [...XR.set].map(c => c.x + ',' + c.y).join(';') : '');
-  if (gk !== TC.gkey || TC.cells !== World.cells) { TC.gkey = gk; TC.cells = World.cells; for (const e of TC.map.values()) tileDrop(e); TC.map.clear(); TC.keys = []; TC.skeys = []; }
+  if (gk !== TC.gkey || TC.cells !== World.cells) { TC.gkey = gk; TC.cells = World.cells; for (const e of TC.map.values()) tileDrop(e); TC.map.clear(); TC.keys = []; TC.skeys = []; atlasReset(); TC.gkAt = frameNo; }
   const cs = World.cells;
   for (let i = 0; i < cs.length; i++) {
     const c = cs[i], k = cellStateKey(c), sk = cellSurfaceKey(c);
@@ -3636,17 +3674,57 @@ function tileCacheFrame() {
       tileDrop(TC.map.get(n)); TC.map.delete(n); TC.calm.set(n, frameNo);
     }
   }
+  // the tiles come to rest are painted now, before anything of this frame is drawn (painting into the atlas after
+  // drawing from it in the same frame would make the browser copy the whole atlas first). Not while the view is
+  // still moving (they'd be thrown away next frame), and only for a few ms a frame.
   TC.built = 0;
+  if (frameNo - (TC.gkAt ?? -99) < 3) return;
+  const t0 = performance.now();
+  for (const c of cs) {
+    if (c.void || TC.map.has(c) || !tileStill(c)) continue;
+    if (TC.built >= 2 && performance.now() - t0 > TC_BUDGET) break;
+    const h0 = HANG.length; buildTile(c, t); HANG.length = h0;
+  }
 }
+// whether a tile holds still enough to be laid from the cache
+const tileStill = c => TC.on && !(c.water != null && c.water > c.h && !waterCached(c)) && !(c.frost > 0) && !c.burn
+  && Math.abs(c.h - c.th) < 1e-3 && frameNo - (TC.calm.get(c) ?? -99) > 8;
+/* The tile bitmaps live side by side in a few big canvases (an atlas) rather than each in its own: a phone's GPU
+   then lays a run of them in one go instead of switching textures for every tile. Each tile takes a slot on a shelf
+   (slots of one size are reused as tiles are repainted), with a clear gutter round it so no neighbour bleeds in. */
+const ATL = { S: 2048, pages: [], free: new Map() };
+const ATL_MAX = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches ? 2 : 6;
+function atlasAlloc(w, h) {
+  const W = Math.ceil((w + 4) / 8) * 8, H = Math.ceil((h + 4) / 16) * 16, S = ATL.S;
+  if (W > S || H > S) return null;
+  const fl = ATL.free.get(W + 'x' + H); if (fl && fl.length) return fl.pop();
+  for (const p of ATL.pages) {
+    for (const sh of p.shelves) if (sh.h >= H && sh.h <= H + 32 && sh.x + W <= S) { const s = { p, x: sh.x, y: sh.y, W, H }; sh.x += W; return s; }
+    if (p.y + H <= S) { p.shelves.push({ y: p.y, h: H, x: W }); p.y += H; return { p, x: 0, y: p.y - H, W, H }; }
+  }
+  if (ATL.pages.length >= ATL_MAX) return null;
+  const cv = document.createElement('canvas'); cv.width = cv.height = S;
+  const p = { cv, g: cv.getContext('2d'), shelves: [{ y: 0, h: H, x: W }], y: H };
+  ATL.pages.push(p);
+  return { p, x: 0, y: 0, W, H };
+}
+function atlasFree(s) { const k = s.W + 'x' + s.H; let fl = ATL.free.get(k); if (!fl) ATL.free.set(k, fl = []); fl.push(s); }
+function atlasReset() { for (const p of ATL.pages) { p.shelves = []; p.y = 0; } ATL.free.clear(); }
+function atlasRelease() { for (const p of ATL.pages) { p.cv.width = 1; p.cv.height = 1; } ATL.pages = []; ATL.free.clear(); }
 // canvases let go by the cache, kept to be reused (fewer new canvases, and less for the browser to clear up)
 const TC_POOL = [];
-function tileDrop(e) { if (e && TC_POOL.length < 64) TC_POOL.push(e.cv); else if (e) { e.cv.width = 1; e.cv.height = 1; } }
+function tileDrop(e) {
+  if (!e) return;
+  if (e.slot) { atlasFree(e.slot); return; }
+  if (TC_POOL.length < 64) TC_POOL.push(e.cv); else { e.cv.width = 1; e.cv.height = 1; }
+}
 /* Lets go of the world's big drawing buffers (tile bitmaps, bloom, the see-through layer, the waterfall strips, the
    sky's glow layer) while a card hides the world: on phones the browser then has the memory to draw the card. Each
    is made again as it's next needed. */
 function releaseBuffers() {
-  for (const e of TC.map.values()) { e.cv.width = 1; e.cv.height = 1; }
+  for (const e of TC.map.values()) if (e.cv) { e.cv.width = 1; e.cv.height = 1; }
   for (const c of TC_POOL) { c.width = 1; c.height = 1; }
+  atlasRelease();
   TC_POOL.length = 0; TC.map.clear(); TC.keys = []; TC.gkey = '';
   for (const k of ['a', 'b']) if (BLOOM[k]) { BLOOM[k].width = 1; BLOOM[k].height = 1; }
   if (_xrC) { _xrC.width = 1; _xrC.height = 1; }
@@ -3660,10 +3738,27 @@ function buildTile(c, t) {
   const X0 = Math.floor((proj(c.x, c.y + 1, 0)[0] - 0.4 * TW * s) * D) / D, X1 = Math.ceil((proj(c.x + 1, c.y, 0)[0] + 0.4 * TW * s) * D) / D;
   const Y0 = Math.floor((proj(c.x, c.y, c.h)[1] - 26 * s - 4) * D) / D, Y1 = Math.ceil((proj(c.x + 1, c.y + 1, zLow)[1] + 18 * s + 4) * D) / D;
   const w = Math.round((X1 - X0) * D), h = Math.round((Y1 - Y0) * D); if (w < 1 || h < 1 || w * h > 4e6) return null;
-  const cv = TC_POOL.pop() || document.createElement('canvas'); cv.width = w; cv.height = h;
-  const lg = cv.getContext('2d'); lg.setTransform(D, 0, 0, D, -X0 * D, -Y0 * D);
-  const h0 = HANG.length; LIGHT_ONLY = 'still';
-  try { drawCell(lg, c, t, 'base'); } finally { LIGHT_ONLY = null; }
+  // a slot in the atlas (or, if it is full, a canvas of the tile's own), cleared and fenced off so nothing spills
+  const slot = atlasAlloc(w, h);
+  let lg, cv = null, src, sx = 0, sy = 0;
+  if (slot) {
+    lg = slot.p.g; src = slot.p.cv; sx = slot.x + 2; sy = slot.y + 2;
+    lg.save(); lg.setTransform(1, 0, 0, 1, 0, 0); lg.clearRect(slot.x, slot.y, slot.W, slot.H);
+    lg.beginPath(); lg.rect(sx, sy, w, h); lg.clip();
+    lg.setTransform(D, 0, 0, D, sx - X0 * D, sy - Y0 * D);
+  } else {
+    cv = src = TC_POOL.pop() || document.createElement('canvas'); cv.width = w; cv.height = h;
+    lg = cv.getContext('2d'); lg.save(); lg.setTransform(D, 0, 0, D, -X0 * D, -Y0 * D);
+  }
+  const h0 = HANG.length; LIGHT_ONLY = 'still'; WATER_PART = 'still';
+  try {
+    drawCell(lg, c, t, 'base');
+    // and what holds still of its water (a pool's, or the water round its jutting corners)
+    if (texOK) {
+      if (!isPool(c)) landShoreWater(lg, c, t);
+      if (c.water != null && c.water > c.h) drawWater(lg, c, World.deco[c.y * World.W + c.x], t);
+    }
+  } finally { LIGHT_ONLY = null; WATER_PART = null; }
   // a block standing in front of the goal has the soft window round the goal cut into its bitmap (see drawXray)
   const xr = XR && XR.set.has(c);
   if (xr) {
@@ -3673,8 +3768,11 @@ function buildTile(c, t) {
     lg.fillStyle = gr; lg.fillRect(XR.cx - XR.R, XR.cy - XR.R, XR.R * 2, XR.R * 2);
     lg.globalCompositeOperation = 'source-over';
   }
-  // (top: whether anything is drawn over it live: water at a jutting corner, or something standing on it)
-  const e = { cv, X0, Y0, w: w / D, h: h / D, hang: HANG.slice(h0), xr, top: !!(c.feat || landWaterCorners(c)) };
+  lg.restore();
+  // (top: whether anything is drawn over it live: water, or something standing on it)
+  const e = { cv, slot, src, sx, sy, sw: w, sh: h, X0, Y0, w: w / D, h: h / D, hang: HANG.slice(h0), xr,
+    top: !!(c.feat || landWaterCorners(c) || (c.water != null && c.water > c.h)),
+    sheets: c.water != null && c.water > c.h && sheetsOn() && [0, 1, 2, 3].some(k => pours(c, k)) };
   TC.map.set(c, e); TC.built++;
   return e;
 }
@@ -3704,25 +3802,25 @@ function tileLightsLive(g, c) {
   const radii = [0, 1, 2, 3].map(k => rc && rc[k] ? ROUND_R : sj && sj.jc[k] ? NOTCH_R : sc && sc[k] ? SOIL_R : lw && lw[k] ? WATER_R : 0);
   const big = rounded ? growPoly(roundedOutline(radii).map(([u, v]) => proj(x + u, y + v, z)), 0.6)
     : growQuad([proj(x, y, z), proj(x + 1, y, z), proj(x + 1, y + 1, z), proj(x, y + 1, z)], 0.6);
-  lightTop(g, c, z, big);
+  // (a pool's own top is under its water: the water takes the light, in waterLive)
+  if (!(c.water != null && c.water > c.h)) lightTop(g, c, z, big);
 }
 function drawTile(g, c, t) {
-  const still = TC.on && !(c.water != null && c.water > c.h) && !(c.frost > 0) && !c.burn && Math.abs(c.h - c.th) < 1e-3
-    && frameNo - (TC.calm.get(c) ?? -99) > 8;
-  let e = still ? TC.map.get(c) : null;
   if (DBGOFF.water && c.water != null && c.water > c.h) return;
-  if (still && !e && TC.built < TC_BUILDS) e = buildTile(c, t); // a few a frame, so settling never makes one long frame
-  else if (e) for (const v of e.hang) HANG.push(v);
+  const e = tileStill(c) ? TC.map.get(c) : null;
   if (!e) { if (XR && XR.set.has(c)) drawXray(g, c, t, XR); else drawCell(g, c, t); return; }
-  if (!DBGOFF.land) g.drawImage(e.cv, e.X0, e.Y0, e.w, e.h);
+  for (const v of e.hang) HANG.push(v);
+  // (a fall's curtains turned away from us go behind the tile)
+  if (e.sheets) drawSheets(g, c, World.deco[c.y * World.W + c.x], t, false);
+  if (!DBGOFF.land) g.drawImage(e.src, e.sx, e.sy, e.sw, e.sh, e.X0, e.Y0, e.w, e.h);
   if (!e.xr && !DBGOFF.lights) tileLights(g, c);
-  if (e.top) drawCell(g, c, t, 'top');
+  if (e.top) { WATER_PART = 'live'; try { drawCell(g, c, t, 'top'); } finally { WATER_PART = null; } }
 }
 /* Chrome on Android may wipe a page's canvases while it is in the background (or short of memory), leaving them
    blank: the painted textures, the tile bitmaps, every sprite made once and kept. So on coming back (and whenever
    the world canvas reports its context restored) all of them are let go and made again as they're next needed. */
 function refreshCanvases() {
-  for (const o of [glowCache, softCache, lightCache, shadeCache, charCache, litCache, ringCache, mossPadded]) for (const k in o) delete o[k];
+  for (const o of [glowCache, softCache, lightCache, lightPadCache, shadeCache, charCache, litCache, ringCache, mossPadded]) for (const k in o) delete o[k];
   for (const k in TEX_SRC) delete TEX_SRC[k];
   for (const k in TEX_IMAGES) { try { paintedTex(k, TEX_IMAGES[k]); } catch (e) { console.warn('texture', k, e); } }
   TEX_VER++;
@@ -3733,9 +3831,9 @@ function refreshCanvases() {
 }
 let frameNo = 0, SKY_LAYER = null, XR = null;
 // ?debug: parts of the scene left out, one at a time (tapping the readout cycles them)
-const DBGOFF = { particles: false, sky: false, water: false, vines: false, lights: false, land: false };
-// how many tiles may be painted into the cache in one frame (main.js lowers it on phones)
-let TC_BUILDS = 8;
+const DBGOFF = { particles: false, sky: false, water: false, vines: false, lights: false, land: false, world: false };
+// how long (ms) a frame may spend painting tiles into the cache (main.js lowers it on phones)
+let TC_BUDGET = 10;
 function render(g, w, h, t, overlay) {
   frameNo++;
   // the game's own canvas has its sky on a layer of its own behind it (main.js repaints that a little less often and
@@ -3743,11 +3841,11 @@ function render(g, w, h, t, overlay) {
   // still paint the sky in.
   if (SKY_LAYER && g.canvas === SKY_LAYER) { g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, g.canvas.width, g.canvas.height); g.restore(); }
   else drawSky(g, w, h, t);
-  if (!World.W) return;
+  if (!World.W || DBGOFF.world) return;
   easeCamera();
   gatherLights(t);
   XR = xrayFor();
-  tileCacheFrame();
+  tileCacheFrame(t);
   g.save();
   if (cam.shake > 0) g.translate((Math.random() - .5) * cam.shake * 14, (Math.random() - .5) * cam.shake * 10);
   // ordered draw list
