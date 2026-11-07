@@ -1786,7 +1786,7 @@ for (const k in TEX_ART) {
   if (typeof Image === 'undefined') break;
   const im = new Image();
   im.onload = () => { TEX_IMAGES[k] = im; try { paintedTex(k, im); } catch (e) { console.warn('texture', k, e); } };
-  im.src = `art/${TEX_ART[k].file}.jpg?v=3`;
+  im.src = `art/${TEX_ART[k].file}.jpg?v=4`;
 }
 let TEX_VER = 0;
 function paintedTex(k, im) {
@@ -2843,7 +2843,7 @@ function sheetRuns(c) {
 }
 // the painted fall, scrolling, as a strip one texture-repeat wide and as tall as the curtain (shared each frame by
 // every curtain of that height): the pool's blue and a bright crest over the lip, fading into mist far below
-const SHEET_PX = 64, _sheetC = {};
+const SHEET_PX = 96, _sheetC = {};
 let _sheetF = -1;
 function sheetPattern(g, hU, t) {
   // (the strip is painted afresh every other frame: the fall moves smoothly enough at that rate)
