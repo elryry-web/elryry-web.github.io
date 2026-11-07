@@ -1043,9 +1043,15 @@ const Grim = {
     if (this.cv.width !== Math.round(innerWidth * Math.min(2, window.devicePixelRatio || 1)) || !this.L || this.L.bw <= 0) this.resize();
     this.open = true; this.closing = false; this.cv.style.display = 'block';
     document.getElementById('pagebtns').style.display = 'flex';
-    this.bookDirty = true; this.inkDirty = true;
+    // (the page itself is painted again only when its lesson or the screen changes, not at every opening)
+    this.inkDirty = true;
     this.updateStatus();
     Sfx.play('page');
+  },
+  // while a card covers the game, the closed book's full-page layers are let go; show() lays them out afresh
+  releaseLayers() {
+    if (this.open || this.closing) return;
+    for (const c of [this.cv, this.book, this.inkLayer, this.glowLayer]) if (c) { c.width = 1; c.height = 1; }
   },
   hide() {
     this.closing = true; this.open = false;
@@ -1175,8 +1181,9 @@ const Grim = {
     g.clearRect(0, 0, innerWidth, innerHeight);
     // leather cover
     g.save();
-    g.shadowColor = 'rgba(0,0,0,0.6)'; g.shadowBlur = 40; g.shadowOffsetY = 16;
     const cvx = L.bx - 14, cvy = L.by - 12, cw = L.bw + 28, ch = L.bh + 24;
+    // its shadow: soft layers spreading out below it (a canvas blur this size is very slow on phones)
+    for (let k = 8; k >= 1; k--) { g.fillStyle = `rgba(0,0,0,${0.075})`; roundRect(g, cvx - k * 3, cvy + 16 - k * 2.5, cw + k * 6, ch + k * 5, 14 + k * 3); g.fill(); }
     const lg = g.createLinearGradient(cvx, cvy, cvx, cvy + ch);
     lg.addColorStop(0, '#4a2232'); lg.addColorStop(1, '#2a1020');
     g.fillStyle = lg; roundRect(g, cvx, cvy, cw, ch, 14); g.fill();
@@ -1392,7 +1399,15 @@ const Grim = {
     g.clearRect(0, 0, innerWidth, innerHeight);
     const A = this.draft.a;
     this.draft.strokes.forEach((st, i) => this.strokeInk(g, st.pts, A.roles[i] === 'stray' ? 'rgba(70,50,60,0.28)' : '#20142e'));
-    this.inkDirty = false; this.glowDirty = true;
+    this.inkDirty = false; this.glowDirty = true; this.inkVer = (this.inkVer || 0) + 1;
+  },
+  // a full-page layer drawn over just the drawing area (with a margin), where the ink can be
+  blitArea(g, src) {
+    const A = this.L.area, m = A.size * 0.12, x0 = Math.max(0, A.x - m), y0 = Math.max(0, A.y - m);
+    const x1 = Math.min(innerWidth, A.x + A.size + m), y1 = Math.min(innerHeight, A.y + A.size + m);
+    if (x1 <= x0 || y1 <= y0) return;
+    const kx = src.width / innerWidth, ky = src.height / innerHeight;
+    g.drawImage(src, x0 * kx, y0 * ky, (x1 - x0) * kx, (y1 - y0) * ky, x0, y0, x1 - x0, y1 - y0);
   },
   renderGlow(col) {
     // blurred at a third of the page's resolution (the glow is soft anyway, and a full-size blur stalls phones)
@@ -1428,8 +1443,6 @@ const Grim = {
     this.anim = clamp(this.anim + (this.open ? dt : -dt) / 0.32, 0, 1);
     if (!this.open && this.anim <= 0) {
       this.closing = false; this.cv.style.display = 'none';
-      // closed, its full-page layers are let go (on phones the memory is wanted elsewhere); show() lays them out afresh
-      for (const c of [this.cv, this.book, this.inkLayer, this.glowLayer]) if (c) { c.width = 1; c.height = 1; }
       return;
     }
     if (this.bookDirty) this.renderBook();
@@ -1465,7 +1478,9 @@ const Grim = {
       drawGlyph(g, this.ghost, cx, cy, r, 'rgba(140,90,40,0.45)', 2.5); g.restore();
     }
     // gilded beautification
-    const sp = D.seal ? buildSpell(this.draft, lessonRules()) : null;
+    // (read afresh only when the ink changes, not every frame)
+    if (this._spInk !== this.inkVer || this._spSeal !== D.seal) { this._sp = D.seal ? buildSpell(this.draft, lessonRules()) : null; this._spInk = this.inkVer; this._spSeal = D.seal; }
+    const sp = this._sp;
     if (D.seal) this.gild(g, D, sp, t);
     // ink
     const valid = sp && !sp.err;
@@ -1474,10 +1489,10 @@ const Grim = {
       if (this.glowDirty || this.glowCol !== sp.color) this.renderGlow(sp.color);
       const ga = g.globalAlpha;
       g.globalAlpha = ga * clamp(0.72 + Math.sin(t * 4) * 0.22 + this.flash, 0, 1);
-      g.drawImage(this.glowLayer, 0, 0, innerWidth, innerHeight);
+      this.blitArea(g, this.glowLayer);
       g.globalAlpha = ga;
     }
-    g.drawImage(this.inkLayer, 0, 0, innerWidth, innerHeight);
+    this.blitArea(g, this.inkLayer);
     if (this.live) this.strokeInk(g, this.live.pts, '#20142e');
     if (this.flash > 0) {
       this.flash = Math.max(0, this.flash - dt * 2.2);
@@ -1513,6 +1528,15 @@ const Grim = {
     }
     g.restore();
   },
+  gildRing(words, r) {
+    const dpr = this.dpr || 1, key = words + '|' + Math.round(r) + '|' + dpr;
+    if (this._ring && this._ring.key === key) return this._ring;
+    if (document.fonts && !document.fonts.check('600 9px Cinzel')) return null;
+    const R = r * 1.25, c = document.createElement('canvas'); c.width = c.height = Math.ceil(R * 2 * dpr);
+    const g = c.getContext('2d'); g.scale(dpr, dpr); g.fillStyle = hexA('#8a5a20', 0.55);
+    textOnCircle(g, words, R, R, r * 1.08, 0, Math.max(7, r * 0.075));
+    return (this._ring = { key, c, R });
+  },
   gild(g, D, sp, t) {
     const A = this.L.area, S = D.seal;
     const cx = A.cx + S.cx * A.half, cy = A.cy + S.cy * A.half, r = S.r * A.half;
@@ -1530,7 +1554,9 @@ const Grim = {
     }
     g.fillStyle = hexA('#8a5a20', 0.55);
     const words = D.sigil && D.sigil.ok ? SIGILS[D.sigil.id].words : 'SIGILLVM · SIGNVM · ';
-    textOnCircle(g, words, cx, cy, r * 1.08, t * 0.08, Math.max(7, r * 0.075));
+    const ring = this.gildRing(words, r);
+    if (ring) { g.save(); g.translate(cx, cy); g.rotate(t * 0.08); g.drawImage(ring.c, -ring.R, -ring.R, ring.R * 2, ring.R * 2); g.restore(); }
+    else textOnCircle(g, words, cx, cy, r * 1.08, t * 0.08, Math.max(7, r * 0.075));
     if (D.sigil && D.sigil.ok) {
       g.globalAlpha = 0.5;
       drawGlyph(g, D.sigil.id, cx, cy, r * 0.62, hexA(col, 0.9), 6);

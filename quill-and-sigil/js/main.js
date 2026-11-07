@@ -448,7 +448,7 @@ const Game = {
   openGrimoire() {
     if (this.state !== 'play' || this.dry()) return;
     Sfx.init();
-    this.state = 'draw'; Grim.bookDirty = true; Grim.show();
+    this.state = 'draw'; Grim.show();
     $('#bGrimoire').classList.add('hidden');
   },
   closeGrimoire() {
@@ -966,7 +966,7 @@ function tick(now) {
   // (and likewise while the grimoire lies open over it: the world is paused then anyway)
   const covered = (Game.coverAt && now - Game.coverAt > 700) || (Grim.open && Grim.anim >= 1);
   // under a card, the world's buffers are let go too, so the phone has the memory to draw the card whole
-  if (covered && Game.coverAt && !Game.released) { Game.released = true; releaseBuffers(); }
+  if (covered && Game.coverAt && !Game.released) { Game.released = true; releaseBuffers(); Grim.releaseLayers(); }
   if (!covered) Game.released = false;
   let r0 = 0;
   if (!covered) {
