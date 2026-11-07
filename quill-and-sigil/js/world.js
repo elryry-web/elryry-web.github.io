@@ -1324,20 +1324,43 @@ function drawSkyMoving(g, w, h, t, m, painted) {
   g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
 }
 
-function fitCamera(vw, vh, pads) {
+// the land's extent on screen at scale 1 (blocks counted at the height they are rising to)
+function landBox() {
+  let minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9;
+  for (const c of World.cells) {
+    if (c.void) continue;
+    const u = c.x - c.y, v = c.x + c.y;
+    minX = Math.min(minX, (u - 1) * TW / 2); maxX = Math.max(maxX, (u + 1) * TW / 2);
+    minY = Math.min(minY, v * TH / 2 - (Math.max(c.h, c.th || 0) + featH(c)) * TZ - 20);
+    maxY = Math.max(maxY, (v + 2) * TH / 2 + 2 * TZ);
+  }
+  if (minX > maxX) return [-World.H * TW / 2, World.W * TW / 2, -20, (World.W + World.H) * TH / 2 + 2 * TZ];
+  return [minX, maxX, minY, maxY];
+}
+function fitCamera(vw, vh, pads, grow) {
   if (!World.W) return;
+  if (!grow) cam.fit = [vw, vh, pads], cam.goal = null;
   if (!pads && World.level && World.level.name === 'Title') pads = [vh * 0.4, 10];
-  let maxH = 0; for (const c of World.cells) if (!c.void) maxH = Math.max(maxH, c.h + featH(c));
-  const minX = -World.H * TW / 2, maxX = World.W * TW / 2;
-  const minY = -maxH * TZ - 20, maxY = (World.W + World.H) * TH / 2 + 2 * TZ;
+  const [minX, maxX, minY, maxY] = landBox();
   // short screens (a phone held sideways) keep the HUD tight to the edges; narrow ones stack it above the land
   const short = vh < 500 && vw > vh;
   const topPad = pads ? pads[0] : short ? 58 : vw < 520 ? 185 : vw < 700 ? 150 : 120;
   const botPad = pads ? pads[1] : short ? 70 : 110;
-  const s = clamp(Math.min((vw - 60) / (maxX - minX), (vh - topPad - botPad) / (maxY - minY)), 0.25, 1.9);
-  cam.s = s;
-  cam.ox = vw / 2 - (minX + maxX) / 2 * s;
-  cam.oy = topPad + (vh - topPad - botPad) / 2 - (minY + maxY) / 2 * s;
+  const side = vw < 520 ? 36 : 60;
+  const s = clamp(Math.min((vw - side) / (maxX - minX), (vh - topPad - botPad) / (maxY - minY)), 0.25, 1.9);
+  const ox = vw / 2 - (minX + maxX) / 2 * s, oy = topPad + (vh - topPad - botPad) / 2 - (minY + maxY) / 2 * s;
+  if (!grow) { cam.s = s; cam.ox = ox; cam.oy = oy; return; }
+  // during play the view only ever widens, gently, when land has risen beyond it
+  const C = cam.goal || cam, out = C.ox + minX * C.s < side * 0.25 || C.ox + maxX * C.s > vw - side * 0.25
+    || C.oy + minY * C.s < topPad * 0.5 || C.oy + maxY * C.s > vh - botPad * 0.4;
+  if (out && s < C.s + 1e-3) cam.goal = { s, ox, oy };
+}
+function easeCamera() {
+  if (cam.fit && frameNo % 20 === 0) fitCamera(cam.fit[0], cam.fit[1], cam.fit[2], true);
+  const G = cam.goal; if (!G) return;
+  const k = 0.07;
+  cam.s += (G.s - cam.s) * k; cam.ox += (G.ox - cam.ox) * k; cam.oy += (G.oy - cam.oy) * k;
+  if (Math.abs(G.s - cam.s) < 1e-4 && Math.abs(G.ox - cam.ox) < 0.3 && Math.abs(G.oy - cam.oy) < 0.3) { cam.s = G.s; cam.ox = G.ox; cam.oy = G.oy; cam.goal = null; }
 }
 
 function growQuad(q, px) {
@@ -1408,7 +1431,9 @@ function gatherLights(t) {
   LIGHTS = L.slice(0, 10);
 }
 // pools of light on a top face at height z (corners A..D already projected)
+let NO_LIGHT = false;
 function lightTop(g, c, z, quad) {
+  if (NO_LIGHT) return;
   let on = false;
   for (const l of LIGHTS) {
     const dh = l.z - z; if (dh < -0.2) continue;
@@ -1422,6 +1447,7 @@ function lightTop(g, c, z, quad) {
 }
 // and on a side face (R: the plane x = c.x + 1, L: the plane y = c.y + 1), lit only from in front of it
 function lightSide(g, c, R, za, zb, quad) {
+  if (NO_LIGHT) return;
   let on = false;
   for (const l of LIGHTS) {
     const d = R ? l.x - (c.x + 1) : l.y - (c.y + 1); if (d < 0.05 || d > l.r) continue;
@@ -1715,7 +1741,9 @@ for (const k in TEX_ART) {
   im.onload = () => { try { paintedTex(k, im); } catch (e) { console.warn('texture', k, e); } };
   im.src = `art/${TEX_ART[k].file}.jpg?v=3`;
 }
+let TEX_VER = 0;
 function paintedTex(k, im) {
+  TEX_VER++;
   const span = TEX_ART[k].span, W = im.naturalWidth, H = im.naturalHeight, U = W / span;
   const mk = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
   if (k === 'grass' || k === 'water' || k === 'ice' || k === 'fall' || k === 'wood' || k === 'runestone') TEX_SRC[k] = { c: im, u: U };
@@ -2162,6 +2190,7 @@ function drawSideFaces(g, c, d, t) {
       if (!texOK) { g.fillStyle = R ? '#4f6a32' : '#62803c'; poly(g, faceS(top, Math.max(sb, top - 0.1))); g.fill(); }
       else {
         const sd = x * 3.7 + y * 5.3 + (R ? 0 : 9), lip = Math.max(sb, top - 0.04);
+        if (!mossLip(g, c, R, top, sb, u0, u1)) {
         g.fillStyle = R ? '#56743a' : '#6a8a44'; poly(g, faceS(top, lip)); g.fill();
         for (let k = 0; k < 5; k++) {
           if (hash2(sd + k, 2.3) < 0.35) continue;
@@ -2174,11 +2203,15 @@ function drawSideFaces(g, c, d, t) {
           g.closePath(); g.fill();
         }
         g.fillStyle = 'rgba(190,215,130,0.35)'; poly(g, faceS(top, Math.max(sb, top - 0.015))); g.fill();
-        const vs = x * 2.93 + y * 6.11 + (R ? 1.3 : 4.1);
-        if (SPRITE['vine-leafy'] && hash2(vs, 3.7) < 0.16 && top - sb > 0.6) {
-          const u = u0 + (u1 - u0) * (0.2 + 0.6 * hash2(vs, 8.1));
-          hangVine(g, SPRITE['vine-leafy'], R ? proj(x + 1, y + u, top - 0.02) : proj(x + u, y + 1, top - 0.02), (top - sb) * (0.55 + 0.3 * hash2(vs, 9.2)), t, vs * 5, hash2(vs, 1.9) < 0.5);
         }
+        const vs = x * 2.93 + y * 6.11 + (R ? 1.3 : 4.1), span = u1 - u0, tall = top - sb;
+        const onW = (u, z) => R ? proj(x + 1, y + u, z) : proj(x + u, y + 1, z);
+        // a drape of moss toward one end of the wall, an ivy sprig toward the other
+        const drape = SPRITE['moss-drape'] && hash2(vs, 6.3) < 0.26 && tall > 0.45 && span > 0.5, ivy = hash2(vs, 3.7) < 0.32 && tall > 0.6 ? ivyFor(vs) : null;
+        const side = hash2(vs, 2.7) < 0.5, uD = u0 + span * (side ? 0.3 : 0.7) + (hash2(vs, 2.2) - 0.5) * 0.12 * span;
+        const uV = drape ? u0 + span * (side ? 0.78 : 0.22) : u0 + span * (0.2 + 0.6 * hash2(vs, 8.1));
+        if (drape) hangDrape(g, R, onW(uD, top + 0.005), Math.min(span * 0.75, 0.42 + 0.2 * hash2(vs, 4.4)), Math.min(tall * 0.8, 0.38 + 0.4 * hash2(vs, 5.7)), hash2(vs, 7.9) < 0.5);
+        if (ivy) hangVine(g, ivy, onW(uV, top - 0.02), tall * (0.5 + 0.35 * hash2(vs, 9.2)), t, vs * 5, hash2(vs, 1.9) < 0.5);
       }
     }
     // the earth beneath
@@ -2224,9 +2257,13 @@ function drawSideFaces(g, c, d, t) {
           if (hash2(sd + k * 3.3, 1.7) > (k ? 0.22 : 0.5)) continue;
           const kind = k ? 2 : hash2(sd, 2.9) < 0.38 ? 0 : hash2(sd, 2.9) < 0.68 ? 1 : 2;
           const u = su0 + (su1 - su0) * (0.18 + 0.64 * hash2(sd + k, 4.4));
-          const im = SPRITE[['vine-leafy', 'vine-moss', 'vine-roots'][kind]];
+          const im = kind === 0 ? ivyFor(sd + k * 0.7) || SPRITE['vine-leafy'] : SPRITE[['vine-leafy', 'vine-moss', 'vine-roots'][kind]];
           const zt = kind === 2 ? bot + 0.18 : st - 0.07, len = [1.9 + 1.2 * hash2(sd, 5.5), 1.5 + 1.0 * hash2(sd, 5.5), 1.1 + 0.6 * hash2(sd + k, 5.5)][kind];
           HANG.push({ k: x + y, im, p: R ? proj(x + 1, y + u, zt) : proj(x + u, y + 1, zt), len, ph: sd * 3 + k, flip: hash2(sd, 6.6) < 0.5 });
+        }
+        if (SPRITE['moss-drape'] && hash2(sd, 8.8) < 0.2 && su1 - su0 > 0.5) {
+          const u = su0 + (su1 - su0) * (0.3 + 0.4 * hash2(sd, 3.9));
+          HANG.push({ k: x + y, drape: true, R, p: R ? proj(x + 1, y + u, st - 0.05) : proj(x + u, y + 1, st - 0.05), wU: 0.45 + 0.2 * hash2(sd, 7.1), hZ: 0.55 + 0.45 * hash2(sd, 2.4), flip: hash2(sd, 5.2) < 0.5 });
         }
       } else if (toVoid && c.h >= 0) {
         // a root or a mossy vine now and then, hanging from the soil over the rock: thick where it leaves the earth,
@@ -2341,8 +2378,9 @@ function edgeBands(g, x, y, z, on, diag, w, stops) {
   g.restore();
 }
 const DIAG = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
-function drawCell(g, c, t) {
+function drawCell(g, c, t, part) {
   const d = World.deco[c.y * World.W + c.x];
+  if (part === 'top') { drawCellTop(g, c, d, t); return; }
   const x = c.x, y = c.y, s = cam.s;
   const rc = stoneCorners(c), sj = stoneJoins(c, rc), sc = soilCorners(c);
   if (rc) for (let k = 0; k < 4; k++) if (rc[k]) cornerGround(g, c, k);
@@ -2458,6 +2496,11 @@ function drawCell(g, c, t) {
     g.strokeStyle = `rgba(255,255,255,${0.7 * c.frost})`; g.lineWidth = 1;
     for (const k of d.cracks) { const p = proj(x + k.u, y + k.v, z); const r = (2 + Math.sin(t * 3 + k.a * 5) * 1.5) * s; g.beginPath(); g.moveTo(p[0] - r, p[1]); g.lineTo(p[0] + r, p[1]); g.moveTo(p[0], p[1] - r); g.lineTo(p[0], p[1] + r); g.stroke(); }
   }
+  if (part !== 'base') drawCellTop(g, c, d, t);
+}
+// what moves on a tile: its water, and whatever stands on it
+function drawCellTop(g, c, d, t) {
+  const x = c.x, y = c.y, z = c.h, s = cam.s;
   // water / ice
   if (c.water != null && c.water > c.h) drawWater(g, c, d, t);
   // features
@@ -2739,15 +2782,54 @@ function drawWater(g, c, d, t) {
 /* Painted props (art/*.png, cut out from the storybook paintings). Each is drawn standing on its tile; until
    one loads, the drawn version stands in. */
 const SPRITE = {};
-for (const k of ['bramble1', 'bramble2', 'bramble3', 'brazier', 'goal', 'vine-leafy', 'vine-moss', 'vine-roots']) {
+for (const k of ['bramble1', 'bramble2', 'bramble3', 'brazier', 'goal', 'vine-leafy', 'vine-moss', 'vine-roots', 'ivy1', 'ivy2', 'ivy3', 'moss-drape', 'moss-lip']) {
   if (typeof Image === 'undefined') break;
-  const im = new Image(); im.onload = () => { SPRITE[k] = im; }; im.src = `art/${k}.png?v=5`;
+  const im = new Image(); im.onload = () => { SPRITE[k] = im; }; im.src = `art/${k}.png?v=6`;
+}
+// a painting darkened to sit on a wall in shade (made once each)
+const shadeCache = {};
+function shadedSprite(k, f) {
+  const im = SPRITE[k]; if (!im) return null;
+  const key = k + '|' + f; if (shadeCache[key]) return shadeCache[key];
+  const c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight;
+  const g = c.getContext('2d'); g.drawImage(im, 0, 0);
+  g.globalCompositeOperation = 'source-atop'; g.fillStyle = `rgba(18,16,30,${f})`; g.fillRect(0, 0, c.width, c.height);
+  return (shadeCache[key] = c);
+}
+// the climbing plants a wall may wear: the leafy vine and the three ivy sprigs
+function ivyFor(seed) {
+  const all = ['vine-leafy', 'ivy1', 'ivy2', 'ivy3'].filter(k => SPRITE[k]);
+  return all.length ? SPRITE[all[Math.floor(hash2(seed, 1.13) * all.length)]] : null;
+}
+/* Moss along a stone block's top edge: the painted strip, repeating along the wall (by u = x - y, so it runs on
+   unbroken from block to block), its dense band just at the edge and its drips hanging down the stone. */
+const lipPats = new WeakMap(), LIP_EDGE = 36;
+function mossLip(g, c, R, top, sb, u0, u1) {
+  const src = R ? shadedSprite('moss-lip', 0.32) : SPRITE['moss-lip']; if (!src) return false;
+  let m = lipPats.get(g); if (!m) lipPats.set(g, m = {});
+  const P = m[R ? 'R' : 'L'] || (m[R ? 'R' : 'L'] = g.createPattern(src, 'repeat-x')); if (!P) return false;
+  const W = src.width, H = src.height, hz = Math.min(0.72, (top - sb) * 0.7), UX = W / 1.5, UY = H / hz, s = cam.s;
+  const pc = R ? c.x + 1 : c.y + 1, z0 = top + LIP_EDGE / UY, o = proj(pc, pc, z0), sl = R ? -TH * 0.5 : TH * 0.5;
+  P.setTransform(new DOMMatrix([TW * 0.5 * s / UX, sl * s / UX, 0, TZ * s / UY, o[0], o[1]]));
+  const at = (u, z) => R ? proj(c.x + 1, c.y + u, z) : proj(c.x + u, c.y + 1, z), zb = Math.max(sb, z0 - hz - 0.02);
+  g.fillStyle = P; poly(g, [at(u0, top), at(u1, top), at(u1, zb), at(u0, zb)]); g.fill();
+  return true;
+}
+// a drape of moss hanging from a wall's top edge at p: wU wide along the edge, hZ tall, sheared to lie on the wall
+function hangDrape(g, R, p, wU, hZ, flip) {
+  const im = R ? shadedSprite('moss-drape', 0.32) : SPRITE['moss-drape']; if (!im) return;
+  const W = im.width, H = im.height, s = cam.s, f = flip ? -1 : 1;
+  const ax = TW * 0.5 * s * wU / W, ay = (R ? -TH : TH) * 0.5 * s * wU / W;
+  g.save(); g.transform(ax * f, ay * f, 0, hZ * TZ * s / H, p[0], p[1]); g.drawImage(im, -W / 2, -H * 0.02); g.restore();
 }
 // vines waiting to be hung, in drawing order; each is drawn once the row of tiles after its own is down
 const HANG = [];
 let hangAt = 0;
 function flushHang(g, t, upTo) {
-  while (hangAt < HANG.length && HANG[hangAt].k <= upTo) { const v = HANG[hangAt++]; hangVine(g, v.im, v.p, v.len, t, v.ph, v.flip); }
+  while (hangAt < HANG.length && HANG[hangAt].k <= upTo) {
+    const v = HANG[hangAt++];
+    if (v.drape) hangDrape(g, v.R, v.p, v.wU, v.hZ, v.flip); else hangVine(g, v.im, v.p, v.len, t, v.ph, v.flip);
+  }
   if (hangAt >= HANG.length) { HANG.length = 0; hangAt = 0; }
 }
 // a painted vine hanging from a point on a wall, `len` world units long, swaying a little from where it hangs
@@ -3157,11 +3239,81 @@ function drawXray(g, c, t, xr) {
   g.drawImage(_xrC, dx0, dy0, dx1 - dx0, dy1 - dy0, dx0, dy0, dx1 - dx0, dy1 - dy0);
   g.restore();
 }
+/* The tile cache. Most of the land holds still from frame to frame, yet painting a tile (its textured top, walls,
+   soil, rock, moss and vines) takes dozens of fills. So a still tile is painted once into a small bitmap of its own
+   and laid down from it each frame; its light, its water and whatever stands on it are still drawn live over it.
+   A tile is painted afresh when it or a tile near it changes (once things settle), or the view moves or rescales. */
+const TC = { on: true, gkey: '', cells: null, map: new Map(), keys: [], calm: new Map() };
+const cellStateKey = c => c.void ? 'v' : c.h.toFixed(3) + '|' + c.th + '|' + c.water + '|' + c.ice + '|' + c.icy + '|' + c.frost + '|' +
+  (c.wet || 0).toFixed(2) + '|' + (c.ash || 0).toFixed(2) + '|' + c.feat + '|' + c.burn;
+function tileCacheFrame() {
+  const D = typeof DPR !== 'undefined' ? DPR : 1;
+  const gk = cam.s + '|' + cam.ox.toFixed(2) + '|' + cam.oy.toFixed(2) + '|' + D + '|' + Object.keys(SPRITE).length + '|' + TEX_VER + '|' + texOK;
+  if (gk !== TC.gkey || TC.cells !== World.cells) { TC.gkey = gk; TC.cells = World.cells; TC.map.clear(); TC.keys = []; }
+  const cs = World.cells;
+  for (let i = 0; i < cs.length; i++) {
+    const c = cs[i], k = cellStateKey(c);
+    if (TC.keys[i] === k) continue;
+    TC.keys[i] = k;
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+      const n = cellI(c.x + dx, c.y + dy); if (!n) continue;
+      TC.map.delete(n); TC.calm.set(n, frameNo);
+    }
+  }
+  TC.built = 0;
+}
+function buildTile(c, t) {
+  const s = cam.s, D = typeof DPR !== 'undefined' ? DPR : 1;
+  let zLow = c.h;
+  for (const R of [true, false]) { const n = R ? cellI(c.x + 1, c.y) : cellI(c.x, c.y + 1); zLow = Math.min(zLow, !n || n.void ? ROCK_FLOOR - 0.4 : n.h); }
+  const X0 = Math.floor((proj(c.x, c.y + 1, 0)[0] - 0.4 * TW * s) * D) / D, X1 = Math.ceil((proj(c.x + 1, c.y, 0)[0] + 0.4 * TW * s) * D) / D;
+  const Y0 = Math.floor((proj(c.x, c.y, c.h)[1] - 26 * s - 4) * D) / D, Y1 = Math.ceil((proj(c.x + 1, c.y + 1, zLow)[1] + 18 * s + 4) * D) / D;
+  const w = Math.round((X1 - X0) * D), h = Math.round((Y1 - Y0) * D); if (w < 1 || h < 1 || w * h > 4e6) return null;
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const lg = cv.getContext('2d'); lg.setTransform(D, 0, 0, D, -X0 * D, -Y0 * D);
+  const h0 = HANG.length; NO_LIGHT = true;
+  try { drawCell(lg, c, t, 'base'); } finally { NO_LIGHT = false; }
+  const e = { cv, X0, Y0, w: w / D, h: h / D, hang: HANG.slice(h0) };
+  TC.map.set(c, e); TC.built++;
+  return e;
+}
+// the light falling on a tile laid from its bitmap: on its two walls in view, then its top (as drawCell lights them)
+function tileLights(g, c) {
+  let near = false;
+  for (const l of LIGHTS) { const dx = c.x + 0.5 - l.x, dy = c.y + 0.5 - l.y; if (dx * dx + dy * dy < (l.r + 1.2) ** 2) { near = true; break; } }
+  if (!near) return;
+  const x = c.x, y = c.y, z = c.h;
+  for (const R of [true, false]) {
+    if (c.icy) continue;
+    const n = R ? cellI(x + 1, y) : cellI(x, y + 1), bot = !n || n.void ? soilBot(c) : n.h;
+    if (bot >= z - 0.001) continue;
+    lightSide(g, c, R, z, bot, R ? [proj(x + 1, y, z), proj(x + 1, y + 1, z), proj(x + 1, y + 1, bot), proj(x + 1, y, bot)]
+      : [proj(x, y + 1, z), proj(x + 1, y + 1, z), proj(x + 1, y + 1, bot), proj(x, y + 1, bot)]);
+  }
+  const rc = stoneCorners(c), sj = stoneJoins(c, rc), sc = soilCorners(c), rounded = rc || sj || sc;
+  const radii = [0, 1, 2, 3].map(k => rc && rc[k] ? ROUND_R : sj && sj.jc[k] ? NOTCH_R : sc && sc[k] ? SOIL_R : 0);
+  const big = rounded ? growPoly(roundedOutline(radii).map(([u, v]) => proj(x + u, y + v, z)), 0.6)
+    : growQuad([proj(x, y, z), proj(x + 1, y, z), proj(x + 1, y + 1, z), proj(x, y + 1, z)], 0.6);
+  lightTop(g, c, z, big);
+}
+function drawTile(g, c, t) {
+  const still = TC.on && !(c.water != null && c.water > c.h) && !(c.frost > 0) && !c.burn && Math.abs(c.h - c.th) < 1e-3
+    && frameNo - (TC.calm.get(c) ?? -99) > 8;
+  let e = still ? TC.map.get(c) : null;
+  if (still && !e && TC.built < 40) e = buildTile(c, t);
+  else if (e) for (const v of e.hang) HANG.push(v);
+  if (!e) { drawCell(g, c, t); return; }
+  g.drawImage(e.cv, e.X0, e.Y0, e.w, e.h);
+  tileLights(g, c);
+  drawCell(g, c, t, 'top');
+}
 let frameNo = 0;
 function render(g, w, h, t, overlay) {
   frameNo++;
   drawSky(g, w, h, t);
   if (!World.W) return;
+  easeCamera();
+  tileCacheFrame();
   gatherLights(t);
   g.save();
   if (cam.shake > 0) g.translate((Math.random() - .5) * cam.shake * 14, (Math.random() - .5) * cam.shake * 10);
@@ -3179,7 +3331,7 @@ function render(g, w, h, t, overlay) {
   const xr = xrayFor();
   for (const it of items) {
     if (hangAt < HANG.length) flushHang(g, t, it.k - 2);
-    if (it.c) { if (xr && xr.set.has(it.c)) drawXray(g, it.c, t, xr); else drawCell(g, it.c, t); }
+    if (it.c) { if (xr && xr.set.has(it.c)) drawXray(g, it.c, t, xr); else drawTile(g, it.c, t); }
     else drawBody(g, it.b, t);
   }
   flushHang(g, t, Infinity);

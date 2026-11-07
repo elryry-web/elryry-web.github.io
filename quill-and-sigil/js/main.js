@@ -372,6 +372,7 @@ const Game = {
 
   showScreen(id) {
     for (const el of document.querySelectorAll('.screen,.card')) el.classList.toggle('show', el.id === id);
+    this.coverAt = id === 'win' || id === 'note' ? performance.now() : 0;
   },
   title() {
     this.state = 'title'; this.level = null;
@@ -681,8 +682,33 @@ function aimOverlay(g, t) {
 /* ---------------- Boot ---------------- */
 const wc = document.getElementById('world'), wg = wc.getContext('2d');
 let DPR = 1;
+/* Quality steps, tried in turn when frames come too slowly (on phones, mostly): first the soft glow goes, then the
+   world is drawn at a lower resolution. The step reached is remembered for next time. */
+const QUALITY = [{ dpr: 2, bloom: true }, { dpr: 2, bloom: false }, { dpr: 1.5, bloom: false }, { dpr: 1.25, bloom: false }];
+let qTier = 0;
+try { qTier = clamp(Math.round(+localStorage.getItem('quillsigil.quality') || 0), 0, QUALITY.length - 1); } catch (e) { }
+const PERF = { n: 0, sum: 0, last: 0, hold: 0, good: 0, probed: false, fellFrom: -1 };
+function setQuality(k, now) {
+  qTier = k; PERF.hold = now + 1500; PERF.n = 0; PERF.sum = 0; PERF.good = 0;
+  try { localStorage.setItem('quillsigil.quality', String(k)); } catch (e) { }
+  resize();
+}
+// called each frame: `drew` is whether the world was drawn this frame
+function perfWatch(now, drew) {
+  const dt = now - PERF.last; PERF.last = now;
+  if (!drew || document.hidden || dt > 250 || now < PERF.hold) { PERF.n = 0; PERF.sum = 0; return; }
+  PERF.n++; PERF.sum += dt;
+  if (PERF.n < 90) return;
+  const avg = PERF.sum / PERF.n; PERF.n = 0; PERF.sum = 0;
+  if (avg > 20 && qTier < QUALITY.length - 1) { PERF.fellFrom = qTier; PERF.good = 0; setQuality(qTier + 1, now); return; }
+  // a step remembered from a slower moment (another tab busy, low power) is tried back up once, after a steady spell
+  PERF.good = avg < 17.5 ? PERF.good + 1 : 0;
+  if (PERF.good >= 6 && qTier > 0 && !PERF.probed && PERF.fellFrom < 0) { PERF.probed = true; setQuality(qTier - 1, now); }
+}
 function resize() {
-  DPR = Math.min(2, window.devicePixelRatio || 1);
+  const Q = QUALITY[qTier];
+  BLOOM.on = Q.bloom;
+  DPR = Math.min(Q.dpr, window.devicePixelRatio || 1);
   wc.width = Math.round(innerWidth * DPR); wc.height = Math.round(innerHeight * DPR);
   Grim.resize();
   fitCamera(innerWidth, innerHeight);
@@ -906,14 +932,20 @@ function tick(now) {
   // The world moves in fixed 1/120 s steps, but screens refresh at 60, 90 or 120 Hz with a little jitter, so a frame
   // may hold 0, 1 or 2 steps. Drawn as-is, motion stutters (worst at 90 Hz: steps of 1, 1, 2). So bodies are drawn
   // between their last two steps, by how far time has run into the next one; a jump (a respawn) is drawn as it is.
-  const k = WORLD_PAUSED.has(Game.state) ? 1 : acc / FIXED, held = [];
-  if (k < 1) for (const b of World.bodies) {
-    if (b._px == null || Math.abs(b.x - b._px) + Math.abs(b.y - b._py) + Math.abs(b.z - b._pz) > 1) continue;
-    held.push(b, b.x, b.y, b.z);
-    b.x = b._px + (b.x - b._px) * k; b.y = b._py + (b.y - b._py) * k; b.z = b._pz + (b.z - b._pz) * k;
+  // once a card has settled over the world, the world behind it holds still and isn't redrawn (it saves the phone's
+  // strength, and a canvas busy redrawing under the card can leave holes in it on some phones)
+  const covered = Game.coverAt && now - Game.coverAt > 700;
+  if (!covered) {
+    const k = WORLD_PAUSED.has(Game.state) ? 1 : acc / FIXED, held = [];
+    if (k < 1) for (const b of World.bodies) {
+      if (b._px == null || Math.abs(b.x - b._px) + Math.abs(b.y - b._py) + Math.abs(b.z - b._pz) > 1) continue;
+      held.push(b, b.x, b.y, b.z);
+      b.x = b._px + (b.x - b._px) * k; b.y = b._py + (b.y - b._py) * k; b.z = b._pz + (b.z - b._pz) * k;
+    }
+    try { render(wg, innerWidth, innerHeight, t, aimOverlay); }
+    finally { for (let i = 0; i < held.length; i += 4) { const b = held[i]; b.x = held[i + 1]; b.y = held[i + 2]; b.z = held[i + 3]; } }
   }
-  try { render(wg, innerWidth, innerHeight, t, aimOverlay); }
-  finally { for (let i = 0; i < held.length; i += 4) { const b = held[i]; b.x = held[i + 1]; b.y = held[i + 2]; b.z = held[i + 3]; } }
+  perfWatch(now, !covered && !PV.isOpen);
   Grim.frame(dt, t);
   Game.update(dt);
   try { Tips.update(dt); } catch (e) { console.error(e); } // a tip must never stop the game
