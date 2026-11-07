@@ -2124,6 +2124,15 @@ function cornerCurve(g, c, k) {
     const cg = g.createLinearGradient(0, q2[0][1], 0, q2[3][1]); cg.addColorStop(0, 'rgba(255,240,205,0.45)'); cg.addColorStop(1, 'rgba(255,240,205,0.06)');
     g.fillStyle = cg; poly(g, q2); g.fill();
   }
+  if (texOK && (SPRITE.stains || SPRITE.lichen)) {
+    const ew = a => [x + ox + Math.cos(a) * r, y + oy + Math.sin(a) * r], P = (a, z) => proj(x + ox + Math.cos(a) * r, y + oy + Math.sin(a) * r, z);
+    const halves = k === 2 ? [[span[0], Math.PI / 4, true], [Math.PI / 4, span[1] + 0.02, false]] : [[span[0], span[1] + 0.02, k === 1]];
+    for (const [b0, b1, Rs] of halves) {
+      const As = [0, 1, 2, 3, 4].map(i => b0 + (b1 - b0) * i / 4), Q = [...As.map(a => P(a, top)), ...As.slice().reverse().map(a => P(a, zb))];
+      stainOn(g, ew(b0), ew(b1), Q, top, zb, wallMossy(x, y, Rs) ? 1 : 0.7);
+      if (SPRITE.lichen && wallLichen(x, y, Rs)) lichenOn(g, ew(b0), ew(b1), Q, Rs ? 0.3 : 0, 0.7);
+    }
+  }
   if (texOK && SPRITE['moss-lip']) {
     // the moss along the top and at the foot carries on round the corner (in shade on the half turned toward +x)
     const ew = a => [x + ox + Math.cos(a) * r, y + oy + Math.sin(a) * r], P = (a, z) => proj(x + ox + Math.cos(a) * r, y + oy + Math.sin(a) * r, z);
@@ -2211,6 +2220,9 @@ function drawSideFaces(g, c, d, t) {
       if (texOK) {
         texSide(g, 'stoneSide', c, R, faceS(top, sb));
         g.fillStyle = blockTone(x, y); poly(g, faceS(top, sb)); g.fill();
+        const wpt = u => R ? [x + 1, y + u] : [x + u, y + 1];
+        if (SPRITE.stains) stainOn(g, wpt(u0), wpt(u1), faceS(top, sb), top, sb, mossy ? 1 : 0.7);
+        if (SPRITE.lichen && wallLichen(x, y, R)) lichenOn(g, wpt(u0), wpt(u1), faceS(top, sb), R ? 0.3 : 0, 0.7);
         // light falls off down the wall into the shade at its foot, the shaded side darker all over, and the rounded
         // top edge catches the light
         onPlane(g, c, R, U => {
@@ -2230,6 +2242,8 @@ function drawSideFaces(g, c, d, t) {
             g.fillStyle = ug; g.fillRect(a + u0 * U, Z(top - cap), (u1 - u0) * U, Z(top - cap - 0.14) - Z(top - cap));
           }
           // damp rising from the foot: darker and a little green low down, fading up the wall
+          // (drawn only until the painted stains have loaded)
+          if (!SPRITE.stains) {
           const dh = Math.min(0.7, tall * 0.5), dmp = g.createLinearGradient(0, Z(sb), 0, Z(sb + dh));
           dmp.addColorStop(0, `rgba(30,44,24,${R ? 0.32 : 0.24})`); dmp.addColorStop(1, 'rgba(30,44,24,0)');
           g.fillStyle = dmp; g.fillRect(a + u0 * U, Z(sb + dh), (u1 - u0) * U, Z(sb) - Z(sb + dh));
@@ -2242,6 +2256,7 @@ function drawSideFaces(g, c, d, t) {
             g.fillStyle = st2;
             g.fillRect(us - w, Z(top - 0.06), w * 2, Z(top - len) - Z(top - 0.06));
             g.fillRect(us - w * 0.4, Z(top - 0.06), w * 0.8, Z(top - len) - Z(top - 0.06));
+          }
           }
           // rounded upright corners: where the block turns a corner toward us, the lit wall brightens and the
           // shaded wall darkens as they roll round it
@@ -2496,7 +2511,10 @@ function drawCell(g, c, t, part) {
   const big = rounded ? growPoly(outline.map(([u, v]) => proj(x + u, y + v, z)), 0.6) : growQuad([A, B, C, D], 0.6);
   g.fillStyle = topColor(c, d); poly(g, big); g.fill();
   texTop(g, c.icy ? 'ice' : c.h >= 1 ? 'stoneTop' : c.h < -0.01 ? 'dirt' : 'grass', z, big);
-  if (c.h >= 1 && !c.icy && texOK) { g.fillStyle = blockTone(x, y); poly(g, big); g.fill(); }
+  if (c.h >= 1 && !c.icy && texOK) {
+    g.fillStyle = blockTone(x, y); poly(g, big); g.fill();
+    if (SPRITE.lichen && hash2(x * 3.3 + 1.1, y * 2.7 + 4.4) < 0.3) lichenTop(g, z, big, 0.7);
+  }
   // the neighbours across each top edge: AB, BC, CD, DA
   const nb = [cellI(x, y - 1), cellI(x + 1, y), cellI(x, y + 1), cellI(x - 1, y)], E = [[A, B], [B, C], [C, D], [D, A]];
   // soft shadow at the foot of a higher neighbour's wall (only the two back edges have a wall in view)
@@ -3007,6 +3025,11 @@ for (const k of ['bramble1', 'bramble2', 'bramble3', 'brazier', 'goal', 'vine-le
   if (typeof Image === 'undefined') break;
   const im = new Image(); im.onload = () => { SPRITE[k] = im; }; im.src = `art/${k}.png?v=7`;
 }
+// the weathering paintings: damp stains (multiplied over stone; white leaves it as it is) and lichen (cut out)
+for (const [k, f] of [['stains', 'tex-stains.jpg'], ['lichen', 'lichen.png']]) {
+  if (typeof Image === 'undefined') break;
+  const im = new Image(); im.onload = () => { SPRITE[k] = im; }; im.src = `art/${f}?v=3`;
+}
 // a painting darkened to sit on a wall in shade (made once each)
 const shadeCache = {};
 function shadedSprite(k, f) {
@@ -3073,6 +3096,42 @@ function mossTop(g, c, z, top, drops) {
   }
   g.restore();
 }
+/* Weathering on stone, from the user's paintings. On a wall the stains run from its top to its foot (the drips
+   under its top, the damp patches at its foot), whatever its height, and repeat every 4 tiles across, so their
+   faint upright lines fall on the joints between blocks; they are multiplied over the stone. Lichen is scattered on
+   walls and tops, pinned to the world, darker on walls in shade. */
+const weatherPats = new WeakMap();
+function weatherPat(g, key, src, rep) {
+  let m = weatherPats.get(g); if (!m) weatherPats.set(g, m = {});
+  return m[key] || (m[key] = g.createPattern(src, rep));
+}
+// a stretch of upright wall between world points e0 and e1 (on its top line, at height top), filling `quad`
+function stainOn(g, e0, e1, quad, top, foot, alpha) {
+  const im = SPRITE.stains; if (!im || top - foot < 0.05) return;
+  const P = weatherPat(g, 'stains', im, 'repeat-x'); if (!P) return;
+  const W = im.naturalWidth, H = im.naturalHeight, UX = W / 4, UY = H / (top - foot), s = cam.s;
+  const u0 = e0[0] - e0[1], du = (e1[0] - e1[1]) - u0, Y0 = (e0[0] + e0[1]) * TH * 0.5, Y1 = (e1[0] + e1[1]) * TH * 0.5;
+  const m = Math.abs(du) > 1e-4 ? (Y1 - Y0) / du : 0;
+  P.setTransform(new DOMMatrix([TW * 0.5 * s / UX, m * s / UX, 0, TZ * s / UY, cam.ox, cam.oy + (Y0 - u0 * m) * s - top * TZ * s]));
+  g.save(); g.globalCompositeOperation = 'multiply'; g.globalAlpha = alpha; g.fillStyle = P; poly(g, quad); g.fill(); g.restore();
+}
+function lichenOn(g, e0, e1, quad, shade, alpha) {
+  const src = shade ? shadedSprite('lichen', shade) : SPRITE.lichen; if (!src) return;
+  const P = weatherPat(g, 'lichen' + shade, src, 'repeat'); if (!P) return;
+  const UX = src.width / 4, s = cam.s;
+  const u0 = e0[0] - e0[1], du = (e1[0] - e1[1]) - u0, Y0 = (e0[0] + e0[1]) * TH * 0.5, Y1 = (e1[0] + e1[1]) * TH * 0.5;
+  const m = Math.abs(du) > 1e-4 ? (Y1 - Y0) / du : 0;
+  P.setTransform(new DOMMatrix([TW * 0.5 * s / UX, m * s / UX, 0, TZ * s / UX, cam.ox + 0.37 * TW * s, cam.oy + (Y0 - u0 * m) * s]));
+  g.save(); g.globalAlpha = alpha; g.fillStyle = P; poly(g, quad); g.fill(); g.restore();
+}
+function lichenTop(g, z, quad, alpha) {
+  const src = SPRITE.lichen; if (!src) return;
+  const P = weatherPat(g, 'lichenTop', src, 'repeat'); if (!P) return;
+  const k = cam.s / (src.width / 4), o = proj(0.21, 0.63, z);
+  P.setTransform(new DOMMatrix([TW * 0.5 * k, TH * 0.5 * k, -TW * 0.5 * k, TH * 0.5 * k, o[0], o[1]]));
+  g.save(); g.globalAlpha = alpha; g.fillStyle = P; poly(g, quad); g.fill(); g.restore();
+}
+const wallLichen = (x, y, R) => hash2(x * 4.9 + y * 1.7 + (R ? 2 : 6), 8.4) < (R ? 0.6 : 0.3);
 // moss and grass creeping up the foot of a stone wall from the ground it stands on
 function mossFoot(g, c, R, top, sb, u0, u1) {
   if (!SPRITE['moss-lip'] || top - sb < 0.3 || u1 - u0 < 0.01) return;
