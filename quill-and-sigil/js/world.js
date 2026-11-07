@@ -880,6 +880,21 @@ const SKY = { stars: [], isles: [], sea: [], motes: [], shoot: null, base: null 
   for (let i = 0; i < 4; i++) SKY.ribbons.push({ y: 0.3 + i * 0.13 + R() * 0.06, a: 0.04 + R() * 0.05, f: 1.5 + R() * 2, f2: 3 + R() * 3, ph: R() * TAU, sp: 0.04 + R() * 0.06, w: 1 + R() * 1.6, al: 0.1 + R() * 0.08 });
   for (let i = 0; i < 28; i++) SKY.motes.push({ x: R(), y: R(), sp: 0.008 + R() * 0.02, sw: R() * TAU, s: 1 + R() * 2, col: R() < 0.6 ? '#ffd9a0' : '#c9b6ff' });
 })();
+/* A painted backdrop (art/sky-wide.jpg for landscape screens, art/sky-tall.jpg for portrait ones). When one has
+   loaded for the screen's shape it replaces the drawn sky's still parts (gradient, nebula, stars, moon, isles,
+   cloud sea); the shooting stars, wind ribbons and drifting motes still move over it. A missing file simply
+   leaves the drawn sky in place. */
+const PAINTED = {};
+for (const k of ['wide', 'tall']) {
+  if (typeof Image === 'undefined') break;
+  const im = new Image();
+  im.onload = () => { PAINTED[k] = im; SKY.base = null; };
+  im.src = `art/sky-${k}.jpg?v=1`;
+}
+function paintedSky(w, h) {
+  const want = w >= h ? 'wide' : 'tall';
+  return PAINTED[want] || PAINTED[want === 'wide' ? 'tall' : 'wide'] || null;
+}
 /* the deep, unchanging part of the sky, drawn once per screen size */
 function skyBase(w, h) {
   if (SKY.base && SKY.base.w === w && SKY.base.h === h) return SKY.base.c;
@@ -887,6 +902,44 @@ function skyBase(w, h) {
   const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w * dpr)); c.height = Math.max(1, Math.round(h * dpr));
   const g = c.getContext('2d'), R = mulberry(7), m = Math.min(w, h);
   g.scale(dpr, dpr);
+  const P = paintedSky(w, h);
+  if (P) {
+    // Fit the full width when that still fills most of the height, so the moon and corner isles stay in view;
+    // the painting sits on the bottom (the cloud sea) and its night sky is carried up to the top of the screen.
+    // On a much taller screen it covers instead, cropping the sides.
+    const nw = P.naturalWidth, nh = P.naturalHeight;
+    const k = Math.max(w / nw, 0.62 * h / nh), pw = nw * k, ph = nh * k;
+    const x0 = (w - pw) / 2, y0 = ph >= h ? h - ph + (ph - h) * 0.35 : h - ph;
+    g.imageSmoothingQuality = 'high';
+    if (y0 > 0) {
+      // the night colour of the painting's top edge (its darkest stretch, so the moon's glow doesn't tint it),
+      // filled over the gap above it; the painting's top then fades in over that colour
+      const band = document.createElement('canvas'); band.width = 8; band.height = 1;
+      const bg = band.getContext('2d', { willReadFrequently: true }); bg.imageSmoothingQuality = 'high';
+      bg.drawImage(P, 0, 0, nw, Math.max(2, nh * 0.02), 0, 0, 8, 1);
+      const px = bg.getImageData(0, 0, 8, 1).data; let best = 0, lum = 1e9;
+      for (let i = 0; i < 8; i++) { const L = px[i * 4] + px[i * 4 + 1] + px[i * 4 + 2]; if (L < lum) { lum = L; best = i; } }
+      const top = `rgb(${px[best * 4]},${px[best * 4 + 1]},${px[best * 4 + 2]})`;
+      g.fillStyle = top; g.fillRect(0, 0, w, y0 + 1);
+      // and a scatter of faint stars, thinning toward the seam
+      for (let i = 0; i < Math.round(w * y0 / 2200); i++) {
+        const x = R() * w, y = R() * y0;
+        g.globalAlpha = (0.2 + R() * 0.5) * Math.min(1, (y0 - y) / (y0 * 0.4)); g.fillStyle = R() < 0.25 ? '#cfe0ff' : '#fff2dc';
+        const s = R() < 0.92 ? 1 : 1.6; g.fillRect(x, y, s, s);
+      }
+      g.globalAlpha = 1;
+      // draw the painting, then melt its top edge into that colour
+      g.drawImage(P, x0, y0, pw, ph);
+      const fade = ph * 0.06, fg = g.createLinearGradient(0, y0 - 1, 0, y0 + fade);
+      fg.addColorStop(0, top); fg.addColorStop(1, top.replace('rgb', 'rgba').replace(')', ',0)'));
+      g.fillStyle = fg; g.fillRect(0, y0 - 1, w, fade + 1);
+      SKY.base = { w, h, c, painted: true };
+      return c;
+    }
+    g.drawImage(P, x0, y0, pw, ph);
+    SKY.base = { w, h, c, painted: true };
+    return c;
+  }
   const gr = g.createLinearGradient(0, 0, 0, h);
   gr.addColorStop(0, '#060515'); gr.addColorStop(0.32, '#16123c'); gr.addColorStop(0.58, '#33245e'); gr.addColorStop(0.8, '#6c3f6e'); gr.addColorStop(0.93, '#b8656a'); gr.addColorStop(1, '#e08a6a');
   g.fillStyle = gr; g.fillRect(0, 0, w, h);
@@ -1177,6 +1230,31 @@ function seaBand(b, w, h) {
 function drawSky(g, w, h, t) {
   const m = Math.min(w, h);
   g.drawImage(skyBase(w, h), 0, 0, w, h);
+  const painted = SKY.base && SKY.base.painted;
+  if (!painted) drawnSkyStill(g, w, h, t, m);
+  // now and then, a shooting star
+  // a rare treat: one every twenty to forty-five seconds
+  if (SKY.nextShoot == null || SKY.nextShoot > t + 60) SKY.nextShoot = t + 12 + Math.random() * 20;
+  if (!SKY.shoot && t >= SKY.nextShoot) { SKY.shoot = { x: 0.1 + Math.random() * 0.6, y: 0.04 + Math.random() * 0.25, t0: t, dx: 0.9 + Math.random() * 0.4, dy: 0.35 + Math.random() * 0.2 }; SKY.nextShoot = t + 20 + Math.random() * 25; }
+  if (SKY.shoot) {
+    const S = SKY.shoot, k = (t - S.t0) / 0.9;
+    if (k > 1 || k < 0) SKY.shoot = null;
+    else {
+      const hx = (S.x + S.dx * 0.25 * k) * w, hy = (S.y + S.dy * 0.25 * k) * h, tx = hx - S.dx * 0.08 * w, ty = hy - S.dy * 0.08 * h;
+      const sg = g.createLinearGradient(tx, ty, hx, hy); const al = Math.sin(k * Math.PI);
+      sg.addColorStop(0, 'rgba(255,240,220,0)'); sg.addColorStop(1, `rgba(255,240,220,${0.85 * al})`);
+      g.strokeStyle = sg; g.lineWidth = 1.6; g.lineCap = 'round'; g.beginPath(); g.moveTo(tx, ty); g.lineTo(hx, hy); g.stroke();
+    }
+  }
+  // far isles, hazy
+  if (!painted) for (const I of SKY.isles) if (I.layer === 0) {
+    const x = ((I.x + t * 0.002 * I.sp) % 1.2 - 0.1) * w, y = I.y * h + Math.sin(t * 0.35 + I.ph) * 5;
+    drawIsle(g, I, x, y, I.s * m * 0.06, t, true);
+  }
+  drawSkyMoving(g, w, h, t, m, painted);
+}
+// the drawn sky's stars and moon (left out under a painted backdrop, which has its own)
+function drawnSkyStill(g, w, h, t, m) {
   // twinkling stars; the brightest wear a small cross of light
   g.fillStyle = 'rgb(255,245,220)'; g.strokeStyle = 'rgb(255,240,210)'; g.lineWidth = 0.8;
   for (const s of SKY.stars) {
@@ -1197,25 +1275,9 @@ function drawSky(g, w, h, t) {
   g.strokeStyle = 'rgba(255,232,190,0.07)'; g.lineWidth = 1;
   for (const k of [2.2, 3.1]) { g.beginPath(); g.arc(mx, my, mr * k, 0, TAU); g.stroke(); }
   g.drawImage(moonSprite(mr), mx - mr, my - mr);
-  // now and then, a shooting star
-  // a rare treat: one every twenty to forty-five seconds
-  if (SKY.nextShoot == null || SKY.nextShoot > t + 60) SKY.nextShoot = t + 12 + Math.random() * 20;
-  if (!SKY.shoot && t >= SKY.nextShoot) { SKY.shoot = { x: 0.1 + Math.random() * 0.6, y: 0.04 + Math.random() * 0.25, t0: t, dx: 0.9 + Math.random() * 0.4, dy: 0.35 + Math.random() * 0.2 }; SKY.nextShoot = t + 20 + Math.random() * 25; }
-  if (SKY.shoot) {
-    const S = SKY.shoot, k = (t - S.t0) / 0.9;
-    if (k > 1 || k < 0) SKY.shoot = null;
-    else {
-      const hx = (S.x + S.dx * 0.25 * k) * w, hy = (S.y + S.dy * 0.25 * k) * h, tx = hx - S.dx * 0.08 * w, ty = hy - S.dy * 0.08 * h;
-      const sg = g.createLinearGradient(tx, ty, hx, hy); const al = Math.sin(k * Math.PI);
-      sg.addColorStop(0, 'rgba(255,240,220,0)'); sg.addColorStop(1, `rgba(255,240,220,${0.85 * al})`);
-      g.strokeStyle = sg; g.lineWidth = 1.6; g.lineCap = 'round'; g.beginPath(); g.moveTo(tx, ty); g.lineTo(hx, hy); g.stroke();
-    }
-  }
-  // far isles, hazy
-  for (const I of SKY.isles) if (I.layer === 0) {
-    const x = ((I.x + t * 0.002 * I.sp) % 1.2 - 0.1) * w, y = I.y * h + Math.sin(t * 0.35 + I.ph) * 5;
-    drawIsle(g, I, x, y, I.s * m * 0.06, t, true);
-  }
+}
+// wind ribbons, the cloud sea with the near isles (drawn sky only) and the lantern motes
+function drawSkyMoving(g, w, h, t, m, painted) {
   // ribbons of wind, luminous, drifting slowly across the dusk
   // (their broad soft glow is the costliest thing in the sky, so it goes into a half-scale layer laid over in one go)
   const RG = SKY.ribbonGlow || (SKY.ribbonGlow = document.createElement('canvas'));
@@ -1243,7 +1305,7 @@ function drawSky(g, w, h, t) {
   g.globalAlpha = 1; g.drawImage(RG, 0, 0, w, h);
   g.globalCompositeOperation = 'source-over';
   // the sea of cloud, lit warm from below: far band first
-  for (let b = 0; b < 3; b++) {
+  if (!painted) for (let b = 0; b < 3; b++) {
     // each band drifts as one piece: a strip that repeats every 1.3 screen widths, laid twice side by side
     const B = seaBand(b, w, h), x0 = ((t * SEA.sp[b]) % 1) * B.span - 0.15 * w;
     g.globalAlpha = 1;
@@ -1278,115 +1340,1071 @@ function fitCamera(vw, vh, pads) {
   cam.oy = topPad + (vh - topPad - botPad) / 2 - (minY + maxY) / 2 * s;
 }
 
+function growQuad(q, px) {
+  const cx = (q[0][0] + q[1][0] + q[2][0] + q[3][0]) / 4, cy = (q[0][1] + q[1][1] + q[2][1] + q[3][1]) / 4;
+  return q.map(p => { const dx = p[0] - cx, dy = p[1] - cy, L = Math.hypot(dx, dy) || 1; return [p[0] + dx / L * px * 1.8, p[1] + dy / L * px]; });
+}
 function poly(g, pts) { g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]); g.closePath(); }
 function shade(hex, f) {
   const n = parseInt(hex.slice(1), 16);
   const r = clamp(Math.round((n >> 16 & 255) * f), 0, 255), gg = clamp(Math.round((n >> 8 & 255) * f), 0, 255), b = clamp(Math.round((n & 255) * f), 0, 255);
   return `rgb(${r},${gg},${b})`;
 }
-function prism(g, x0, y0, x1, y1, z0, z1, top, left, right, edge) {
+function prism(g, x0, y0, x1, y1, z0, z1, top, left, right, edge, ink = INK) {
   const A = proj(x0, y0, z1), B = proj(x1, y0, z1), C = proj(x1, y1, z1), D = proj(x0, y1, z1);
   const Bb = proj(x1, y0, z0), Cb = proj(x1, y1, z0), Db = proj(x0, y1, z0);
   g.fillStyle = right; poly(g, [B, C, Cb, Bb]); g.fill();
   g.fillStyle = left; poly(g, [D, C, Cb, Db]); g.fill();
   g.fillStyle = top; poly(g, [A, B, C, D]); g.fill();
   if (edge) { g.strokeStyle = edge; g.lineWidth = 1; poly(g, [A, B, C, D]); g.stroke(); }
+  if (ink) {
+    // the storybook outline: the whole silhouette, then the three edges that meet at the near corner
+    const sd = x0 * 3.1 + y0 * 5.7 + z0 * 2.3;
+    g.beginPath();
+    inkPath(g, A, B, sd); inkPath(g, B, Bb, sd + 1, true); inkPath(g, Bb, Cb, sd + 2, true); inkPath(g, Cb, Db, sd + 3, true); inkPath(g, Db, D, sd + 4, true); inkPath(g, D, A, sd + 5, true);
+    inkPath(g, B, C, sd + 6); inkPath(g, C, D, sd + 7); inkPath(g, C, Cb, sd + 8);
+    inkStroke(g, ink, 1.6);
+  }
+}
+
+/* Ink: the storybook outline drawn round land and things. Each line bows a little, the same way every frame
+   (seeded by where it is), as if drawn by hand. */
+const INK = 'rgba(40,24,22,0.82)';
+function hash2(a, b) { const v = Math.sin(a * 127.1 + b * 311.7) * 43758.5453; return v - Math.floor(v); }
+function inkPath(g, p, q, seed, cont) {
+  const dx = q[0] - p[0], dy = q[1] - p[1], L = Math.hypot(dx, dy);
+  if (cont) g.lineTo(p[0], p[1]); else g.moveTo(p[0], p[1]);
+  if (L < 5) { g.lineTo(q[0], q[1]); return; }
+  const o = (hash2(seed, 1.7) - 0.5) * Math.min(2.4 * cam.s, L * 0.05), k = 0.35 + hash2(seed, 4.1) * 0.3;
+  g.quadraticCurveTo(p[0] + dx * k - dy / L * o, p[1] + dy * k + dx / L * o, q[0], q[1]);
+}
+function inkStroke(g, col, w) {
+  g.strokeStyle = col; g.lineWidth = w * cam.s; g.lineJoin = 'round'; g.lineCap = 'round'; g.stroke();
+}
+
+/* Light that falls on the land: lit braziers, fire, the orb and the font each throw a soft pool of their colour
+   onto the faces near them (drawn per face, clipped to it, so nearer land still hides it). Gathered once a frame. */
+let LIGHTS = [];
+const lightCache = {};
+function lightSprite(col) {
+  if (lightCache[col]) return lightCache[col];
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d');
+  const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  gr.addColorStop(0, hexA(col, 1)); gr.addColorStop(0.3, hexA(col, 0.6)); gr.addColorStop(0.65, hexA(col, 0.18)); gr.addColorStop(1, hexA(col, 0));
+  g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+  return lightCache[col] = c;
+}
+function gatherLights(t) {
+  const L = [];
+  for (const c of World.cells) {
+    if (c.void) continue;
+    if (c.feat === 'brazier' && c.lit) L.push({ x: c.x + .5, y: c.y + .5, z: c.h + brazierBowlZ() + 0.1, col: '#ffa04a', r: 2.8, a: 0.62 + 0.06 * Math.sin(t * 11 + c.x * 3) });
+    else if (c.burn) L.push({ x: c.x + .5, y: c.y + .5, z: c.h + 0.4, col: '#ff7a36', r: 1.9, a: 0.4 + 0.05 * Math.sin(t * 13 + c.y * 5) });
+    if (c.feat === 'font') L.push({ x: c.x + .5, y: c.y + .5, z: c.h + 0.2, col: '#78e6ff', r: 2.0, a: 0.4 });
+  }
+  for (const b of World.bodies) if (b.alive && b.kind === 'orb') L.push({ x: b.x, y: b.y, z: b.z + b.r, col: '#ffc45e', r: 2.2, a: b.captured ? 0.6 : 0.42 });
+  L.sort((p, q) => q.a - p.a);
+  LIGHTS = L.slice(0, 10);
+}
+// pools of light on a top face at height z (corners A..D already projected)
+function lightTop(g, c, z, quad) {
+  let on = false;
+  for (const l of LIGHTS) {
+    const dh = l.z - z; if (dh < -0.2) continue;
+    const dx = c.x + 0.5 - l.x, dy = c.y + 0.5 - l.y; if (dx * dx + dy * dy > (l.r + 0.8) ** 2) continue;
+    if (!on) { g.save(); poly(g, quad); g.clip(); g.globalCompositeOperation = 'lighter'; on = true; }
+    const [px, py] = proj(l.x, l.y, z), R = l.r * TW * 0.7071 * cam.s;
+    g.globalAlpha = l.a * clamp(1.15 - dh / 3, 0.3, 1);
+    g.drawImage(lightSprite(l.col), px - R, py - R * 0.5, R * 2, R);
+  }
+  if (on) g.restore();
+}
+// and on a side face (R: the plane x = c.x + 1, L: the plane y = c.y + 1), lit only from in front of it
+function lightSide(g, c, R, za, zb, quad) {
+  let on = false;
+  for (const l of LIGHTS) {
+    const d = R ? l.x - (c.x + 1) : l.y - (c.y + 1); if (d < 0.05 || d > l.r) continue;
+    const u = R ? l.y - (c.y + 0.5) : l.x - (c.x + 0.5); if (Math.abs(u) > l.r + 0.6) continue;
+    if (l.z < zb - 0.2) continue;
+    if (!on) { g.save(); poly(g, quad); g.clip(); g.globalCompositeOperation = 'lighter'; on = true; }
+    const zc = clamp(l.z, zb, za), [px, py] = R ? proj(c.x + 1, l.y, zc) : proj(l.x, c.y + 1, zc), Rr = (l.r - d) * TW * 0.6 * cam.s;
+    g.globalAlpha = l.a * 0.8;
+    g.drawImage(lightSprite(l.col), px - Rr, py - Rr, Rr * 2, Rr * 2);
+  }
+  if (on) g.restore();
+}
+
+/* Textures: painted detail laid over the land's flat colours, so tone, wetness, frost and light still come from
+   the colours underneath. Each is painted once into a seamless square covering 4×4 tiles (TEXU texels a tile) and
+   pinned to the world (tops by x and y, walls by their run along the edge and by height), so the grass runs on
+   unbroken from tile to tile and stone courses and soil layers line up all round the island. */
+const TEXN = 512, TEXU = 128;
+const texPats = new WeakMap();
+let texOK = typeof DOMMatrix !== 'undefined' && typeof CanvasPattern !== 'undefined' && !!CanvasPattern.prototype.setTransform;
+function texWrap(x, y, r, fn) {
+  for (const ox of [-TEXN, 0, TEXN]) for (const oy of [-TEXN, 0, TEXN]) {
+    const X = x + ox, Y = y + oy;
+    if (X + r < 0 || X - r > TEXN || Y + r < 0 || Y - r > TEXN) continue;
+    fn(X, Y);
+  }
+}
+function rgbaOf(rgb, a) { return `rgba(${rgb},${a})`; }
+function texBlotches(g, R, n, r0, r1, light, dark, la, da) {
+  for (let i = 0; i < n; i++) {
+    const x = R() * TEXN, y = R() * TEXN, r = r0 + R() * (r1 - r0), L = R() < 0.5, col = L ? light : dark, a = (L ? la : da) * (0.5 + R() * 0.5);
+    texWrap(x, y, r, (X, Y) => {
+      const gr = g.createRadialGradient(X, Y, 0, X, Y, r); gr.addColorStop(0, rgbaOf(col, a)); gr.addColorStop(1, rgbaOf(col, 0));
+      g.fillStyle = gr; g.fillRect(X - r, Y - r, r * 2, r * 2);
+    });
+  }
+}
+function texSpecks(g, R, n, col, a0, a1, s0, s1) {
+  for (let i = 0; i < n; i++) {
+    const x = R() * TEXN, y = R() * TEXN, s = s0 + R() * (s1 - s0), sy = s * (0.6 + R() * 0.4), rot = R() * 3;
+    g.fillStyle = rgbaOf(col, a0 + R() * (a1 - a0));
+    texWrap(x, y, s, (X, Y) => { g.beginPath(); g.ellipse(X, Y, s, sy, rot, 0, TAU); g.fill(); });
+  }
+}
+function texPebbles(g, R, n, rx0, rx1) {
+  for (let i = 0; i < n; i++) {
+    const x = R() * TEXN, y = R() * TEXN, rx = rx0 + R() * (rx1 - rx0), ry = rx * (0.55 + R() * 0.25), rot = (R() - 0.5) * 0.6;
+    texWrap(x, y, rx + 3, (X, Y) => {
+      g.fillStyle = 'rgba(20,12,8,0.35)'; g.beginPath(); g.ellipse(X + 1.5, Y + 2, rx, ry, rot, 0, TAU); g.fill();
+      g.fillStyle = 'rgba(150,128,104,0.5)'; g.beginPath(); g.ellipse(X, Y, rx, ry, rot, 0, TAU); g.fill();
+      g.fillStyle = 'rgba(235,215,185,0.32)'; g.beginPath(); g.ellipse(X - rx * 0.25, Y - ry * 0.35, rx * 0.5, ry * 0.4, rot, 0, TAU); g.fill();
+    });
+  }
+}
+// Slabs for the raised stone. On tops, light falls from the back corner (texture top-left) to the front one;
+// on walls, from the top edge down. Each slab is painted inside its own clip, so nothing spills into the next.
+function texSlabs(g, R, wall, U = TEXU, N = TEXN, light = false) {
+  const n = Math.round(N / U), kk = U / 128;
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+    const x0 = i * U, y0 = j * U;
+    g.save(); g.beginPath(); g.rect(x0, y0, U, U); g.clip();
+    // the broad shading
+    const gr = wall ? g.createLinearGradient(0, y0, 0, y0 + U) : g.createLinearGradient(x0, y0, x0 + U, y0 + U);
+    gr.addColorStop(0, rgbaOf('255,253,240', wall ? 0.13 : 0.18)); gr.addColorStop(0.45, 'rgba(255,253,240,0)'); gr.addColorStop(1, 'rgba(22,28,34,0.26)');
+    g.fillStyle = gr; g.fillRect(x0, y0, U, U);
+    // soft mottling, and a faint grain (left out over a painted stone, which has its own surface)
+    if (!light) for (let k = 0; k < 6; k++) {
+      const x = x0 + R() * U, y = y0 + R() * U, r = 18 + R() * 40, col = R() < 0.5 ? '255,250,235' : '30,42,40', a = 0.05 + R() * 0.08;
+      const rg = g.createRadialGradient(x, y, 0, x, y, r); rg.addColorStop(0, rgbaOf(col, a)); rg.addColorStop(1, rgbaOf(col, 0));
+      g.fillStyle = rg; g.fillRect(x - r, y - r, r * 2, r * 2);
+    }
+    if (!light) for (let k = 0; k < 50; k++) { g.fillStyle = R() < 0.5 ? 'rgba(30,36,40,0.16)' : 'rgba(255,250,235,0.14)'; g.fillRect(x0 + R() * U, y0 + R() * U, 1.5 + R(), 1.5 + R()); }
+    // now and then a hairline crack, cut in: a dark line with a lit lip beside it
+    if (!light && R() < 0.38) {
+      const e = R() * 4 | 0, u = 0.25 + R() * 0.5;
+      let p = e === 0 ? [x0 + u * U, y0] : e === 1 ? [x0 + U, y0 + u * U] : e === 2 ? [x0 + u * U, y0 + U] : [x0, y0 + u * U];
+      let an = [Math.PI / 2, Math.PI, -Math.PI / 2, 0][e] + (R() - 0.5) * 0.8;
+      const pts = [p];
+      for (let k = 0, m = 3 + (R() * 3 | 0); k < m; k++) { an += (R() - 0.5) * 1.1; p = [p[0] + Math.cos(an) * (8 + R() * 12), p[1] + Math.sin(an) * (8 + R() * 12)]; pts.push(p); }
+      g.lineCap = 'round'; g.lineJoin = 'round';
+      for (const [dx, dy, col, w] of [[1.4, 1.4, 'rgba(255,250,235,0.2)', 1.4], [0, 0, 'rgba(34,38,46,0.5)', 1.5]]) {
+        g.strokeStyle = col; g.lineWidth = w; g.beginPath(); pts.forEach((q, k) => (k ? g.lineTo : g.moveTo).call(g, q[0] + dx, q[1] + dy)); g.stroke();
+      }
+    }
+    // a chipped corner
+    if (!light && R() < 0.3) {
+      const cx = R() < 0.5 ? x0 : x0 + U, cy = R() < 0.5 ? y0 : y0 + U, sx = cx === x0 ? 1 : -1, sy = cy === y0 ? 1 : -1, a = 9 + R() * 10, b = 9 + R() * 10;
+      g.fillStyle = 'rgba(28,32,38,0.32)'; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + sx * a, cy); g.lineTo(cx + sx * a * 0.35, cy + sy * b * 0.45); g.lineTo(cx, cy + sy * b); g.closePath(); g.fill();
+      g.strokeStyle = 'rgba(255,250,235,0.22)'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(cx + sx * a, cy); g.lineTo(cx + sx * a * 0.35, cy + sy * b * 0.45); g.lineTo(cx, cy + sy * b); g.stroke();
+    }
+    // the rounded edge: lit along the top (and, on tops, the left), shadowed along the others
+    const bw = 7 * kk;
+    g.lineCap = 'butt';
+    g.lineWidth = bw;
+    g.strokeStyle = 'rgba(255,255,245,0.26)'; g.beginPath(); g.moveTo(x0, y0 + bw / 2); g.lineTo(x0 + U, y0 + bw / 2); g.stroke();
+    g.strokeStyle = wall ? 'rgba(255,255,245,0.1)' : 'rgba(255,255,245,0.22)'; g.beginPath(); g.moveTo(x0 + bw / 2, y0); g.lineTo(x0 + bw / 2, y0 + U); g.stroke();
+    g.strokeStyle = 'rgba(20,26,32,0.28)'; g.beginPath(); g.moveTo(x0, y0 + U - bw / 2); g.lineTo(x0 + U, y0 + U - bw / 2); g.stroke();
+    g.strokeStyle = wall ? 'rgba(20,26,32,0.14)' : 'rgba(20,26,32,0.24)'; g.beginPath(); g.moveTo(x0 + U - bw / 2, y0); g.lineTo(x0 + U - bw / 2, y0 + U); g.stroke();
+    // moss creeping in from an edge (on walls, only from the top)
+    if (!light && R() < (wall ? 0.3 : 0.45)) {
+      const e = wall ? 0 : R() * 4 | 0, c0 = 0.1 + R() * 0.4, c1 = c0 + 0.25 + R() * 0.35;
+      for (let k = 0; k < 22; k++) {
+        const u = c0 + R() * (c1 - c0), dep = Math.pow(R(), 1.8) * 16, r = 3 + R() * 5 * (1 - dep / 20);
+        const [x, y] = e === 0 ? [x0 + u * U, y0 + dep] : e === 1 ? [x0 + U - dep, y0 + u * U] : e === 2 ? [x0 + u * U, y0 + U - dep] : [x0 + dep, y0 + u * U];
+        g.fillStyle = 'rgba(30,48,22,0.3)'; g.beginPath(); g.ellipse(x + 1.2, y + 1.6, r, r * 0.75, 0, 0, TAU); g.fill();
+        g.fillStyle = R() < 0.4 ? 'rgba(160,190,96,0.62)' : 'rgba(104,140,62,0.62)'; g.beginPath(); g.ellipse(x, y, r, r * 0.75, 0, 0, TAU); g.fill();
+      }
+    }
+    // the joint to the next slab
+    g.strokeStyle = 'rgba(40,46,50,0.2)'; g.lineWidth = 2 * kk; g.strokeRect(x0, y0, U, U);
+    g.restore();
+  }
+}
+const TEX_PAINT = {
+  // grass: broad patches of lighter and darker growth, clumps of leafy dabs each with its own shadow, seed specks
+  grass(g, R) {
+    texBlotches(g, R, 70, 30, 95, '214,236,130', '16,38,10', 0.16, 0.2);
+    for (let i = 0; i < 300; i++) {
+      const cx = R() * TEXN, cy = R() * TEXN, n = 5 + (R() * 8 | 0), tone = R(), dabs = [];
+      for (let j = 0; j < n; j++) {
+        const a = R() * TAU, rr = R() * 13, L = 6 + R() * 8, an = R() * TAU;
+        dabs.push({ x: Math.cos(a) * rr, y: Math.sin(a) * rr, dx: Math.cos(an) * L / 2, dy: Math.sin(an) * L / 2, w0: 3 + R() * 1.5, w1: 2.5 + R() * 1.5, a: R() });
+      }
+      g.lineCap = 'round';
+      texWrap(cx, cy, 30, (X, Y) => {
+        for (const b of dabs) {
+          const x = X + b.x, y = Y + b.y;
+          g.strokeStyle = 'rgba(24,46,14,0.32)'; g.lineWidth = b.w0;
+          g.beginPath(); g.moveTo(x - b.dx + 2, y - b.dy + 2.5); g.lineTo(x + b.dx + 2, y + b.dy + 2.5); g.stroke();
+          g.strokeStyle = tone < 0.45 ? `rgba(196,222,112,${0.3 + b.a * 0.25})` : tone < 0.85 ? `rgba(138,172,72,${0.35 + b.a * 0.25})` : `rgba(226,232,140,${0.35 + b.a * 0.2})`;
+          g.lineWidth = b.w1;
+          g.beginPath(); g.moveTo(x - b.dx, y - b.dy); g.lineTo(x + b.dx, y + b.dy); g.stroke();
+        }
+      });
+    }
+    texSpecks(g, R, 500, '20,34,12', 0.2, 0.4, 1, 2.2);
+    texSpecks(g, R, 90, '250,240,170', 0.25, 0.5, 1, 1.8);
+  },
+  // the low, sunken ground: bare earth with pebbles
+  dirt(g, R) {
+    texBlotches(g, R, 50, 40, 120, '200,150,104', '40,20,14', 0.2, 0.26);
+    texSpecks(g, R, 160, '30,16,10', 0.15, 0.35, 1.5, 3);
+    texPebbles(g, R, 14, 5, 11);
+  },
+  // the raised stone, as in the storybook: one big smooth slab to a tile on top, and one to each unit of height
+  // on the walls, softly shaded from a lit edge to a shadowed one, bevelled, with the odd crack, chip and moss
+  stoneTop(g, R) { texSlabs(g, R, false); },
+  stoneSide(g, R) { texSlabs(g, R, true); },
+  // the earth under the grass: wavy layers of lighter and darker soil, pebbles, and fine roots
+  soil(g, R) {
+    let y = 0, dark = false;
+    const lines = [];
+    while (y < TEXN) {
+      const hgt = y > TEXN - 70 ? TEXN - y : 30 + R() * 40, k = 1 + (R() * 3 | 0), A = 3 + R() * 6, ph = R() * TAU;
+      lines.push({ y, k, A, ph, hgt, dark });
+      y += hgt; dark = !dark;
+    }
+    const wave = (l, x) => l.y + Math.sin(x / TEXN * TAU * l.k + l.ph) * l.A * (l.y === 0 ? 0 : 1);
+    for (let i = 0; i < lines.length; i++) {
+      const l = lines[i], n = lines[i + 1] || { y: TEXN, k: 1, A: 0, ph: 0 };
+      g.beginPath(); g.moveTo(0, wave(l, 0));
+      for (let x = 0; x <= TEXN; x += 8) g.lineTo(x, wave(l, x));
+      for (let x = TEXN; x >= 0; x -= 8) g.lineTo(x, n.y === TEXN ? TEXN : wave(n, x));
+      g.closePath(); g.fillStyle = l.dark ? `rgba(24,14,8,${0.08 + R() * 0.12})` : `rgba(200,160,110,${0.06 + R() * 0.1})`; g.fill();
+      if (l.y > 0) {
+        g.beginPath(); for (let x = 0; x <= TEXN; x += 8) (x ? g.lineTo : g.moveTo).call(g, x, wave(l, x));
+        g.strokeStyle = 'rgba(28,16,10,0.35)'; g.lineWidth = 2; g.stroke();
+        g.beginPath(); for (let x = 0; x <= TEXN; x += 8) (x ? g.lineTo : g.moveTo).call(g, x, wave(l, x) + 2.5);
+        g.strokeStyle = 'rgba(210,170,120,0.12)'; g.lineWidth = 1.5; g.stroke();
+      }
+    }
+    texSpecks(g, R, 600, '18,10,6', 0.2, 0.45, 1, 2.2);
+    texSpecks(g, R, 200, '220,190,150', 0.12, 0.3, 1, 1.8);
+    texPebbles(g, R, 55, 3, 9);
+    g.lineCap = 'round';
+    for (let i = 0; i < 26; i++) {
+      let x = R() * TEXN, y = R() * TEXN, an = Math.PI / 2 + (R() - 0.5) * 1.6;
+      const pts = [[x, y]];
+      for (let k = 0; k < 5; k++) { an += (R() - 0.5) * 0.9; x += Math.cos(an) * 8; y += Math.sin(an) * 8; pts.push([x, y]); }
+      g.strokeStyle = `rgba(36,22,14,${0.3 + R() * 0.25})`; g.lineWidth = 1 + R() * 1.2;
+      texWrap(pts[0][0], pts[0][1], 50, (X, Y) => { const dx = X - pts[0][0], dy = Y - pts[0][1]; g.beginPath(); pts.forEach((p, k) => (k ? g.lineTo : g.moveTo).call(g, p[0] + dx, p[1] + dy)); g.stroke(); });
+    }
+  },
+  // still water: a luminous blue with soft deeper and paler pools and faint swirls
+  water(g, R) {
+    g.fillStyle = '#4b98d2'; g.fillRect(0, 0, TEXN, TEXN);
+    texBlotches(g, R, 46, 40, 120, '160,222,248', '22,70,140', 0.3, 0.28);
+    g.lineCap = 'round';
+    for (let i = 0; i < 40; i++) {
+      const x = R() * TEXN, y = R() * TEXN, r = 18 + R() * 40, a0 = R() * TAU, a1 = a0 + 0.6 + R() * 1.2, col = R() < 0.6 ? 'rgba(190,235,255,0.16)' : 'rgba(20,60,120,0.16)', w = 2 + R() * 3;
+      texWrap(x, y, r + 4, (X, Y) => { g.strokeStyle = col; g.lineWidth = w; g.beginPath(); g.ellipse(X, Y, r, r * 0.6, 0, a0, a1); g.stroke(); });
+    }
+  },
+  // ice: pale, frosted, with a few soft cracks
+  ice(g, R) {
+    g.fillStyle = '#cdeaf6'; g.fillRect(0, 0, TEXN, TEXN);
+    texBlotches(g, R, 40, 30, 100, '255,255,255', '120,180,215', 0.4, 0.25);
+    texSpecks(g, R, 200, '255,255,255', 0.3, 0.7, 1, 2.5);
+  },
+  // glints on the surface, drifted across it to make it move
+  ripple(g, R) {
+    g.lineCap = 'round';
+    for (let i = 0; i < 150; i++) {
+      const x = R() * TEXN, y = R() * TEXN, L = 8 + R() * 26, bend = (R() - 0.5) * 10, w = 1.5 + R() * 2.5, a = 0.25 + R() * 0.45;
+      texWrap(x, y, L + 12, (X, Y) => {
+        g.strokeStyle = `rgba(235,250,255,${a})`; g.lineWidth = w;
+        g.beginPath(); g.moveTo(X - L / 2, Y); g.quadraticCurveTo(X, Y + bend, X + L / 2, Y); g.stroke();
+      });
+    }
+    texSpecks(g, R, 60, '255,255,255', 0.5, 0.9, 1.2, 2.4);
+  },
+  // the rock the island hangs from, for walls over the void (L lit, R in shade): above the soil line it only
+  // darkens the soil toward the rock; below, opaque rock in layers fading into the sky by about 3.4 units down
+  // wooden planks for crates: four boards to a unit, grain running along them, dark gaps, a nail at each end
+  wood(g, R) {
+    const bh = TEXU / 4;
+    for (let j = 0; j < TEXN / bh; j++) {
+      const y0 = j * bh, tone = R();
+      g.fillStyle = `rgb(${Math.round(150 + tone * 30)},${Math.round(100 + tone * 22)},${Math.round(58 + tone * 14)})`; g.fillRect(0, y0, TEXN, bh);
+      for (let k = 0; k < 7; k++) {
+        const yy = y0 + 4 + R() * (bh - 8), A = 1 + R() * 2, f = 1 + (R() * 3 | 0), ph = R() * TAU;
+        g.strokeStyle = R() < 0.5 ? 'rgba(80,46,22,0.35)' : 'rgba(230,190,140,0.25)'; g.lineWidth = 1 + R() * 1.5;
+        g.beginPath(); for (let x = 0; x <= TEXN; x += 8) (x ? g.lineTo : g.moveTo).call(g, x, yy + Math.sin(x / TEXN * TAU * f + ph) * A); g.stroke();
+      }
+      g.fillStyle = 'rgba(255,230,190,0.25)'; g.fillRect(0, y0 + 1, TEXN, 2);
+      g.fillStyle = 'rgba(40,22,10,0.6)'; g.fillRect(0, y0 + bh - 3, TEXN, 3);
+      for (const nx of [TEXU * 0.12, TEXU * 0.88, TEXU * 1.12, TEXU * 1.88, TEXU * 2.12, TEXU * 2.88, TEXU * 3.12, TEXU * 3.88]) {
+        g.fillStyle = 'rgba(40,30,26,0.7)'; g.beginPath(); g.arc(nx, y0 + bh / 2, 2.2, 0, TAU); g.fill();
+      }
+    }
+    for (let i = 0; i <= 4; i++) { g.fillStyle = 'rgba(40,22,10,0.5)'; g.fillRect(i * TEXU - 2, 0, 4, TEXN); }
+  },
+  // soot left where grass burned: soft dark patches and grey flecks
+  ash(g, R) {
+    texBlotches(g, R, 40, 18, 60, '40,32,30', '14,10,10', 0.55, 0.6);
+    texSpecks(g, R, 400, '120,110,104', 0.3, 0.6, 1, 2.4);
+    texSpecks(g, R, 300, '10,8,8', 0.3, 0.6, 1, 2.6);
+  },
+  // broad patches over the cliffs, many tiles across, so long cliffs don't look the same all along
+  soilMacro(g, R) {
+    texBlotches(g, R, 26, 50, 150, '220,170,120', '24,12,18', 0.3, 0.42);
+    texBlotches(g, R, 10, 60, 140, '150,66,36', '150,66,36', 0.16, 0.16);
+    texBlotches(g, R, 8, 40, 110, '96,128,64', '96,128,64', 0.18, 0.18);
+  },
+  underL(g, R) { texUnder(g, R, false, TEXU, TEXN, null); },
+  underR(g, R) { texUnder(g, R, true, TEXU, TEXN, null); },
+};
+// U texels to a world unit; the texture is W wide and 4 units tall (z 0 at the top row, −4 at the bottom)
+function texUnder(g, R, dark, U, W, soil) {
+  const top = U, end = U * 3.4, H = U * 4;
+  g.save(); g.beginPath(); g.rect(0, top, W, H - top); g.clip();
+  if (soil) {
+    // the painted soil, carried on down and dimmed toward the rock's shadowed underside
+    for (let y = 0; y < H; y += soil.naturalHeight) g.drawImage(soil, 0, y, W, soil.naturalHeight);
+    const dg = g.createLinearGradient(0, top, 0, end); dg.addColorStop(0, 'rgba(26,14,30,0.42)'); dg.addColorStop(1, 'rgba(26,14,30,0.8)');
+    g.fillStyle = dg; g.fillRect(0, top, W, H - top);
+    if (dark) { g.fillStyle = 'rgba(20,10,24,0.22)'; g.fillRect(0, top, W, H - top); }
+  } else {
+    g.fillStyle = dark ? '#2e2230' : '#3c2c3a'; g.fillRect(0, top, W, H - top);
+    for (let k = 0; k < 9; k++) {
+      const y0 = top + 14 + k * 34 + R() * 10, A = 3 + R() * 5, f = 1 + (R() * 3 | 0), ph = R() * TAU;
+      g.beginPath(); for (let x = 0; x <= W; x += 8) (x ? g.lineTo : g.moveTo).call(g, x, y0 + Math.sin(x / W * TAU * f + ph) * A);
+      g.strokeStyle = R() < 0.5 ? 'rgba(120,96,110,0.35)' : 'rgba(14,8,16,0.4)'; g.lineWidth = 2 + R() * 3; g.stroke();
+    }
+    texBlotches(g, R, 40, 20, 60, '140,110,120', '10,6,14', 0.15, 0.25);
+    texSpecks(g, R, 300, '10,6,12', 0.2, 0.4, 1, 2);
+  }
+  g.restore();
+  // fade it out downward
+  const m = g.createLinearGradient(0, top, 0, end);
+  m.addColorStop(0, 'rgba(0,0,0,1)'); m.addColorStop(0.5, 'rgba(0,0,0,0.78)'); m.addColorStop(1, 'rgba(0,0,0,0)');
+  g.globalCompositeOperation = 'destination-in'; g.fillStyle = m; g.fillRect(0, top, W, H - top);
+  g.globalCompositeOperation = 'source-over';
+  // above the soil line: the soil itself (painted version only), darkening toward the rock
+  if (soil) {
+    g.drawImage(soil, 0, 0, W, soil.naturalHeight);
+    if (dark) { g.fillStyle = 'rgba(20,10,24,0.22)'; g.fillRect(0, 0, W, top); }
+  }
+  const sg = g.createLinearGradient(0, 0, 0, top);
+  sg.addColorStop(0, 'rgba(16,8,20,0)'); sg.addColorStop(1, dark ? 'rgba(16,8,20,0.5)' : 'rgba(16,8,20,0.42)');
+  g.fillStyle = sg; g.fillRect(0, 0, W, top);
+}
+/* Painted textures (art/tex-*.jpg, made in the storybook painting's style) take over from the drawn ones as
+   they load. `span` is how many world units one copy of a painting covers. Stone keeps the drawn slab edges and
+   shading over the painting; the soil also makes the painted rock below the rim. */
+const TEX_SRC = {};
+const TEX_ART = { grass: { file: 'tex-grass', span: 3 }, stone: { file: 'tex-stone', span: 2 }, soil: { file: 'tex-soil', span: 2.5 }, water: { file: 'tex-water', span: 5 }, ice: { file: 'tex-ice', span: 2 }, fall: { file: 'tex-fall', span: 2 }, wood: { file: 'tex-wood', span: 1 }, runestone: { file: 'tex-runestone', span: 1.6 } };
+for (const k in TEX_ART) {
+  if (typeof Image === 'undefined') break;
+  const im = new Image();
+  im.onload = () => { try { paintedTex(k, im); } catch (e) { console.warn('texture', k, e); } };
+  im.src = `art/${TEX_ART[k].file}.jpg?v=3`;
+}
+function paintedTex(k, im) {
+  const span = TEX_ART[k].span, W = im.naturalWidth, H = im.naturalHeight, U = W / span;
+  const mk = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+  if (k === 'grass' || k === 'water' || k === 'ice' || k === 'fall' || k === 'wood' || k === 'runestone') TEX_SRC[k] = { c: im, u: U };
+  else if (k === 'stone') {
+    for (const wall of [false, true]) {
+      const c = mk(W, H), g = c.getContext('2d');
+      g.drawImage(im, 0, 0);
+      g.globalCompositeOperation = 'multiply'; g.fillStyle = wall ? '#b4ae8c' : '#e6d6aa'; g.fillRect(0, 0, W, H);
+      g.globalCompositeOperation = 'source-over';
+      texSlabs(g, mulberry(wall ? 31 : 17), wall, U, W, true);
+      TEX_SRC[wall ? 'stoneSide' : 'stoneTop'] = { c, u: U };
+    }
+  } else if (k === 'soil') {
+    TEX_SRC.soil = { c: im, u: U };
+    for (const dark of [false, true]) {
+      const c = mk(W, Math.round(U * 4)), g = c.getContext('2d');
+      texUnder(g, null, dark, U, W, im);
+      TEX_SRC[dark ? 'underR' : 'underL'] = { c, u: U };
+    }
+  }
+}
+function texSource(name) {
+  if (TEX_SRC[name]) return TEX_SRC[name];
+  const c = document.createElement('canvas'); c.width = c.height = TEXN;
+  TEX_PAINT[name](c.getContext('2d'), mulberry(name.length * 977 + name.charCodeAt(0) * 31));
+  return TEX_SRC[name] = { c, u: name === 'soilMacro' ? 56 : TEXU, drawn: true };
+}
+function texPattern(g, name) {
+  if (!texOK) return null;
+  let M = texPats.get(g); if (!M) texPats.set(g, M = {});
+  const S = texSource(name);
+  if (M[name] && M[name].src === S) return M[name].p;
+  try { M[name] = { src: S, p: g.createPattern(S.c, 'repeat') }; } catch (e) { texOK = false; return null; }
+  return M[name].p;
+}
+const texUnit = name => texSource(name).u;
+// lay a texture on a top face at height z
+function texTop(g, name, z, quad, alpha = 1, ox = 0, oy = 0) {
+  const P = texPattern(g, name); if (!P) return;
+  const s = cam.s / texUnit(name), o = proj(ox, oy, z);
+  P.setTransform(new DOMMatrix([TW * 0.5 * s, TH * 0.5 * s, -TW * 0.5 * s, TH * 0.5 * s, o[0], o[1]]));
+  const ga = g.globalAlpha; g.globalAlpha = ga * alpha; g.fillStyle = P; poly(g, quad); g.fill(); g.globalAlpha = ga;
+}
+// and on a wall: R the plane x = c.x + 1 (running along y), otherwise the plane y = c.y + 1 (running along x)
+function texSide(g, name, c, R, quad, alpha = 1, wave = null) {
+  texWall(g, name, R, R ? c.x + 1 : c.y + 1, quad, alpha, wave, R ? c.y : c.x);
+}
+// a texture on any upright plane: R the plane x = pc, otherwise y = pc; `a0` is where a waved face starts along it.
+// Across, the texture runs by u = x - y (how far across the screen a point is), not by distance along the wall, and
+// down by height: so two faces meeting at any corner, outward or inward, carry it on unbroken round the turn.
+function texWall(g, name, R, pc, quad, alpha = 1, wave = null, a0 = 0) {
+  const P = texPattern(g, name); if (!P) return;
+  const s = cam.s / texUnit(name), o = proj(pc, pc, 0), sl = R ? -TH * 0.5 : TH * 0.5;
+  if (wave) {
+    // the texture is lifted by w(u) world units, w running straight from wave[0] at the face's start to wave[1] at
+    // its end; with the same heights at shared ends, the layers flow on unbroken from face to face
+    const us = R ? pc - a0 : a0 - pc, k = (wave[1] - wave[0]) * (R ? -1 : 1), w0 = wave[0] - k * us;
+    P.setTransform(new DOMMatrix([TW * 0.5 * s, (sl - k * TZ) * s, 0, TZ * s, o[0], o[1] - w0 * TZ * cam.s]));
+  } else
+  P.setTransform(new DOMMatrix([TW * 0.5 * s, sl * s, 0, TZ * s, o[0], o[1]]));
+  const ga = g.globalAlpha; g.globalAlpha = ga * alpha; g.fillStyle = P; poly(g, quad); g.fill(); g.globalAlpha = ga;
+}
+// the same, laid on a curved strip of wall: mapped exactly at the strip's two ends (world points e0 and e1, lifted
+// by wave[0] and wave[1]), so it meets the flat walls either side without a break
+function texChord(g, name, e0, e1, quad, alpha = 1, wave = null) {
+  const P = texPattern(g, name); if (!P) return;
+  const s = cam.s / texUnit(name), u0 = e0[0] - e0[1], u1 = e1[0] - e1[1], du = u1 - u0;
+  const Y0 = (e0[0] + e0[1]) * TH * 0.5 - (wave ? wave[0] : 0) * TZ, Y1 = (e1[0] + e1[1]) * TH * 0.5 - (wave ? wave[1] : 0) * TZ;
+  const m = Math.abs(du) > 1e-3 ? (Y1 - Y0) / du : 0;
+  P.setTransform(new DOMMatrix([TW * 0.5 * s, m * s, 0, TZ * s, cam.ox, cam.oy + (Y0 - u0 * m) * cam.s]));
+  const ga = g.globalAlpha; g.globalAlpha = ga * alpha; g.fillStyle = P; poly(g, quad); g.fill(); g.globalAlpha = ga;
+}
+/* A block drawn like the land: textured top and walls, the far wall in shade, darker toward the foot, light catching
+   its near edges, no ink. Used for things that stand on the land: ice blocks, raised slabs, the gate, crates. */
+function texturedBox(g, x0, y0, x1, y1, z0, z1, o) {
+  const s = cam.s, A = proj(x0, y0, z1), B = proj(x1, y0, z1), C = proj(x1, y1, z1), D = proj(x0, y1, z1);
+  const Bb = proj(x1, y0, z0), Cb = proj(x1, y1, z0), Db = proj(x0, y1, z0), Rf = [B, C, Cb, Bb], Lf = [D, C, Cb, Db], Tf = [A, B, C, D];
+  const ga = g.globalAlpha; if (o.alpha != null) g.globalAlpha = ga * o.alpha;
+  for (const [R, F, col, dark] of [[true, Rf, o.colR, 0.3], [false, Lf, o.colL, 0.08]]) {
+    g.fillStyle = col; poly(g, F); g.fill();
+    if (o.side) texWall(g, o.side, R, R ? x1 : y1, F, o.sideAlpha ?? 1);
+    const sg = g.createLinearGradient(0, Math.min(F[0][1], F[1][1]), 0, Math.max(F[2][1], F[3][1]));
+    sg.addColorStop(0, `rgba(14,10,20,${dark * 0.5})`); sg.addColorStop(1, `rgba(14,10,20,${dark + 0.3})`);
+    g.fillStyle = sg; poly(g, F); g.fill();
+    if (o.tint) { g.fillStyle = o.tint; poly(g, F); g.fill(); }
+  }
+  g.fillStyle = o.colT; poly(g, Tf); g.fill();
+  if (o.top) texTop(g, o.top, z1, Tf, o.topAlpha ?? 1);
+  if (o.tint) { g.fillStyle = o.tint; poly(g, Tf); g.fill(); }
+  // light along the rounded near edges
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  g.strokeStyle = o.rim || 'rgba(255,245,220,0.4)'; g.lineWidth = 1.4 * s;
+  g.beginPath(); g.moveTo(B[0], B[1]); g.lineTo(C[0], C[1]); g.lineTo(D[0], D[1]); g.stroke();
+  g.globalAlpha *= 0.55; g.beginPath(); g.moveTo(C[0], C[1]); g.lineTo(Cb[0], Cb[1]); g.moveTo(D[0], D[1]); g.lineTo(A[0], A[1]); g.lineTo(B[0], B[1]); g.stroke();
+  g.globalAlpha = ga;
+}
+
+/* The island's shape. Its middle (in world units) and reach, so the rock beneath can hang deepest under the
+   middle and taper to the rim. Worked out once per level. */
+function isleShape() {
+  if (World._isleFor === World.cells && World._isle) return World._isle;
+  let sx = 0, sy = 0, n = 0;
+  for (const c of World.cells) if (!c.void) { sx += c.x + 0.5; sy += c.y + 0.5; n++; }
+  const cx = n ? sx / n : 0, cy = n ? sy / n : 0;
+  let m = 0;
+  for (const c of World.cells) if (!c.void) m = Math.max(m, Math.hypot(c.x + 0.5 - cx, c.y + 0.5 - cy));
+  World._isleFor = World.cells;
+  return World._isle = { cx, cy, m: m + 0.8 };
+}
+// a point of the rock's lower edge, hanging under the world point (wx, wy): how far it drops, and where it ends
+// up after leaning in toward the middle. The same point gives the same answer from both faces that share it.
+function rockAt(wx, wy) {
+  const I = isleShape(), dx = I.cx - wx, dy = I.cy - wy, dd = Math.hypot(dx, dy), k = clamp(1 - dd / I.m, 0, 1);
+  const L = 0.3 + 2.0 * Math.pow(k, 1.15);
+  const sh = dd > 0 ? Math.min(dd, L * 0.35) / dd : 0;
+  return [wx + dx * sh, wy + dy * sh, L];
+}
+// draw in a wall's own plane: x runs along the wall in world units × TEXU, y is height × −TEXU (so textures
+// and gradients line up from one tile's wall to the next)
+function onPlane(g, c, R, fn) {
+  const s = cam.s / TEXU, o = R ? proj(c.x + 1, 0, 0) : proj(0, c.y + 1, 0), ux = R ? -TW * 0.5 : TW * 0.5;
+  g.save(); g.transform(ux * s, TH * 0.5 * s, 0, TZ * s, o[0], o[1]); fn(TEXU); g.restore();
+}
+const SOIL_DEPTH = 1.0, ROCK_FLOOR = -3.5;
+// how far the rock hangs at a point on the rim, as a share of its usual reach: soft lumps that run on unbroken
+// from wall to wall and round every corner
+function rockKnot(wx, wy) { return 1 + 0.17 * Math.sin(wx * 2.9 + wy * 1.3 + 0.4) + 0.12 * Math.sin(wy * 3.7 - wx * 1.7 + 2.1); }
+// how far the soil's layers are lifted at a world point on the island's rim: two slow, crossing swells
+function soilWave(wx, wy) { return 0.38 * Math.sin(wx * 0.8 + wy * 0.55) + 0.22 * Math.sin(wx * 0.31 - wy * 1.3 + 2); }
+function soilWaveFor(c, R) {
+  return R ? [soilWave(c.x + 1, c.y), soilWave(c.x + 1, c.y + 1)] : [soilWave(c.x, c.y + 1), soilWave(c.x + 1, c.y + 1)];
+}
+// a stone bedded in the soil here and there, kept clear of the wall's rounded ends (where the curve is drawn over it)
+function cliffDetails(g, c, R, st, bot, t, su0 = 0, su1 = 1) {
+  const x = c.x, y = c.y, a0 = R ? y : x, sd = x * 5.13 + y * 2.71 + (R ? 0.37 : 0.91);
+  if (hash2(sd, 1.1) < 0.42 && st - bot > 0.5) {
+    const r = 0.1 + 0.09 * hash2(sd, 4.4), lo = su0 + r + 0.06, hi = su1 - r - 0.06;
+    if (hi <= lo) return;
+    const u = lo + (hi - lo) * hash2(sd, 2.2), zc = st - 0.32 - Math.min(0.5, st - bot - 0.45) * hash2(sd, 3.3);
+    onPlane(g, c, R, U => {
+      const cx = (a0 + u) * U, cy = -zc * U, pts = [];
+      for (let i = 0; i < 9; i++) { const a = i / 9 * TAU, j = 0.82 + 0.3 * hash2(sd + i, 5.5); pts.push([cx + Math.cos(a) * r * U * j, cy + Math.sin(a) * r * U * 0.72 * j]); }
+      g.fillStyle = 'rgba(16,10,8,0.4)'; g.beginPath(); pts.forEach((p, i) => (i ? g.lineTo : g.moveTo).call(g, p[0] + 3, p[1] + 7)); g.closePath(); g.fill();
+      const gr = g.createLinearGradient(cx - r * U, cy - r * U * 0.7, cx + r * U * 0.6, cy + r * U * 0.7);
+      gr.addColorStop(0, '#b3ab8e'); gr.addColorStop(0.5, '#7c7660'); gr.addColorStop(1, '#4a4436');
+      g.fillStyle = gr; g.beginPath(); pts.forEach((p, i) => (i ? g.lineTo : g.moveTo).call(g, p[0], p[1])); g.closePath(); g.fill();
+      g.strokeStyle = 'rgba(34,22,16,0.45)'; g.lineWidth = 4; g.stroke();
+      g.fillStyle = 'rgba(255,245,220,0.3)'; g.beginPath(); g.ellipse(cx - r * U * 0.3, cy - r * U * 0.35, r * U * 0.35, r * U * 0.16, -0.3, 0, TAU); g.fill();
+    });
+  }
+}
+/* Raised stone is drawn as rounded blocks: wherever the land drops away across both edges of a top corner, that
+   corner is rounded off (radius ROUND_R), and the upright corner below it becomes a curve. The bit of tile the
+   rounding leaves open is filled with the ground beside it. Corners are A, B, C, D (k = 0..3). */
+const ROUND_R = 0.24;
+function stoneCorners(c) {
+  if (!texOK || c.icy || c.h < 1 || c.void) return null;
+  const x = c.x, y = c.y, z = c.h, drop = n => !n || n.void || n.h < z - 0.01;
+  const e = [drop(cellI(x, y - 1)), drop(cellI(x + 1, y)), drop(cellI(x, y + 1)), drop(cellI(x - 1, y))];
+  const k = [e[3] && e[0], e[0] && e[1], e[1] && e[2], e[2] && e[3]];
+  return k.some(v => v) ? k : null;
+}
+// Where stone blocks of one height stand side by side, each still reads as its own block: their shared corners are
+// nicked (radius NOTCH_R) into a small dark gap, a groove runs along the shared top edge, and another down the
+// walls where they run on from one block into the next.
+const NOTCH_R = 0.1;
+const sameStone = (c, n) => !!n && !n.void && !n.icy && n.h >= 1 && Math.abs(n.h - c.h) < 0.01;
+function stoneJoins(c, rc) {
+  if (!texOK || c.icy || c.h < 1 || c.void) return null;
+  const x = c.x, y = c.y, e = [cellI(x, y - 1), cellI(x + 1, y), cellI(x, y + 1), cellI(x - 1, y)].map(n => sameStone(c, n));
+  const jc = [0, 1, 2, 3].map(k => !(rc && rc[k]) && (e[(k + 3) % 4] || e[k]));
+  return jc.some(v => v) ? { jc, e } : null;
+}
+// does this stone wall run straight on into the next block's (so a groove marks the join)?
+function stoneWallGoesOn(c, R, step) {
+  const m = R ? cellI(c.x, c.y + step) : cellI(c.x + step, c.y);
+  if (!sameStone(c, m)) return false;
+  const n = R ? cellI(c.x + 1, c.y + step) : cellI(c.x + step, c.y + 1);
+  return !n || n.void || n.h < c.h - 0.001;
+}
+// The island's own outer corners round off too: where a grass tile's two edges both open onto the sky, its top,
+// its soil wall, the grass lip and the rock below all turn the corner in a curve of radius SOIL_R.
+const SOIL_R = 0.24;
+function soilCorners(c) {
+  if (!texOK || c.icy || c.void || c.h < 0 || c.h >= 1) return null;
+  const x = c.x, y = c.y, open = n => !n || n.void;
+  const e = [open(cellI(x, y - 1)), open(cellI(x + 1, y)), open(cellI(x, y + 1)), open(cellI(x - 1, y))];
+  const k = [e[3] && e[0], e[0] && e[1], e[1] && e[2], e[2] && e[3]];
+  return k.some(v => v) ? k : null;
+}
+function soilCornerCurve(g, c, k) {
+  // drawn as whole strips round the curve (one fill per layer), not slice by slice: these corners are many on
+  // spiky islands, and each fill of a texture costs
+  const x = c.x, y = c.y, st = Math.min(c.h, 0), bot = st - SOIL_DEPTH, r = SOIL_R, s = cam.s, C = [[0, 0], [1, 0], [1, 1], [0, 1]][k];
+  const ox = C[0] ? C[0] - r : r, oy = C[1] ? C[1] - r : r;
+  const span = { 1: [-Math.PI / 4, 0], 2: [0, Math.PI / 2], 3: [Math.PI / 2, Math.PI * 3 / 4] }[k]; if (!span) return;
+  const N = k === 2 ? 6 : 3, A = [];
+  for (let i = 0; i <= N; i++) A.push(span[0] + (span[1] - span[0]) * i / N + (i === N ? 0.02 : 0));
+  const wx = a => x + ox + Math.cos(a) * r, wy = a => y + oy + Math.sin(a) * r, P = (a, z) => proj(wx(a), wy(a), z);
+  const strip = (z0, z1) => [...A.map(a => P(a, z0)), ...A.slice().reverse().map(a => P(a, z1))];
+  const plane = k === 1, wv = soilWaveFor(c, plane);
+  const p0 = P(A[0], st), p1 = P(A[N], st);
+  // which way it faces: across the curve, from the shaded R side to the lit L side
+  const fR = clamp(span[0] / (Math.PI / 2), 0, 1), fL = clamp(span[1] / (Math.PI / 2), 0, 1), mix = f => [Math.round(86 + 24 * f), Math.round(58 + 18 * f), Math.round(40 + 11 * f)];
+  const grad = (cA, cB) => { const gr = g.createLinearGradient(p0[0], 0, p1[0], 0); gr.addColorStop(0, cA); gr.addColorStop(1, cB); return gr; };
+  // the soil
+  const soil = strip(st, bot), cA = mix(fR), cB = mix(fL);
+  g.fillStyle = grad(`rgb(${cA})`, `rgb(${cB})`); poly(g, soil); g.fill();
+  const e0 = [wx(A[0]), wy(A[0])], e1 = [wx(A[N]), wy(A[N])], cv = [soilWave(e0[0], e0[1]), soilWave(e1[0], e1[1])], under = plane ? 'underR' : 'underL';
+  texChord(g, 'soil', e0, e1, soil, 1, cv); texChord(g, 'soilMacro', e0, e1, soil); texChord(g, under, e0, e1, soil, 1, cv);
+  // the rock below, leaning in and fading like the rest
+  const room = bot - ROCK_FLOOR;
+  if (room > 0.05) {
+    const low = A.slice().reverse().map(a => { const q = rockAt(wx(a), wy(a)); return proj(q[0], q[1], bot - Math.min(q[2] * rockKnot(wx(a), wy(a)), room)); });
+    texChord(g, under, e0, e1, [...A.map(a => P(a, bot)), ...low], 1, cv);
+  }
+  // the shaded side of the curve a touch darker, as on the walls
+  g.fillStyle = grad(`rgba(10,6,12,${(0.2 * (1 - fR)).toFixed(3)})`, `rgba(10,6,12,${(0.2 * (1 - fL)).toFixed(3)})`); poly(g, soil); g.fill();
+  // the grass lip rolling round it, with its shadow
+  const sh = strip(st - 0.06, st - 0.42), sg = g.createLinearGradient(0, P(A[0], st - 0.06)[1], 0, P(A[0], st - 0.42)[1]);
+  sg.addColorStop(0, 'rgba(14,8,18,0.5)'); sg.addColorStop(1, 'rgba(14,8,18,0)');
+  g.fillStyle = sg; poly(g, sh); g.fill();
+  const dz = A.map(a => 0.13 + 0.05 * Math.sin(a * 9 + x * 1.7 + y));
+  const lip = [...A.map(a => P(a, st)), ...A.slice().reverse().map((a, i) => P(a, st - dz[N - i]))];
+  const lg = g.createLinearGradient(0, p0[1], 0, P(A[0], st - 0.2)[1]);
+  lg.addColorStop(0, fL > 0.5 ? '#8aae4a' : '#78993f'); lg.addColorStop(1, fL > 0.5 ? '#557636' : '#45632a');
+  g.fillStyle = lg; poly(g, lip); g.fill();
+  texChord(g, 'grass', e0, e1, lip, 0.7);
+  g.lineCap = 'round';
+  g.strokeStyle = 'rgba(26,40,16,0.32)'; g.lineWidth = 1.5 * s; g.beginPath(); A.forEach((a, i) => { const q = P(a, st - dz[i]); (i ? g.lineTo : g.moveTo).call(g, q[0], q[1]); }); g.stroke();
+  g.strokeStyle = 'rgba(214,236,150,0.45)'; g.beginPath(); A.forEach((a, i) => { const q = P(a, st); (i ? g.lineTo : g.moveTo).call(g, q[0], q[1] + 0.8 * s); }); g.stroke();
+}
+// The island's inward corners are filled in with a curve too. Seen from the front, an inward corner is where one
+// tile's R wall meets the L wall of the tile up and to its right across an empty cell; each wall stops SOIL_R short of
+// the corner, and soilFillet fills the gap with grass, soil, lip and rock curving round from one wall to the other.
+function soilConcave(c, R) {
+  if (!texOK || c.icy || c.void || c.h < 0 || c.h >= 1) return false;
+  const x = c.x, y = c.y, N = R ? cellI(x + 1, y) : cellI(x, y + 1);
+  if (N && !N.void) return false;
+  const Q = R ? cellI(x + 1, y - 1) : cellI(x - 1, y + 1), M = R ? cellI(x, y - 1) : cellI(x - 1, y);
+  return !!Q && !Q.void && !Q.icy && Math.abs(Q.h - c.h) < 0.01 && !!M && !M.void;
+}
+// drawn with the tile whose L wall turns the corner (the later of the two in drawing order)
+function soilFillet(g, c) {
+  const X = c.x, Y = c.y + 1, r = SOIL_R, st = Math.min(c.h, 0), bot = st - SOIL_DEPTH, s = cam.s, N = 5, A = [];
+  for (let i = 0; i <= N; i++) A.push(Math.PI + Math.PI / 2 * i / N);
+  const wx = a => X + r + Math.cos(a) * r, wy = a => Y + r + Math.sin(a) * r, P = (a, z) => proj(wx(a), wy(a), z);
+  const strip = (z0, z1) => [...A.map(a => P(a, z0)), ...A.slice().reverse().map(a => P(a, z1))], wv = soilWaveFor(c, false);
+  // the grass filling the corner
+  const T = growPoly([[X, Y], ...A.map(a => [wx(a), wy(a)])].map(([u, v]) => proj(u, v, st)), 0.5);
+  g.fillStyle = shade('#6f8a44', 1); poly(g, T); g.fill(); texTop(g, 'grass', st, T);
+  // the soil curving from the one wall round to the other, shaded like the R wall at one end and the L at the other
+  const soil = strip(st, bot), pa = P(A[0], st), pb = P(A[N], st), gr = g.createLinearGradient(pa[0], 0, pb[0], 0);
+  gr.addColorStop(0, '#563a28'); gr.addColorStop(1, '#6e4c33');
+  g.fillStyle = gr; poly(g, soil); g.fill();
+  const e0 = [wx(A[0]), wy(A[0])], e1 = [wx(A[N]), wy(A[N])], cv = [soilWave(e0[0], e0[1]), soilWave(e1[0], e1[1])];
+  texChord(g, 'soil', e0, e1, soil, 1, cv); texChord(g, 'soilMacro', e0, e1, soil); texChord(g, 'underL', e0, e1, soil, 1, cv);
+  const room = bot - ROCK_FLOOR;
+  if (room > 0.05) {
+    const low = A.slice().reverse().map(a => { const q = rockAt(wx(a), wy(a)); return proj(q[0], q[1], bot - Math.min(q[2] * rockKnot(wx(a), wy(a)), room)); });
+    texChord(g, 'underL', e0, e1, [...A.map(a => P(a, bot)), ...low], 1, cv);
+  }
+  const dg = g.createLinearGradient(pa[0], 0, pb[0], 0); dg.addColorStop(0, 'rgba(10,6,12,0.22)'); dg.addColorStop(1, 'rgba(10,6,12,0.04)');
+  g.fillStyle = dg; poly(g, soil); g.fill();
+  // the lip and its shadow
+  const sh = strip(st - 0.06, st - 0.42), sg = g.createLinearGradient(0, P(A[0], st - 0.06)[1], 0, P(A[0], st - 0.42)[1]);
+  sg.addColorStop(0, 'rgba(14,8,18,0.5)'); sg.addColorStop(1, 'rgba(14,8,18,0)');
+  g.fillStyle = sg; poly(g, sh); g.fill();
+  const dz = A.map(a => 0.13 + 0.05 * Math.sin(a * 9 + X * 1.7 + Y));
+  const lip = [...A.map(a => P(a, st)), ...A.slice().reverse().map((a, i) => P(a, st - dz[N - i]))];
+  const lg = g.createLinearGradient(0, pa[1], 0, P(A[0], st - 0.2)[1]); lg.addColorStop(0, '#80a344'); lg.addColorStop(1, '#4d6c30');
+  g.fillStyle = lg; poly(g, lip); g.fill(); texChord(g, 'grass', e0, e1, lip, 0.7);
+  g.lineCap = 'round';
+  g.strokeStyle = 'rgba(26,40,16,0.32)'; g.lineWidth = 1.5 * s; g.beginPath(); A.forEach((a, i) => { const q = P(a, st - dz[i]); (i ? g.lineTo : g.moveTo).call(g, q[0], q[1]); }); g.stroke();
+  g.strokeStyle = 'rgba(214,236,150,0.45)'; g.beginPath(); A.forEach((a, i) => { const q = P(a, st); (i ? g.lineTo : g.moveTo).call(g, q[0], q[1] + 0.8 * s); }); g.stroke();
+}
+// the dark nick between blocks at a shared corner
+function cornerNotch(g, c, k) {
+  const x = c.x, y = c.y, z = c.h, C = [[0, 0], [1, 0], [1, 1], [0, 1]][k], r = NOTCH_R;
+  const ox = C[0] ? C[0] - r : r, oy = C[1] ? C[1] - r : r, a0 = [Math.PI, -Math.PI / 2, 0, Math.PI / 2][k];
+  const pts = [[C[0], C[1]]];
+  for (let i = 0; i <= 6; i++) { const a = a0 + i / 6 * Math.PI / 2; pts.push([ox + Math.cos(a) * r, oy + Math.sin(a) * r]); }
+  g.fillStyle = 'rgba(26,24,18,0.85)'; poly(g, growPoly(pts.map(([u, v]) => proj(x + u, y + v, z)), 0.4)); g.fill();
+}
+// the ground level beside corner k: the highest neighbour there that is lower than the block (or the soil's top)
+function cornerBase(c, k) {
+  const [dx, dy] = DIAG[k];
+  let zb = 0;
+  for (const n of [cellI(c.x + dx, c.y), cellI(c.x, c.y + dy), cellI(c.x + dx, c.y + dy)]) if (n && !n.void && n.h < c.h - 0.01) zb = Math.max(zb, n.h);
+  return zb;
+}
+// a top's outline in its unit square, corners rounded where asked; each point remembers which edge (or arc) it ends
+function roundedOutline(radii) {
+  const pts = [], C = [[0, 0], [1, 0], [1, 1], [0, 1]], a0 = [Math.PI, -Math.PI / 2, 0, Math.PI / 2];
+  for (let k = 0; k < 4; k++) {
+    const [cx, cy] = C[k], r = radii[k];
+    if (!r) { pts.push([cx, cy]); continue; }
+    const ox = cx ? cx - r : r, oy = cy ? cy - r : r;
+    for (let i = 0; i <= 6; i++) { const a = a0[k] + i / 6 * Math.PI / 2; pts.push([ox + Math.cos(a) * r, oy + Math.sin(a) * r]); }
+  }
+  return pts;
+}
+function growPoly(P, px) {
+  let cx = 0, cy = 0; for (const p of P) { cx += p[0]; cy += p[1]; } cx /= P.length; cy /= P.length;
+  return P.map(p => { const dx = p[0] - cx, dy = p[1] - cy, L = Math.hypot(dx, dy) || 1; return [p[0] + dx / L * px * 1.8, p[1] + dy / L * px]; });
+}
+// the open bit of tile beside a rounded corner, filled with the ground that lies there
+function cornerGround(g, c, k) {
+  const zb = cornerBase(c, k), x = c.x, y = c.y, C = [[0, 0], [1, 0], [1, 1], [0, 1]][k], r = ROUND_R;
+  const ox = C[0] ? C[0] - r : r, oy = C[1] ? C[1] - r : r, a0 = [Math.PI, -Math.PI / 2, 0, Math.PI / 2][k];
+  const pts = [[C[0], C[1]]];
+  for (let i = 0; i <= 6; i++) { const a = a0 + i / 6 * Math.PI / 2; pts.push([ox + Math.cos(a) * r, oy + Math.sin(a) * r]); }
+  const P = growPoly(pts.map(([u, v]) => proj(x + u, y + v, zb)), 0.5);
+  const fake = { h: zb, icy: false };
+  g.fillStyle = topColor(fake, { tone: 0.5 }); poly(g, P); g.fill();
+  texTop(g, zb >= 1 ? 'stoneTop' : zb < -0.01 ? 'dirt' : 'grass', zb, P);
+  // the block's foot shades the ground round the curve
+  const [cx, cy] = proj(x + ox, y + oy, zb), R = r * 1.9 * TW * 0.7071 * cam.s;
+  g.save(); poly(g, P); g.clip();
+  const sg = g.createRadialGradient(cx, cy, R * 0.45, cx, cy, R);
+  sg.addColorStop(0, 'rgba(18,10,30,0.4)'); sg.addColorStop(1, 'rgba(18,10,30,0)');
+  g.fillStyle = sg; g.fillRect(cx - R, cy - R, R * 2, R * 2);
+  g.restore();
+}
+// the curved upright corner of a rounded block, from its top down to the ground beside it; only the part turned
+// toward the viewer (between the R and L walls' facings) is drawn
+function cornerCurve(g, c, k) {
+  const x = c.x, y = c.y, top = c.h, zb = cornerBase(c, k), r = ROUND_R, C = [[0, 0], [1, 0], [1, 1], [0, 1]][k];
+  const ox = C[0] ? C[0] - r : r, oy = C[1] ? C[1] - r : r;
+  const span = { 1: [-Math.PI / 4, 0], 2: [0, Math.PI / 2], 3: [Math.PI / 2, Math.PI * 3 / 4] }[k]; if (!span) return;
+  const N = k === 2 ? 8 : 4, colR = [87, 90, 72], colL = [108, 111, 88];
+  for (let i = 0; i < N; i++) {
+    const a1 = span[0] + (span[1] - span[0]) * i / N, a2 = span[0] + (span[1] - span[0]) * (i + 1) / N, am = (a1 + a2) / 2;
+    const P = (a, z) => proj(x + ox + Math.cos(a) * r, y + oy + Math.sin(a) * r, z);
+    const q = [P(a1, top), P(a2 + 0.02, top), P(a2 + 0.02, zb), P(a1, zb)];
+    // shade by facing: turned toward +x it matches the shaded R wall, toward +y the lit L wall, with a soft
+    // highlight where it faces the light most
+    const f = clamp(am / (Math.PI / 2), 0, 1), hl = Math.max(0, Math.sin((f - 0.45) * Math.PI)) * 18;
+    const col = colR.map((v, j) => Math.round(v + (colL[j] - v) * f + hl));
+    g.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`; poly(g, q); g.fill();
+    texSide(g, 'stoneSide', c, f < 0.5, q, 0.85);
+    const gy0 = q[0][1], gy1 = q[3][1], sg = g.createLinearGradient(0, gy0, 0, gy1);
+    sg.addColorStop(0, `rgba(16,14,24,${0.18 * (1 - f)})`); sg.addColorStop(1, `rgba(16,14,24,${0.55 - 0.13 * f})`);
+    g.fillStyle = sg; poly(g, q); g.fill();
+    const cap = Math.min(0.16, (top - zb) * 0.3), q2 = [P(a1, top), P(a2 + 0.02, top), P(a2 + 0.02, top - cap), P(a1, top - cap)];
+    const cg = g.createLinearGradient(0, q2[0][1], 0, q2[3][1]); cg.addColorStop(0, 'rgba(255,240,205,0.45)'); cg.addColorStop(1, 'rgba(255,240,205,0.06)');
+    g.fillStyle = cg; poly(g, q2); g.fill();
+  }
 }
 
 function drawSideFaces(g, c, d, t) {
-  const x = c.x, y = c.y, top = c.h;
+  const x = c.x, y = c.y, top = c.h, rc = stoneCorners(c), sc = soilCorners(c), cr = rc || sc, R0 = rc ? ROUND_R : SOIL_R;
+  let fillet = false;
   for (const side of ['R', 'L']) {
     const n = side === 'R' ? cellI(x + 1, y) : cellI(x, y + 1);
     let bot, toVoid = false;
-    if (!n || n.void) { bot = top - d.depth - (top > 0 ? top * 0.4 : 0); toVoid = true; }
+    if (!n || n.void) { bot = Math.min(top, 0) - SOIL_DEPTH; toVoid = true; }
     else bot = n.h;
     if (bot >= top - 0.001) continue;
     const P = side === 'R' ? [proj(x + 1, y, top), proj(x + 1, y + 1, top), proj(x + 1, y + 1, bot), proj(x + 1, y, bot)]
       : [proj(x, y + 1, top), proj(x + 1, y + 1, top), proj(x + 1, y + 1, bot), proj(x, y + 1, bot)];
     const face = (za, zb) => side === 'R' ? [proj(x + 1, y, za), proj(x + 1, y + 1, za), proj(x + 1, y + 1, zb), proj(x + 1, y, zb)]
       : [proj(x, y + 1, za), proj(x + 1, y + 1, za), proj(x + 1, y + 1, zb), proj(x, y + 1, zb)];
-    const R = side === 'R', s = cam.s;
-    if (c.icy) { g.fillStyle = R ? '#7fb4d0' : '#a6d6ea'; poly(g, P); g.fill(); g.fillStyle = R ? '#9cd0e6' : '#c4e8f6'; poly(g, face(top, Math.max(bot, top - 0.18))); g.fill(); continue; }
-    // raised stone: pale, mossy blocks above the ground line
+    const R = side === 'R', s = cam.s, a0 = R ? y : x;
+    // where a rounded block's wall starts and ends along its edge
+    let u0 = cr && (R ? cr[1] : cr[3]) ? R0 : 0, u1 = cr && cr[2] ? 1 - R0 : 1, su0 = sc ? u0 : 0, su1 = sc ? u1 : 1;
+    const cc = soilConcave(c, R);
+    if (cc) { u0 = SOIL_R; su0 = SOIL_R; if (!R) fillet = true; }
+    const faceS = (za, zb) => side === 'R' ? [proj(x + 1, y + u0, za), proj(x + 1, y + u1, za), proj(x + 1, y + u1, zb), proj(x + 1, y + u0, zb)]
+      : [proj(x + u0, y + 1, za), proj(x + u1, y + 1, za), proj(x + u1, y + 1, zb), proj(x + u0, y + 1, zb)];
+    // light, once the face is painted (the land carries no ink outlines: faces are told apart by their shading)
+    const finish = () => lightSide(g, c, R, top, bot, P);
+    if (c.icy) {
+      g.fillStyle = R ? '#7fb4d0' : '#a6d6ea'; poly(g, P); g.fill();
+      if (texOK) { texSide(g, 'ice', c, R, P, 0.8); const sg = g.createLinearGradient(0, P[0][1], 0, P[2][1]); sg.addColorStop(0, 'rgba(255,255,255,0.25)'); sg.addColorStop(1, `rgba(30,70,110,${R ? 0.35 : 0.2})`); g.fillStyle = sg; poly(g, P); g.fill(); }
+      else { g.fillStyle = R ? '#9cd0e6' : '#c4e8f6'; poly(g, face(top, Math.max(bot, top - 0.18))); g.fill(); }
+      finish(); continue;
+    }
+    // raised stone: smooth slabs above the ground line, with moss spilling over the top
     if (top > 0.01) {
       const sb = Math.max(bot, 0);
-      g.fillStyle = R ? '#77716a' : '#97907f'; poly(g, face(top, sb)); g.fill();
-      g.strokeStyle = 'rgba(40,32,30,0.25)'; g.lineWidth = 1;
-      for (let z = top - 0.5; z > sb + 0.05; z -= 0.5) { const a = face(z, z)[0], b = face(z, z)[1]; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); }
-      g.fillStyle = R ? '#4f6a32' : '#62803c'; poly(g, face(top, Math.max(sb, top - 0.1))); g.fill();
+      g.fillStyle = R ? '#575a48' : '#6c6f58'; poly(g, faceS(top, sb)); g.fill();
+      if (texOK) {
+        texSide(g, 'stoneSide', c, R, faceS(top, sb));
+        // light falls off down the wall into the shade at its foot, the shaded side darker all over, and the rounded
+        // top edge catches the light
+        onPlane(g, c, R, U => {
+          const Z = z => -z * U, a = (R ? y : x) * U;
+          const sg = g.createLinearGradient(0, Z(top), 0, Z(sb));
+          sg.addColorStop(0, R ? 'rgba(16,14,24,0.18)' : 'rgba(16,14,24,0)'); sg.addColorStop(0.55, R ? 'rgba(16,14,24,0.3)' : 'rgba(16,14,24,0.12)'); sg.addColorStop(1, R ? 'rgba(16,14,24,0.55)' : 'rgba(16,14,24,0.42)');
+          g.fillStyle = sg; g.fillRect(a + u0 * U, Z(top), (u1 - u0) * U, Z(sb) - Z(top));
+          // the top slab: a band lighter than the block below, rounded over at its top edge, casting a soft
+          // shadow onto the block just beneath its lip
+          const cap = Math.min(0.16, (top - sb) * 0.3);
+          if (cap > 0.04) {
+            const cg = g.createLinearGradient(0, Z(top), 0, Z(top - cap));
+            cg.addColorStop(0, 'rgba(255,240,205,0.5)'); cg.addColorStop(0.3, 'rgba(255,240,205,0.2)'); cg.addColorStop(1, 'rgba(255,240,205,0.08)');
+            g.fillStyle = cg; g.fillRect(a + u0 * U, Z(top), (u1 - u0) * U, Z(top - cap) - Z(top));
+            const ug = g.createLinearGradient(0, Z(top - cap), 0, Z(top - cap - 0.14));
+            ug.addColorStop(0, 'rgba(18,14,10,0.42)'); ug.addColorStop(1, 'rgba(18,14,10,0)');
+            g.fillStyle = ug; g.fillRect(a + u0 * U, Z(top - cap), (u1 - u0) * U, Z(top - cap - 0.14) - Z(top - cap));
+          }
+          // rounded upright corners: where the block turns a corner toward us, the lit wall brightens and the
+          // shaded wall darkens as they roll round it
+          const nearOpen = R ? (() => { const n = cellI(x, y + 1); return !n || n.void || n.h < top - 0.01; })()
+            : (() => { const n = cellI(x + 1, y); return !n || n.void || n.h < top - 0.01; })();
+          // a groove down the wall where it runs on into the next block's
+          for (const [step, ue] of [[-1, 0], [1, 1]]) {
+            if (!stoneWallGoesOn(c, R, step)) continue;
+            const ex = (a0 + ue) * U, dir = ue ? -1 : 1;
+            const dg = g.createLinearGradient(ex, 0, ex + dir * 0.06 * U, 0);
+            dg.addColorStop(0, 'rgba(22,20,14,0.6)'); dg.addColorStop(1, 'rgba(22,20,14,0)');
+            g.fillStyle = dg; g.fillRect(Math.min(ex, ex + dir * 0.06 * U), Z(top), 0.06 * U, Z(sb) - Z(top));
+            const lg = g.createLinearGradient(ex + dir * 0.05 * U, 0, ex + dir * 0.17 * U, 0);
+            lg.addColorStop(0, 'rgba(255,240,205,0.14)'); lg.addColorStop(1, 'rgba(255,240,205,0)');
+            g.fillStyle = lg; g.fillRect(Math.min(ex + dir * 0.05 * U, ex + dir * 0.17 * U), Z(top), 0.12 * U, Z(sb) - Z(top));
+          }
+          if (nearOpen && !(rc && rc[2])) {
+            const e = (R ? y : x) + 1, rg = g.createLinearGradient(e * U, 0, (e - 0.16) * U, 0);
+            if (R) { rg.addColorStop(0, 'rgba(14,10,12,0.3)'); rg.addColorStop(1, 'rgba(14,10,12,0)'); }
+            else { rg.addColorStop(0, 'rgba(255,240,205,0.3)'); rg.addColorStop(1, 'rgba(255,240,205,0)'); }
+            g.fillStyle = rg; g.fillRect((e - 0.16) * U, Z(top), 0.16 * U, Z(sb) - Z(top));
+          }
+        });
+      } else {
+        g.strokeStyle = 'rgba(40,32,30,0.25)'; g.lineWidth = 1;
+        for (let z = top - 0.5; z > sb + 0.05; z -= 0.5) { const a = face(z, z)[0], b = face(z, z)[1]; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); }
+      }
+      if (!texOK) { g.fillStyle = R ? '#4f6a32' : '#62803c'; poly(g, faceS(top, Math.max(sb, top - 0.1))); g.fill(); }
+      else {
+        const sd = x * 3.7 + y * 5.3 + (R ? 0 : 9), lip = Math.max(sb, top - 0.04);
+        g.fillStyle = R ? '#56743a' : '#6a8a44'; poly(g, faceS(top, lip)); g.fill();
+        for (let k = 0; k < 5; k++) {
+          if (hash2(sd + k, 2.3) < 0.35) continue;
+          const u = u0 + (u1 - u0) * (k + 0.2 + hash2(sd + k, 5.1) * 0.6) / 5, wd = 0.05 + hash2(sd + k, 7.7) * 0.06, dz = Math.min(top - sb - 0.02, 0.08 + hash2(sd + k, 9.9) * 0.26);
+          const at = (uu, zz) => R ? proj(x + 1, y + uu, zz) : proj(x + uu, y + 1, zz);
+          const a = at(u - wd, top - 0.02), b = at(u + wd, top - 0.02), m = at(u, top - dz), w = (b[0] - a[0]) * 0.55;
+          g.beginPath(); g.moveTo(a[0], a[1]);
+          g.bezierCurveTo(a[0], a[1] + (m[1] - a[1]) * 0.6, m[0] - w, m[1], m[0], m[1]);
+          g.bezierCurveTo(m[0] + w, m[1], b[0], b[1] + (m[1] - b[1]) * 0.6, b[0], b[1]);
+          g.closePath(); g.fill();
+        }
+        g.fillStyle = 'rgba(190,215,130,0.35)'; poly(g, faceS(top, Math.max(sb, top - 0.015))); g.fill();
+        const vs = x * 2.93 + y * 6.11 + (R ? 1.3 : 4.1);
+        if (SPRITE['vine-leafy'] && hash2(vs, 3.7) < 0.16 && top - sb > 0.6) {
+          const u = u0 + (u1 - u0) * (0.2 + 0.6 * hash2(vs, 8.1));
+          hangVine(g, SPRITE['vine-leafy'], R ? proj(x + 1, y + u, top - 0.02) : proj(x + u, y + 1, top - 0.02), (top - sb) * (0.55 + 0.3 * hash2(vs, 9.2)), t, vs * 5, hash2(vs, 1.9) < 0.5);
+        }
+      }
     }
-    // the earth beneath: a grass lip, brown soil in bands, and below it dark root-shot earth fading into the sky
+    // the earth beneath
     const st = Math.min(top, 0);
     if (bot < st - 0.001) {
-      const Q = face(st, bot);
-      if (toVoid) {
-        const gy0 = Q[0][1], gy1 = Q[2][1] + 8;
-        const gr = g.createLinearGradient(0, gy0, 0, gy1);
-        gr.addColorStop(0, R ? '#5d3f2b' : '#7a5538'); gr.addColorStop(0.35, R ? '#4a3224' : '#5f412d'); gr.addColorStop(0.75, R ? '#2f2030' : '#3c2a36'); gr.addColorStop(1, 'rgba(30,20,40,0)');
-        g.fillStyle = gr;
-      } else g.fillStyle = R ? '#4a3224' : '#5f412d';
-      if (c.h < 0) g.fillStyle = R ? '#3e3226' : '#4c3e2e';
+      const Q = (sc || cc) ? faceS(st, bot) : face(st, bot), low = c.h < 0;
+      g.fillStyle = low ? (R ? '#3e3226' : '#4c3e2e') : (R ? '#563a28' : '#6e4c33');
       poly(g, Q); g.fill();
-      // soil bands and pebbles
-      g.strokeStyle = 'rgba(30,18,10,0.3)'; g.lineWidth = 1;
-      for (let z = st - 0.32; z > bot + 0.25; z -= 0.38) { const a = face(z, z)[0], b = face(z + (R ? 0.04 : -0.04), 0)[1]; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); }
-      g.fillStyle = 'rgba(150,120,90,0.35)';
-      for (const k of d.cracks) { if (k.l > 0.33) continue; const zz = st - 0.2 - k.v * Math.min(1, st - bot - 0.3); if (zz < bot + 0.15) continue; const p = R ? proj(x + 1, y + k.u, zz) : proj(x + k.u, y + 1, zz); g.beginPath(); g.ellipse(p[0], p[1], 2 * s, 1.3 * s, 0, 0, TAU); g.fill(); }
-      // the grass lip, with a ragged fringe hanging over the soil
-      if (top <= 0.01 && c.h >= 0) {
-        const L = face(st, st - 0.13);
-        g.fillStyle = R ? '#4d6a30' : '#5e7e38'; poly(g, L); g.fill();
-        g.fillStyle = R ? '#4d6a30' : '#5e7e38';
-        for (let k = 0; k < 6; k++) {
-          const u = (k + 0.5) / 6, dz = 0.13 + 0.07 * Math.abs(Math.sin(k * 2.7 + x * 1.3 + y));
-          const a = R ? proj(x + 1, y + u - 0.07, st - 0.12) : proj(x + u - 0.07, y + 1, st - 0.12), b = R ? proj(x + 1, y + u + 0.07, st - 0.12) : proj(x + u + 0.07, y + 1, st - 0.12), m = R ? proj(x + 1, y + u, st - dz) : proj(x + u, y + 1, st - dz);
-          g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(m[0], m[1]); g.lineTo(b[0], b[1]); g.closePath(); g.fill();
+      const wv = soilWaveFor(c, R);
+      if (texOK) {
+        texSide(g, 'soil', c, R, Q, 1, wv);
+        texSide(g, 'soilMacro', c, R, Q);
+        if (toVoid) texSide(g, R ? 'underR' : 'underL', c, R, Q, 1, wv);
+        if (c.h >= 0) cliffDetails(g, c, R, st, bot, t, su0, su1);
+      } else {
+        g.strokeStyle = 'rgba(30,18,10,0.3)'; g.lineWidth = 1;
+        for (let z = st - 0.32; z > bot + 0.25; z -= 0.38) { const a = face(z, z)[0], b = face(z + (R ? 0.04 : -0.04), 0)[1]; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); }
+      }
+      // over the void, the rock the island grew from hangs below the soil, tapering to the rim and fading into the sky
+      if (toVoid) {
+        // the rock's lower edge, in soft lumps: a gentle swell between knots at each quarter of the edge, eased from
+        // one to the next (the corners take no swell, so neighbouring faces meet)
+        const pts = [], room = bot - ROCK_FLOOR;
+        for (let i = 16; i >= 0; i--) {
+          const u = su0 + (su1 - su0) * i / 16, wpx = R ? x + 1 : x + u, wpy = R ? y + u : y + 1;
+          const [rx, ry, L0] = rockAt(wpx, wpy);
+          pts.push([rx, ry, Math.min(L0 * rockKnot(wpx, wpy), room)]);
+        }
+        if (room > 0.05) {
+          const end = u => R ? proj(x + 1, y + u, bot) : proj(x + u, y + 1, bot);
+          const poly5 = [end(su0), end(su1), ...pts.map(p => proj(p[0], p[1], bot - p[2]))];
+          if (texOK) texSide(g, R ? 'underR' : 'underL', c, R, poly5, 1, wv);
+          else { g.fillStyle = 'rgba(46,32,42,0.8)'; poly(g, poly5); g.fill(); }
         }
       }
       // roots and mossy strands hanging from the underside of the island's rim
-      if (toVoid && c.h >= 0) {
+      const vines = SPRITE['vine-leafy'] && SPRITE['vine-moss'] && SPRITE['vine-roots'];
+      if (toVoid && c.h >= 0 && vines) {
+        // now and then a leafy vine or a mossy strand spills from under the grass lip, or a tangle of roots hangs
+        // from the soil's foot over the rock
+        const sd = x * 4.31 + y * 7.17 + (R ? 0.5 : 2.5);
+        for (let k = 0; k < 2; k++) {
+          if (hash2(sd + k * 3.3, 1.7) > (k ? 0.22 : 0.5)) continue;
+          const kind = k ? 2 : hash2(sd, 2.9) < 0.38 ? 0 : hash2(sd, 2.9) < 0.68 ? 1 : 2;
+          const u = su0 + (su1 - su0) * (0.18 + 0.64 * hash2(sd + k, 4.4));
+          const im = SPRITE[['vine-leafy', 'vine-moss', 'vine-roots'][kind]];
+          const zt = kind === 2 ? bot + 0.18 : st - 0.07, len = [1.9 + 1.2 * hash2(sd, 5.5), 1.5 + 1.0 * hash2(sd, 5.5), 1.1 + 0.6 * hash2(sd + k, 5.5)][kind];
+          HANG.push({ k: x + y, im, p: R ? proj(x + 1, y + u, zt) : proj(x + u, y + 1, zt), len, ph: sd * 3 + k, flip: hash2(sd, 6.6) < 0.5 });
+        }
+      } else if (toVoid && c.h >= 0) {
+        // a root or a mossy vine now and then, hanging from the soil over the rock: thick where it leaves the earth,
+        // curling as it hangs, thinning and fading to its tip, swaying a little
         g.lineCap = 'round';
         for (let k = 0; k < 2; k++) {
-          const cr = d.cracks[k + (R ? 0 : 2)], u = 0.2 + cr.u * 0.6, z0 = bot + (st - bot) * 0.45, len = 0.6 + cr.l * 2.2;
-          const p0 = R ? proj(x + 1, y + u, z0) : proj(x + u, y + 1, z0);
-          const sw = Math.sin(t * 0.8 + cr.a * 3) * 3 * s, L = len * TZ * s;
-          const moss = cr.a > 3.5;
-          g.strokeStyle = moss ? 'rgba(84,120,70,0.85)' : 'rgba(78,56,40,0.9)'; g.lineWidth = (moss ? 1.6 : 2.2) * s;
-          g.beginPath(); g.moveTo(p0[0], p0[1]); g.bezierCurveTo(p0[0] + 4 * s, p0[1] + L * 0.35, p0[0] - 4 * s + sw, p0[1] + L * 0.7, p0[0] + sw, p0[1] + L); g.stroke();
-          if (moss) { g.fillStyle = 'rgba(110,150,90,0.8)'; for (const q of [0.45, 0.7, 0.92]) { g.beginPath(); g.ellipse(p0[0] + sw * q + (q > 0.6 ? -2 : 2) * s, p0[1] + L * q, 2.4 * s, 1.3 * s, q * 2, 0, TAU); g.fill(); } }
+          const cr = d.cracks[k + (R ? 0 : 2)];
+          if (hash2(x * 3.1 + k, y * 2.3 + (R ? 1 : 5)) > (k ? 0.25 : 0.6)) continue;
+          const u = 0.15 + cr.u * 0.7, z0 = bot + 0.25 + cr.v * 0.3, len = 0.45 + cr.l * 1.6, moss = cr.a > 3.6;
+          const p0 = R ? proj(x + 1, y + u, z0) : proj(x + u, y + 1, z0), L = len * TZ * s;
+          const sw = Math.sin(t * 0.7 + cr.a * 3) * 2.5 * s, curl = (hash2(cr.a, 7.7) - 0.5) * 14 * s;
+          const pt = q => {
+            const a = 1 - q, b0 = a * a * a, b1 = 3 * a * a * q, b2 = 3 * a * q * q, b3 = q * q * q;
+            return [p0[0] * b0 + (p0[0] + curl) * b1 + (p0[0] - curl * 0.8 + sw) * b2 + (p0[0] + curl * 0.3 + sw * 1.4) * b3,
+              p0[1] * b0 + (p0[1] + L * 0.3) * b1 + (p0[1] + L * 0.7) * b2 + (p0[1] + L) * b3];
+          };
+          const w0 = (moss ? 2.2 : 3.0) * s, col = moss ? [84, 118, 64] : [74, 52, 38], SEG = 10;
+          let prev = pt(0);
+          for (let i = 1; i <= SEG; i++) {
+            const q = i / SEG, p = pt(q);
+            g.strokeStyle = `rgba(${col[0]},${col[1]},${col[2]},${(0.95 * (1 - q * q * 0.85)).toFixed(3)})`;
+            g.lineWidth = Math.max(0.6 * s, w0 * (1 - q * 0.8));
+            g.beginPath(); g.moveTo(prev[0], prev[1]); g.lineTo(p[0], p[1]); g.stroke();
+            prev = p;
+          }
+          if (moss) {
+            g.fillStyle = 'rgba(118,158,86,0.85)';
+            for (const q of [0.3, 0.5, 0.68, 0.85]) { const p = pt(q), sd = q > 0.55 ? -1 : 1; g.beginPath(); g.ellipse(p[0] + sd * 2.6 * s, p[1], 2.6 * s * (1.1 - q * 0.5), 1.3 * s, sd * 0.6, 0, TAU); g.fill(); }
+          }
+        }
+      }
+      // the grass rolls over the edge in a thick, rounded lip, scalloped along its lower edge, with a soft shadow beneath
+      if (top <= 0.01 && c.h >= 0) {
+        if (texOK) onPlane(g, c, R, U => {
+          const Z = z => -z * U, A = a => a * U, lo = Math.max(bot, st - 0.45);
+          // the shadow the overhang throws on the soil
+          const sg = g.createLinearGradient(0, Z(st - 0.06), 0, Z(lo));
+          sg.addColorStop(0, 'rgba(14,8,18,0.5)'); sg.addColorStop(1, 'rgba(14,8,18,0)');
+          g.fillStyle = sg; g.fillRect(A(a0 + su0), Z(st - 0.06), (su1 - su0) * U, Z(lo) - Z(st - 0.06));
+          // the lip: three rounded bumps an edge, each its own depth, meeting at the tile corners at a shared depth
+          // two to four bumps an edge, of uneven widths and depths, so the lip doesn't read as a row of scallops
+          const d0 = 0.1, hs = (R ? x : y) * 1.9 + a0 * 3.7, nB = 2 + (hash2(hs, R ? 1.3 : 2.9) * 3 | 0), knots = [a0 + su1];
+          for (let k = 1; k < nB; k++) knots.push(a0 + su1 - (su1 - su0) * (k + (hash2(hs + k, 6.1) - 0.5) * 0.5) / nB);
+          knots.push(a0 + su0);
+          const bumps = () => {
+            for (let k = 0; k < knots.length - 1; k++) {
+              const u1 = knots[k], u0 = knots[k + 1], w = u1 - u0, db = Math.min(st - bot - 0.01, 0.12 + 0.14 * hash2(hs + k * 1.7, R ? 4.1 : 8.3) * Math.min(1, w * 3));
+              g.bezierCurveTo(A(u1 - w * 0.2), Z(st - db * 1.3), A(u0 + w * 0.2), Z(st - db * 1.3), A(u0), Z(st - d0));
+            }
+          };
+          const path = () => {
+            g.beginPath(); g.moveTo(A(a0 + su0), Z(st)); g.lineTo(A(a0 + su1), Z(st)); g.lineTo(A(a0 + su1), Z(st - d0));
+            bumps(); g.closePath();
+          };
+          const lg = g.createLinearGradient(0, Z(st), 0, Z(st - 0.26));
+          lg.addColorStop(0, R ? '#78993f' : '#8aae4a'); lg.addColorStop(1, R ? '#45632a' : '#557636');
+          path(); g.fillStyle = lg; g.fill();
+          const GP = texPattern(g, 'grass'); if (GP) { const k = TEXU / texUnit('grass'); GP.setTransform(new DOMMatrix([k, 0, 0, k, 0, 0])); g.globalAlpha = 0.7; g.fillStyle = GP; g.fill(); g.globalAlpha = 1; }
+          // ink round the lip's underside, and a lit rim where it rolls over
+          g.lineJoin = 'round'; g.lineCap = 'round';
+          g.strokeStyle = 'rgba(26,40,16,0.32)'; g.lineWidth = 6;
+          g.beginPath(); g.moveTo(A(a0 + su1), Z(st - d0)); bumps(); g.stroke();
+          g.strokeStyle = 'rgba(214,236,150,0.45)'; g.lineWidth = 6;
+          g.beginPath(); g.moveTo(A(a0 + su0), Z(st) + 3); g.lineTo(A(a0 + su1), Z(st) + 3); g.stroke();
+        });
+        else {
+          const L = face(st, st - 0.13);
+          g.fillStyle = R ? '#4d6a30' : '#5e7e38'; poly(g, L); g.fill();
         }
       }
     }
+    finish();
   }
+  if (rc && top > 0.01) for (const k of [1, 3, 2]) if (rc[k]) cornerCurve(g, c, k);
+  if (sc) for (const k of [1, 3, 2]) if (sc[k]) soilCornerCurve(g, c, k);
+  if (fillet) soilFillet(g, c);
 }
 
 function topColor(c, d) {
   if (c.icy) return shade('#cdeefa', 0.92 + d.tone * 0.12);
-  if (c.h < -0.01) return shade('#4a4536', 0.9 + d.tone * 0.2);
-  if (c.h >= 1) return shade('#b3ad9c', 0.88 + d.tone * 0.2);
-  return shade('#6f8a44', 0.85 + d.tone * 0.25);
+  if (c.h < -0.01) return shade('#6a4a34', 0.95 + d.tone * 0.1);
+  if (c.h >= 1) return shade('#a29f80', 0.9 + d.tone * 0.16);
+  return shade('#6f8a44', 0.97 + d.tone * 0.06);
 }
 
+/* Soft bands along a top face's edges (shade at the foot of a wall, a lit chamfer, light where water laps the
+   bank), drawn in the face's own unit square so they run true to the edges. Edges are AB, BC, CD, DA (0..3);
+   `on[i]` says which edges get one. Where two banded edges meet they are mitred, so the corner isn't doubled;
+   `diag[k]` adds a quarter-round at corner k (A, B, C, D) where only the diagonal neighbour calls for one, so a
+   band carries on round the end of a bank instead of stopping dead. */
+function edgeBands(g, x, y, z, on, diag, w, stops) {
+  const s = cam.s, o = proj(x, y, z);
+  g.save(); g.transform(TW * 0.5 * s, TH * 0.5 * s, -TW * 0.5 * s, TH * 0.5 * s, o[0], o[1]);
+  const fill = (gr) => { for (const [k, col] of stops) gr.addColorStop(k, col); g.fillStyle = gr; };
+  for (let i = 0; i < 4; i++) {
+    if (!on[i]) continue;
+    const pv = on[(i + 3) % 4], nx = on[(i + 1) % 4];
+    const pts = [
+      [[0, 0], [1, 0], [nx ? 1 - w : 1, w], [pv ? w : 0, w]],
+      [[1, 0], [1, 1], [1 - w, nx ? 1 - w : 1], [1 - w, pv ? w : 0]],
+      [[1, 1], [0, 1], [nx ? w : 0, 1 - w], [pv ? 1 - w : 1, 1 - w]],
+      [[0, 1], [0, 0], [w, nx ? w : 0], [w, pv ? 1 - w : 1]]][i];
+    const [mx, my, ix, iy] = [[0.5, 0, 0, 1], [1, 0.5, -1, 0], [0.5, 1, 0, -1], [0, 0.5, 1, 0]][i];
+    fill(g.createLinearGradient(mx, my, mx + ix * w, my + iy * w)); poly(g, pts); g.fill();
+  }
+  for (let k = 0; k < 4; k++) {
+    if (!diag[k] || on[k] || on[(k + 3) % 4]) continue;
+    const [cx, cy] = [[0, 0], [1, 0], [1, 1], [0, 1]][k];
+    fill(g.createRadialGradient(cx, cy, 0, cx, cy, w));
+    g.fillRect(cx ? 1 - w : 0, cy ? 1 - w : 0, w, w);
+  }
+  g.restore();
+}
+const DIAG = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
 function drawCell(g, c, t) {
   const d = World.deco[c.y * World.W + c.x];
   const x = c.x, y = c.y, s = cam.s;
+  const rc = stoneCorners(c), sj = stoneJoins(c, rc), sc = soilCorners(c);
+  if (rc) for (let k = 0; k < 4; k++) if (rc[k]) cornerGround(g, c, k);
   drawSideFaces(g, c, d, t);
   const z = c.h;
   const A = proj(x, y, z), B = proj(x + 1, y, z), C = proj(x + 1, y + 1, z), D = proj(x, y + 1, z);
-  g.fillStyle = topColor(c, d); poly(g, [A, B, C, D]); g.fill();
-  // rim light on back edges
-  g.strokeStyle = 'rgba(255,240,210,0.13)'; g.lineWidth = 1;
-  g.beginPath(); g.moveTo(D[0], D[1]); g.lineTo(A[0], A[1]); g.lineTo(B[0], B[1]); g.stroke();
-  g.strokeStyle = 'rgba(10,5,20,0.18)';
-  g.beginPath(); g.moveTo(B[0], B[1]); g.lineTo(C[0], C[1]); g.lineTo(D[0], D[1]); g.stroke();
-  if (c.h >= 1) { // stone cracks & moss
+  // grown a hair past its edges, so neighbouring tops overlap instead of leaving a faint seam between them
+  // (a rounded block's top follows its rounded outline)
+  const radii = [0, 1, 2, 3].map(k => rc && rc[k] ? ROUND_R : sj && sj.jc[k] ? NOTCH_R : sc && sc[k] ? SOIL_R : 0), rounded = rc || sj || sc;
+  if (sj) for (let k = 0; k < 4; k++) if (sj.jc[k]) cornerNotch(g, c, k);
+  const outline = rounded ? roundedOutline(radii) : null;
+  const big = rounded ? growPoly(outline.map(([u, v]) => proj(x + u, y + v, z)), 0.6) : growQuad([A, B, C, D], 0.6);
+  g.fillStyle = topColor(c, d); poly(g, big); g.fill();
+  texTop(g, c.icy ? 'ice' : c.h >= 1 ? 'stoneTop' : c.h < -0.01 ? 'dirt' : 'grass', z, big);
+  // the neighbours across each top edge: AB, BC, CD, DA
+  const nb = [cellI(x, y - 1), cellI(x + 1, y), cellI(x, y + 1), cellI(x - 1, y)], E = [[A, B], [B, C], [C, D], [D, A]];
+  // soft shadow at the foot of a higher neighbour's wall (only the two back edges have a wall in view)
+  {
+    const higher = n => n && !n.void && n.h > z + 0.01;
+    const on = [higher(nb[0]), false, false, higher(nb[3])], dg = [higher(cellI(x - 1, y - 1)), false, false, false];
+    if (on[0] || on[3] || dg[0]) edgeBands(g, x, y, z, on, dg, 0.3, [[0, 'rgba(18,10,30,0.38)'], [1, 'rgba(18,10,30,0)']]);
+  }
+  // raised stone: a rounded, lit chamfer just inside each edge where the block drops away
+  if (c.h >= 1 && !c.icy && texOK) {
+    const drops = n => !n || n.void || n.h < z - 0.01;
+    g.save(); poly(g, big); g.clip();
+    edgeBands(g, x, y, z, nb.map(drops), [false, false, false, false], 0.1,
+      [[0, 'rgba(255,240,205,0.3)'], [0.4, 'rgba(255,240,205,0.1)'], [1, 'rgba(255,240,205,0)']]);
+    if (sj) {
+      // a groove where this block meets the next: dark in the joint, with a rounded, lit edge just inside it
+      const nf = [false, false, false, false];
+      edgeBands(g, x, y, z, sj.e, nf, 0.16, [[0, 'rgba(255,240,205,0)'], [0.3, 'rgba(255,240,205,0.16)'], [1, 'rgba(255,240,205,0)']]);
+      edgeBands(g, x, y, z, sj.e, nf, 0.05, [[0, 'rgba(24,22,16,0.6)'], [1, 'rgba(24,22,16,0)']]);
+    }
+    g.restore();
+  }
+  lightTop(g, c, z, big);
+  // a soft lit rim wherever the land steps or ends (none between tiles level with each other), and along the
+  // island's back edges. Where the grass rolls over a front edge in its lip, the lip has its own lit rim.
+  const lipped = texOK && !c.icy && c.h >= 0 && c.h <= 0.01;
+  g.strokeStyle = 'rgba(255,240,210,0.16)'; g.lineWidth = 1.2;
+  for (const i of [0, 3]) { const n = nb[i]; if (n && !n.void && n.h >= z - 0.01) continue; g.beginPath(); g.moveTo(E[i][0][0], E[i][0][1]); g.lineTo(E[i][1][0], E[i][1][1]); g.stroke(); }
+  g.beginPath();
+  let inked = false;
+  if (rounded) {
+    // along the rounded outline: every arc, and every straight run on an edge where the land drops
+    const drop = i => { const n = nb[i]; return !n || n.void || Math.abs(n.h - z) >= 0.01; };
+    for (let j = 0; j < outline.length; j++) {
+      const [u1, v1] = outline[j], [u2, v2] = outline[(j + 1) % outline.length], mu = (u1 + u2) / 2, mv = (v1 + v2) / 2;
+      const e = mv < 0.001 ? 0 : mu > 0.999 ? 1 : mv > 0.999 ? 2 : mu < 0.001 ? 3 : -1;
+      if (e >= 0 && !drop(e)) continue;
+      if (lipped && (e === 1 || e === 2 || (e < 0 && mu > 0.5 && mv > 0.5))) continue; // the lip has its own rim there
+      const p = proj(x + u1, y + v1, z), q = proj(x + u2, y + v2, z);
+      g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); inked = true;
+    }
+  } else for (let i = 0; i < 4; i++) {
+    const n = nb[i]; if (n && !n.void && Math.abs(n.h - z) < 0.01) continue;
+    if (lipped && (i === 1 || i === 2) && (!n || n.void || n.h < z)) continue;
+    inkPath(g, E[i][0], E[i][1], x * 7.3 + y * 13.1 + i * 2.9 + 100); inked = true;
+  }
+  if (inked) inkStroke(g, 'rgba(255,244,214,0.26)', 1.3);
+  if (c.h >= 1 && !texOK) { // stone cracks & moss (the flagstone texture has its own)
     g.strokeStyle = 'rgba(60,50,70,0.35)';
     for (const k of d.cracks.slice(0, 2)) { const p = proj(x + k.u, y + k.v, z), q = proj(x + clamp(k.u + Math.cos(k.a) * k.l, 0, 1), y + clamp(k.v + Math.sin(k.a) * k.l, 0, 1), z); g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); g.stroke(); }
   }
-  if (c.wet > 0) { g.fillStyle = `rgba(20,30,50,${c.wet * 0.25})`; poly(g, [A, B, C, D]); g.fill(); }
+  if (c.wet > 0) {
+    // damp ground darkens most in the middle of the tile, fading toward its edges, so no square shows
+    const [px, py] = proj(x + 0.5, y + 0.5, z), R = TW * 0.62 * s, wg2 = g.createRadialGradient(px, py, 0, px, py, R);
+    wg2.addColorStop(0, `rgba(20,30,50,${c.wet * 0.32})`); wg2.addColorStop(0.7, `rgba(20,30,50,${c.wet * 0.2})`); wg2.addColorStop(1, 'rgba(20,30,50,0)');
+    g.save(); g.translate(px, py); g.scale(1, 0.5); g.translate(-px, -py); g.fillStyle = wg2; g.fillRect(px - R, py - R, R * 2, R * 2); g.restore();
+  }
   if (c.ash > 0) {
-    g.fillStyle = 'rgba(30,22,20,0.55)';
-    for (const k of d.tufts) { const p = proj(x + k.u, y + k.v, z); g.beginPath(); g.ellipse(p[0], p[1], 9 * s, 4.5 * s, 0, 0, TAU); g.fill(); }
+    if (texOK) texTop(g, 'ash', z, big, Math.min(1, c.ash) * 0.85);
+    else {
+      g.fillStyle = 'rgba(30,22,20,0.55)';
+      for (const k of d.tufts) { const p = proj(x + k.u, y + k.v, z); g.beginPath(); g.ellipse(p[0], p[1], 9 * s, 4.5 * s, 0, 0, TAU); g.fill(); }
+    }
   }
   // decorations
   if (!c.feat && c.water == null && c.h >= 0 && !c.ash) {
@@ -1403,7 +2421,24 @@ function drawCell(g, c, t) {
     }
   }
   if (c.frost > 0 && c.water == null) {
-    g.fillStyle = `rgba(230,246,255,${0.6 * c.frost})`; poly(g, [A, B, C, D]); g.fill();
+    // a skin of frost: the ice painting laid thin over the ground, with a few glints
+    if (texOK) {
+      // soft rounded patches of rime, not a square: a few overlapping frosty blooms, the ice painting showing in them
+      g.save(); g.beginPath();
+      for (let k = 0; k < 5; k++) {
+        const q = d.cracks[k % d.cracks.length], u = 0.3 + 0.4 * ((q.u + k * 0.37) % 1), v = 0.3 + 0.4 * ((q.v + k * 0.61) % 1), [px, py] = proj(x + u, y + v, z), R = (0.26 + 0.12 * ((q.a * 7 + k) % 1)) * TW * 0.7071 * s;
+        g.moveTo(px + R, py); g.ellipse(px, py, R, R * 0.5, 0, 0, TAU);
+      }
+      g.clip();
+      texTop(g, 'ice', z, big, 0.62 * c.frost);
+      g.restore();
+      g.save(); g.globalCompositeOperation = 'lighter';
+      for (let k = 0; k < 5; k++) {
+        const q = d.cracks[k % d.cracks.length], u = 0.3 + 0.4 * ((q.u + k * 0.37) % 1), v = 0.3 + 0.4 * ((q.v + k * 0.61) % 1), [px, py] = proj(x + u, y + v, z), R = (0.34 + 0.12 * ((q.a * 7 + k) % 1)) * TW * 0.7071 * s;
+        g.globalAlpha = 0.18 * c.frost; g.drawImage(softSprite('#e8f8ff'), px - R, py - R * 0.5, R * 2, R);
+      }
+      g.restore();
+    } else { g.fillStyle = `rgba(230,246,255,${0.6 * c.frost})`; poly(g, [A, B, C, D]); g.fill(); }
     g.strokeStyle = `rgba(255,255,255,${0.7 * c.frost})`; g.lineWidth = 1;
     for (const k of d.cracks) { const p = proj(x + k.u, y + k.v, z); const r = (2 + Math.sin(t * 3 + k.a * 5) * 1.5) * s; g.beginPath(); g.moveTo(p[0] - r, p[1]); g.lineTo(p[0] + r, p[1]); g.moveTo(p[0], p[1] - r); g.lineTo(p[0], p[1] + r); g.stroke(); }
   }
@@ -1417,7 +2452,8 @@ function drawCell(g, c, t) {
     case 'iceblock': {
       const hh = 0.95 * (1 - c.melt);
       if (hh > 0.02) {
-        prism(g, x + 0.06, y + 0.06, x + 0.94, y + 0.94, z, z + hh, 'rgba(225,248,255,0.85)', 'rgba(170,220,245,0.75)', 'rgba(130,190,230,0.75)', 'rgba(255,255,255,0.9)');
+        if (texOK) texturedBox(g, x + 0.06, y + 0.06, x + 0.94, y + 0.94, z, z + hh, { colT: '#dff4fc', colL: '#a9daf0', colR: '#86bedc', top: 'ice', side: 'ice', sideAlpha: 0.75, alpha: 0.9, rim: 'rgba(255,255,255,0.8)' });
+        else prism(g, x + 0.06, y + 0.06, x + 0.94, y + 0.94, z, z + hh, 'rgba(225,248,255,0.85)', 'rgba(170,220,245,0.75)', 'rgba(130,190,230,0.75)', 'rgba(255,255,255,0.9)', 'rgba(50,100,140,0.75)');
         const p = proj(x + 0.3, y + 0.94, z + hh * 0.7), q = proj(x + 0.7, y + 0.94, z + hh * 0.3);
         g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = 1.5 * s; g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); g.stroke();
       }
@@ -1427,6 +2463,97 @@ function drawCell(g, c, t) {
   }
 }
 
+// A waterfall's sheet rolls over a rounded lip (radius FALL_R) and drops, bowing out a little as it falls. For a
+// distance L down the sheet: [how far out from the wall it is, how far below the pool's surface].
+const FALL_R = 0.17, FALL_ARC = FALL_R * Math.PI / 2;
+function fallProfile(L) {
+  if (L <= FALL_ARC) { const a = L / FALL_R; return [FALL_R * Math.sin(a), FALL_R * (1 - Math.cos(a))]; }
+  const dd = L - FALL_ARC; return [FALL_R + 0.1 * Math.sqrt(dd) + 0.04 * dd, FALL_R + dd];
+}
+// does this tile's water pour over its R (or L) edge?
+const fallsOver = (c, R) => { if (!c || c.void || c.water == null || c.ice) return false; const n = R ? cellI(c.x + 1, c.y) : cellI(c.x, c.y + 1); return !n || n.void; };
+function drawFall(g, c, d, t, R, z, zb) {
+  const x = c.x, y = c.y, s = cam.s, hU = FALL_ARC + (z - FALL_R - zb);
+  const b0 = R ? proj(x + 1, y, z) : proj(x, y + 1, z), b1 = proj(x + 1, y + 1, z), out = R ? [TW * 0.5 * s, TH * 0.5 * s] : [-TW * 0.5 * s, TH * 0.5 * s];
+  // where this sheet meets another at a corner: round an outward corner (the same tile pours over its other front
+  // edge too) each runs on as far as it bows out, so the two meet; into an inward corner each stops that far short
+  const cvx = fallsOver(c, !R), ccv = fallsOver(R ? cellI(x + 1, y - 1) : cellI(x - 1, y + 1), !R);
+  // a point on the sheet: w along the edge (world units from its start), L down it
+  const S = (w, L) => { const [o, dz] = fallProfile(L); return [b0[0] + (b1[0] - b0[0]) * w + out[0] * o, b0[1] + (b1[1] - b0[1]) * w + out[1] * o + dz * TZ * s]; };
+  // the painted fall, pouring: drawn into a small canvas, one pixel row per step down the sheet, scrolled down (it
+  // keeps one width all the way down, wide enough for an outward corner; corners are cut from it, not squeezed)
+  const ext = cvx ? fallProfile(hU)[0] : 0, PX = 96, cw = Math.round(PX * (1 + ext)), ch = Math.max(8, Math.round(PX * hU));
+  const oc = fallCanvas(cw, ch), og = oc.getContext('2d'), FP = texPattern(og, 'fall'); if (!FP) return;
+  const k = PX / texUnit('fall'), along = R ? y : x, ra = FALL_ARC * PX;
+  og.globalCompositeOperation = 'copy';
+  FP.setTransform(new DOMMatrix([k, 0, 0, k, -along * PX, (t * 1.7 - z) * PX]));
+  og.fillStyle = FP; og.fillRect(0, 0, cw, ch);
+  og.globalCompositeOperation = 'source-over';
+  // over the lip it is still the pool's blue, catches the light on the crest as it tips, and is shaded just under it
+  const lg = og.createLinearGradient(0, 0, 0, ra * 2.6);
+  lg.addColorStop(0, 'rgba(75,152,210,0.75)'); lg.addColorStop(0.18, 'rgba(150,215,245,0.5)'); lg.addColorStop(0.34, 'rgba(255,255,255,0.6)');
+  lg.addColorStop(0.5, 'rgba(255,255,255,0.15)'); lg.addColorStop(0.66, 'rgba(24,70,110,0.22)'); lg.addColorStop(1, 'rgba(24,70,110,0)');
+  og.fillStyle = lg; og.fillRect(0, 0, cw, Math.min(ch, ra * 2.6));
+  // fading into the mist far below
+  og.globalCompositeOperation = 'destination-in';
+  const m = og.createLinearGradient(0, 0, 0, ch);
+  m.addColorStop(0, 'rgba(0,0,0,1)'); m.addColorStop(0.3, 'rgba(0,0,0,0.9)'); m.addColorStop(0.75, 'rgba(0,0,0,0.45)'); m.addColorStop(1, 'rgba(0,0,0,0)');
+  og.fillStyle = m; og.fillRect(0, 0, cw, ch);
+  if (ccv || cvx) {
+    const rows = []; for (let i = 0; i <= 16; i++) { const L = hU * (i / 16) * (i / 16); rows.push([fallProfile(L)[0] * PX, L * PX]); }
+    og.globalCompositeOperation = 'destination-out'; og.fillStyle = '#000';
+    if (ccv) { og.beginPath(); og.moveTo(0, 0); for (const [o, r] of rows) og.lineTo(o, r); og.lineTo(0, ch + 1); og.closePath(); og.fill(); }
+    if (cvx) { og.beginPath(); og.moveTo(cw + 1, 0); for (const [o, r] of rows) og.lineTo(PX + o, r); og.lineTo(cw + 1, ch + 1); og.closePath(); og.fill(); }
+    og.globalCompositeOperation = 'destination-in';
+  }
+  // soft at its sides where the fall ends (not where it runs on into the next tile's)
+  const f0 = !ccv && !fallsOver(R ? cellI(x, y - 1) : cellI(x - 1, y), R), f1 = !cvx && !fallsOver(R ? cellI(x, y + 1) : cellI(x + 1, y), R);
+  if (f0 || f1) {
+    const hg = og.createLinearGradient(0, 0, cw, 0);
+    const e = 0.12 * PX / cw;
+    hg.addColorStop(0, f0 ? 'rgba(0,0,0,0.1)' : '#000'); hg.addColorStop(e, '#000'); hg.addColorStop(1 - e, '#000'); hg.addColorStop(1, f1 ? 'rgba(0,0,0,0.1)' : '#000');
+    og.fillStyle = hg; og.fillRect(0, 0, cw, ch);
+  }
+  og.globalCompositeOperation = 'source-over';
+  // laid onto the sheet's curve in bands, finer over the lip where it bends most
+  const Ls = [0, 0.25, 0.5, 0.75, 1].map(f => FALL_ARC * f), rest = hU - FALL_ARC;
+  for (let i = 1; i <= 5; i++) Ls.push(FALL_ARC + rest * (i / 5) * (i / 5));
+  for (let i = 0; i + 1 < Ls.length; i++) {
+    const y0 = Ls[i] * PX, y1 = Math.min(ch, Ls[i + 1] * PX), hh = Math.min(ch - y0, y1 - y0 + (i + 2 < Ls.length ? 0.6 : 0));
+    if (hh < 0.5) continue;
+    const A0 = S(0, Ls[i]), A1 = S(cw / PX, Ls[i]), B0 = S(0, Ls[i + 1]), ry = [(B0[0] - A0[0]) / (y1 - y0), (B0[1] - A0[1]) / (y1 - y0)];
+    g.save(); g.transform((A1[0] - A0[0]) / cw, (A1[1] - A0[1]) / cw, ry[0], ry[1], A0[0] - ry[0] * y0, A0[1] - ry[1] * y0);
+    g.drawImage(oc, 0, y0, cw, hh, 0, y0, cw, hh); g.restore();
+  }
+  // a bright thread along the crest
+  g.lineCap = 'round'; g.strokeStyle = 'rgba(240,252,255,0.55)'; g.lineWidth = 1.6 * s; g.beginPath();
+  const cL = FALL_ARC * 0.42, co = fallProfile(cL)[0], c0 = ccv ? co : 0.03, c1 = cvx ? 1 + co : 0.97;
+  for (let i = 0; i <= 6; i++) { const q = S(c0 + (c1 - c0) * i / 6, cL); (i ? g.lineTo : g.moveTo).call(g, q[0], q[1]); }
+  g.stroke();
+  // foam churning where the sheet turns down, and mist where it vanishes
+  g.save(); g.globalCompositeOperation = 'lighter';
+  for (let j = 0; j < 7; j++) {
+    const ph = (t * 0.9 + j * 0.37 + x * 0.21 + y * 0.13) % 1, u = (j + 0.5 + 0.3 * Math.sin(j * 3.1 + t)) / 7;
+    const q = S(clamp(u, 0.06, 0.94), FALL_ARC * 0.8 + ph * 0.35), r = (5 + 5 * Math.sin(ph * Math.PI)) * s;
+    g.globalAlpha = 0.3 * Math.sin(ph * Math.PI); g.drawImage(softSprite('#f4fbff'), q[0] - r, q[1] - r * 0.7, r * 2, r * 1.4);
+  }
+  for (let j = 0; j < 3; j++) {
+    const u = 0.2 + j * 0.3, ph = (t * 0.3 + j * 0.33 + d.tone) % 1, q = S(u, hU - 1.4 + ph * 0.6), r = (22 + ph * 18) * s;
+    g.globalAlpha = 0.16 * Math.sin(ph * Math.PI); g.drawImage(softSprite('#dceeff'), q[0] - r, q[1] - r * 0.6, r * 2, r * 1.2);
+  }
+  g.restore();
+}
+// scratch canvases for the waterfall faces, one per face drawn in a frame (reusing a single one would make each
+// face wait for the last to be drawn before it can be painted over)
+const _fallC = [];
+let _fallI = 0, _fallF = -1;
+function fallCanvas(w, h) {
+  if (_fallF !== frameNo) { _fallF = frameNo; _fallI = 0; }
+  let c = _fallC[_fallI]; if (!c) c = _fallC[_fallI] = document.createElement('canvas');
+  _fallI++;
+  if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+  return c;
+}
 function drawWater(g, c, d, t) {
   const x = c.x, y = c.y, z = c.water, s = cam.s;
   const A = proj(x, y, z), B = proj(x + 1, y, z), C = proj(x + 1, y + 1, z), D = proj(x, y + 1, z);
@@ -1437,8 +2564,10 @@ function drawWater(g, c, d, t) {
     const P = side === 'R' ? [B, C, proj(x + 1, y + 1, c.h), proj(x + 1, y, c.h)] : [D, C, proj(x + 1, y + 1, c.h), proj(x, y + 1, c.h)];
     if (!c.ice && (!n || n.void)) {
       // a proper waterfall: foam where it tips over, bright streaks pouring down, fading far below into mist
-      const zb = c.h - d.depth - 2.6, at = (u, zz) => side === 'R' ? proj(x + 1, y + u, zz) : proj(x + u, y + 1, zz);
+      const zb = Math.min(c.h, 0) - SOIL_DEPTH - 2.3, at = (u, zz) => side === 'R' ? proj(x + 1, y + u, zz) : proj(x + u, y + 1, zz);
       const Pf = [at(0, z), at(1, z), at(1, zb), at(0, zb)];
+      if (TEX_SRC.fall && texOK) drawFall(g, c, d, t, side === 'R', z, zb);
+      else {
       const fg = g.createLinearGradient(0, Pf[0][1], 0, Pf[3][1]);
       fg.addColorStop(0, 'rgba(170,220,255,0.9)'); fg.addColorStop(0.25, 'rgba(110,175,235,0.75)'); fg.addColorStop(0.7, 'rgba(120,180,240,0.35)'); fg.addColorStop(1, 'rgba(140,190,240,0)');
       g.fillStyle = fg; poly(g, Pf); g.fill();
@@ -1452,23 +2581,38 @@ function drawWater(g, c, d, t) {
       }
       g.setLineDash([]); g.restore();
       // the white lip of foam where the water curls over the edge
-      const l0 = at(0, z - 0.04), l1 = at(1, z - 0.04);
-      g.strokeStyle = 'rgba(245,252,255,0.9)'; g.lineWidth = 3 * s; g.beginPath(); g.moveTo(l0[0], l0[1]); g.lineTo(l1[0], l1[1]); g.stroke();
-      g.fillStyle = 'rgba(255,255,255,0.85)';
-      for (let k = 0; k < 6; k++) { const u = (k + 0.5) / 6, p = at(u, z - 0.1 - 0.06 * Math.abs(Math.sin(t * 4 + k * 2 + x))); g.beginPath(); g.arc(p[0], p[1], (1.5 + Math.abs(Math.sin(t * 3 + k)) * 1.2) * s, 0, TAU); g.fill(); }
+      const fb = [at(0, z + 0.01), at(1, z + 0.01), at(1, z - 0.2), at(0, z - 0.2)], fgr = g.createLinearGradient(0, fb[0][1], 0, fb[3][1]);
+      fgr.addColorStop(0, 'rgba(250,254,255,0.85)'); fgr.addColorStop(0.45, 'rgba(235,248,255,0.45)'); fgr.addColorStop(1, 'rgba(235,248,255,0)');
+      g.fillStyle = fgr; poly(g, fb); g.fill();
+      g.save(); g.globalCompositeOperation = 'lighter';
+      for (let k = 0; k < 7; k++) {
+        const ph = (t * 0.9 + k * 0.37 + x * 0.21 + y * 0.13) % 1, u = (k + 0.5 + 0.3 * Math.sin(k * 3.1 + t)) / 7;
+        const p = at(clamp(u, 0.05, 0.95), z - 0.04 - ph * 0.22), r = (6 + 5 * Math.sin(ph * Math.PI)) * s;
+        g.globalAlpha = 0.35 * Math.sin(ph * Math.PI); g.drawImage(softSprite('#f4fbff'), p[0] - r, p[1] - r * 0.7, r * 2, r * 1.4);
+      }
+      g.restore();
       // mist rising where it vanishes
       g.globalCompositeOperation = 'lighter';
       for (let k = 0; k < 3; k++) { const u = 0.2 + k * 0.3, ph = (t * 0.3 + k * 0.33 + d.tone) % 1, p = at(u, zb + 0.9 + ph * 0.6); g.globalAlpha = 0.18 * Math.sin(ph * Math.PI); const r = (22 + ph * 18) * s; g.drawImage(softSprite('#dceeff'), p[0] - r, p[1] - r * 0.6, r * 2, r * 1.2); }
       g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+      }
     } else { g.fillStyle = c.ice ? 'rgba(190,230,250,0.8)' : 'rgba(70,140,210,0.55)'; poly(g, P); g.fill(); }
-    if (!c.ice && (!n || n.void) && Math.random() < 0.3) {
-      const u = Math.random();
-      const px = side === 'R' ? x + 1.02 : x + u, py = side === 'R' ? y + u : y + 1.02;
-      emit({ x: px, y: py, z: z - 0.05, vx: side === 'R' ? 0.6 : 0, vy: side === 'L' ? 0.6 : 0, vz: -0.5, grav: 10, life: 1, size: 1.6 + Math.random(), color: Math.random() < .5 ? '#bfe6ff' : '#78b8ee', kind: 'drop' });
-      if (Math.random() < 0.1) emit({ x: px, y: py, z: z - 1.2, vx: 0, vy: 0, vz: -0.3, life: 1.5, size: 10, color: '#cfe6ff', kind: 'smoke' });
+    if (!c.ice && (!n || n.void) && Math.random() < 0.5) {
+      // spray: fine white streaks thrown off the lip, falling a little ahead of the sheet; now and then a drift of mist
+      const u = 0.05 + Math.random() * 0.9, o = FALL_R + 0.03, R = side === 'R', out = 0.2 + Math.random() * 0.35;
+      const px = R ? x + 1 + o : x + u, py = R ? y + u : y + 1 + o;
+      emit({ x: px, y: py, z: z - FALL_R - 0.05, vx: R ? out : 0, vy: R ? 0 : out, vz: -0.8 - Math.random() * 1.2, grav: 6, life: 0.8 + Math.random() * 0.6, size: 0.9 + Math.random() * 0.8, color: Math.random() < 0.6 ? '#f4fbff' : '#cdeaff', kind: 'streak' });
+      if (Math.random() < 0.06) emit({ x: px + (R ? 0.25 : 0), y: py + (R ? 0 : 0.25), z: z - 1.4 - Math.random(), vx: R ? 0.15 : 0, vy: R ? 0 : 0.15, vz: -0.25, drag: 0.3, life: 2.2, size: 14, color: '#eef7ff', kind: 'smoke' });
     }
   }
-  if (c.ice) {
+  if (c.ice && texOK) {
+    const big = growQuad([A, B, C, D], 0.6);
+    g.fillStyle = '#cdeaf6'; poly(g, big); g.fill();
+    texTop(g, 'ice', z, big);
+    lightTop(g, c, z, big);
+    const gl = (t * 0.35 + (x + y) * 0.12) % 1.6;
+    if (gl < 1) { const p = proj(x + gl, y, z), q = proj(x, y + gl, z); g.strokeStyle = 'rgba(255,255,255,0.45)'; g.lineWidth = 2 * s; g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); g.stroke(); }
+  } else if (c.ice) {
     const gr = g.createLinearGradient(A[0], A[1], C[0], C[1]);
     gr.addColorStop(0, '#eaf8ff'); gr.addColorStop(1, '#a8d8f0');
     g.fillStyle = gr; poly(g, [A, B, C, D]); g.fill();
@@ -1476,6 +2620,22 @@ function drawWater(g, c, d, t) {
     for (const k of d.cracks) { const p = proj(x + k.u, y + k.v, z), q = proj(x + clamp(k.u + Math.cos(k.a) * k.l, 0, 1), y + clamp(k.v + Math.sin(k.a) * k.l, 0, 1), z); g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); g.stroke(); }
     const gl = (t * 0.35 + (x + y) * 0.12) % 1.6;
     if (gl < 1) { const p = proj(x + gl, y, z), q = proj(x, y + gl, z); g.strokeStyle = 'rgba(255,255,255,0.6)'; g.lineWidth = 2 * s; g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); g.stroke(); }
+  } else if (texOK) {
+    // one sheet of water across the tiles: an opaque, world-pinned surface (so tiles can overlap without seams),
+    // glints drifting over it (along the current where it flows), and pale light where it laps against land
+    const big = growQuad([A, B, C, D], 0.6), fl = c.flow;
+    g.fillStyle = '#4b98d2'; poly(g, big); g.fill();
+    texTop(g, 'water', z, big);
+    const sp = fl ? fl.s * 0.35 : 0, ox = fl ? fl.x * t * sp : t * 0.05, oy = fl ? fl.y * t * sp : t * 0.03;
+    const gk = texSource('water').drawn ? 1 : 0.55;
+    texTop(g, 'ripple', z, big, (0.5 + 0.12 * Math.sin(t * 0.9)) * gk, ox, oy);
+    texTop(g, 'ripple', z, big, 0.3 * gk, -oy * 0.8 + 0.37, ox * 0.7 + 0.61);
+    lightTop(g, c, z, big);
+    // a bank is land at or above the water (open edges, over the void or lower ground, have the fall's foam instead)
+    const bank = n => !!n && !n.void && !(n.water != null && n.water > n.h && Math.abs(n.water - z) < 0.02) && n.h >= z - 0.01;
+    const nb = [cellI(x, y - 1), cellI(x + 1, y), cellI(x, y + 1), cellI(x - 1, y)];
+    edgeBands(g, x, y, z, nb.map(bank), DIAG.map(([dx, dy]) => bank(cellI(x + dx, y + dy))), 0.2,
+      [[0, 'rgba(230,248,255,0.55)'], [0.35, 'rgba(200,238,255,0.18)'], [1, 'rgba(200,238,255,0)']]);
   } else {
     g.fillStyle = 'rgba(52,118,196,0.72)'; poly(g, [A, B, C, D]); g.fill();
     g.save(); poly(g, [A, B, C, D]); g.clip();
@@ -1494,10 +2654,105 @@ function drawWater(g, c, d, t) {
   }
 }
 
+/* Painted props (art/*.png, cut out from the storybook paintings). Each is drawn standing on its tile; until
+   one loads, the drawn version stands in. */
+const SPRITE = {};
+for (const k of ['bramble1', 'bramble2', 'bramble3', 'brazier', 'goal', 'vine-leafy', 'vine-moss', 'vine-roots']) {
+  if (typeof Image === 'undefined') break;
+  const im = new Image(); im.onload = () => { SPRITE[k] = im; }; im.src = `art/${k}.png?v=5`;
+}
+// vines waiting to be hung, in drawing order; each is drawn once the row of tiles after its own is down
+const HANG = [];
+let hangAt = 0;
+function flushHang(g, t, upTo) {
+  while (hangAt < HANG.length && HANG[hangAt].k <= upTo) { const v = HANG[hangAt++]; hangVine(g, v.im, v.p, v.len, t, v.ph, v.flip); }
+  if (hangAt >= HANG.length) { HANG.length = 0; hangAt = 0; }
+}
+// a painted vine hanging from a point on a wall, `len` world units long, swaying a little from where it hangs
+function hangVine(g, im, p, len, t, ph, flip) {
+  const h = len * TZ * cam.s, w = h * im.naturalWidth / im.naturalHeight;
+  g.save(); g.translate(p[0], p[1]); g.rotate(Math.sin(t * 0.8 + ph) * 0.035); if (flip) g.scale(-1, 1);
+  g.drawImage(im, -w / 2, -h * 0.02, w, h);
+  g.restore();
+}
+// one of the bush paintings for a tile, chosen by where it is, so neighbours differ
+function bushFor(x, y) {
+  const all = ['bramble1', 'bramble2', 'bramble3'].map(k => SPRITE[k]).filter(Boolean);
+  return all.length ? all[Math.floor(hash2(x * 1.7 + 0.3, y * 2.9 + 0.7) * all.length)] : null;
+}
+// the bramble scorched to one of six depths as it burns (made once each)
+const charCache = {};
+function charred(im, bf) {
+  const lv = Math.round(bf * 5); if (!lv) return im;
+  const key = lv + im.src;
+  if (charCache[key]) return charCache[key];
+  const c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight;
+  const g = c.getContext('2d'); g.drawImage(im, 0, 0);
+  g.globalCompositeOperation = 'source-atop';
+  g.fillStyle = `rgba(150,60,20,${0.25 * Math.sin(lv / 5 * Math.PI)})`; g.fillRect(0, 0, c.width, c.height);
+  g.fillStyle = `rgba(26,14,8,${0.9 * lv / 5})`; g.fillRect(0, 0, c.width, c.height);
+  return charCache[key] = c;
+}
+// a sprite washed in a light's colour, laid over it additively where firelight reaches (made once per colour)
+const litCache = {};
+function litSprite(im, col) {
+  const key = col + (im.src || '');
+  if (litCache[key]) return litCache[key];
+  const c = document.createElement('canvas'); c.width = im.naturalWidth || im.width; c.height = im.naturalHeight || im.height;
+  const g = c.getContext('2d'); g.drawImage(im, 0, 0);
+  g.globalCompositeOperation = 'source-atop';
+  const gr = g.createLinearGradient(0, 0, 0, c.height); gr.addColorStop(0, col); gr.addColorStop(1, hexA(col, 0.35));
+  g.fillStyle = gr; g.fillRect(0, 0, c.width, c.height);
+  return litCache[key] = c;
+}
+// the strongest light reaching a point on the ground, as [strength, colour]
+function lightAt(px, py) {
+  let la = 0, lc = null;
+  for (const l of LIGHTS) {
+    const dd = Math.hypot(px - l.x, py - l.y), R = l.r + 0.5; if (dd > R) continue;
+    const k = l.a * (1 - dd / R); if (k > la) { la = k; lc = l.col; }
+  }
+  return [la, lc];
+}
+// how high the brazier's bowl sits above its tile (the painted one is taller than the drawn one)
+const BRAZ_W = 0.5;
+function brazierBowlZ() {
+  const im = SPRITE.brazier; if (!im) return 0.62;
+  const W = im.naturalWidth, H = im.naturalHeight, k = BRAZ_W * TW / W;
+  return (H - W / 4 - 0.145 * H) * k / TZ;
+}
 function drawBramble(g, c, d, t) {
   const x = c.x, y = c.y, z = c.h, s = cam.s;
   const bf = c.burn ? clamp(c.burnT, 0, 1) : 0;
   const hk = 1 - clamp((bf - 0.45) / 0.55, 0, 1);
+  const bush = bushFor(x, y);
+  if (bush) {
+    const im = bush, W = im.naturalWidth, H = im.naturalHeight, k = 1.02 * TW * s / W * (0.55 + 0.45 * hk);
+    const w = W * k, h = H * k * (0.6 + 0.4 * hk), G = proj(x + 0.5, y + 0.5, z), by = G[1] + 9 * s;
+    {
+      const rx = w * 0.4, cy = G[1] + 4 * s, sg = g.createRadialGradient(G[0], cy, 0, G[0], cy, rx);
+      sg.addColorStop(0, 'rgba(8,16,10,0.42)'); sg.addColorStop(0.6, 'rgba(8,16,10,0.22)'); sg.addColorStop(1, 'rgba(8,16,10,0)');
+      g.save(); g.translate(G[0], cy); g.scale(1, 0.5); g.translate(-G[0], -cy); g.fillStyle = sg; g.fillRect(G[0] - rx, cy - rx, rx * 2, rx * 2); g.restore();
+    }
+    // it leans a little in the wind, from the root
+    const sk = Math.sin(t * 1.1 + x * 1.7 + y * 0.9) * 0.03;
+    g.save(); g.translate(G[0], by); g.transform(1, 0, -sk, 1, 0, 0);
+    g.drawImage(charred(im, bf), -w / 2, -h, w, h);
+    // firelight nearby warms the side of the bush
+    const [la, lc] = lightAt(x + 0.5, y + 0.5);
+    if (la > 0.02 && bf < 0.5) { g.globalCompositeOperation = 'lighter'; g.globalAlpha = la * 0.42; g.drawImage(litSprite(im, lc), -w / 2, -h, w, h); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; }
+    g.restore();
+    if (bf > 0) {
+      g.save(); g.globalCompositeOperation = 'lighter';
+      for (const v of d.vines) {
+        const px = G[0] + (v.u - 0.5) * w * 0.8, py = by - h * (0.25 + v.h * 0.5), r = w * (0.12 + v.h * 0.1);
+        g.globalAlpha = 0.7 * Math.sin(bf * Math.PI) * (0.6 + 0.4 * Math.sin(t * 9 + v.ph * 3));
+        g.drawImage(glowSprite('#ff7a30'), px - r, py - r, r * 2, r * 2);
+      }
+      g.restore();
+    }
+    return;
+  }
   // a mounded briar: clumps of dark foliage, a few thorny canes arching out, and small wild roses; it chars as it burns
   const mixc = (a, b, k) => { const A = parseInt(a.slice(1), 16), B = parseInt(b.slice(1), 16); const ch = sh => Math.round(lerp((A >> sh) & 255, (B >> sh) & 255, k)); return `rgb(${ch(16)},${ch(8)},${ch(0)})`; };
   const dark = mixc('#1f3020', '#1a120c', bf), mid = mixc('#35532f', '#2a1a10', bf), hi = mixc('#6a8f46', '#4a2a14', bf), cane = mixc('#5b3442', '#24140c', bf);
@@ -1525,6 +2780,8 @@ function drawBramble(g, c, d, t) {
   const puffs = d.vines.slice().sort((a, b) => (a.u + a.v) - (b.u + b.v));
   for (const p of puffs) {
     const [px, py] = proj(x + p.u + sway(p.ph), y + p.v, z + (0.16 + p.h * 0.4) * hk), r = (8.5 + p.h * 6) * s * (0.5 + 0.5 * hk);
+    // ink round each clump first; the next clump covers the inside of it, leaving a scalloped outline
+    g.beginPath(); g.arc(px, py + r * 0.18, r, 0, TAU); g.strokeStyle = bf > 0.5 ? 'rgba(20,12,8,0.85)' : INK; g.lineWidth = 2.8 * s; g.stroke();
     g.fillStyle = dark; g.beginPath(); g.arc(px, py + r * 0.18, r, 0, TAU); g.fill();
     g.fillStyle = mid; g.beginPath(); g.arc(px, py, r * 0.88, 0, TAU); g.fill();
     g.fillStyle = hi; g.globalAlpha = 0.75; g.beginPath(); g.arc(px - r * 0.28, py - r * 0.32, r * 0.42, 0, TAU); g.fill();
@@ -1549,11 +2806,37 @@ function drawBramble(g, c, d, t) {
 
 function drawBrazier(g, c, t) {
   const x = c.x, y = c.y, z = c.h, s = cam.s;
+  if (SPRITE.brazier) {
+    const im = SPRITE.brazier, W = im.naturalWidth, H = im.naturalHeight, k = BRAZ_W * TW * s / W, w = W * k, h = H * k;
+    const G = proj(x + 0.5, y + 0.5, z), left = G[0] - w / 2, topY = G[1] - (H - W / 4) * k;
+    g.fillStyle = 'rgba(10,8,16,0.3)'; g.beginPath(); g.ellipse(G[0], G[1], w * 0.62, w * 0.3, 0, 0, TAU); g.fill();
+    g.drawImage(im, left, topY, w, h);
+    // the bowl's mouth: embers when lit, a slow ember ring when not
+    const bx = left + 0.487 * w, byy = topY + 0.145 * h, rx = 0.36 * w, ry = 0.16 * w, bz = z + brazierBowlZ();
+    if (c.lit) {
+      g.save(); g.beginPath(); g.ellipse(bx, byy, rx, ry, 0, 0, TAU); g.clip();
+      const eg = g.createRadialGradient(bx, byy + ry * 0.2, 0, bx, byy + ry * 0.2, rx);
+      eg.addColorStop(0, '#fff0b0'); eg.addColorStop(0.35, '#ffa040'); eg.addColorStop(1, 'rgba(160,50,20,0.9)');
+      g.fillStyle = eg; g.fillRect(bx - rx, byy - ry, rx * 2, ry * 2);
+      g.restore();
+      if (Math.random() < 0.9) flameP(x + 0.5 + (Math.random() - .5) * 0.22, y + 0.5 + (Math.random() - .5) * 0.22, bz + 0.05, 1.1);
+    } else {
+      const pulse = 0.5 + 0.5 * Math.sin(t * 2.2 + c.x);
+      g.strokeStyle = `rgba(255,170,80,${0.3 + pulse * 0.4})`; g.lineWidth = 1.5; g.beginPath(); g.ellipse(bx, byy, rx * 0.9, ry * 0.9, 0, 0, TAU); g.stroke();
+      g.save(); g.globalCompositeOperation = 'lighter'; g.globalAlpha = 0.15 + pulse * 0.2;
+      g.strokeStyle = '#ffb060'; g.lineWidth = 2 * s;
+      g.beginPath(); g.ellipse(G[0], G[1], (26 + pulse * 6) * s, (13 + pulse * 3) * s, 0, 0, TAU); g.stroke();
+      g.restore();
+      if (Math.random() < 0.04) emit({ x: c.x + 0.5 + (Math.random() - .5) * 0.3, y: c.y + 0.5 + (Math.random() - .5) * 0.3, z: bz, vz: 0.6, life: 1.2, size: 2.2, color: '#ffb060', kind: 'glow' });
+    }
+    return;
+  }
   prism(g, x + 0.3, y + 0.3, x + 0.7, y + 0.7, z, z + 0.5, '#9a8fa8', '#6e6380', '#4e4560');
   prism(g, x + 0.22, y + 0.22, x + 0.78, y + 0.78, z, z + 0.08, '#8a7f98', '#5e5470', '#443c55');
   const P = proj(x + 0.5, y + 0.5, z + 0.62);
   g.fillStyle = '#3a2c3a'; g.beginPath(); g.ellipse(P[0], P[1] + 3 * s, 15 * s, 8 * s, 0, 0, Math.PI); g.fill();
   g.fillStyle = '#7a6a5a'; g.beginPath(); g.ellipse(P[0], P[1], 16 * s, 7 * s, 0, 0, TAU); g.fill();
+  g.beginPath(); g.ellipse(P[0], P[1], 16 * s, 7 * s, 0, 0, TAU); g.moveTo(P[0] + 15 * s, P[1] + 2 * s); g.ellipse(P[0], P[1] + 3 * s, 15 * s, 8 * s, 0, 0.3, Math.PI - 0.3); inkStroke(g, INK, 1.3);
   g.fillStyle = c.lit ? '#ff9a3a' : '#2a2026'; g.beginPath(); g.ellipse(P[0], P[1], 12.5 * s, 5 * s, 0, 0, TAU); g.fill();
   if (c.lit) {
     if (Math.random() < 0.9) flameP(x + 0.5 + (Math.random() - .5) * 0.25, y + 0.5 + (Math.random() - .5) * 0.25, z + 0.72, 1.1);
@@ -1577,7 +2860,13 @@ function drawGate(g, c, t) {
     g.strokeStyle = 'rgba(255,210,120,0.5)'; g.lineWidth = 1.5 * s; g.beginPath(); g.ellipse(P[0], P[1], 18 * s, 9 * s, 0, 0, TAU); g.stroke();
     return;
   }
-  prism(g, x + 0.08, y + 0.08, x + 0.92, y + 0.92, z, z + hh, '#8c84a8', '#5c5280', '#443a66', 'rgba(255,255,255,0.12)');
+  if (texOK) {
+    const rs = TEX_SRC.runestone && !TEX_SRC.runestone.drawn;
+    texturedBox(g, x + 0.08, y + 0.08, x + 0.92, y + 0.92, z, z + hh, rs
+      ? { colT: '#6a6478', colL: '#5c5670', colR: '#4a4560', top: 'runestone', side: 'runestone', tint: 'rgba(40,24,70,0.12)', rim: 'rgba(220,200,255,0.4)' }
+      : { colT: '#8c84a8', colL: '#5c5280', colR: '#443a66', top: 'stoneTop', side: 'stoneSide', tint: 'rgba(70,46,120,0.32)', rim: 'rgba(220,200,255,0.4)' });
+  }
+  else prism(g, x + 0.08, y + 0.08, x + 0.92, y + 0.92, z, z + hh, '#8c84a8', '#5c5280', '#443a66', 'rgba(255,255,255,0.12)');
   // runes on faces
   const lit = World.braziers.filter(b => b.lit).length, tot = World.braziers.length;
   const col = World.gateOpen ? '#ffd27a' : '#7fe8ff';
@@ -1599,14 +2888,38 @@ function drawGate(g, c, t) {
   g.restore();
 }
 
+// where the painted ring's dark well sits in its picture (fractions of its width and height; radii of its width),
+// and how much to flatten it so it lies flush on the tile
+const GOAL = { cx: 0.5009, cy: 0.4943, rx: 0.326, ry: 0.1975, squash: 0.83, w: 0.8 };
 function drawFont(g, c, t) {
   const x = c.x, y = c.y, z = c.h, s = cam.s;
   const P = proj(x + 0.5, y + 0.5, z);
+  if (SPRITE.goal) {
+    const im = SPRITE.goal, w = GOAL.w * TW * s, h = w * im.naturalHeight / im.naturalWidth * GOAL.squash;
+    const left = P[0] - GOAL.cx * w, topY = P[1] - GOAL.cy * h, irx = GOAL.rx * w, iry = GOAL.ry * w * GOAL.squash;
+    g.fillStyle = 'rgba(10,8,16,0.3)'; g.beginPath(); g.ellipse(P[0], P[1] + 2 * s, w * 0.52, w * 0.27, 0, 0, TAU); g.fill();
+    g.drawImage(im, left, topY, w, h);
+    // the well of light
+    const gr = g.createRadialGradient(P[0], P[1] + iry * 0.2, 0, P[0], P[1], irx * 1.05);
+    gr.addColorStop(0, '#f0ffff'); gr.addColorStop(0.35, '#7fe4f5'); gr.addColorStop(0.8, '#1d5d80'); gr.addColorStop(1, 'rgba(20,40,70,0.75)');
+    g.fillStyle = gr; g.beginPath(); g.ellipse(P[0], P[1], irx, iry, 0, 0, TAU); g.fill();
+    // its inner rim, shaded where the stone overhangs it
+    g.strokeStyle = 'rgba(20,24,40,0.45)'; g.lineWidth = 2 * s; g.beginPath(); g.ellipse(P[0], P[1] + 0.6 * s, irx, iry, 0, Math.PI * 1.05, Math.PI * 1.95); g.stroke();
+    // the rune ring turning slowly in the light
+    g.save(); g.translate(P[0], P[1]); g.scale(1, iry / irx); g.rotate(t * 0.4);
+    g.strokeStyle = 'rgba(200,250,255,0.85)'; g.lineWidth = 1.2 * s;
+    g.beginPath(); g.arc(0, 0, irx * 0.72, 0, TAU); g.stroke();
+    for (let k = 0; k < 8; k++) { g.rotate(TAU / 8); g.beginPath(); g.moveTo(irx * 0.58, 0); g.lineTo(irx * 0.84, 0); g.moveTo(irx * 0.71, -3 * s); g.lineTo(irx * 0.71, 3 * s); g.stroke(); }
+    g.restore();
+    if (Math.random() < 0.25) emit({ x: x + 0.5 + (Math.random() - .5) * 0.45, y: y + 0.5 + (Math.random() - .5) * 0.45, z: z + 0.05, vz: 0.8 + Math.random(), life: 1.6, size: 3, color: '#8ff4ff', kind: 'glow' });
+    return;
+  }
   const rx = 0.42 * TW * 0.7071 * s * 1.25, ry = rx * 0.5;
   // a gilded ring set into the ground around a well of light
   g.fillStyle = '#5a3f1c'; g.beginPath(); g.ellipse(P[0], P[1] + 3 * s, rx * 1.06, ry * 1.06, 0, 0, TAU); g.fill();
   const rim = g.createLinearGradient(P[0] - rx, P[1] - ry, P[0] + rx, P[1] + ry);
   rim.addColorStop(0, '#fff1c2'); rim.addColorStop(0.45, '#e2b45e'); rim.addColorStop(1, '#93621f');
+  g.beginPath(); g.ellipse(P[0], P[1] + 1.5 * s, rx * 1.06, ry * 1.06 + 1.5 * s, 0, 0, TAU); inkStroke(g, INK, 1.4);
   g.fillStyle = rim; g.beginPath(); g.ellipse(P[0], P[1], rx, ry, 0, 0, TAU); g.fill();
   g.fillStyle = '#1c1530'; g.beginPath(); g.ellipse(P[0], P[1] + 0.5 * s, rx * 0.8, ry * 0.8, 0, 0, TAU); g.fill();
   const gr = g.createRadialGradient(P[0], P[1] + ry * 0.2, 0, P[0], P[1], rx * 0.78);
@@ -1648,7 +2961,8 @@ function drawBody(g, b, t) {
   if (b.kind === 'slab') {
     const r = b.r;
     if (b.lev > 0) { const [gx, gy] = proj(b.x, b.y, b.z); g.save(); g.globalCompositeOperation = 'lighter'; g.globalAlpha = 0.45 + 0.15 * Math.sin(t * 4); g.drawImage(glowSprite('#cdb0ff'), gx - 40 * s, gy - 14 * s, 80 * s, 40 * s); g.restore(); }
-    prism(g, b.x - r, b.y - r, b.x + r, b.y + r, b.z, b.z + b.hgt, '#bcb2cc', '#857a98', '#665c7a', 'rgba(255,255,255,0.25)');
+    if (texOK) texturedBox(g, b.x - r, b.y - r, b.x + r, b.y + r, b.z, b.z + b.hgt, { colT: '#a29f80', colL: '#6c6f58', colR: '#575a48', top: 'stoneTop', side: 'stoneSide', tint: 'rgba(150,110,210,0.16)' });
+    else prism(g, b.x - r, b.y - r, b.x + r, b.y + r, b.z, b.z + b.hgt, '#bcb2cc', '#857a98', '#665c7a', 'rgba(255,255,255,0.25)');
     const P = proj(b.x, b.y, b.z + b.hgt);
     g.strokeStyle = `rgba(205,176,255,${0.5 + 0.3 * Math.sin(t * 3)})`; g.lineWidth = 1.2 * s;
     g.beginPath(); g.ellipse(P[0], P[1], 13 * s, 6.5 * s, 0, 0, TAU); g.stroke();
@@ -1679,6 +2993,10 @@ function drawBody(g, b, t) {
     g.fillStyle = 'rgba(255,255,255,0.9)'; g.beginPath(); g.ellipse(cx - r * 0.38, cy - r * 0.45, r * 0.16, r * 0.1, -0.6, 0, TAU); g.fill();
   } else {
     const r = b.r, burnt = b.burn ? clamp(b.burn, 0, 1) : 0;
+    if (texOK) {
+      texturedBox(g, b.x - r, b.y - r, b.x + r, b.y + r, b.z, b.z + b.hgt, { colT: '#b98a52', colL: '#8a6238', colR: '#6a4628', top: 'wood', side: 'wood', tint: burnt ? `rgba(26,14,8,${(burnt * 0.75).toFixed(3)})` : null, rim: 'rgba(255,230,190,0.35)' });
+      return;
+    }
     const top = burnt ? shade('#b98a52', 1 - burnt * 0.6) : '#b98a52', left = burnt ? shade('#8a6238', 1 - burnt * 0.6) : '#8a6238', right = burnt ? shade('#6a4628', 1 - burnt * 0.6) : '#6a4628';
     prism(g, b.x - r, b.y - r, b.x + r, b.y + r, b.z, b.z + b.hgt, top, left, right, 'rgba(40,20,10,0.6)');
     g.strokeStyle = 'rgba(50,25,10,0.55)'; g.lineWidth = 1.2 * s;
@@ -1714,9 +3032,12 @@ function drawSeal(g, sp, x, y, z, R, alpha, rot, prog, t) {
   g.restore();
 }
 
+let frameNo = 0;
 function render(g, w, h, t, overlay) {
+  frameNo++;
   drawSky(g, w, h, t);
   if (!World.W) return;
+  gatherLights(t);
   g.save();
   if (cam.shake > 0) g.translate((Math.random() - .5) * cam.shake * 14, (Math.random() - .5) * cam.shake * 10);
   // ordered draw list
@@ -1729,10 +3050,13 @@ function render(g, w, h, t, overlay) {
   }
   items.sort((a, b) => a.k - b.k || a.sub - b.sub);
   // ground-plane seals underneath bodies: draw seals (normal) after terrain items of their diagonal — simpler: draw all terrain, then seals, but bodies keep order
+  HANG.length = 0; hangAt = 0;
   for (const it of items) {
+    if (hangAt < HANG.length) flushHang(g, t, it.k - 2);
     if (it.c) drawCell(g, it.c, t);
     else drawBody(g, it.b, t);
   }
+  flushHang(g, t, Infinity);
   // overlay (aim preview) & casting seals
   if (overlay) overlay(g, t);
   g.save(); g.globalCompositeOperation = 'lighter';
@@ -1753,7 +3077,7 @@ function render(g, w, h, t, overlay) {
     g.globalAlpha = 0.22; g.drawImage(glowSprite('#ffb850'), cx - r, cy - r * 0.6, r * 2, r * 1.2);
   }
   for (const c of World.cells) {
-    if (c.feat === 'brazier' && c.lit) { const [cx, cy] = proj(c.x + .5, c.y + .5, c.h + .9), r = (110 + Math.sin(t * 13 + c.x) * 6) * s; g.globalAlpha = 0.3; g.drawImage(glowSprite('#ff8a3a'), cx - r, cy - r * 0.7, r * 2, r * 1.4); }
+    if (c.feat === 'brazier' && c.lit) { const [cx, cy] = proj(c.x + .5, c.y + .5, c.h + brazierBowlZ() + 0.3), r = (110 + Math.sin(t * 13 + c.x) * 6) * s; g.globalAlpha = 0.3; g.drawImage(glowSprite('#ff8a3a'), cx - r, cy - r * 0.7, r * 2, r * 1.4); }
     if (c.burn) { const [cx, cy] = proj(c.x + .5, c.y + .5, c.h + .5), r = 90 * s; g.globalAlpha = 0.25; g.drawImage(glowSprite('#ff7030'), cx - r, cy - r * 0.7, r * 2, r * 1.4); }
     if (c.feat === 'font') {
       const [cx, cy] = proj(c.x + .5, c.y + .5, c.h), r = 70 * s;
@@ -1775,8 +3099,38 @@ function render(g, w, h, t, overlay) {
   }
   g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
   g.restore();
+  // the storybook's soft glow: light bleeds gently from bright things, and the scene sits in a faint warm haze
+  bloom(g);
   // vignette
   g.drawImage(vignette(w, h), 0, 0, w, h);
+}
+/* Bloom: the frame is shrunk twice into small buffers (the shrinking blurs it), each squared by multiplying it with
+   itself so mostly the bright parts survive, then laid back over the frame with 'screen', which only lightens. */
+const BLOOM = { on: true, a: null, b: null };
+function bloomBuf(k, w, h) {
+  let c = BLOOM[k];
+  if (!c) c = BLOOM[k] = document.createElement('canvas');
+  if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+  return c;
+}
+function bloom(g) {
+  if (!BLOOM.on || !g.canvas) return;
+  const cv = g.canvas, W = cv.width, H = cv.height; if (W < 16 || H < 16) return;
+  const a = bloomBuf('a', Math.max(2, Math.round(W / 6)), Math.max(2, Math.round(H / 6))), ag = a.getContext('2d');
+  const b = bloomBuf('b', Math.max(2, Math.round(W / 24)), Math.max(2, Math.round(H / 24))), bg = b.getContext('2d');
+  ag.imageSmoothingQuality = 'high'; bg.imageSmoothingQuality = 'high';
+  ag.globalCompositeOperation = 'copy'; ag.drawImage(cv, 0, 0, a.width, a.height);
+  ag.globalCompositeOperation = 'multiply'; ag.drawImage(a, 0, 0);
+  bg.globalCompositeOperation = 'copy'; bg.drawImage(a, 0, 0, b.width, b.height);
+  g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.imageSmoothingQuality = 'high';
+  g.globalCompositeOperation = 'screen';
+  g.globalAlpha = 0.36; g.drawImage(a, 0, 0, W, H);
+  g.globalAlpha = 0.5; g.drawImage(b, 0, 0, W, H);
+  // a faint warm haze, strongest low in the frame where the sunset glows
+  const hz = g.createLinearGradient(0, 0, 0, H);
+  hz.addColorStop(0, 'rgba(120,90,160,0.03)'); hz.addColorStop(0.6, 'rgba(255,170,130,0.05)'); hz.addColorStop(1, 'rgba(255,180,140,0.09)');
+  g.globalAlpha = 1; g.fillStyle = hz; g.fillRect(0, 0, W, H);
+  g.restore();
 }
 /* the vignette is a smooth gradient, so it is painted once per screen size at a quarter scale and stretched */
 let _vig = null;
