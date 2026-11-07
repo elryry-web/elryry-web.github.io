@@ -372,7 +372,7 @@ const Game = {
 
   showScreen(id) {
     for (const el of document.querySelectorAll('.screen,.card')) el.classList.toggle('show', el.id === id);
-    this.coverAt = id === 'win' || id === 'note' ? performance.now() : 0;
+    this.coverAt = id === 'win' || id === 'note' || id === 'levels' ? performance.now() : 0;
   },
   title() {
     this.state = 'title'; this.level = null;
@@ -694,15 +694,16 @@ const QUALITY = [{ dpr: 2, bloom: true }, { dpr: 2, bloom: false }, { dpr: 1.75,
 // phones start without the soft glow (it copies the whole frame each frame, which phones feel most)
 let qTier = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches ? 1 : 0;
 // (a new name: steps remembered under the old one were taken too eagerly, and are let go)
-try { const q = localStorage.getItem('quillsigil.quality2'); if (q != null) qTier = clamp(Math.round(+q || 0), 0, QUALITY.length - 1); } catch (e) { }
+try { const q = localStorage.getItem('quillsigil.quality3'); if (q != null) qTier = clamp(Math.round(+q || 0), 0, QUALITY.length - 1); } catch (e) { }
 const PERF = { n: 0, sum: 0, last: 0, hold: 0, good: 0, bad: 0, probed: false, fellFrom: -1, mode: '' };
 function setQuality(k, now) {
   qTier = k; PERF.hold = now + 1500; PERF.n = 0; PERF.sum = 0; PERF.good = 0;
-  try { localStorage.setItem('quillsigil.quality2', String(k)); } catch (e) { }
+  try { localStorage.setItem('quillsigil.quality3', String(k)); } catch (e) { }
   resize();
 }
 // ?debug in the address shows frame timings in a corner (to see what a given phone is doing)
 const DEBUG = /[?&]debug(=|&|$)/.test(location.search);
+const GAME_VERSION = (() => { const s = document.querySelector('script[src*="main.js"]'); const m = s && /[?&]v=(\d+)/.exec(s.getAttribute('src')); return m ? m[1] : '?'; })();
 const DBG = { el: null, n: 0, iv: 0, rd: 0, worst: 0, last: 0 };
 function debugFrame(now, renderMs) {
   if (!DEBUG) return;
@@ -711,7 +712,7 @@ function debugFrame(now, renderMs) {
   DBG.n++; DBG.iv += dt; DBG.rd += renderMs; DBG.worst = Math.max(DBG.worst, dt);
   if (DBG.n < 30) return;
   const cached = typeof TC !== 'undefined' ? TC.map.size : 0, tiles = World.cells.filter(c => !c.void).length;
-  DBG.el.textContent = `${(1000 / (DBG.iv / DBG.n)).toFixed(0)} fps  frame ${(DBG.iv / DBG.n).toFixed(1)}ms  worst ${DBG.worst.toFixed(0)}ms
+  DBG.el.textContent = `v${GAME_VERSION}  ${(1000 / (DBG.iv / DBG.n)).toFixed(0)} fps  frame ${(DBG.iv / DBG.n).toFixed(1)}ms  worst ${DBG.worst.toFixed(0)}ms
 draw ${(DBG.rd / DBG.n).toFixed(1)}ms  quality ${qTier}  dpr ${DPR}
 tiles ${cached}/${tiles}  particles ${parts.length}`;
   DBG.n = 0; DBG.iv = 0; DBG.rd = 0; DBG.worst = 0;

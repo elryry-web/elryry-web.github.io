@@ -2,7 +2,7 @@
    The game's own files are fetched fresh when there is a connection (so updates arrive at once)
    and served from the cache when there is not. Fonts are cached on first use.
    Bump VERSION together with the ?v=N script versions in index.html. */
-const VERSION = 122;
+const VERSION = 123;
 const CACHE = 'quill-sigil-v' + VERSION;
 const CORE = [
   './',
@@ -38,8 +38,10 @@ self.addEventListener('fetch', e => {
     return;
   }
   if (url.origin !== self.location.origin) return;
-  // the game itself: network first, cache as a fallback
-  e.respondWith(fetch(req).then(res => {
+  // the game itself: network first (asking the server whether its copy is still current, past the browser's own
+  // cache, so a reload always gets the newest version), the offline cache as a fallback
+  const fresh = req.mode === 'navigate' ? fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' }) : fetch(req, { cache: 'no-cache' });
+  e.respondWith(fresh.then(res => {
     if (res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }
     return res;
   }).catch(() => caches.match(req).then(hit => hit || caches.match(req, { ignoreSearch: true }))
