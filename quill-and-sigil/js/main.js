@@ -684,14 +684,16 @@ const wc = document.getElementById('world'), wg = wc.getContext('2d');
 let DPR = 1;
 /* Quality steps, tried in turn when frames come too slowly (on phones, mostly): first the soft glow goes, then the
    world is drawn at a lower resolution. The step reached is remembered for next time. */
-const QUALITY = [{ dpr: 2, bloom: true }, { dpr: 2, bloom: false }, { dpr: 1.5, bloom: false }, { dpr: 1.25, bloom: false }];
+// (never below 1.5: on a sharp phone screen anything less looks blurred and blocky)
+const QUALITY = [{ dpr: 2, bloom: true }, { dpr: 2, bloom: false }, { dpr: 1.75, bloom: false }, { dpr: 1.5, bloom: false }];
 // phones start without the soft glow (it copies the whole frame each frame, which phones feel most)
 let qTier = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches ? 1 : 0;
-try { const q = localStorage.getItem('quillsigil.quality'); if (q != null) qTier = clamp(Math.round(+q || 0), 0, QUALITY.length - 1); } catch (e) { }
-const PERF = { n: 0, sum: 0, last: 0, hold: 0, good: 0, probed: false, fellFrom: -1 };
+// (a new name: steps remembered under the old one were taken too eagerly, and are let go)
+try { const q = localStorage.getItem('quillsigil.quality2'); if (q != null) qTier = clamp(Math.round(+q || 0), 0, QUALITY.length - 1); } catch (e) { }
+const PERF = { n: 0, sum: 0, last: 0, hold: 0, good: 0, bad: 0, probed: false, fellFrom: -1, mode: '' };
 function setQuality(k, now) {
   qTier = k; PERF.hold = now + 1500; PERF.n = 0; PERF.sum = 0; PERF.good = 0;
-  try { localStorage.setItem('quillsigil.quality', String(k)); } catch (e) { }
+  try { localStorage.setItem('quillsigil.quality2', String(k)); } catch (e) { }
   resize();
 }
 // ?debug in the address shows frame timings in a corner (to see what a given phone is doing)
@@ -712,11 +714,17 @@ tiles ${cached}/${tiles}  particles ${parts.length}`;
 // called each frame: `drew` is whether the world was drawn this frame
 function perfWatch(now, drew) {
   const dt = now - PERF.last; PERF.last = now;
+  // a change of scene (a lesson starting, a card, the grimoire opening or closing, the window resizing) brings a few
+  // slow frames of its own: those aren't held against the phone
+  const mode = `${Game.state}|${Game.coverAt ? 1 : 0}|${Grim.open ? 1 : 0}|${innerWidth}x${innerHeight}|${Game.idx}`;
+  if (mode !== PERF.mode) { PERF.mode = mode; PERF.hold = Math.max(PERF.hold, now + 2500); }
   if (!drew || document.hidden || dt > 250 || now < PERF.hold) { PERF.n = 0; PERF.sum = 0; return; }
   PERF.n++; PERF.sum += dt;
   if (PERF.n < 60) return;
   const avg = PERF.sum / PERF.n; PERF.n = 0; PERF.sum = 0;
-  if (avg > 20 && qTier < QUALITY.length - 1) { PERF.fellFrom = qTier; PERF.good = 0; setQuality(qTier + 1, now); return; }
+  // two slow spells running before stepping down
+  PERF.bad = avg > 22 ? PERF.bad + 1 : 0;
+  if (PERF.bad >= 2 && qTier < QUALITY.length - 1) { PERF.fellFrom = qTier; PERF.good = 0; PERF.bad = 0; setQuality(qTier + 1, now); return; }
   // a step remembered from a slower moment (another tab busy, low power) is tried back up once, after a steady spell
   PERF.good = avg < 17.5 ? PERF.good + 1 : 0;
   if (PERF.good >= 6 && qTier > 0 && !PERF.probed && PERF.fellFrom < 0) { PERF.probed = true; setQuality(qTier - 1, now); }
