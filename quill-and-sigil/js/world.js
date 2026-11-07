@@ -1786,7 +1786,7 @@ for (const k in TEX_ART) {
   if (typeof Image === 'undefined') break;
   const im = new Image();
   im.onload = () => { TEX_IMAGES[k] = im; try { paintedTex(k, im); } catch (e) { console.warn('texture', k, e); } };
-  im.src = `art/${TEX_ART[k].file}.jpg?v=4`;
+  im.src = `art/${TEX_ART[k].file}.jpg?v=5`;
 }
 let TEX_VER = 0;
 function paintedTex(k, im) {
@@ -1984,7 +1984,9 @@ function stoneWallGoesOn(c, R, step) {
 // its soil wall, the grass lip and the rock below all turn the corner in a curve of radius SOIL_R.
 const SOIL_R = 0.24;
 function soilCorners(c) {
-  if (!texOK || c.icy || c.void || c.h < 0 || c.h >= 1) return null;
+  // (a pool's earth too, sunk though it is: its water's corner over the open air is rounded, and a square corner of
+  // earth below it would poke out through the fall)
+  if (!texOK || c.icy || c.void || (c.h < 0 && !isPool(c)) || c.h >= 1) return null;
   const x = c.x, y = c.y, open = n => !n || n.void;
   const e = [open(cellI(x, y - 1)), open(cellI(x + 1, y)), open(cellI(x, y + 1)), open(cellI(x - 1, y))];
   const k = [e[3] && e[0], e[0] && e[1], e[1] && e[2], e[2] && e[3]];
@@ -2400,7 +2402,11 @@ function drawSideFaces(g, c, d, t) {
       }
       // roots and mossy strands hanging from the underside of the island's rim
       const vines = SPRITE['vine-leafy'] && SPRITE['vine-moss'] && SPRITE['vine-roots'];
-      if (toVoid && c.h >= 0 && vines) {
+      // (none behind a waterfall, this tile's or a neighbour's pouring into the same open air: they're drawn after
+      // the curtain, so they'd poke through it)
+      const VX = R ? x + 1 : x, VY = R ? y : y + 1;
+      const fallHere = [0, 1, 2, 3].some(e => pours(cellI(VX - EDGE_D[e][0], VY - EDGE_D[e][1]), e));
+      if (toVoid && c.h >= 0 && vines && !fallHere) {
         // now and then a leafy vine or a mossy strand spills from under the grass lip, or a tangle of roots hangs
         // from the soil's foot over the rock
         const sd = x * 4.31 + y * 7.17 + (R ? 0.5 : 2.5);
@@ -2809,6 +2815,9 @@ function sheetRuns(c) {
   const x = c.x, y = c.y, op = [0, 1, 2, 3].map(k => pours(c, k)), r = waterRound(c) || [0, 0, 0, 0];
   const C = [[0, 0], [1, 0], [1, 1], [0, 1]], a0 = [Math.PI, -Math.PI / 2, 0, Math.PI / 2], runs = [];
   let cur = null;
+  // at an inner corner another fall pours into the same open air from the side: the run doesn't tuck in against the
+  // cliff there (the earth in the corner would show between the two), it carries on to meet the other
+  const meets = (e, d, back) => { const V = [x + EDGE_D[e][0] + d[0], y + EDGE_D[e][1] + d[1]]; return pours(cellI(V[0], V[1]), back); };
   const push = (pt) => { if (!cur) { cur = { pts: [], fadeA: false, fadeB: false }; runs.push(cur); } cur.pts.push(pt); };
   // go round from corner A; a run that is still open at the end joins the first
   for (let k = 0; k < 4; k++) {
@@ -2823,12 +2832,12 @@ function sheetRuns(c) {
       cur = null;
       const ad = EDGE_D[(e + 3) % 4];
       push([x + C[k][0], y + C[k][1], nx, ny]);
-      cur.fadeA = !pours(cellI(x + ad[0], y + ad[1]), e);
+      cur.fadeA = !pours(cellI(x + ad[0], y + ad[1]), e) && !meets(e, ad, (e + 1) % 4);
     }
     if (!r[k2]) {
       push([x + C[k2][0], y + C[k2][1], nx, ny]);
       const ad = EDGE_D[(e + 1) % 4];
-      cur.fadeB = !pours(cellI(x + ad[0], y + ad[1]), e);
+      cur.fadeB = !pours(cellI(x + ad[0], y + ad[1]), e) && !meets(e, ad, (e + 3) % 4);
       cur = null;
     } else {
       const ox = C[k2][0] ? C[k2][0] - r[k2] : r[k2], oy = C[k2][1] ? C[k2][1] - r[k2] : r[k2], an = a0[k2];
