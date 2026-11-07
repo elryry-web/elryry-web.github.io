@@ -1424,7 +1424,12 @@ const Grim = {
   frame(dt, t) {
     if (!this.open && !this.closing) return;
     this.anim = clamp(this.anim + (this.open ? dt : -dt) / 0.32, 0, 1);
-    if (!this.open && this.anim <= 0) { this.closing = false; this.cv.style.display = 'none'; return; }
+    if (!this.open && this.anim <= 0) {
+      this.closing = false; this.cv.style.display = 'none';
+      // closed, its full-page layers are let go (on phones the memory is wanted elsewhere); show() lays them out afresh
+      for (const c of [this.cv, this.book, this.inkLayer, this.glowLayer]) if (c) { c.width = 1; c.height = 1; }
+      return;
+    }
     if (this.bookDirty) this.renderBook();
     if (this.inkDirty) this.renderInk();
     const g = this.g, dpr = this.dpr, e = ease(this.anim), A = this.L.area;

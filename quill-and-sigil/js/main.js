@@ -694,6 +694,21 @@ function setQuality(k, now) {
   try { localStorage.setItem('quillsigil.quality', String(k)); } catch (e) { }
   resize();
 }
+// ?debug in the address shows frame timings in a corner (to see what a given phone is doing)
+const DEBUG = /[?&]debug(=|&|$)/.test(location.search);
+const DBG = { el: null, n: 0, iv: 0, rd: 0, worst: 0, last: 0 };
+function debugFrame(now, renderMs) {
+  if (!DEBUG) return;
+  if (!DBG.el) { DBG.el = document.createElement('div'); DBG.el.style.cssText = 'position:fixed;left:6px;bottom:6px;z-index:99;font:11px/1.35 monospace;color:#cfe;background:rgba(0,0,0,.6);padding:4px 6px;border-radius:4px;pointer-events:none;white-space:pre'; document.body.appendChild(DBG.el); }
+  const dt = DBG.last ? now - DBG.last : 0; DBG.last = now;
+  DBG.n++; DBG.iv += dt; DBG.rd += renderMs; DBG.worst = Math.max(DBG.worst, dt);
+  if (DBG.n < 30) return;
+  const cached = typeof TC !== 'undefined' ? TC.map.size : 0, tiles = World.cells.filter(c => !c.void).length;
+  DBG.el.textContent = `${(1000 / (DBG.iv / DBG.n)).toFixed(0)} fps  frame ${(DBG.iv / DBG.n).toFixed(1)}ms  worst ${DBG.worst.toFixed(0)}ms
+draw ${(DBG.rd / DBG.n).toFixed(1)}ms  quality ${qTier}  dpr ${DPR}
+tiles ${cached}/${tiles}  particles ${parts.length}`;
+  DBG.n = 0; DBG.iv = 0; DBG.rd = 0; DBG.worst = 0;
+}
 // called each frame: `drew` is whether the world was drawn this frame
 function perfWatch(now, drew) {
   const dt = now - PERF.last; PERF.last = now;
@@ -937,6 +952,10 @@ function tick(now) {
   // strength, and a canvas busy redrawing under the card can leave holes in it on some phones)
   // (and likewise while the grimoire lies open over it: the world is paused then anyway)
   const covered = (Game.coverAt && now - Game.coverAt > 700) || (Grim.open && Grim.anim >= 1);
+  // under a card, the world's buffers are let go too, so the phone has the memory to draw the card whole
+  if (covered && Game.coverAt && !Game.released) { Game.released = true; releaseBuffers(); }
+  if (!covered) Game.released = false;
+  let r0 = 0;
   if (!covered) {
     const k = WORLD_PAUSED.has(Game.state) ? 1 : acc / FIXED, held = [];
     if (k < 1) for (const b of World.bodies) {
@@ -944,10 +963,12 @@ function tick(now) {
       held.push(b, b.x, b.y, b.z);
       b.x = b._px + (b.x - b._px) * k; b.y = b._py + (b.y - b._py) * k; b.z = b._pz + (b.z - b._pz) * k;
     }
+    r0 = DEBUG ? performance.now() : 0;
     try { render(wg, innerWidth, innerHeight, t, aimOverlay); }
     finally { for (let i = 0; i < held.length; i += 4) { const b = held[i]; b.x = held[i + 1]; b.y = held[i + 2]; b.z = held[i + 3]; } }
   }
   perfWatch(now, !covered && !PV.isOpen);
+  if (DEBUG) debugFrame(now, covered ? 0 : performance.now() - r0);
   Grim.frame(dt, t);
   Game.update(dt);
   try { Tips.update(dt); } catch (e) { console.error(e); } // a tip must never stop the game

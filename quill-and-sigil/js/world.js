@@ -1508,10 +1508,16 @@ function texPebbles(g, R, n, rx0, rx1) {
 }
 // Slabs for the raised stone. On tops, light falls from the back corner (texture top-left) to the front one;
 // on walls, from the top edge down. Each slab is painted inside its own clip, so nothing spills into the next.
+/* ?bond in the address lays the walls' slabs in running bond (each course offset half a block from the next), so a
+   wall of several blocks reads as one piece of masonry rather than a stack of cubes */
+const STONE_BOND = typeof location !== 'undefined' && /[?&]bond(=|&|$)/.test(location.search);
+// how mossy a stone wall is: walls in shade (R) usually, walls in the light now and then; and each block's own tone
+const wallMossy = (x, y, R) => hash2(x * 3.7 + y * 5.3 + (R ? 0 : 9), 4.2) < (R ? 0.78 : 0.38);
+function blockTone(x, y) { const h = hash2(x * 1.31 + 0.7, y * 7.9 + 2.1); return h < 0.34 ? 'rgba(205,165,115,0.09)' : h < 0.67 ? 'rgba(105,115,132,0.1)' : 'rgba(100,122,70,0.08)'; }
 function texSlabs(g, R, wall, U = TEXU, N = TEXN, light = false) {
-  const n = Math.round(N / U), kk = U / 128;
-  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
-    const x0 = i * U, y0 = j * U;
+  const n = Math.round(N / U), kk = U / 128, bond = wall && STONE_BOND;
+  for (let j = 0; j < n; j++) for (let i = bond ? -1 : 0; i < n; i++) {
+    const x0 = i * U + (bond && j % 2 ? U / 2 : 0), y0 = j * U;
     g.save(); g.beginPath(); g.rect(x0, y0, U, U); g.clip();
     // the broad shading
     const gr = wall ? g.createLinearGradient(0, y0, 0, y0 + U) : g.createLinearGradient(x0, y0, x0 + U, y0 + U);
@@ -2124,6 +2130,7 @@ function cornerCurve(g, c, k) {
     const mid = (span[0] + span[1]) / 2, halves = k === 2 ? [[span[0], Math.PI / 4, true], [Math.PI / 4, span[1] + 0.02, false]] : [[span[0], span[1] + 0.02, k === 1]];
     const tall = top - zb;
     for (const [b0, b1, Rs] of halves) {
+      if (!wallMossy(x, y, Rs)) continue;
       const As = [0, 1, 2, 3, 4].map(i => b0 + (b1 - b0) * i / 4), e0 = ew(b0), e1 = ew(b1);
       const strip = (z0, z1) => [...As.map(a => P(a, z0)), ...As.slice().reverse().map(a => P(a, z1))];
       const hz = Math.min(0.5, tall * 0.6);
@@ -2200,8 +2207,10 @@ function drawSideFaces(g, c, d, t) {
         qg.addColorStop(0, `rgba(16,14,24,${R ? 0.3 : 0.14})`); qg.addColorStop(1, `rgba(16,14,24,${R ? 0.55 : 0.42})`);
         g.fillStyle = qg; poly(g, Q); g.fill();
       }
+      const mossy = wallMossy(x, y, R), tall = top - sb;
       if (texOK) {
         texSide(g, 'stoneSide', c, R, faceS(top, sb));
+        g.fillStyle = blockTone(x, y); poly(g, faceS(top, sb)); g.fill();
         // light falls off down the wall into the shade at its foot, the shaded side darker all over, and the rounded
         // top edge catches the light
         onPlane(g, c, R, U => {
@@ -2220,20 +2229,42 @@ function drawSideFaces(g, c, d, t) {
             ug.addColorStop(0, 'rgba(18,14,10,0.42)'); ug.addColorStop(1, 'rgba(18,14,10,0)');
             g.fillStyle = ug; g.fillRect(a + u0 * U, Z(top - cap), (u1 - u0) * U, Z(top - cap - 0.14) - Z(top - cap));
           }
+          // damp rising from the foot: darker and a little green low down, fading up the wall
+          const dh = Math.min(0.7, tall * 0.5), dmp = g.createLinearGradient(0, Z(sb), 0, Z(sb + dh));
+          dmp.addColorStop(0, `rgba(30,44,24,${R ? 0.32 : 0.24})`); dmp.addColorStop(1, 'rgba(30,44,24,0)');
+          g.fillStyle = dmp; g.fillRect(a + u0 * U, Z(sb + dh), (u1 - u0) * U, Z(sb) - Z(sb + dh));
+          // under moss, a few faint streaks where water has run down the stone
+          if (mossy && tall > 0.4) for (let k = 0; k < 3; k++) {
+            const hs = x * 5.1 + y * 2.3 + (R ? 3 : 7) + k * 1.7; if (hash2(hs, 1.4) > 0.65) continue;
+            const us = a + (u0 + (u1 - u0) * (0.12 + 0.76 * hash2(hs, 2.8))) * U, w = (0.025 + 0.03 * hash2(hs, 3.9)) * U, len = tall * (0.35 + 0.4 * hash2(hs, 5.2));
+            const st2 = g.createLinearGradient(0, Z(top - 0.06), 0, Z(top - len));
+            st2.addColorStop(0, 'rgba(28,36,22,0.2)'); st2.addColorStop(1, 'rgba(28,36,22,0)');
+            g.fillStyle = st2;
+            g.fillRect(us - w, Z(top - 0.06), w * 2, Z(top - len) - Z(top - 0.06));
+            g.fillRect(us - w * 0.4, Z(top - 0.06), w * 0.8, Z(top - len) - Z(top - 0.06));
+          }
           // rounded upright corners: where the block turns a corner toward us, the lit wall brightens and the
           // shaded wall darkens as they roll round it
           const nearOpen = R ? (() => { const n = cellI(x, y + 1); return !n || n.void || n.h < top - 0.01; })()
             : (() => { const n = cellI(x + 1, y); return !n || n.void || n.h < top - 0.01; })();
           // a groove down the wall where it runs on into the next block's
-          for (const [step, ue] of [[-1, 0], [1, 1]]) {
+          // (shallow and soft, as an old joint is; in running bond, left to the slabs' own joints)
+          if (!STONE_BOND) for (const [step, ue] of [[-1, 0], [1, 1]]) {
             if (!stoneWallGoesOn(c, R, step)) continue;
             const ex = (a0 + ue) * U, dir = ue ? -1 : 1;
             const dg = g.createLinearGradient(ex, 0, ex + dir * 0.06 * U, 0);
-            dg.addColorStop(0, 'rgba(22,20,14,0.6)'); dg.addColorStop(1, 'rgba(22,20,14,0)');
+            dg.addColorStop(0, 'rgba(22,20,14,0.38)'); dg.addColorStop(1, 'rgba(22,20,14,0)');
             g.fillStyle = dg; g.fillRect(Math.min(ex, ex + dir * 0.06 * U), Z(top), 0.06 * U, Z(sb) - Z(top));
             const lg = g.createLinearGradient(ex + dir * 0.05 * U, 0, ex + dir * 0.17 * U, 0);
-            lg.addColorStop(0, 'rgba(255,240,205,0.14)'); lg.addColorStop(1, 'rgba(255,240,205,0)');
+            lg.addColorStop(0, 'rgba(255,240,205,0.07)'); lg.addColorStop(1, 'rgba(255,240,205,0)');
             g.fillStyle = lg; g.fillRect(Math.min(ex + dir * 0.05 * U, ex + dir * 0.17 * U), Z(top), 0.12 * U, Z(sb) - Z(top));
+            // dirt and a thread of moss settled into the joint's foot
+            const hj = x * 2.2 + y * 4.7 + ue * 3.1 + (R ? 1 : 5);
+            if (hash2(hj, 6.1) < 0.6) {
+              const zt = sb + tall * (0.12 + 0.22 * hash2(hj, 2.9)), jg = g.createLinearGradient(0, Z(sb), 0, Z(zt));
+              jg.addColorStop(0, 'rgba(62,78,40,0.55)'); jg.addColorStop(1, 'rgba(62,78,40,0)');
+              g.fillStyle = jg; g.fillRect(Math.min(ex, ex + dir * 0.05 * U), Z(zt), 0.05 * U, Z(sb) - Z(zt));
+            }
           }
           if (nearOpen && !(rc && rc[2])) {
             const e = (R ? y : x) + 1, rg = g.createLinearGradient(e * U, 0, (e - 0.16) * U, 0);
@@ -2249,10 +2280,15 @@ function drawSideFaces(g, c, d, t) {
       if (!texOK) { g.fillStyle = R ? '#4f6a32' : '#62803c'; poly(g, faceS(top, Math.max(sb, top - 0.1))); g.fill(); }
       else {
         const sd = x * 3.7 + y * 5.3 + (R ? 0 : 9), lip = Math.max(sb, top - 0.04);
-        mossFoot(g, c, R, top, sb, u0, u1);
-        // and along the foot of the squared-off wall below a rounded corner
-        for (const [k, ua, ub] of [[R ? 1 : 3, 0, u0], [2, u1, 1]]) if (rc && rc[k] && ub - ua > 0.001 && Math.min(cornerBase(c, k), top) > sb + 0.01) mossFoot(g, c, R, top, sb, ua, ub);
-        if (!mossLip(g, c, R, top, sb, u0, u1)) {
+        // moss grows where it's damp and shaded: most walls in shade have it at the top and the foot, walls in the
+        // light seldom do (the bare edges are what keep it from reading as trim)
+        if (mossy || hash2(sd, 6.6) < 0.22) {
+          mossFoot(g, c, R, top, sb, u0, u1);
+          // and along the foot of the squared-off wall below a rounded corner
+          for (const [k, ua, ub] of [[R ? 1 : 3, 0, u0], [2, u1, 1]]) if (rc && rc[k] && ub - ua > 0.001 && Math.min(cornerBase(c, k), top) > sb + 0.01) mossFoot(g, c, R, top, sb, ua, ub);
+        }
+        if (SPRITE['moss-lip']) { if (mossy) mossLip(g, c, R, top, sb, u0, u1); }
+        else {
         g.fillStyle = R ? '#56743a' : '#6a8a44'; poly(g, faceS(top, lip)); g.fill();
         for (let k = 0; k < 5; k++) {
           if (hash2(sd + k, 2.3) < 0.35) continue;
@@ -2266,10 +2302,10 @@ function drawSideFaces(g, c, d, t) {
         }
         g.fillStyle = 'rgba(190,215,130,0.35)'; poly(g, faceS(top, Math.max(sb, top - 0.015))); g.fill();
         }
-        const vs = x * 2.93 + y * 6.11 + (R ? 1.3 : 4.1), span = u1 - u0, tall = top - sb;
+        const vs = x * 2.93 + y * 6.11 + (R ? 1.3 : 4.1), span = u1 - u0;
         const onW = (u, z) => R ? proj(x + 1, y + u, z) : proj(x + u, y + 1, z);
         // a drape of moss toward one end of the wall, an ivy sprig toward the other
-        const drape = SPRITE['moss-drape'] && hash2(vs, 6.3) < 0.26 && tall > 0.45 && span > 0.5, ivy = hash2(vs, 3.7) < 0.32 && tall > 0.6 ? ivyFor(vs) : null;
+        const drape = mossy && SPRITE['moss-drape'] && hash2(vs, 6.3) < 0.3 && tall > 0.45 && span > 0.5, ivy = hash2(vs, 3.7) < 0.32 && tall > 0.6 ? ivyFor(vs) : null;
         const side = hash2(vs, 2.7) < 0.5, uD = u0 + span * (side ? 0.3 : 0.7) + (hash2(vs, 2.2) - 0.5) * 0.12 * span;
         const uV = drape ? u0 + span * (side ? 0.78 : 0.22) : u0 + span * (0.2 + 0.6 * hash2(vs, 8.1));
         if (drape) hangDrape(g, R, onW(uD, top + 0.005), Math.min(span * 0.75, 0.42 + 0.2 * hash2(vs, 4.4)), Math.min(tall * 0.8, 0.38 + 0.4 * hash2(vs, 5.7)), hash2(vs, 7.9) < 0.5);
@@ -2460,6 +2496,7 @@ function drawCell(g, c, t, part) {
   const big = rounded ? growPoly(outline.map(([u, v]) => proj(x + u, y + v, z)), 0.6) : growQuad([A, B, C, D], 0.6);
   g.fillStyle = topColor(c, d); poly(g, big); g.fill();
   texTop(g, c.icy ? 'ice' : c.h >= 1 ? 'stoneTop' : c.h < -0.01 ? 'dirt' : 'grass', z, big);
+  if (c.h >= 1 && !c.icy && texOK) { g.fillStyle = blockTone(x, y); poly(g, big); g.fill(); }
   // the neighbours across each top edge: AB, BC, CD, DA
   const nb = [cellI(x, y - 1), cellI(x + 1, y), cellI(x, y + 1), cellI(x - 1, y)], E = [[A, B], [B, C], [C, D], [D, A]];
   // soft shadow at the foot of a higher neighbour's wall (only the two back edges have a wall in view)
@@ -2477,8 +2514,8 @@ function drawCell(g, c, t, part) {
     if (sj) {
       // a groove where this block meets the next: dark in the joint, with a rounded, lit edge just inside it
       const nf = [false, false, false, false];
-      edgeBands(g, x, y, z, sj.e, nf, 0.16, [[0, 'rgba(255,240,205,0)'], [0.3, 'rgba(255,240,205,0.16)'], [1, 'rgba(255,240,205,0)']]);
-      edgeBands(g, x, y, z, sj.e, nf, 0.05, [[0, 'rgba(24,22,16,0.6)'], [1, 'rgba(24,22,16,0)']]);
+      edgeBands(g, x, y, z, sj.e, nf, 0.16, [[0, 'rgba(255,240,205,0)'], [0.3, 'rgba(255,240,205,0.1)'], [1, 'rgba(255,240,205,0)']]);
+      edgeBands(g, x, y, z, sj.e, nf, 0.05, [[0, 'rgba(24,22,16,0.42)'], [1, 'rgba(24,22,16,0)']]);
     }
     g.restore();
   }
@@ -2517,7 +2554,10 @@ function drawCell(g, c, t, part) {
   }
   if (inked) inkStroke(g, 'rgba(255,244,214,0.26)', 1.3);
   // moss rolling over a stone block's edges onto its top (over the lit rim, so it reads as one with the wall's moss)
-  if (c.h >= 1 && !c.icy && texOK && SPRITE['moss-lip']) mossTop(g, c, z, big, nb.map(n => !n || n.void || n.h < z - 0.01));
+  if (c.h >= 1 && !c.icy && texOK && SPRITE['moss-lip']) {
+    const mt = [hash2(x * 2.9 + y * 4.1, 7.3) < 0.4, wallMossy(x, y, true), wallMossy(x, y, false), hash2(x * 2.9 + y * 4.1 + 3, 7.3) < 0.4];
+    mossTop(g, c, z, big, nb.map((n, i) => mt[i] && (!n || n.void || n.h < z - 0.01)));
+  }
   if (c.h >= 1 && !texOK) { // stone cracks & moss (the flagstone texture has its own)
     g.strokeStyle = 'rgba(60,50,70,0.35)';
     for (const k of d.cracks.slice(0, 2)) { const p = proj(x + k.u, y + k.v, z), q = proj(x + clamp(k.u + Math.cos(k.a) * k.l, 0, 1), y + clamp(k.v + Math.sin(k.a) * k.l, 0, 1), z); g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); g.stroke(); }
@@ -3474,7 +3514,7 @@ const cellStateKey = c => c.void ? 'v' : c.h.toFixed(3) + '|' + c.th + '|' + (c.
 function tileCacheFrame() {
   const D = typeof DPR !== 'undefined' ? DPR : 1;
   const gk = cam.s + '|' + cam.ox.toFixed(2) + '|' + cam.oy.toFixed(2) + '|' + D + '|' + Object.keys(SPRITE).length + '|' + TEX_VER + '|' + texOK;
-  if (gk !== TC.gkey || TC.cells !== World.cells) { TC.gkey = gk; TC.cells = World.cells; TC.map.clear(); TC.keys = []; }
+  if (gk !== TC.gkey || TC.cells !== World.cells) { TC.gkey = gk; TC.cells = World.cells; for (const e of TC.map.values()) tileDrop(e); TC.map.clear(); TC.keys = []; }
   const cs = World.cells;
   for (let i = 0; i < cs.length; i++) {
     const c = cs[i], k = cellStateKey(c);
@@ -3482,10 +3522,25 @@ function tileCacheFrame() {
     TC.keys[i] = k;
     for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
       const n = cellI(c.x + dx, c.y + dy); if (!n) continue;
-      TC.map.delete(n); TC.calm.set(n, frameNo);
+      tileDrop(TC.map.get(n)); TC.map.delete(n); TC.calm.set(n, frameNo);
     }
   }
   TC.built = 0;
+}
+// canvases let go by the cache, kept to be reused (fewer new canvases, and less for the browser to clear up)
+const TC_POOL = [];
+function tileDrop(e) { if (e && TC_POOL.length < 64) TC_POOL.push(e.cv); else if (e) { e.cv.width = 1; e.cv.height = 1; } }
+/* Lets go of the world's big drawing buffers (tile bitmaps, bloom, the see-through layer, the waterfall strips, the
+   sky's glow layer) while a card hides the world: on phones the browser then has the memory to draw the card. Each
+   is made again as it's next needed. */
+function releaseBuffers() {
+  for (const e of TC.map.values()) { e.cv.width = 1; e.cv.height = 1; }
+  for (const c of TC_POOL) { c.width = 1; c.height = 1; }
+  TC_POOL.length = 0; TC.map.clear(); TC.keys = []; TC.gkey = '';
+  for (const k of ['a', 'b']) if (BLOOM[k]) { BLOOM[k].width = 1; BLOOM[k].height = 1; }
+  if (_xrC) { _xrC.width = 1; _xrC.height = 1; }
+  for (const k in _sheetC) { _sheetC[k].c.width = 1; _sheetC[k].c.height = 1; _sheetC[k].fresh = false; }
+  if (SKY.ribbonGlow) { SKY.ribbonGlow.width = 1; SKY.ribbonGlow.height = 1; }
 }
 function buildTile(c, t) {
   const s = cam.s, D = typeof DPR !== 'undefined' ? DPR : 1;
@@ -3494,7 +3549,7 @@ function buildTile(c, t) {
   const X0 = Math.floor((proj(c.x, c.y + 1, 0)[0] - 0.4 * TW * s) * D) / D, X1 = Math.ceil((proj(c.x + 1, c.y, 0)[0] + 0.4 * TW * s) * D) / D;
   const Y0 = Math.floor((proj(c.x, c.y, c.h)[1] - 26 * s - 4) * D) / D, Y1 = Math.ceil((proj(c.x + 1, c.y + 1, zLow)[1] + 18 * s + 4) * D) / D;
   const w = Math.round((X1 - X0) * D), h = Math.round((Y1 - Y0) * D); if (w < 1 || h < 1 || w * h > 4e6) return null;
-  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const cv = TC_POOL.pop() || document.createElement('canvas'); cv.width = w; cv.height = h;
   const lg = cv.getContext('2d'); lg.setTransform(D, 0, 0, D, -X0 * D, -Y0 * D);
   const h0 = HANG.length; NO_LIGHT = true;
   try { drawCell(lg, c, t, 'base'); } finally { NO_LIGHT = false; }
@@ -3530,7 +3585,7 @@ function drawTile(g, c, t) {
   const still = TC.on && !(c.water != null && c.water > c.h) && !(c.frost > 0) && !c.burn && Math.abs(c.h - c.th) < 1e-3
     && frameNo - (TC.calm.get(c) ?? -99) > 8;
   let e = still ? TC.map.get(c) : null;
-  if (still && !e && TC.built < 40) e = buildTile(c, t);
+  if (still && !e && TC.built < 8) e = buildTile(c, t); // a few a frame, so settling never makes one long frame
   else if (e) for (const v of e.hang) HANG.push(v);
   if (!e) { drawCell(g, c, t); return; }
   g.drawImage(e.cv, e.X0, e.Y0, e.w, e.h);
