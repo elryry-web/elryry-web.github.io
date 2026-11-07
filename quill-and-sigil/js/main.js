@@ -695,7 +695,10 @@ const QUALITY = [{ dpr: 2, bloom: true }, { dpr: 2, bloom: false }, { dpr: 1.75,
 let qTier = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches ? 1 : 0;
 // (a new name: steps remembered under the old one were taken too eagerly, and are let go)
 try { const q = localStorage.getItem('quillsigil.quality3'); if (q != null) qTier = clamp(Math.round(+q || 0), 0, QUALITY.length - 1); } catch (e) { }
-const PERF = { n: 0, sum: 0, last: 0, hold: 0, good: 0, bad: 0, probed: false, fellFrom: -1, mode: '' };
+// (block[k]: until when step k isn't tried again after it proved too slow; wait[k]: how long the next wait is)
+const PERF = { n: 0, sum: 0, last: 0, hold: 0, good: 0, bad: 0, block: [], wait: [], mode: '' };
+// phones never try the soft glow (the step above 1) by themselves
+const QMIN = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches ? 1 : 0;
 function setQuality(k, now) {
   qTier = k; PERF.hold = now + 1500; PERF.n = 0; PERF.sum = 0; PERF.good = 0;
   try { localStorage.setItem('quillsigil.quality3', String(k)); } catch (e) { }
@@ -776,10 +779,15 @@ function perfWatch(now, drew) {
   const avg = PERF.sum / PERF.n; PERF.n = 0; PERF.sum = 0;
   // two slow spells running before stepping down
   PERF.bad = avg > 22 ? PERF.bad + 1 : 0;
-  if (PERF.bad >= 2 && qTier < QUALITY.length - 1) { PERF.fellFrom = qTier; PERF.good = 0; PERF.bad = 0; setQuality(qTier + 1, now); return; }
-  // a step remembered from a slower moment (another tab busy, low power) is tried back up once, after a steady spell
+  if (PERF.bad >= 2 && qTier < QUALITY.length - 1) {
+    // the step that was too slow isn't tried again for a while (twice as long each time it fails)
+    const w = PERF.wait[qTier] || 30000; PERF.block[qTier] = now + w; PERF.wait[qTier] = Math.min(w * 2, 600000);
+    PERF.good = 0; PERF.bad = 0; setQuality(qTier + 1, now); return;
+  }
+  // after a steady spell, the next step up is tried (a step remembered from a slower moment, or one the phone has
+  // grown able for), unless it failed lately
   PERF.good = avg < 17.5 ? PERF.good + 1 : 0;
-  if (PERF.good >= 6 && qTier > 0 && !PERF.probed && PERF.fellFrom < 0) { PERF.probed = true; setQuality(qTier - 1, now); }
+  if (PERF.good >= 6 && qTier > QMIN && now > (PERF.block[qTier - 1] || 0)) { PERF.good = 0; setQuality(qTier - 1, now); }
 }
 function resize() {
   const Q = QUALITY[qTier];

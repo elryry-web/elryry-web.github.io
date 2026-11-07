@@ -813,7 +813,7 @@ function drawParticles(g, additivePass) {
       case 'fire': { const r = p.size * s * (0.3 + 0.9 * (1 - t * t)); g.globalAlpha = a * 0.75; g.drawImage(glowSprite(t < 0.5 ? p.color : '#c0381a'), sx - r, sy - r * 1.3, r * 2, r * 2.4); break; }
       case 'streak': {
         const [ex, ey] = proj(p.x - p.vx * 0.07, p.y - p.vy * 0.07, p.z - p.vz * 0.07);
-        g.globalAlpha = a * 0.7; g.strokeStyle = p.color; g.lineWidth = p.size * s; g.lineCap = 'round';
+        g.globalAlpha = a * 0.7 * (p.fade ?? 1); g.strokeStyle = p.color; g.lineWidth = p.size * s; g.lineCap = 'round';
         g.beginPath(); g.moveTo(sx, sy); g.lineTo(ex, ey); g.stroke(); break;
       }
       case 'ring': {
@@ -2852,7 +2852,7 @@ function sheetPattern(g, hU, t) {
   let E = _sheetC[key];
   if (!E) E = _sheetC[key] = { c: document.createElement('canvas'), fresh: false, pats: new WeakMap() };
   if (!E.fresh) {
-    const S = texSource('fall'), PX = SHEET_PX, period = S.c.width / texUnit('fall'), cw = Math.round(PX * period), ch = Math.max(8, Math.round(PX * key / 10));
+    const S = texSource('fall'), PX = SHEET_PX, period = S.c.width / texUnit('fall'), cw = Math.round(PX * period * 2), ch = Math.max(8, Math.round(PX * key / 10));
     if (E.c.width !== cw || E.c.height !== ch) { E.c.width = cw; E.c.height = ch; }
     const og = E.c.getContext('2d'), FP = texPattern(og, 'fall'), k = PX / texUnit('fall'), ra = FALL_ARC * PX;
     og.globalCompositeOperation = 'copy';
@@ -2864,14 +2864,38 @@ function sheetPattern(g, hU, t) {
     lg.addColorStop(0.5, 'rgba(255,255,255,0.15)'); lg.addColorStop(0.66, 'rgba(24,70,110,0.22)'); lg.addColorStop(1, 'rgba(24,70,110,0)');
     og.fillStyle = lg; og.fillRect(0, 0, cw, Math.min(ch, ra * 2.6));
     og.globalCompositeOperation = 'destination-in';
-    const m = og.createLinearGradient(0, 0, 0, ch);
-    m.addColorStop(0, 'rgba(0,0,0,1)'); m.addColorStop(0.3, 'rgba(0,0,0,0.9)'); m.addColorStop(0.75, 'rgba(0,0,0,0.45)'); m.addColorStop(1, 'rgba(0,0,0,0)');
-    og.fillStyle = m; og.fillRect(0, 0, cw, ch);
+    og.drawImage(sheetMask(cw, ch), 0, 0);
     og.globalCompositeOperation = 'source-over';
     E.fresh = true; E.pats = new WeakMap();
   }
   let P = E.pats.get(g); if (!P) { P = g.createPattern(E.c, 'repeat-x'); E.pats.set(g, P); }
   return P;
+}
+/* How much of the fall is left at each point of its strip: whole near the lip, then thinning as it falls, each
+   stretch of it at its own pace (so its foot is ragged, not a straight fade), and lower down breaking into strands
+   with sky between them. Periodic across the strip, so it repeats without a seam. Made once per size. */
+const _sheetMask = {};
+function sheetMask(cw, ch) {
+  const key = cw + 'x' + ch; if (_sheetMask[key]) return _sheetMask[key];
+  const c = document.createElement('canvas'); c.width = cw; c.height = ch;
+  const g = c.getContext('2d'), im = g.createImageData(cw, ch), d = im.data;
+  const wave = (x, f, ph) => Math.sin(x / cw * TAU * f + ph);
+  for (let x = 0; x < cw; x++) {
+    // the stretch's pace (broad), and the strands (fine): between strands the water parts first
+    const n1 = 0.5 * wave(x, 2, 0.3) + 0.3 * wave(x, 5, 1.7) + 0.2 * wave(x, 9, 4.1);
+    const n2 = 0.45 * wave(x, 14, 2.2) + 0.35 * wave(x, 23, 0.9) + 0.2 * wave(x, 37, 5.3);
+    const y0 = ch * (0.3 + 0.1 * n1), y1 = ch * Math.min(0.99, 0.86 + 0.11 * n1);
+    for (let y = 0; y < ch; y++) {
+      const f = clamp((y - y0) / (y1 - y0), 0, 1);
+      let a = 1 - f * (0.55 + 0.45 * f);
+      // the strands: the gaps between them open as the water falls
+      const br = clamp((y / ch - 0.25) / 0.55, 0, 1), gap = clamp((0.15 - n2) * 2.2, 0, 1);
+      a *= 1 - br * gap * 0.85;
+      d[(y * cw + x) * 4 + 3] = Math.round(clamp(a, 0, 1) * 255);
+    }
+  }
+  g.putImageData(im, 0, 0);
+  return _sheetMask[key] = c;
 }
 // a tile's curtains: the back ones (turned away from us) before its earth is drawn, the front ones after
 function drawSheets(g, c, d, t, front) {
@@ -2933,13 +2957,19 @@ function drawSheets(g, c, d, t, front) {
       const q = at(lerpQ(q1, q2, f), FALL_ARC * 0.8 + ph * 0.35), r = (5 + 5 * Math.sin(ph * Math.PI)) * s;
       g.globalAlpha = 0.3 * Math.sin(ph * Math.PI); g.drawImage(softSprite('#f4fbff'), q[0] - r, q[1] - r * 0.7, r * 2, r * 1.4);
     }
-    if (len > 0.5) for (let j = 0; j < 3; j++) {
-      const ph = (t * 0.3 + j * 0.33 + d.tone + si * 0.17) % 1, q = at(lerpQ(q1, q2, 0.2 + j * 0.3), hU - 1.4 + ph * 0.6), r = (22 + ph * 18) * s;
-      g.globalAlpha = 0.16 * Math.sin(ph * Math.PI); g.drawImage(softSprite('#dceeff'), q[0] - r, q[1] - r * 0.6, r * 2, r * 1.2);
+    const nm = Math.max(1, Math.round(len * 3));
+    for (let j = 0; j < nm; j++) {
+      const ph = (t * 0.22 + j * 0.37 + d.tone + si * 0.17) % 1, f = (j + 0.5) / nm + 0.08 * Math.sin(t * 0.4 + j * 2.3);
+      const q = at(lerpQ(q1, q2, clamp(f, 0.08, 0.92)), hU * (0.62 + 0.1 * Math.sin(j * 4.1)) + ph * 0.5), r = (26 + ph * 26) * s;
+      // (drifting out from the fall as it rises)
+      const ox = (q1[2] + q2[2]) * 0.5 * ph * 14 * s, oy = (q1[3] + q2[3]) * 0.5 * ph * 7 * s - ph * 10 * s;
+      g.globalAlpha = 0.2 * Math.sin(ph * Math.PI); g.drawImage(softSprite('#dceeff'), q[0] - r + ox, q[1] - r * 0.6 + oy, r * 2, r * 1.2);
     }
-    if (Math.random() < 0.5 * len) {
+    const vx = Math.floor((q1[0] + q2[0]) * 0.5 + (q1[2] + q2[2]) * 0.3), vy = Math.floor((q1[1] + q2[1]) * 0.5 + (q1[3] + q2[3]) * 0.3);
+    const solid = (X, Y) => { const n = cellI(X, Y); return !!n && !n.void; };
+    if (Math.random() < 0.5 * len && !solid(vx + 1, vy) && !solid(vx, vy + 1) && !solid(vx + 1, vy + 1)) {
       const q = lerpQ(q1, q2, Math.random()), o = FALL_R + 0.03, out = 0.2 + Math.random() * 0.35;
-      emit({ x: q[0] + q[2] * o, y: q[1] + q[3] * o, z: z - FALL_R - 0.05, vx: q[2] * out, vy: q[3] * out, vz: -0.8 - Math.random() * 1.2, grav: 6, life: 0.8 + Math.random() * 0.6, size: 0.9 + Math.random() * 0.8, color: Math.random() < 0.6 ? '#f4fbff' : '#cdeaff', kind: 'streak' });
+      emit({ x: q[0] + q[2] * o, y: q[1] + q[3] * o, z: z - FALL_R - 0.05, vx: q[2] * out, vy: q[3] * out, vz: -0.8 - Math.random() * 1.2, grav: 6, life: 0.4 + Math.random() * 0.35, size: 0.8 + Math.random() * 0.7, color: Math.random() < 0.6 ? '#f4fbff' : '#cdeaff', kind: 'streak', fade: 0.5 });
       if (Math.random() < 0.06) emit({ x: q[0] + q[2] * 0.4, y: q[1] + q[3] * 0.4, z: z - 1.4 - Math.random(), vx: q[2] * 0.15, vy: q[3] * 0.15, vz: -0.25, drag: 0.3, life: 2.2, size: 14, color: '#eef7ff', kind: 'smoke' });
     }
   });
