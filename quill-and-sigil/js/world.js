@@ -3471,9 +3471,10 @@ function drawBrazier(g, c, t) {
     } else {
       const pulse = 0.5 + 0.5 * Math.sin(t * 2.2 + c.x);
       g.strokeStyle = `rgba(255,170,80,${0.3 + pulse * 0.4})`; g.lineWidth = 1.5; g.beginPath(); g.ellipse(bx, byy, rx * 0.9, ry * 0.9, 0, 0, TAU); g.stroke();
+      // (kept inside its own tile: wider, the tiles in front, drawn after it, cut its front off)
       g.save(); g.globalCompositeOperation = 'lighter'; g.globalAlpha = 0.15 + pulse * 0.2;
       g.strokeStyle = '#ffb060'; g.lineWidth = 2 * s;
-      g.beginPath(); g.ellipse(G[0], G[1], (26 + pulse * 6) * s, (13 + pulse * 3) * s, 0, 0, TAU); g.stroke();
+      g.beginPath(); g.ellipse(G[0], G[1], (17 + pulse * 4) * s, (8.5 + pulse * 2) * s, 0, 0, TAU); g.stroke();
       g.restore();
       if (Math.random() < 0.04 * AMB.k) emit({ x: c.x + 0.5 + (Math.random() - .5) * 0.3, y: c.y + 0.5 + (Math.random() - .5) * 0.3, z: bz, vz: 0.6, life: 1.2, size: 2.2, color: '#ffb060', kind: 'glow' });
     }
@@ -3495,7 +3496,7 @@ function drawBrazier(g, c, t) {
     const G = proj(c.x + 0.5, c.y + 0.5, z);
     g.save(); g.globalCompositeOperation = 'lighter'; g.globalAlpha = 0.15 + pulse * 0.2;
     g.strokeStyle = '#ffb060'; g.lineWidth = 2 * s;
-    g.beginPath(); g.ellipse(G[0], G[1], (26 + pulse * 6) * s, (13 + pulse * 3) * s, 0, 0, TAU); g.stroke();
+    g.beginPath(); g.ellipse(G[0], G[1], (17 + pulse * 4) * s, (8.5 + pulse * 2) * s, 0, 0, TAU); g.stroke();
     g.restore();
     if (Math.random() < 0.04 * AMB.k) emit({ x: c.x + 0.5 + (Math.random() - .5) * 0.3, y: c.y + 0.5 + (Math.random() - .5) * 0.3, z: z + 0.7, vz: 0.6, life: 1.2, size: 2.2, color: '#ffb060', kind: 'glow' });
   }
