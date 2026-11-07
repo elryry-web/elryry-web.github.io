@@ -2331,6 +2331,7 @@ function drawCell(g, c, t) {
   const x = c.x, y = c.y, s = cam.s;
   const rc = stoneCorners(c), sj = stoneJoins(c, rc), sc = soilCorners(c);
   if (rc) for (let k = 0; k < 4; k++) if (rc[k]) cornerGround(g, c, k);
+  if (c.water != null && c.water > c.h && !c.ice && sheetsOn()) drawSheets(g, c, d, t, false);
   drawSideFaces(g, c, d, t);
   const z = c.h;
   const A = proj(x, y, z), B = proj(x + 1, y, z), C = proj(x + 1, y + 1, z), D = proj(x, y + 1, z);
@@ -2464,110 +2465,158 @@ function drawCell(g, c, t) {
 }
 
 // A waterfall's sheet rolls over a rounded lip (radius FALL_R) and drops, bowing out a little as it falls. For a
-// distance L down the sheet: [how far out from the wall it is, how far below the pool's surface].
+// distance L down the sheet: [how far out from the edge it is, how far below the pool's surface].
 const FALL_R = 0.17, FALL_ARC = FALL_R * Math.PI / 2;
 function fallProfile(L) {
   if (L <= FALL_ARC) { const a = L / FALL_R; return [FALL_R * Math.sin(a), FALL_R * (1 - Math.cos(a))]; }
   const dd = L - FALL_ARC; return [FALL_R + 0.1 * Math.sqrt(dd) + 0.04 * dd, FALL_R + dd];
 }
-// the water's top is rounded off (radius WATER_R) at a corner where both its edges open onto the sky: the back
-// corner, and the left and right points, where a fall then starts just past the curve. Not the front corner: there
-// the two falls wrap round it as one curtain. Corners A, B, C, D (k = 0..3), as for the land.
-const WATER_R = 0.24;
+// Water pours over every edge that opens onto the sky, back edges too, so its top never ends in a bare edge.
+// Edges N (−y), R (+x), L (+y), W (−x) are s = 0..3; corners A, B, C, D are k = 0..3 (edge s runs from corner s to
+// corner s + 1). A corner whose two edges both pour is rounded (WATER_R), top and curtain alike.
+const WATER_R = 0.24, EDGE_D = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+const pours = (c, e) => { if (!c || c.void || c.ice || c.water == null || c.water <= c.h) return false; const n = cellI(c.x + EDGE_D[e][0], c.y + EDGE_D[e][1]); return !n || n.void; };
 function waterRound(c) {
   if (!texOK || c.ice) return null;
-  const x = c.x, y = c.y, open = n => !n || n.void;
-  const e = [open(cellI(x, y - 1)), open(cellI(x + 1, y)), open(cellI(x, y + 1)), open(cellI(x - 1, y))];
-  const r = [e[3] && e[0], e[0] && e[1], false, e[2] && e[3]].map(v => v ? WATER_R : 0);
+  const e = [0, 1, 2, 3].map(k => pours(c, k));
+  const r = [0, 1, 2, 3].map(k => e[(k + 3) % 4] && e[k] ? WATER_R : 0);
   return r.some(v => v) ? r : null;
 }
-// does this tile's water pour over its R (or L) edge?
-const fallsOver = (c, R) => { if (!c || c.void || c.water == null || c.ice) return false; const n = R ? cellI(c.x + 1, c.y) : cellI(c.x, c.y + 1); return !n || n.void; };
-function drawFall(g, c, d, t, R, z, zb) {
-  const x = c.x, y = c.y, s = cam.s, hU = FALL_ARC + (z - FALL_R - zb);
-  const b0 = R ? proj(x + 1, y, z) : proj(x, y + 1, z), b1 = proj(x + 1, y + 1, z), out = R ? [TW * 0.5 * s, TH * 0.5 * s] : [-TW * 0.5 * s, TH * 0.5 * s];
-  // where this sheet meets another at a corner: round an outward corner (the same tile pours over its other front
-  // edge too) each runs on as far as it bows out, so the two meet; into an inward corner each stops that far short
-  const cvx = fallsOver(c, !R), ccv = fallsOver(R ? cellI(x + 1, y - 1) : cellI(x - 1, y + 1), !R);
-  // a rounded corner at its start: the sheet begins where the curve meets the straight edge
-  const wr = waterRound(c), rs = wr ? wr[R ? 1 : 3] : 0;
-  // a point on the sheet: w along the edge (world units from its start), L down it
-  const S = (w, L) => { const [o, dz] = fallProfile(L); return [b0[0] + (b1[0] - b0[0]) * w + out[0] * o, b0[1] + (b1[1] - b0[1]) * w + out[1] * o + dz * TZ * s]; };
-  // the painted fall, pouring: drawn into a small canvas, one pixel row per step down the sheet, scrolled down (it
-  // keeps one width all the way down, wide enough for an outward corner; corners are cut from it, not squeezed)
-  const ext = cvx ? fallProfile(hU)[0] : 0, PX = 96, cw = Math.round(PX * (1 + ext)), ch = Math.max(8, Math.round(PX * hU));
-  const oc = fallCanvas(cw, ch), og = oc.getContext('2d'), FP = texPattern(og, 'fall'); if (!FP) return;
-  const k = PX / texUnit('fall'), along = R ? y : x, ra = FALL_ARC * PX;
-  og.globalCompositeOperation = 'copy';
-  FP.setTransform(new DOMMatrix([k, 0, 0, k, -along * PX, (t * 1.7 - z) * PX]));
-  og.fillStyle = FP; og.fillRect(0, 0, cw, ch);
-  og.globalCompositeOperation = 'source-over';
-  // over the lip it is still the pool's blue, catches the light on the crest as it tips, and is shaded just under it
-  const lg = og.createLinearGradient(0, 0, 0, ra * 2.6);
-  lg.addColorStop(0, 'rgba(75,152,210,0.75)'); lg.addColorStop(0.18, 'rgba(150,215,245,0.5)'); lg.addColorStop(0.34, 'rgba(255,255,255,0.6)');
-  lg.addColorStop(0.5, 'rgba(255,255,255,0.15)'); lg.addColorStop(0.66, 'rgba(24,70,110,0.22)'); lg.addColorStop(1, 'rgba(24,70,110,0)');
-  og.fillStyle = lg; og.fillRect(0, 0, cw, Math.min(ch, ra * 2.6));
-  // fading into the mist far below
-  og.globalCompositeOperation = 'destination-in';
-  const m = og.createLinearGradient(0, 0, 0, ch);
-  m.addColorStop(0, 'rgba(0,0,0,1)'); m.addColorStop(0.3, 'rgba(0,0,0,0.9)'); m.addColorStop(0.75, 'rgba(0,0,0,0.45)'); m.addColorStop(1, 'rgba(0,0,0,0)');
-  og.fillStyle = m; og.fillRect(0, 0, cw, ch);
-  if (ccv || cvx || rs) {
-    const rows = []; for (let i = 0; i <= 16; i++) { const L = hU * (i / 16) * (i / 16); rows.push([fallProfile(L)[0] * PX, L * PX]); }
-    og.globalCompositeOperation = 'destination-out'; og.fillStyle = '#000';
-    if (ccv || rs) { og.beginPath(); og.moveTo(0, 0); for (const [o, r] of rows) og.lineTo(Math.max(rs, ccv ? o / PX : 0) * PX, r); og.lineTo(0, ch + 1); og.closePath(); og.fill(); }
-    if (cvx) { og.beginPath(); og.moveTo(cw + 1, 0); for (const [o, r] of rows) og.lineTo(PX + o, r); og.lineTo(cw + 1, ch + 1); og.closePath(); og.fill(); }
+// the curtain's path round a tile: lip points [wx, wy, nx, ny] (the outward normal), in runs that pour; each run also
+// says whether it fades out at its start or end (where it stops beside land rather than running on into more falls)
+function sheetRuns(c) {
+  const x = c.x, y = c.y, op = [0, 1, 2, 3].map(k => pours(c, k)), r = waterRound(c) || [0, 0, 0, 0];
+  const C = [[0, 0], [1, 0], [1, 1], [0, 1]], a0 = [Math.PI, -Math.PI / 2, 0, Math.PI / 2], runs = [];
+  let cur = null;
+  const push = (pt) => { if (!cur) { cur = { pts: [], fadeA: false, fadeB: false }; runs.push(cur); } cur.pts.push(pt); };
+  // go round from corner A; a run that is still open at the end joins the first
+  for (let k = 0; k < 4; k++) {
+    if (r[k]) {
+      const ox = C[k][0] ? C[k][0] - r[k] : r[k], oy = C[k][1] ? C[k][1] - r[k] : r[k];
+      for (let i = 0; i <= 3; i++) { const an = a0[k] + i / 3 * Math.PI / 2, nx = Math.cos(an), ny = Math.sin(an); push([x + ox + nx * r[k], y + oy + ny * r[k], nx, ny]); }
+    }
+    // the straight edge from corner k to k + 1
+    const e = k, k2 = (k + 1) % 4, [nx, ny] = EDGE_D[e];
+    if (!op[e]) { cur = null; continue; }
+    if (!r[k]) {
+      cur = null;
+      const ad = EDGE_D[(e + 3) % 4];
+      push([x + C[k][0], y + C[k][1], nx, ny]);
+      cur.fadeA = !pours(cellI(x + ad[0], y + ad[1]), e);
+    }
+    if (!r[k2]) {
+      push([x + C[k2][0], y + C[k2][1], nx, ny]);
+      const ad = EDGE_D[(e + 1) % 4];
+      cur.fadeB = !pours(cellI(x + ad[0], y + ad[1]), e);
+      cur = null;
+    } else {
+      const ox = C[k2][0] ? C[k2][0] - r[k2] : r[k2], oy = C[k2][1] ? C[k2][1] - r[k2] : r[k2], an = a0[k2];
+      push([x + ox + Math.cos(an) * r[k2], y + oy + Math.sin(an) * r[k2], nx, ny]);
+    }
+  }
+  if (cur && runs.length > 1 && runs[0] !== cur && !runs[0].fadeA && op[3] && r[0]) {
+    // the loop closed through corner A: the last run carries on into the first
+    const first = runs.shift(); cur.pts.push(...first.pts.slice(1)); cur.fadeB = first.fadeB;
+  }
+  return runs;
+}
+// the painted fall, scrolling, as a strip one texture-repeat wide and as tall as the curtain (shared each frame by
+// every curtain of that height): the pool's blue and a bright crest over the lip, fading into mist far below
+const SHEET_PX = 64, _sheetC = {};
+let _sheetF = -1;
+function sheetPattern(g, hU, t) {
+  if (_sheetF !== frameNo) { _sheetF = frameNo; for (const k in _sheetC) _sheetC[k].fresh = false; }
+  const key = Math.round(hU * 10);
+  let E = _sheetC[key];
+  if (!E) E = _sheetC[key] = { c: document.createElement('canvas'), fresh: false, pats: new WeakMap() };
+  if (!E.fresh) {
+    const S = texSource('fall'), PX = SHEET_PX, period = S.c.width / texUnit('fall'), cw = Math.round(PX * period), ch = Math.max(8, Math.round(PX * key / 10));
+    if (E.c.width !== cw || E.c.height !== ch) { E.c.width = cw; E.c.height = ch; }
+    const og = E.c.getContext('2d'), FP = texPattern(og, 'fall'), k = PX / texUnit('fall'), ra = FALL_ARC * PX;
+    og.globalCompositeOperation = 'copy';
+    FP.setTransform(new DOMMatrix([k, 0, 0, k, 0, t * 1.7 * PX]));
+    og.fillStyle = FP; og.fillRect(0, 0, cw, ch);
+    og.globalCompositeOperation = 'source-over';
+    const lg = og.createLinearGradient(0, 0, 0, ra * 2.6);
+    lg.addColorStop(0, 'rgba(75,152,210,0.75)'); lg.addColorStop(0.18, 'rgba(150,215,245,0.5)'); lg.addColorStop(0.34, 'rgba(255,255,255,0.6)');
+    lg.addColorStop(0.5, 'rgba(255,255,255,0.15)'); lg.addColorStop(0.66, 'rgba(24,70,110,0.22)'); lg.addColorStop(1, 'rgba(24,70,110,0)');
+    og.fillStyle = lg; og.fillRect(0, 0, cw, Math.min(ch, ra * 2.6));
     og.globalCompositeOperation = 'destination-in';
+    const m = og.createLinearGradient(0, 0, 0, ch);
+    m.addColorStop(0, 'rgba(0,0,0,1)'); m.addColorStop(0.3, 'rgba(0,0,0,0.9)'); m.addColorStop(0.75, 'rgba(0,0,0,0.45)'); m.addColorStop(1, 'rgba(0,0,0,0)');
+    og.fillStyle = m; og.fillRect(0, 0, cw, ch);
+    og.globalCompositeOperation = 'source-over';
+    E.fresh = true; E.pats = new WeakMap();
   }
-  // soft at its sides where the fall ends (not where it runs on into the next tile's)
-  const f0 = rs > 0 || !ccv && !fallsOver(R ? cellI(x, y - 1) : cellI(x - 1, y), R), f1 = !cvx && !fallsOver(R ? cellI(x, y + 1) : cellI(x + 1, y), R);
-  if (f0 || f1) {
-    const hg = og.createLinearGradient(0, 0, cw, 0);
-    const e = 0.12 * PX / cw;
-    const st = rs * PX / cw;
-    hg.addColorStop(st, f0 ? 'rgba(0,0,0,0.1)' : '#000'); hg.addColorStop(st + e, '#000'); hg.addColorStop(1 - e, '#000'); hg.addColorStop(1, f1 ? 'rgba(0,0,0,0.1)' : '#000');
-    og.fillStyle = hg; og.fillRect(0, 0, cw, ch);
+  let P = E.pats.get(g); if (!P) { P = g.createPattern(E.c, 'repeat-x'); E.pats.set(g, P); }
+  return P;
+}
+// a tile's curtains: the back ones (turned away from us) before its earth is drawn, the front ones after
+function drawSheets(g, c, d, t, front) {
+  const z = c.water, zb = Math.min(c.h, 0) - SOIL_DEPTH - 2.3, hU = Math.round((FALL_ARC + (z - FALL_R - zb)) * 10) / 10, s = cam.s, PX = SHEET_PX;
+  const runs = sheetRuns(c); if (!runs.length) return;
+  const P = sheetPattern(g, hU, t); if (!P) return;
+  const Ls = [0, 0.5, 1].map(f => FALL_ARC * f), rest = hU - FALL_ARC;
+  for (const f of [0.08, 0.25, 0.5, 1]) Ls.push(FALL_ARC + rest * f);
+  const at = (q, L) => { const [o, dz] = fallProfile(L); return proj(q[0] + q[2] * o, q[1] + q[3] * o, z - dz); };
+  const lerpQ = (q1, q2, f) => q1.map((v, i) => v + (q2[i] - v) * f);
+  const ga = g.globalAlpha, segs = [];
+  for (const run of runs) {
+    // split the run's ends into short fading pieces where it stops beside land
+    const pts = run.pts, list = [];
+    for (let i = 0; i + 1 < pts.length; i++) {
+      let q1 = pts[i], q2 = pts[i + 1];
+      const len = Math.hypot(q2[0] - q1[0], q2[1] - q1[1]);
+      const fa = run.fadeA && i === 0, fb = run.fadeB && i + 2 === pts.length, F = [0.2, 0.5, 0.8], step = Math.min(0.05, len / 8);
+      if (fa) { for (let j = 0; j < 3; j++) list.push([lerpQ(q1, q2, j * step / len), lerpQ(q1, q2, (j + 1) * step / len), F[j]]); q1 = lerpQ(q1, q2, 3 * step / len); }
+      let q2m = q2;
+      if (fb) q2m = lerpQ(q1, q2, 1 - 3 * step / Math.hypot(q2[0] - q1[0], q2[1] - q1[1]));
+      list.push([q1, q2m, 1]);
+      if (fb) for (let j = 2; j >= 0; j--) list.push([lerpQ(q2m, q2, (2 - j) / 3), lerpQ(q2m, q2, (3 - j) / 3), F[j]]);
+    }
+    for (const [q1, q2, al] of list) {
+      // which way this piece faces: toward us (front) or away (back)
+      const fr = (q1[2] + q2[2]) + (q1[3] + q2[3]) > 0.001;
+      if (fr !== front) continue;
+      const c1 = (q1[0] - q1[1]) * PX, c2 = (q2[0] - q2[1]) * PX;
+      if (Math.abs(c2 - c1) < 0.3) continue;
+      segs.push([q1, q2]);
+      g.globalAlpha = ga * al * (front ? 1 : 0.85); g.fillStyle = P;
+      for (let i = 0; i + 1 < Ls.length; i++) {
+        const L0 = Ls[i], L1 = Ls[i + 1], a0 = at(q1, L0), b0 = at(q2, L0), a1 = at(q1, L1), b1 = at(q2, L1), r0 = L0 * PX, r1 = L1 * PX;
+        const ax = (b0[0] - a0[0]) / (c2 - c1), ay = (b0[1] - a0[1]) / (c2 - c1), rx = (a1[0] - a0[0]) / (r1 - r0), ry = (a1[1] - a0[1]) / (r1 - r0);
+        P.setTransform(new DOMMatrix([ax, ay, rx, ry, a0[0] - c1 * ax - r0 * rx, a0[1] - c1 * ay - r0 * ry]));
+        g.beginPath(); g.moveTo(a0[0], a0[1]); g.lineTo(b0[0], b0[1]); g.lineTo(b1[0], b1[1]); g.lineTo(a1[0], a1[1]); g.closePath(); g.fill();
+      }
+    }
   }
-  og.globalCompositeOperation = 'source-over';
-  // laid onto the sheet's curve in bands, finer over the lip where it bends most
-  const Ls = [0, 0.25, 0.5, 0.75, 1].map(f => FALL_ARC * f), rest = hU - FALL_ARC;
-  for (let i = 1; i <= 5; i++) Ls.push(FALL_ARC + rest * (i / 5) * (i / 5));
-  for (let i = 0; i + 1 < Ls.length; i++) {
-    const y0 = Ls[i] * PX, y1 = Math.min(ch, Ls[i + 1] * PX), hh = Math.min(ch - y0, y1 - y0 + (i + 2 < Ls.length ? 0.6 : 0));
-    if (hh < 0.5) continue;
-    const A0 = S(0, Ls[i]), A1 = S(cw / PX, Ls[i]), B0 = S(0, Ls[i + 1]), ry = [(B0[0] - A0[0]) / (y1 - y0), (B0[1] - A0[1]) / (y1 - y0)];
-    g.save(); g.transform((A1[0] - A0[0]) / cw, (A1[1] - A0[1]) / cw, ry[0], ry[1], A0[0] - ry[0] * y0, A0[1] - ry[1] * y0);
-    g.drawImage(oc, 0, y0, cw, hh, 0, y0, cw, hh); g.restore();
-  }
-  // a bright thread along the crest
-  g.lineCap = 'round'; g.strokeStyle = 'rgba(240,252,255,0.55)'; g.lineWidth = 1.6 * s; g.beginPath();
-  const cL = FALL_ARC * 0.42, co = fallProfile(cL)[0], c0 = Math.max(rs + 0.03, ccv ? co : 0.03), c1 = cvx ? 1 + co : 0.97;
-  for (let i = 0; i <= 6; i++) { const q = S(c0 + (c1 - c0) * i / 6, cL); (i ? g.lineTo : g.moveTo).call(g, q[0], q[1]); }
-  g.stroke();
-  // foam churning where the sheet turns down, and mist where it vanishes
+  g.globalAlpha = ga;
+  if (!front || !segs.length) return;
+  // the bright thread along the crest, foam churning where the sheet turns down, mist where it vanishes, and spray
+  g.lineCap = 'round'; g.strokeStyle = 'rgba(240,252,255,0.55)'; g.lineWidth = 1.6 * s;
+  const cL = FALL_ARC * 0.42;
+  for (const [q1, q2] of segs) { const p1 = at(q1, cL), p2 = at(q2, cL); g.beginPath(); g.moveTo(p1[0], p1[1]); g.lineTo(p2[0], p2[1]); g.stroke(); }
   g.save(); g.globalCompositeOperation = 'lighter';
-  for (let j = 0; j < 7; j++) {
-    const ph = (t * 0.9 + j * 0.37 + x * 0.21 + y * 0.13) % 1, u = (j + 0.5 + 0.3 * Math.sin(j * 3.1 + t)) / 7;
-    const q = S(clamp(u, rs + 0.06, 0.94), FALL_ARC * 0.8 + ph * 0.35), r = (5 + 5 * Math.sin(ph * Math.PI)) * s;
-    g.globalAlpha = 0.3 * Math.sin(ph * Math.PI); g.drawImage(softSprite('#f4fbff'), q[0] - r, q[1] - r * 0.7, r * 2, r * 1.4);
-  }
-  for (let j = 0; j < 3; j++) {
-    const u = 0.2 + j * 0.3, ph = (t * 0.3 + j * 0.33 + d.tone) % 1, q = S(u, hU - 1.4 + ph * 0.6), r = (22 + ph * 18) * s;
-    g.globalAlpha = 0.16 * Math.sin(ph * Math.PI); g.drawImage(softSprite('#dceeff'), q[0] - r, q[1] - r * 0.6, r * 2, r * 1.2);
-  }
+  segs.forEach(([q1, q2], si) => {
+    const len = Math.hypot(q2[0] - q1[0], q2[1] - q1[1]), n = Math.max(1, Math.round(len * 7));
+    for (let j = 0; j < n; j++) {
+      const ph = (t * 0.9 + j * 0.37 + si * 0.29 + c.x * 0.21 + c.y * 0.13) % 1, f = clamp((j + 0.5 + 0.3 * Math.sin(j * 3.1 + t)) / n, 0.05, 0.95);
+      const q = at(lerpQ(q1, q2, f), FALL_ARC * 0.8 + ph * 0.35), r = (5 + 5 * Math.sin(ph * Math.PI)) * s;
+      g.globalAlpha = 0.3 * Math.sin(ph * Math.PI); g.drawImage(softSprite('#f4fbff'), q[0] - r, q[1] - r * 0.7, r * 2, r * 1.4);
+    }
+    if (len > 0.5) for (let j = 0; j < 3; j++) {
+      const ph = (t * 0.3 + j * 0.33 + d.tone + si * 0.17) % 1, q = at(lerpQ(q1, q2, 0.2 + j * 0.3), hU - 1.4 + ph * 0.6), r = (22 + ph * 18) * s;
+      g.globalAlpha = 0.16 * Math.sin(ph * Math.PI); g.drawImage(softSprite('#dceeff'), q[0] - r, q[1] - r * 0.6, r * 2, r * 1.2);
+    }
+    if (Math.random() < 0.5 * len) {
+      const q = lerpQ(q1, q2, Math.random()), o = FALL_R + 0.03, out = 0.2 + Math.random() * 0.35;
+      emit({ x: q[0] + q[2] * o, y: q[1] + q[3] * o, z: z - FALL_R - 0.05, vx: q[2] * out, vy: q[3] * out, vz: -0.8 - Math.random() * 1.2, grav: 6, life: 0.8 + Math.random() * 0.6, size: 0.9 + Math.random() * 0.8, color: Math.random() < 0.6 ? '#f4fbff' : '#cdeaff', kind: 'streak' });
+      if (Math.random() < 0.06) emit({ x: q[0] + q[2] * 0.4, y: q[1] + q[3] * 0.4, z: z - 1.4 - Math.random(), vx: q[2] * 0.15, vy: q[3] * 0.15, vz: -0.25, drag: 0.3, life: 2.2, size: 14, color: '#eef7ff', kind: 'smoke' });
+    }
+  });
   g.restore();
 }
-// scratch canvases for the waterfall faces, one per face drawn in a frame (reusing a single one would make each
-// face wait for the last to be drawn before it can be painted over)
-const _fallC = [];
-let _fallI = 0, _fallF = -1;
-function fallCanvas(w, h) {
-  if (_fallF !== frameNo) { _fallF = frameNo; _fallI = 0; }
-  let c = _fallC[_fallI]; if (!c) c = _fallC[_fallI] = document.createElement('canvas');
-  _fallI++;
-  if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
-  return c;
-}
+const sheetsOn = () => texOK && !!TEX_SRC.fall;
 function drawWater(g, c, d, t) {
   const x = c.x, y = c.y, z = c.water, s = cam.s;
   const A = proj(x, y, z), B = proj(x + 1, y, z), C = proj(x + 1, y + 1, z), D = proj(x, y + 1, z);
@@ -2580,7 +2629,7 @@ function drawWater(g, c, d, t) {
       // a proper waterfall: foam where it tips over, bright streaks pouring down, fading far below into mist
       const zb = Math.min(c.h, 0) - SOIL_DEPTH - 2.3, at = (u, zz) => side === 'R' ? proj(x + 1, y + u, zz) : proj(x + u, y + 1, zz);
       const Pf = [at(0, z), at(1, z), at(1, zb), at(0, zb)];
-      if (TEX_SRC.fall && texOK) drawFall(g, c, d, t, side === 'R', z, zb);
+      if (sheetsOn()) { /* the curtains are drawn round the whole tile, below */ }
       else {
       const fg = g.createLinearGradient(0, Pf[0][1], 0, Pf[3][1]);
       fg.addColorStop(0, 'rgba(170,220,255,0.9)'); fg.addColorStop(0.25, 'rgba(110,175,235,0.75)'); fg.addColorStop(0.7, 'rgba(120,180,240,0.35)'); fg.addColorStop(1, 'rgba(140,190,240,0)');
@@ -2611,7 +2660,7 @@ function drawWater(g, c, d, t) {
       g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
       }
     } else { g.fillStyle = c.ice ? 'rgba(190,230,250,0.8)' : 'rgba(70,140,210,0.55)'; poly(g, P); g.fill(); }
-    if (!c.ice && (!n || n.void) && Math.random() < 0.5) {
+    if (!c.ice && (!n || n.void) && !sheetsOn() && Math.random() < 0.5) {
       // spray: fine white streaks thrown off the lip, falling a little ahead of the sheet; now and then a drift of mist
       const R = side === 'R', wr0 = waterRound(c), u0 = (wr0 ? wr0[R ? 1 : 3] : 0) + 0.05, u = u0 + Math.random() * (0.95 - u0), o = FALL_R + 0.03, out = 0.2 + Math.random() * 0.35;
       const px = R ? x + 1 + o : x + u, py = R ? y + u : y + 1 + o;
@@ -2619,6 +2668,7 @@ function drawWater(g, c, d, t) {
       if (Math.random() < 0.06) emit({ x: px + (R ? 0.25 : 0), y: py + (R ? 0 : 0.25), z: z - 1.4 - Math.random(), vx: R ? 0.15 : 0, vy: R ? 0 : 0.15, vz: -0.25, drag: 0.3, life: 2.2, size: 14, color: '#eef7ff', kind: 'smoke' });
     }
   }
+  if (!c.ice && sheetsOn()) drawSheets(g, c, d, t, true);
   if (c.ice && texOK) {
     const big = growQuad([A, B, C, D], 0.6);
     g.fillStyle = '#cdeaf6'; poly(g, big); g.fill();
