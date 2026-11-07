@@ -1286,9 +1286,10 @@ function drawSkyMoving(g, w, h, t, m, painted) {
   // (their broad soft glow is the costliest thing in the sky, so it goes into a half-scale layer laid over in one go)
   const RG = SKY.ribbonGlow || (SKY.ribbonGlow = document.createElement('canvas'));
   const rw = Math.max(2, Math.round(w * 0.5)), rh = Math.max(2, Math.round(h * 0.5));
+  const fresh = RG.width !== rw || RG.height !== rh || frameNo % 3 === 0 || !SKY.ribbonDrawn;
   if (RG.width !== rw || RG.height !== rh) { RG.width = rw; RG.height = rh; }
   const rg = RG.getContext('2d');
-  rg.setTransform(1, 0, 0, 1, 0, 0); rg.clearRect(0, 0, rw, rh); rg.setTransform(rw / w, 0, 0, rh / h, 0, 0);
+  if (fresh) { rg.setTransform(1, 0, 0, 1, 0, 0); rg.clearRect(0, 0, rw, rh); rg.setTransform(rw / w, 0, 0, rh / h, 0, 0); SKY.ribbonDrawn = true; }
   rg.globalCompositeOperation = 'lighter'; rg.lineCap = 'round'; rg.globalAlpha = 0.25;
   g.globalCompositeOperation = 'lighter'; g.lineCap = 'round';
   const ribbonGrad = (cx, Rb) => {
@@ -1303,7 +1304,7 @@ function drawSkyMoving(g, w, h, t, m, painted) {
       pts.push([u * w, (Rb.y + Rb.a * Math.sin(u * Rb.f * TAU / 2 + Rb.ph + t * Rb.sp) + Rb.a * 0.4 * Math.sin(u * Rb.f2 * TAU / 2 - t * Rb.sp * 1.7)) * h]);
     }
     const path = cx => { cx.beginPath(); pts.forEach(([px, py], i) => i ? cx.lineTo(px, py) : cx.moveTo(px, py)); };
-    rg.strokeStyle = ribbonGrad(rg, Rb); rg.lineWidth = Rb.w * 14; path(rg); rg.stroke();
+    if (fresh) { rg.strokeStyle = ribbonGrad(rg, Rb); rg.lineWidth = Rb.w * 14; path(rg); rg.stroke(); }
     g.strokeStyle = ribbonGrad(g, Rb); g.globalAlpha = 1; g.lineWidth = Rb.w; path(g); g.stroke();
   }
   g.globalAlpha = 1; g.drawImage(RG, 0, 0, w, h);
@@ -1422,24 +1423,30 @@ function lightSprite(col) {
   g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
   return lightCache[col] = c;
 }
+// Lights that stand still (lit braziers, the font) are painted into each tile's cached bitmap with the tile; only
+// moving lights (the orb, fire) are laid on live each frame. LIGHT_ONLY picks which a lightTop/lightSide call uses.
+let LIGHTS_STILL = [], LIGHTS_MOVING = [], LIGHT_ONLY = null, LIGHT_SIG = '';
+const lightList = () => LIGHT_ONLY === 'still' ? LIGHTS_STILL : LIGHT_ONLY === 'moving' ? LIGHTS_MOVING : LIGHTS;
 function gatherLights(t) {
-  const L = [];
+  const L = [], S = [];
   for (const c of World.cells) {
     if (c.void) continue;
-    if (c.feat === 'brazier' && c.lit) L.push({ x: c.x + .5, y: c.y + .5, z: c.h + brazierBowlZ() + 0.1, col: '#ffa04a', r: 2.8, a: 0.62 + 0.06 * Math.sin(t * 11 + c.x * 3) });
+    if (c.feat === 'brazier' && c.lit) S.push({ x: c.x + .5, y: c.y + .5, z: c.h + brazierBowlZ() + 0.1, col: '#ffa04a', r: 2.8, a: 0.62, still: true });
     else if (c.burn) L.push({ x: c.x + .5, y: c.y + .5, z: c.h + 0.4, col: '#ff7a36', r: 1.9, a: 0.4 + 0.05 * Math.sin(t * 13 + c.y * 5) });
-    if (c.feat === 'font') L.push({ x: c.x + .5, y: c.y + .5, z: c.h + 0.2, col: '#78e6ff', r: 2.0, a: 0.4 });
+    if (c.feat === 'font') S.push({ x: c.x + .5, y: c.y + .5, z: c.h + 0.2, col: '#78e6ff', r: 2.0, a: 0.4, still: true });
   }
   for (const b of World.bodies) if (b.alive && b.kind === 'orb') L.push({ x: b.x, y: b.y, z: b.z + b.r, col: '#ffc45e', r: 2.2, a: b.captured ? 0.6 : 0.42 });
   L.sort((p, q) => q.a - p.a);
-  LIGHTS = L.slice(0, 10);
+  LIGHTS_STILL = S; LIGHTS_MOVING = L.slice(0, 6);
+  LIGHTS = [...S, ...LIGHTS_MOVING];
+  LIGHT_SIG = S.map(l => l.x + ',' + l.y + ',' + l.z.toFixed(2)).join(';');
 }
 // pools of light on a top face at height z (corners A..D already projected)
 let NO_LIGHT = false;
 function lightTop(g, c, z, quad) {
   if (NO_LIGHT) return;
   let on = false;
-  for (const l of LIGHTS) {
+  for (const l of lightList()) {
     const dh = l.z - z; if (dh < -0.2) continue;
     const dx = c.x + 0.5 - l.x, dy = c.y + 0.5 - l.y; if (dx * dx + dy * dy > (l.r + 0.8) ** 2) continue;
     if (!on) { g.save(); poly(g, quad); g.clip(); g.globalCompositeOperation = 'lighter'; on = true; }
@@ -1453,7 +1460,7 @@ function lightTop(g, c, z, quad) {
 function lightSide(g, c, R, za, zb, quad) {
   if (NO_LIGHT) return;
   let on = false;
-  for (const l of LIGHTS) {
+  for (const l of lightList()) {
     const d = R ? l.x - (c.x + 1) : l.y - (c.y + 1); if (d < 0.05 || d > l.r) continue;
     const u = R ? l.y - (c.y + 0.5) : l.x - (c.x + 0.5); if (Math.abs(u) > (l.r - d) * 1.2 + 0.55) continue;
     if (l.z < zb - 0.2) continue;
@@ -2462,7 +2469,7 @@ function drawSideFaces(g, c, d, t) {
   if (rc && top > 0.01) for (const k of [1, 3, 2]) if (rc[k]) cornerCurve(g, c, k);
   if (sc) for (const k of [1, 3, 2]) if (sc[k]) soilCornerCurve(g, c, k);
   if (fillet) soilFillet(g, c);
-  if (!NO_LIGHT && LIGHTS.length) lightCurves(g, c);
+  if (!NO_LIGHT && lightList().length) lightCurves(g, c);
 }
 
 function topColor(c, d) {
@@ -3508,6 +3515,16 @@ function drawBody(g, b, t) {
 }
 
 /* Spell seal projected onto the ground */
+const ringCache = {};
+function sealRing(sp) {
+  const key = sp.sigil + '|' + sp.color; if (ringCache[key]) return ringCache[key];
+  // only once the lettering's font has arrived (till then it is lettered live)
+  if (typeof document !== 'undefined' && document.fonts && !document.fonts.check('600 9px Cinzel')) return null;
+  const S = 512, c = document.createElement('canvas'); c.width = c.height = S;
+  const g = c.getContext('2d'); g.translate(S / 2, S / 2); g.scale(S / 2 / 130, S / 2 / 130);
+  g.fillStyle = hexA(sp.color, 0.9); textOnCircle(g, SIGILS[sp.sigil].words, 0, 0, 108, 0, 9);
+  return (ringCache[key] = c);
+}
 function drawSeal(g, sp, x, y, z, R, alpha, rot, prog, t) {
   const [cx, cy] = proj(x, y, z), k = R * TW * 0.7071 * cam.s;
   g.save(); g.translate(cx, cy); g.scale(k, k * 0.5); g.rotate(rot);
@@ -3520,7 +3537,10 @@ function drawSeal(g, sp, x, y, z, R, alpha, rot, prog, t) {
   g.beginPath(); g.arc(0, 0, 1.0, 0, TAU * Math.min(1, prog * 1.5)); glow(2);
   g.beginPath(); g.arc(0, 0, 1.16, 0, TAU); glow(1);
   g.fillStyle = hexA(sp.color, 0.9);
-  g.save(); g.scale(1 / 100, 1 / 100); textOnCircle(g, SIGILS[sp.sigil].words, 0, 0, 108, -rot * 2, 9); g.restore();
+  // (lettering 60 letters along a squashed circle each frame was most of a phone's frame while casting)
+  const ring = sealRing(sp);
+  if (ring) { g.save(); g.rotate(-rot * 2); g.drawImage(ring, -1.3, -1.3, 2.6, 2.6); g.restore(); }
+  else { g.save(); g.scale(1 / 100, 1 / 100); textOnCircle(g, SIGILS[sp.sigil].words, 0, 0, 108, -rot * 2, 9); g.restore(); }
   // the caster's own strokes
   for (const st of sp.art) {
     const n = Math.max(2, Math.floor(st.pts.length * clamp(prog * 1.4, 0, 1)));
@@ -3581,7 +3601,7 @@ const cellStateKey = c => c.void ? 'v' : c.h.toFixed(3) + '|' + c.th + '|' + (c.
   (c.wet || 0).toFixed(2) + '|' + (c.ash || 0).toFixed(2) + '|' + c.feat + '|' + c.burn;
 function tileCacheFrame() {
   const D = typeof DPR !== 'undefined' ? DPR : 1;
-  const gk = cam.s + '|' + cam.ox.toFixed(2) + '|' + cam.oy.toFixed(2) + '|' + D + '|' + Object.keys(SPRITE).length + '|' + TEX_VER + '|' + texOK;
+  const gk = cam.s + '|' + cam.ox.toFixed(2) + '|' + cam.oy.toFixed(2) + '|' + D + '|' + Object.keys(SPRITE).length + '|' + TEX_VER + '|' + texOK + '|' + LIGHT_SIG;
   if (gk !== TC.gkey || TC.cells !== World.cells) { TC.gkey = gk; TC.cells = World.cells; for (const e of TC.map.values()) tileDrop(e); TC.map.clear(); TC.keys = []; }
   const cs = World.cells;
   for (let i = 0; i < cs.length; i++) {
@@ -3608,7 +3628,7 @@ function releaseBuffers() {
   for (const k of ['a', 'b']) if (BLOOM[k]) { BLOOM[k].width = 1; BLOOM[k].height = 1; }
   if (_xrC) { _xrC.width = 1; _xrC.height = 1; }
   for (const k in _sheetC) { _sheetC[k].c.width = 1; _sheetC[k].c.height = 1; _sheetC[k].fresh = false; }
-  if (SKY.ribbonGlow) { SKY.ribbonGlow.width = 1; SKY.ribbonGlow.height = 1; }
+  if (SKY.ribbonGlow) { SKY.ribbonGlow.width = 1; SKY.ribbonGlow.height = 1; SKY.ribbonDrawn = false; }
 }
 function buildTile(c, t) {
   const s = cam.s, D = typeof DPR !== 'undefined' ? DPR : 1;
@@ -3619,8 +3639,8 @@ function buildTile(c, t) {
   const w = Math.round((X1 - X0) * D), h = Math.round((Y1 - Y0) * D); if (w < 1 || h < 1 || w * h > 4e6) return null;
   const cv = TC_POOL.pop() || document.createElement('canvas'); cv.width = w; cv.height = h;
   const lg = cv.getContext('2d'); lg.setTransform(D, 0, 0, D, -X0 * D, -Y0 * D);
-  const h0 = HANG.length; NO_LIGHT = true;
-  try { drawCell(lg, c, t, 'base'); } finally { NO_LIGHT = false; }
+  const h0 = HANG.length; LIGHT_ONLY = 'still';
+  try { drawCell(lg, c, t, 'base'); } finally { LIGHT_ONLY = null; }
   const e = { cv, X0, Y0, w: w / D, h: h / D, hang: HANG.slice(h0) };
   TC.map.set(c, e); TC.built++;
   return e;
@@ -3628,8 +3648,12 @@ function buildTile(c, t) {
 // the light falling on a tile laid from its bitmap: on its two walls in view, then its top (as drawCell lights them)
 function tileLights(g, c) {
   let near = false;
-  for (const l of LIGHTS) { const dx = c.x + 0.5 - l.x, dy = c.y + 0.5 - l.y; if (dx * dx + dy * dy < (l.r + 1.2) ** 2) { near = true; break; } }
+  for (const l of LIGHTS_MOVING) { const dx = c.x + 0.5 - l.x, dy = c.y + 0.5 - l.y; if (dx * dx + dy * dy < (l.r + 1.2) ** 2) { near = true; break; } }
   if (!near) return;
+  LIGHT_ONLY = 'moving';
+  try { tileLightsLive(g, c); } finally { LIGHT_ONLY = null; }
+}
+function tileLightsLive(g, c) {
   const x = c.x, y = c.y, z = c.h;
   const rc0 = stoneCorners(c), sc0 = soilCorners(c), cr = rc0 || sc0, R0 = rc0 ? ROUND_R : SOIL_R;
   for (const R of [true, false]) {
@@ -3666,8 +3690,8 @@ function render(g, w, h, t, overlay) {
   drawSky(g, w, h, t);
   if (!World.W) return;
   easeCamera();
-  tileCacheFrame();
   gatherLights(t);
+  tileCacheFrame();
   g.save();
   if (cam.shake > 0) g.translate((Math.random() - .5) * cam.shake * 14, (Math.random() - .5) * cam.shake * 10);
   // ordered draw list
@@ -3734,8 +3758,8 @@ function render(g, w, h, t, overlay) {
   g.restore();
   // the storybook's soft glow: light bleeds gently from bright things, and the scene sits in a faint warm haze
   bloom(g);
-  // vignette
-  g.drawImage(vignette(w, h), 0, 0, w, h);
+  // (the vignette is a fixed overlay in the page, #vig, so the browser composites it once instead of the game painting
+  // it over the whole frame every frame)
 }
 /* Bloom: the frame is shrunk twice into small buffers (the shrinking blurs it), each squared by multiplying it with
    itself so mostly the bright parts survive, then laid back over the frame with 'screen', which only lightens. */

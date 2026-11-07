@@ -214,6 +214,8 @@
   #satCount:not(:empty)::before { content: '·'; margin: 0 4px; opacity: .6; }
   #page { cursor: crosshair; }
   body.aiming #world { cursor: crosshair; }
+  /* the vignette, laid over the world by the page rather than painted into every frame */
+  #vig { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(circle at 50% 50%, rgba(6,3,16,0) 35vmin, rgba(6,3,16,.6) 75vmax); }
   @media (max-width: 700px) {
     #pagebtns { gap: 5px; } #pagebtns .btn { font-size: 11px; padding: 6px 8px; } #pagebtns .btn.primary { font-size: 12px; padding: 7px 12px; }
     #ltitle { font-size: 22px; } #tools .btn span { display: none; } #objs { font-size: 14px; }
@@ -366,6 +368,7 @@
 </head>
 <body>
 <canvas id="world"></canvas>
+<div id="vig"></div>
 <canvas id="page"></canvas>
 
 <div id="hud">
@@ -532,9 +535,9 @@
   </div>
 </div>
 
-<script src="js/ink.js?v=116"></script>
-<script src="js/world.js?v=116"></script>
-<script src="js/tips.js?v=116"></script>
-<script src="js/main.js?v=116"></script>
+<script src="js/ink.js?v=117"></script>
+<script src="js/world.js?v=117"></script>
+<script src="js/tips.js?v=117"></script>
+<script src="js/main.js?v=117"></script>
 </body>
 </html>
