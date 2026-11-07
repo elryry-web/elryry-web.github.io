@@ -2507,6 +2507,8 @@ function drawCell(g, c, t, part) {
     inkPath(g, p, q, x * 7.3 + y * 13.1 + i * 2.9 + 100); inked = true;
   }
   if (inked) inkStroke(g, 'rgba(255,244,214,0.26)', 1.3);
+  // moss rolling over a stone block's edges onto its top (over the lit rim, so it reads as one with the wall's moss)
+  if (c.h >= 1 && !c.icy && texOK && SPRITE['moss-lip']) mossTop(g, c, z, big, nb.map(n => !n || n.void || n.h < z - 0.01));
   if (c.h >= 1 && !texOK) { // stone cracks & moss (the flagstone texture has its own)
     g.strokeStyle = 'rgba(60,50,70,0.35)';
     for (const k of d.cracks.slice(0, 2)) { const p = proj(x + k.u, y + k.v, z), q = proj(x + clamp(k.u + Math.cos(k.a) * k.l, 0, 1), y + clamp(k.v + Math.sin(k.a) * k.l, 0, 1), z); g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); g.stroke(); }
@@ -2999,6 +3001,28 @@ function mossLip(g, c, R, top, sb, u0, u1) {
   const hz = Math.min(0.5, (top - sb) * 0.6), at = (u, z) => R ? proj(c.x + 1, c.y + u, z) : proj(c.x + u, c.y + 1, z), w = u => R ? [c.x + 1, c.y + u] : [c.x + u, c.y + 1];
   const zb = Math.max(sb, top - hz - 0.02);
   return mossOn(g, R ? 0.32 : 0, false, w(u0), w(u1), [at(u0, top), at(u1, top), at(u1, zb), at(u0, zb)], top, hz);
+}
+/* Moss creeping over a stone block's top from each edge where the block drops away: the same strip laid flat on the
+   top, its dense band along the edge and its drips reaching a little way in as soft lobes, so the moss on the wall
+   below reads as one growth rolling over the corner. Along each edge it runs by the world axis the edge follows, so
+   it carries on from block to block. `top` is the top's outline (it is clipped to it). */
+function mossTop(g, c, z, top, drops) {
+  const P = mossPat(g, 0); if (!P) return;
+  const im = SPRITE['moss-lip'], W = im.naturalWidth, H = im.naturalHeight, s = cam.s, UX = W / 3;
+  const J = (wx, wy) => [(wx - wy) * TW * 0.5 * s, (wx + wy) * TH * 0.5 * s];
+  g.save(); poly(g, top); g.clip();
+  for (let i = 0; i < 4; i++) {
+    if (!drops[i]) continue;
+    const dep = 0.2 + 0.12 * hash2(c.x * 3.1 + i, c.y * 5.7 + 1.3), UY = (H - LIP_EDGE) / dep;
+    const along = i === 0 || i === 2 ? [1, 0] : [0, 1], n = [-EDGE_D[i][0], -EDGE_D[i][1]];
+    // a point on the edge line where the along-coordinate is 0, stepped out so the strip's dense edge lies on the edge
+    const e = i === 0 ? [0, c.y] : i === 2 ? [0, c.y + 1] : i === 1 ? [c.x + 1, 0] : [c.x, 0];
+    const o = [e[0] - n[0] * LIP_EDGE / UY, e[1] - n[1] * LIP_EDGE / UY];
+    const ax = J(along[0] / UX, along[1] / UX), ay = J(n[0] / UY, n[1] / UY), oo = J(o[0], o[1]);
+    P.setTransform(new DOMMatrix([ax[0], ax[1], ay[0], ay[1], cam.ox + oo[0], cam.oy + oo[1] - z * TZ * s]));
+    g.fillStyle = P; poly(g, top); g.fill();
+  }
+  g.restore();
 }
 // moss and grass creeping up the foot of a stone wall from the ground it stands on
 function mossFoot(g, c, R, top, sb, u0, u1) {
