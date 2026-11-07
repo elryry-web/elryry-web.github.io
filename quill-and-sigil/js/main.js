@@ -681,6 +681,10 @@ function aimOverlay(g, t) {
 
 /* ---------------- Boot ---------------- */
 const wc = document.getElementById('world'), wg = wc.getContext('2d');
+// the sky on its own canvas behind the world's: repainted about 25 times a second, at no more than 1.25x resolution
+const skc = document.getElementById('sky'), skg = skc.getContext('2d', { alpha: false });
+const SKYP = { dpr: 1, last: -1e9 };
+SKY_LAYER = wc;
 let DPR = 1;
 /* Quality steps, tried in turn when frames come too slowly (on phones, mostly): first the soft glow goes, then the
    world is drawn at a lower resolution. The step reached is remembered for next time. */
@@ -733,6 +737,9 @@ function resize() {
   const Q = QUALITY[qTier];
   BLOOM.on = Q.bloom;
   DPR = Math.min(Q.dpr, window.devicePixelRatio || 1);
+  PARTICLE_CAP = qTier >= 2 ? 120 : qTier >= 1 ? 200 : 3000;
+  SKYP.dpr = Math.min(DPR, 1.25); SKYP.last = -1e9;
+  skc.width = Math.round(innerWidth * SKYP.dpr); skc.height = Math.round(innerHeight * SKYP.dpr);
   wc.width = Math.round(innerWidth * DPR); wc.height = Math.round(innerHeight * DPR);
   Grim.resize();
   fitCamera(innerWidth, innerHeight);
@@ -976,6 +983,7 @@ function tick(now) {
       held.push(b, b.x, b.y, b.z);
       b.x = b._px + (b.x - b._px) * k; b.y = b._py + (b.y - b._py) * k; b.z = b._pz + (b.z - b._pz) * k;
     }
+    if (now - SKYP.last >= 38) { SKYP.last = now; skg.setTransform(SKYP.dpr, 0, 0, SKYP.dpr, 0, 0); drawSky(skg, innerWidth, innerHeight, t); }
     r0 = DEBUG ? performance.now() : 0;
     try { render(wg, innerWidth, innerHeight, t, aimOverlay); }
     finally { for (let i = 0; i < held.length; i += 4) { const b = held[i]; b.x = held[i + 1]; b.y = held[i + 2]; b.z = held[i + 3]; } }

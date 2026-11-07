@@ -743,9 +743,11 @@ function updateWisps(dt) {
 /* ---------------- Particles ---------------- */
 const parts = [];
 const MAXP = 3000;
+// fewer at once on phones (main.js lowers it with the quality step)
+let PARTICLE_CAP = MAXP;
 let smokeN = 0;
 function emit(o) {
-  if (parts.length >= MAXP) return;
+  if (parts.length >= PARTICLE_CAP) return;
   if (o.kind === 'smoke') { if (smokeN >= 36) return; smokeN++; }
   parts.push({ x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, age: 0, life: 1, size: 4, color: '#fff', kind: 'glow', grav: 0, drag: 0, rot: Math.random() * TAU, vr: 0, ...o });
 }
@@ -3711,10 +3713,14 @@ function refreshCanvases() {
   for (const I of SKY.isles) I.spr = null;
   releaseBuffers();
 }
-let frameNo = 0;
+let frameNo = 0, SKY_LAYER = null;
 function render(g, w, h, t, overlay) {
   frameNo++;
-  drawSky(g, w, h, t);
+  // the game's own canvas has its sky on a layer of its own behind it (main.js repaints that a little less often and
+  // at a lower resolution, the sky being soft and slow): here the frame is only cleared. Other canvases (snapshots)
+  // still paint the sky in.
+  if (SKY_LAYER && g.canvas === SKY_LAYER) { g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, g.canvas.width, g.canvas.height); g.restore(); }
+  else drawSky(g, w, h, t);
   if (!World.W) return;
   easeCamera();
   gatherLights(t);
