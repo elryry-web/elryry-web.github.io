@@ -2236,7 +2236,20 @@ function drawSideFaces(g, c, d, t) {
     const faceS = (za, zb) => side === 'R' ? [proj(x + 1, y + u0, za), proj(x + 1, y + u1, za), proj(x + 1, y + u1, zb), proj(x + 1, y + u0, zb)]
       : [proj(x + u0, y + 1, za), proj(x + u1, y + 1, za), proj(x + u1, y + 1, zb), proj(x + u0, y + 1, zb)];
     // light, once the face is painted (the land carries no ink outlines: faces are told apart by their shading)
-    const finish = () => lightSide(g, c, R, top, bot, P);
+    // a wall facing into a narrow gap of open air, with more land just beyond it (another island, drawn in front):
+    // from this view the gap itself hardly shows, so the wall sinks into a cool shade and the island in front reads
+    // as standing apart from it, not joined to it
+    const solidAt = (X, Y) => { const m = cellI(X, Y); return !!m && !m.void; };
+    const gapBeyond = toVoid && (R ? solidAt(x + 2, y) || solidAt(x + 2, y + 1) || solidAt(x + 2, y - 1)
+      : solidAt(x, y + 2) || solidAt(x + 1, y + 2) || solidAt(x - 1, y + 2));
+    const finish = () => {
+      lightSide(g, c, R, top, bot, P);
+      if (gapBeyond) {
+        const hg = g.createLinearGradient(0, Math.min(P[0][1], P[1][1]), 0, Math.max(P[2][1], P[3][1]));
+        hg.addColorStop(0, 'rgba(40,34,78,0.34)'); hg.addColorStop(0.5, 'rgba(46,38,86,0.46)'); hg.addColorStop(1, 'rgba(52,42,92,0.58)');
+        g.fillStyle = hg; poly(g, P); g.fill();
+      }
+    };
     if (c.icy) {
       g.fillStyle = R ? '#7fb4d0' : '#a6d6ea'; poly(g, P); g.fill();
       if (texOK) { texSide(g, 'ice', c, R, P, 0.8); const sg = g.createLinearGradient(0, P[0][1], 0, P[2][1]); sg.addColorStop(0, 'rgba(255,255,255,0.25)'); sg.addColorStop(1, `rgba(30,70,110,${R ? 0.35 : 0.2})`); g.fillStyle = sg; poly(g, P); g.fill(); }
@@ -3909,6 +3922,13 @@ function render(g, w, h, t, overlay) {
     if (!b.alive) continue;
     const fx = Math.floor(b.x + b.r * 0.7), fy = Math.floor(b.y + b.r * 0.7);
     items.push({ k: fx + fy, sub: fx + 0.5, b });
+  }
+  // something riding another body (the orb on a floating slab) is drawn after it: ordered by its own front corner it
+  // can fall a diagonal behind the wider slab, which would then be drawn over it
+  for (const it of items) {
+    const base = it.b && it.b.onBody; if (!base || !base.alive) continue;
+    const bi = items.find(o => o.b === base); if (!bi) continue;
+    if (it.k < bi.k || (it.k === bi.k && it.sub <= bi.sub)) { it.k = bi.k; it.sub = bi.sub + 0.001; }
   }
   items.sort((a, b) => a.k - b.k || a.sub - b.sub);
   // ground-plane seals underneath bodies: draw seals (normal) after terrain items of their diagonal — simpler: draw all terrain, then seals, but bodies keep order
