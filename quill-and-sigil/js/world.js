@@ -174,7 +174,9 @@ function imbueTick(b, dt) {
 function arrivalCheck(b, dt) {
   b.arriveT += dt;
   const sp = Math.hypot(b.vx, b.vy);
-  if (!(b.captured || (b.arriveT > 0.3 && sp < 0.6 && b.lev <= 0) || (b.arriveT > 0.15 && b.offEdge) || b.arriveT > 7)) return;
+  // (a sailing slab floats the whole way: it arrives when it stops, run ashore or its float spent)
+  const sails = b.kind === 'slab' && b.drift;
+  if (!(b.captured || (b.arriveT > 0.3 && sp < 0.6 && b.lev <= 0) || (sails && b.arriveT > 0.6 && sp < 0.35) || (b.arriveT > 0.15 && b.offEdge) || b.arriveT > 7)) return;
   const list = b.arrive; b.arrive = null;
   for (const a of list) arriveEffect(b, a.id, a.n, a.dir);
 }
@@ -618,11 +620,14 @@ function applySpell(sp, tx, ty, tz) {
   if (cnt('gale') && !mover) sp = { ...sp, reach: 2 * cnt('gale') };
   // Petra shapes the stone and Luna on its ring makes it float in place; Luna at the centre with Petra on the ring is a ferry that sails along the sign
   if (sp.sigil === 'stone' && cnt('luna')) return spawnSlabs(sp, tx, ty, tz, cnt('luna'));
-  if (sp.sigil === 'luna' && cnt('stone')) return spawnFerry(sp, tx, ty, tz, cnt('stone'), cnt('gale'));
+  // (the ferry's other ring-sigils ride on its slab: Ignis on arrival kindles where it comes to rest)
+  const ferryRest = (slabs, used) => { for (const s of inf) if (!used(s)) for (const b of slabs) infuseBody(b, s, sp); };
+  if (sp.sigil === 'luna' && cnt('stone')) return ferryRest(spawnFerry(sp, tx, ty, tz, cnt('stone'), cnt('gale')), s => s.id === 'stone' || s.id === 'gale');
   // the ferry (v60): Ventus at the centre with Luna and Petra both on its ring at once (behind the sign) raises a
   // floating slab beneath what you touch, and the wind sails it the way of the sign, rider and all
   const now = id => inf.filter(s => s.id === id && s.rel === 'now').reduce((a, s) => a + s.n, 0);
-  if (sp.sigil === 'gale' && sp.dir && now('stone') && now('luna')) return spawnFerry(sp, tx, ty, tz, now('stone'), 1, now('luna'));
+  if (sp.sigil === 'gale' && sp.dir && now('stone') && now('luna'))
+    return ferryRest(spawnFerry(sp, tx, ty, tz, now('stone'), 1, now('luna')), s => s.rel === 'now' && (s.id === 'stone' || s.id === 'luna'));
   if ((sp.sigil === 'flame' || sp.sigil === 'frost') && cnt('luna')) return spawnWisps(sp, tx, ty, tz, cnt('luna'));
   const out = { bodies: [], cells: [], prev: new Map() };
   baseSpell(sp, tx, ty, tz, out);
@@ -702,6 +707,7 @@ function raiseSlab(x, y, tz, T, drift) {
   const b = makeBody('slab', x + 0.5, y + 0.5, z);
   Object.assign(b, { lev: T, levAge: 0, hover: z, drift });
   World.bodies.push(b);
+  return b;
   for (let i = 0; i < 14; i++) emit({ x: x + Math.random(), y: y + Math.random(), z: z - 0.4, vx: 0, vy: 0, vz: 1 + Math.random() * 2, life: 1.2, size: 4, color: i % 2 ? '#cdb0ff' : '#c8bca8', kind: 'glow' });
 }
 /* Petra + Luna on the ring: Petra's shape, raised as stone that floats where it stands */
@@ -715,8 +721,10 @@ function spawnFerry(sp, tx, ty, tz, n, gale = 0, luna = 0) {
   const T = 6 + 2 * n + 2 * Math.max(0, luna - 1), v = sp.dir && gale ? (0.8 + 0.6 * sp.s) * (1 + 0.4 * (gale - 1)) : 0, drift = v ? { x: sp.dir.x * v, y: sp.dir.y * v } : null;
   const ix = Math.floor(tx), iy = Math.floor(ty);
   const tiles = sp.amp ? [-1, 0, 1].flatMap(a => [-1, 0, 1].map(b => [ix + a, iy + b])) : [[ix, iy]];
-  for (const [x, y] of tiles) if (x >= 0 && y >= 0 && x < World.W && y < World.H) raiseSlab(x, y, tz, T, drift && { ...drift });
+  const slabs = [];
+  for (const [x, y] of tiles) if (x >= 0 && y >= 0 && x < World.W && y < World.H) { const b = raiseSlab(x, y, tz, T, drift && { ...drift }); if (b) slabs.push(b); }
   ring(tx, ty, tz, '#cdb0ff', sp.amp ? 1.8 : 1.1); cam.shake = Math.max(cam.shake, 0.15);
+  return slabs;
 }
 /* Ignis / Gelu + Luna: a drifting wisp that carries the element along the signs, over walls */
 function spawnWisps(sp, tx, ty, tz, n) {
@@ -3799,7 +3807,9 @@ function buildTile(c, t) {
   let zLow = c.h;
   for (const R of [true, false]) { const n = R ? cellI(c.x + 1, c.y) : cellI(c.x, c.y + 1); zLow = Math.min(zLow, !n || n.void ? ROCK_FLOOR - 0.4 : n.h); }
   const X0 = Math.floor((proj(c.x, c.y + 1, 0)[0] - 0.4 * TW * s) * D) / D, X1 = Math.ceil((proj(c.x + 1, c.y, 0)[0] + 0.4 * TW * s) * D) / D;
-  const Y0 = Math.floor((proj(c.x, c.y, c.h)[1] - 26 * s - 4) * D) / D, Y1 = Math.ceil((proj(c.x + 1, c.y + 1, zLow)[1] + 18 * s + 4) * D) / D;
+  // (from the highest thing in it: a pool's water stands above its bed, and would be cut off at its back corner)
+  const zTop = c.water != null && c.water > c.h ? c.water : c.h;
+  const Y0 = Math.floor((proj(c.x, c.y, zTop)[1] - 26 * s - 4) * D) / D, Y1 = Math.ceil((proj(c.x + 1, c.y + 1, zLow)[1] + 18 * s + 4) * D) / D;
   const w = Math.round((X1 - X0) * D), h = Math.round((Y1 - Y0) * D); if (w < 1 || h < 1 || w * h > 4e6) return null;
   // a slot in the atlas (or, if it is full, a canvas of the tile's own), cleared and fenced off so nothing spills
   const slot = atlasAlloc(w, h);
