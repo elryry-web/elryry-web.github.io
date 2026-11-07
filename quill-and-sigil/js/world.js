@@ -2117,9 +2117,9 @@ function cornerCurve(g, c, k) {
     for (const [b0, b1, Rs] of halves) {
       const As = [0, 1, 2, 3, 4].map(i => b0 + (b1 - b0) * i / 4), e0 = ew(b0), e1 = ew(b1);
       const strip = (z0, z1) => [...As.map(a => P(a, z0)), ...As.slice().reverse().map(a => P(a, z1))];
-      const hz = Math.min(0.72, tall * 0.7);
+      const hz = Math.min(0.5, tall * 0.6);
       mossOn(g, Rs ? 0.32 : 0, false, e0, e1, strip(top, Math.max(zb, top - hz - 0.02)), top, hz);
-      if (tall >= 0.3) { const hf = Math.min(0.42, tall * 0.4); mossOn(g, Rs ? 0.45 : 0.2, true, e0, e1, strip(zb + hf, zb), zb, hf); }
+      if (tall >= 0.3) { const hf = Math.min(0.34, tall * 0.35); mossOn(g, Rs ? 0.45 : 0.2, true, e0, e1, strip(zb + hf, zb), zb, hf); }
     }
   }
 }
@@ -2954,7 +2954,7 @@ function drawWater(g, c, d, t) {
 const SPRITE = {};
 for (const k of ['bramble1', 'bramble2', 'bramble3', 'brazier', 'goal', 'vine-leafy', 'vine-moss', 'vine-roots', 'ivy1', 'ivy2', 'ivy3', 'moss-drape', 'moss-lip']) {
   if (typeof Image === 'undefined') break;
-  const im = new Image(); im.onload = () => { SPRITE[k] = im; }; im.src = `art/${k}.png?v=6`;
+  const im = new Image(); im.onload = () => { SPRITE[k] = im; }; im.src = `art/${k}.png?v=7`;
 }
 // a painting darkened to sit on a wall in shade (made once each)
 const shadeCache = {};
@@ -2973,7 +2973,7 @@ function ivyFor(seed) {
 }
 /* Moss along a stone block's top edge: the painted strip, repeating along the wall (by u = x - y, so it runs on
    unbroken from block to block), its dense band just at the edge and its drips hanging down the stone. */
-const lipPats = new WeakMap(), LIP_EDGE = 36;
+const lipPats = new WeakMap(), LIP_EDGE = 34;
 // the moss strip as a pattern on this canvas, darkened by f (for walls in shade, and the shadowed foot of a wall)
 function mossPat(g, f) {
   const src = f ? shadedSprite('moss-lip', f) : SPRITE['moss-lip']; if (!src) return null;
@@ -2985,7 +2985,7 @@ function mossPat(g, f) {
 // u = x - y like the wall textures, so it carries on unbroken from wall to wall and round a curved corner.
 function mossOn(g, f, foot, e0, e1, quad, zEdge, hz) {
   const P = mossPat(g, f); if (!P) return false;
-  const im = SPRITE['moss-lip'], W = im.naturalWidth, H = im.naturalHeight, UX = W / (foot ? 1.2 : 1.5), UY = H / hz, s = cam.s;
+  const im = SPRITE['moss-lip'], W = im.naturalWidth, H = im.naturalHeight, UX = W / (foot ? 2.6 : 3), UY = H / hz, s = cam.s;
   const u0 = e0[0] - e0[1], du = (e1[0] - e1[1]) - u0, Y0 = (e0[0] + e0[1]) * TH * 0.5, Y1 = (e1[0] + e1[1]) * TH * 0.5;
   const m = Math.abs(du) > 1e-4 ? (Y1 - Y0) / du : 0, zo = foot ? zEdge - LIP_EDGE / UY : zEdge + LIP_EDGE / UY;
   const a = TW * 0.5 * s / UX, b = m * s / UX, sh = foot ? 0.37 * UX : 0;
@@ -2995,14 +2995,15 @@ function mossOn(g, f, foot, e0, e1, quad, zEdge, hz) {
 }
 function mossLip(g, c, R, top, sb, u0, u1) {
   if (!SPRITE['moss-lip']) return false;
-  const hz = Math.min(0.72, (top - sb) * 0.7), at = (u, z) => R ? proj(c.x + 1, c.y + u, z) : proj(c.x + u, c.y + 1, z), w = u => R ? [c.x + 1, c.y + u] : [c.x + u, c.y + 1];
+  // near the painting's own proportions (stretched taller, its clumps turn to strings)
+  const hz = Math.min(0.5, (top - sb) * 0.6), at = (u, z) => R ? proj(c.x + 1, c.y + u, z) : proj(c.x + u, c.y + 1, z), w = u => R ? [c.x + 1, c.y + u] : [c.x + u, c.y + 1];
   const zb = Math.max(sb, top - hz - 0.02);
   return mossOn(g, R ? 0.32 : 0, false, w(u0), w(u1), [at(u0, top), at(u1, top), at(u1, zb), at(u0, zb)], top, hz);
 }
 // moss and grass creeping up the foot of a stone wall from the ground it stands on
 function mossFoot(g, c, R, top, sb, u0, u1) {
   if (!SPRITE['moss-lip'] || top - sb < 0.3 || u1 - u0 < 0.01) return;
-  const hz = Math.min(0.42, (top - sb) * 0.4), at = (u, z) => R ? proj(c.x + 1, c.y + u, z) : proj(c.x + u, c.y + 1, z), w = u => R ? [c.x + 1, c.y + u] : [c.x + u, c.y + 1];
+  const hz = Math.min(0.34, (top - sb) * 0.35), at = (u, z) => R ? proj(c.x + 1, c.y + u, z) : proj(c.x + u, c.y + 1, z), w = u => R ? [c.x + 1, c.y + u] : [c.x + u, c.y + 1];
   mossOn(g, R ? 0.45 : 0.2, true, w(u0), w(u1), [at(u0, sb + hz), at(u1, sb + hz), at(u1, sb), at(u0, sb)], sb, hz);
 }
 // a drape of moss hanging from a wall's top edge at p: wU wide along the edge, hZ tall, sheared to lie on the wall
