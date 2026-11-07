@@ -1840,6 +1840,9 @@ function onPlane(g, c, R, fn) {
   g.save(); g.transform(ux * s, TH * 0.5 * s, 0, TZ * s, o[0], o[1]); fn(TEXU); g.restore();
 }
 const SOIL_DEPTH = 1.0, ROCK_FLOOR = -3.5;
+// the foot of a tile's soil over the void: a depth below its ground, or (under a pool) below the water's surface,
+// so a pool's bed sitting a little low doesn't leave its earth hanging lower than the land's beside it
+const soilBot = c => Math.min(c.water != null && c.water > c.h ? Math.max(c.water, c.h) : c.h, 0) - SOIL_DEPTH;
 // how far the rock hangs at a point on the rim, as a share of its usual reach: soft lumps that run on unbroken
 // from wall to wall and round every corner
 function rockKnot(wx, wy) { return 1 + 0.17 * Math.sin(wx * 2.9 + wy * 1.3 + 0.4) + 0.12 * Math.sin(wy * 3.7 - wx * 1.7 + 2.1); }
@@ -1909,7 +1912,7 @@ function soilCorners(c) {
 function soilCornerCurve(g, c, k) {
   // drawn as whole strips round the curve (one fill per layer), not slice by slice: these corners are many on
   // spiky islands, and each fill of a texture costs
-  const x = c.x, y = c.y, st = Math.min(c.h, 0), bot = st - SOIL_DEPTH, r = SOIL_R, s = cam.s, C = [[0, 0], [1, 0], [1, 1], [0, 1]][k];
+  const x = c.x, y = c.y, st = Math.min(c.h, 0), bot = soilBot(c), r = SOIL_R, s = cam.s, C = [[0, 0], [1, 0], [1, 1], [0, 1]][k];
   const ox = C[0] ? C[0] - r : r, oy = C[1] ? C[1] - r : r;
   const span = { 1: [-Math.PI / 4, 0], 2: [0, Math.PI / 2], 3: [Math.PI / 2, Math.PI * 3 / 4] }[k]; if (!span) return;
   const N = k === 2 ? 6 : 3, A = [];
@@ -1960,7 +1963,7 @@ function soilConcave(c, R) {
 }
 // drawn with the tile whose L wall turns the corner (the later of the two in drawing order)
 function soilFillet(g, c) {
-  const X = c.x, Y = c.y + 1, r = SOIL_R, st = Math.min(c.h, 0), bot = st - SOIL_DEPTH, s = cam.s, N = 5, A = [];
+  const X = c.x, Y = c.y + 1, r = SOIL_R, st = Math.min(c.h, 0), bot = soilBot(c), s = cam.s, N = 5, A = [];
   for (let i = 0; i <= N; i++) A.push(Math.PI + Math.PI / 2 * i / N);
   const wx = a => X + r + Math.cos(a) * r, wy = a => Y + r + Math.sin(a) * r, P = (a, z) => proj(wx(a), wy(a), z);
   const strip = (z0, z1) => [...A.map(a => P(a, z0)), ...A.slice().reverse().map(a => P(a, z1))], wv = soilWaveFor(c, false);
@@ -2072,7 +2075,7 @@ function drawSideFaces(g, c, d, t) {
   for (const side of ['R', 'L']) {
     const n = side === 'R' ? cellI(x + 1, y) : cellI(x, y + 1);
     let bot, toVoid = false;
-    if (!n || n.void) { bot = Math.min(top, 0) - SOIL_DEPTH; toVoid = true; }
+    if (!n || n.void) { bot = soilBot(c); toVoid = true; }
     else bot = n.h;
     if (bot >= top - 0.001) continue;
     const P = side === 'R' ? [proj(x + 1, y, top), proj(x + 1, y + 1, top), proj(x + 1, y + 1, bot), proj(x + 1, y, bot)]
@@ -2098,6 +2101,18 @@ function drawSideFaces(g, c, d, t) {
     if (top > 0.01) {
       const sb = Math.max(bot, 0);
       g.fillStyle = R ? '#575a48' : '#6c6f58'; poly(g, faceS(top, sb)); g.fill();
+      // below the ground beside a rounded corner (a lower block's top), the wall runs on square to its corner:
+      // the curve stops there, and cutting the wall short below it would leave a notch open to the sky
+      for (const [k, ua, ub] of [[R ? 1 : 3, 0, u0], [2, u1, 1]]) {
+        if (!(rc && rc[k]) || ub - ua < 0.001) continue;
+        const zc = Math.min(cornerBase(c, k), top); if (zc <= sb + 0.01) continue;
+        const at = (u, z) => R ? proj(x + 1, y + u, z) : proj(x + u, y + 1, z), Q = [at(ua, zc), at(ub, zc), at(ub, sb), at(ua, sb)];
+        g.fillStyle = R ? '#575a48' : '#6c6f58'; poly(g, Q); g.fill();
+        if (texOK) texSide(g, 'stoneSide', c, R, Q);
+        const qg = g.createLinearGradient(0, Q[0][1], 0, Q[2][1]);
+        qg.addColorStop(0, `rgba(16,14,24,${R ? 0.3 : 0.14})`); qg.addColorStop(1, `rgba(16,14,24,${R ? 0.55 : 0.42})`);
+        g.fillStyle = qg; poly(g, Q); g.fill();
+      }
       if (texOK) {
         texSide(g, 'stoneSide', c, R, faceS(top, sb));
         // light falls off down the wall into the shade at its foot, the shaded side darker all over, and the rounded
@@ -2558,21 +2573,23 @@ function drawSheets(g, c, d, t, front) {
   const P = sheetPattern(g, hU, t); if (!P) return;
   const Ls = [0, 0.5, 1].map(f => FALL_ARC * f), rest = hU - FALL_ARC;
   for (const f of [0.08, 0.25, 0.5, 1]) Ls.push(FALL_ARC + rest * f);
-  const at = (q, L) => { const [o, dz] = fallProfile(L); return proj(q[0] + q[2] * o, q[1] + q[3] * o, z - dz); };
+  // q[4], where set, draws the sheet in toward the cliff (0: flush with it), for the end of a fall beside land
+  const at = (q, L) => { const [o0, dz] = fallProfile(L), o = o0 * (q[4] ?? 1); return proj(q[0] + q[2] * o, q[1] + q[3] * o, z - dz); };
   const lerpQ = (q1, q2, f) => q1.map((v, i) => v + (q2[i] - v) * f);
   const ga = g.globalAlpha, segs = [];
   for (const run of runs) {
-    // split the run's ends into short fading pieces where it stops beside land
-    const pts = run.pts, list = [];
+    // where a run stops beside land, its last stretch draws in to lie flush against the cliff (so no gap opens
+    // between the water and the earth beside it), softening a little at the very end
+    const pts = run.pts, list = [], NP = 4;
+    const piece = (q1, q2, f0, f1, k0, k1, al) => { const a = lerpQ(q1, q2, f0), b = lerpQ(q1, q2, f1); a[4] = k0; b[4] = k1; list.push([a, b, al]); };
     for (let i = 0; i + 1 < pts.length; i++) {
-      let q1 = pts[i], q2 = pts[i + 1];
-      const len = Math.hypot(q2[0] - q1[0], q2[1] - q1[1]);
-      const fa = run.fadeA && i === 0, fb = run.fadeB && i + 2 === pts.length, F = [0.2, 0.5, 0.8], step = Math.min(0.05, len / 8);
-      if (fa) { for (let j = 0; j < 3; j++) list.push([lerpQ(q1, q2, j * step / len), lerpQ(q1, q2, (j + 1) * step / len), F[j]]); q1 = lerpQ(q1, q2, 3 * step / len); }
-      let q2m = q2;
-      if (fb) q2m = lerpQ(q1, q2, 1 - 3 * step / Math.hypot(q2[0] - q1[0], q2[1] - q1[1]));
-      list.push([q1, q2m, 1]);
-      if (fb) for (let j = 2; j >= 0; j--) list.push([lerpQ(q2m, q2, (2 - j) / 3), lerpQ(q2m, q2, (3 - j) / 3), F[j]]);
+      const q1 = pts[i], q2 = pts[i + 1], len = Math.hypot(q2[0] - q1[0], q2[1] - q1[1]);
+      const fa = run.fadeA && i === 0, fb = run.fadeB && i + 2 === pts.length, T = Math.min(0.3, len * (fa && fb ? 0.45 : 0.9)) / len;
+      let f0 = 0, f1 = 1;
+      if (fa) { for (let j = 0; j < NP; j++) piece(q1, q2, j * T / NP, (j + 1) * T / NP, j / NP, (j + 1) / NP, j ? 1 : 0.8); f0 = T; }
+      if (fb) f1 = 1 - T;
+      piece(q1, q2, f0, f1, 1, 1, 1);
+      if (fb) for (let j = 0; j < NP; j++) piece(q1, q2, f1 + j * T / NP, f1 + (j + 1) * T / NP, 1 - j / NP, 1 - (j + 1) / NP, j < NP - 1 ? 1 : 0.8);
     }
     for (const [q1, q2, al] of list) {
       // which way this piece faces: toward us (front) or away (back)
@@ -3036,8 +3053,10 @@ function drawBody(g, b, t) {
   if (b.kind === 'orb') {
     const [cx, cy] = proj(b.x, b.y, b.z + b.r);
     const r = b.r * TW * 0.78 * s;
+    // a tight halo here; its glow on the ground is drawn in the light pass, once the land is down (drawn here, the
+    // tiles in front would cut it off square)
     g.save(); g.globalCompositeOperation = 'lighter';
-    g.globalAlpha = 0.6 + (b.captured ? 0.4 : 0); g.drawImage(glowSprite('#ffc860'), cx - r * 3, cy - r * 3, r * 6, r * 6); g.restore();
+    g.globalAlpha = 0.55 + (b.captured ? 0.35 : 0); g.drawImage(glowSprite('#ffc860'), cx - r * 1.8, cy - r * 1.8, r * 3.6, r * 3.6); g.restore();
     const gr = g.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.05, cx, cy, r);
     gr.addColorStop(0, '#fffbea'); gr.addColorStop(0.35, '#ffd77a'); gr.addColorStop(0.8, '#d4862c'); gr.addColorStop(1, '#8a4a1a');
     g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, r, 0, TAU); g.fill();
@@ -3097,6 +3116,47 @@ function drawSeal(g, sp, x, y, z, R, alpha, rot, prog, t) {
   g.restore();
 }
 
+/* The goal must never be lost behind the land: blocks standing in front of it, tall enough to hide it, are drawn
+   into a layer of their own, a soft window is rubbed out of that layer round the goal, and the layer laid down. */
+function xrayFor() {
+  const f = World.cells.find(c => c.feat === 'font'); if (!f) return null;
+  const set = new Set();
+  for (const c of World.cells) {
+    if (c.void || c === f) continue;
+    const di = c.x - f.x, dj = c.y - f.y;
+    if (di < 0 || dj < 0 || Math.abs(di - dj) > 1) continue;
+    if ((c.h - f.h) * TZ > (di + dj) * TH * 0.5 - 12) set.add(c);
+  }
+  if (!set.size) return null;
+  const [cx, cy] = proj(f.x + 0.5, f.y + 0.5, f.h);
+  return { set, cx, cy: cy - 14 * cam.s, R: TW * cam.s * 1.15 };
+}
+let _xrC = null;
+function drawXray(g, c, t, xr) {
+  const m = g.getTransform(), W = g.canvas.width, H = g.canvas.height;
+  if (!_xrC) _xrC = document.createElement('canvas');
+  if (_xrC.width !== W || _xrC.height !== H) { _xrC.width = W; _xrC.height = H; }
+  // only the block's own box on screen is cleared and laid down
+  const pts = [];
+  for (const [u, v] of [[0, 0], [1, 0], [1, 1], [0, 1]]) for (const z of [c.h + 0.2, ROCK_FLOOR - 0.5]) pts.push(proj(c.x + u, c.y + v, z));
+  const pad = 24 * cam.s, X0 = Math.min(...pts.map(p => p[0])) - pad, X1 = Math.max(...pts.map(p => p[0])) + pad;
+  const Y0 = Math.min(...pts.map(p => p[1])) - pad, Y1 = Math.max(...pts.map(p => p[1])) + pad;
+  const dx0 = Math.max(0, Math.floor(m.a * X0 + m.e)), dy0 = Math.max(0, Math.floor(m.d * Y0 + m.f));
+  const dx1 = Math.min(W, Math.ceil(m.a * X1 + m.e)), dy1 = Math.min(H, Math.ceil(m.d * Y1 + m.f));
+  if (dx1 <= dx0 || dy1 <= dy0) { drawCell(g, c, t); return; }
+  const lg = _xrC.getContext('2d');
+  lg.setTransform(1, 0, 0, 1, 0, 0); lg.clearRect(dx0, dy0, dx1 - dx0, dy1 - dy0);
+  lg.setTransform(m); lg.globalAlpha = 1; lg.globalCompositeOperation = 'source-over';
+  drawCell(lg, c, t);
+  lg.globalCompositeOperation = 'destination-out';
+  const gr = lg.createRadialGradient(xr.cx, xr.cy, 0, xr.cx, xr.cy, xr.R);
+  gr.addColorStop(0, 'rgba(0,0,0,0.62)'); gr.addColorStop(0.5, 'rgba(0,0,0,0.5)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+  lg.fillStyle = gr; lg.fillRect(xr.cx - xr.R, xr.cy - xr.R, xr.R * 2, xr.R * 2);
+  lg.globalCompositeOperation = 'source-over';
+  g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+  g.drawImage(_xrC, dx0, dy0, dx1 - dx0, dy1 - dy0, dx0, dy0, dx1 - dx0, dy1 - dy0);
+  g.restore();
+}
 let frameNo = 0;
 function render(g, w, h, t, overlay) {
   frameNo++;
@@ -3116,9 +3176,10 @@ function render(g, w, h, t, overlay) {
   items.sort((a, b) => a.k - b.k || a.sub - b.sub);
   // ground-plane seals underneath bodies: draw seals (normal) after terrain items of their diagonal — simpler: draw all terrain, then seals, but bodies keep order
   HANG.length = 0; hangAt = 0;
+  const xr = xrayFor();
   for (const it of items) {
     if (hangAt < HANG.length) flushHang(g, t, it.k - 2);
-    if (it.c) drawCell(g, it.c, t);
+    if (it.c) { if (xr && xr.set.has(it.c)) drawXray(g, it.c, t, xr); else drawCell(g, it.c, t); }
     else drawBody(g, it.b, t);
   }
   flushHang(g, t, Infinity);
@@ -3140,6 +3201,8 @@ function render(g, w, h, t, overlay) {
     if (!b.alive || b.kind !== 'orb') continue;
     const [cx, cy] = proj(b.x, b.y, b.z + 0.3), r = 120 * s;
     g.globalAlpha = 0.22; g.drawImage(glowSprite('#ffb850'), cx - r, cy - r * 0.6, r * 2, r * 1.2);
+    const [hx, hy] = proj(b.x, b.y, b.z), hr = b.r * TW * 0.78 * s * 3.4;
+    g.globalAlpha = 0.32 + (b.captured ? 0.25 : 0); g.drawImage(glowSprite('#ffc860'), hx - hr, hy - hr * 0.5, hr * 2, hr);
   }
   for (const c of World.cells) {
     if (c.feat === 'brazier' && c.lit) { const [cx, cy] = proj(c.x + .5, c.y + .5, c.h + brazierBowlZ() + 0.3), r = (110 + Math.sin(t * 13 + c.x) * 6) * s; g.globalAlpha = 0.3; g.drawImage(glowSprite('#ff8a3a'), cx - r, cy - r * 0.7, r * 2, r * 1.4); }
