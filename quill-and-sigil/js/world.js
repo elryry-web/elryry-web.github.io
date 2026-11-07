@@ -2470,6 +2470,17 @@ function fallProfile(L) {
   if (L <= FALL_ARC) { const a = L / FALL_R; return [FALL_R * Math.sin(a), FALL_R * (1 - Math.cos(a))]; }
   const dd = L - FALL_ARC; return [FALL_R + 0.1 * Math.sqrt(dd) + 0.04 * dd, FALL_R + dd];
 }
+// the water's top is rounded off (radius WATER_R) at a corner where both its edges open onto the sky: the back
+// corner, and the left and right points, where a fall then starts just past the curve. Not the front corner: there
+// the two falls wrap round it as one curtain. Corners A, B, C, D (k = 0..3), as for the land.
+const WATER_R = 0.24;
+function waterRound(c) {
+  if (!texOK || c.ice) return null;
+  const x = c.x, y = c.y, open = n => !n || n.void;
+  const e = [open(cellI(x, y - 1)), open(cellI(x + 1, y)), open(cellI(x, y + 1)), open(cellI(x - 1, y))];
+  const r = [e[3] && e[0], e[0] && e[1], false, e[2] && e[3]].map(v => v ? WATER_R : 0);
+  return r.some(v => v) ? r : null;
+}
 // does this tile's water pour over its R (or L) edge?
 const fallsOver = (c, R) => { if (!c || c.void || c.water == null || c.ice) return false; const n = R ? cellI(c.x + 1, c.y) : cellI(c.x, c.y + 1); return !n || n.void; };
 function drawFall(g, c, d, t, R, z, zb) {
@@ -2478,6 +2489,8 @@ function drawFall(g, c, d, t, R, z, zb) {
   // where this sheet meets another at a corner: round an outward corner (the same tile pours over its other front
   // edge too) each runs on as far as it bows out, so the two meet; into an inward corner each stops that far short
   const cvx = fallsOver(c, !R), ccv = fallsOver(R ? cellI(x + 1, y - 1) : cellI(x - 1, y + 1), !R);
+  // a rounded corner at its start: the sheet begins where the curve meets the straight edge
+  const wr = waterRound(c), rs = wr ? wr[R ? 1 : 3] : 0;
   // a point on the sheet: w along the edge (world units from its start), L down it
   const S = (w, L) => { const [o, dz] = fallProfile(L); return [b0[0] + (b1[0] - b0[0]) * w + out[0] * o, b0[1] + (b1[1] - b0[1]) * w + out[1] * o + dz * TZ * s]; };
   // the painted fall, pouring: drawn into a small canvas, one pixel row per step down the sheet, scrolled down (it
@@ -2499,19 +2512,20 @@ function drawFall(g, c, d, t, R, z, zb) {
   const m = og.createLinearGradient(0, 0, 0, ch);
   m.addColorStop(0, 'rgba(0,0,0,1)'); m.addColorStop(0.3, 'rgba(0,0,0,0.9)'); m.addColorStop(0.75, 'rgba(0,0,0,0.45)'); m.addColorStop(1, 'rgba(0,0,0,0)');
   og.fillStyle = m; og.fillRect(0, 0, cw, ch);
-  if (ccv || cvx) {
+  if (ccv || cvx || rs) {
     const rows = []; for (let i = 0; i <= 16; i++) { const L = hU * (i / 16) * (i / 16); rows.push([fallProfile(L)[0] * PX, L * PX]); }
     og.globalCompositeOperation = 'destination-out'; og.fillStyle = '#000';
-    if (ccv) { og.beginPath(); og.moveTo(0, 0); for (const [o, r] of rows) og.lineTo(o, r); og.lineTo(0, ch + 1); og.closePath(); og.fill(); }
+    if (ccv || rs) { og.beginPath(); og.moveTo(0, 0); for (const [o, r] of rows) og.lineTo(Math.max(rs, ccv ? o / PX : 0) * PX, r); og.lineTo(0, ch + 1); og.closePath(); og.fill(); }
     if (cvx) { og.beginPath(); og.moveTo(cw + 1, 0); for (const [o, r] of rows) og.lineTo(PX + o, r); og.lineTo(cw + 1, ch + 1); og.closePath(); og.fill(); }
     og.globalCompositeOperation = 'destination-in';
   }
   // soft at its sides where the fall ends (not where it runs on into the next tile's)
-  const f0 = !ccv && !fallsOver(R ? cellI(x, y - 1) : cellI(x - 1, y), R), f1 = !cvx && !fallsOver(R ? cellI(x, y + 1) : cellI(x + 1, y), R);
+  const f0 = rs > 0 || !ccv && !fallsOver(R ? cellI(x, y - 1) : cellI(x - 1, y), R), f1 = !cvx && !fallsOver(R ? cellI(x, y + 1) : cellI(x + 1, y), R);
   if (f0 || f1) {
     const hg = og.createLinearGradient(0, 0, cw, 0);
     const e = 0.12 * PX / cw;
-    hg.addColorStop(0, f0 ? 'rgba(0,0,0,0.1)' : '#000'); hg.addColorStop(e, '#000'); hg.addColorStop(1 - e, '#000'); hg.addColorStop(1, f1 ? 'rgba(0,0,0,0.1)' : '#000');
+    const st = rs * PX / cw;
+    hg.addColorStop(st, f0 ? 'rgba(0,0,0,0.1)' : '#000'); hg.addColorStop(st + e, '#000'); hg.addColorStop(1 - e, '#000'); hg.addColorStop(1, f1 ? 'rgba(0,0,0,0.1)' : '#000');
     og.fillStyle = hg; og.fillRect(0, 0, cw, ch);
   }
   og.globalCompositeOperation = 'source-over';
@@ -2527,14 +2541,14 @@ function drawFall(g, c, d, t, R, z, zb) {
   }
   // a bright thread along the crest
   g.lineCap = 'round'; g.strokeStyle = 'rgba(240,252,255,0.55)'; g.lineWidth = 1.6 * s; g.beginPath();
-  const cL = FALL_ARC * 0.42, co = fallProfile(cL)[0], c0 = ccv ? co : 0.03, c1 = cvx ? 1 + co : 0.97;
+  const cL = FALL_ARC * 0.42, co = fallProfile(cL)[0], c0 = Math.max(rs + 0.03, ccv ? co : 0.03), c1 = cvx ? 1 + co : 0.97;
   for (let i = 0; i <= 6; i++) { const q = S(c0 + (c1 - c0) * i / 6, cL); (i ? g.lineTo : g.moveTo).call(g, q[0], q[1]); }
   g.stroke();
   // foam churning where the sheet turns down, and mist where it vanishes
   g.save(); g.globalCompositeOperation = 'lighter';
   for (let j = 0; j < 7; j++) {
     const ph = (t * 0.9 + j * 0.37 + x * 0.21 + y * 0.13) % 1, u = (j + 0.5 + 0.3 * Math.sin(j * 3.1 + t)) / 7;
-    const q = S(clamp(u, 0.06, 0.94), FALL_ARC * 0.8 + ph * 0.35), r = (5 + 5 * Math.sin(ph * Math.PI)) * s;
+    const q = S(clamp(u, rs + 0.06, 0.94), FALL_ARC * 0.8 + ph * 0.35), r = (5 + 5 * Math.sin(ph * Math.PI)) * s;
     g.globalAlpha = 0.3 * Math.sin(ph * Math.PI); g.drawImage(softSprite('#f4fbff'), q[0] - r, q[1] - r * 0.7, r * 2, r * 1.4);
   }
   for (let j = 0; j < 3; j++) {
@@ -2599,7 +2613,7 @@ function drawWater(g, c, d, t) {
     } else { g.fillStyle = c.ice ? 'rgba(190,230,250,0.8)' : 'rgba(70,140,210,0.55)'; poly(g, P); g.fill(); }
     if (!c.ice && (!n || n.void) && Math.random() < 0.5) {
       // spray: fine white streaks thrown off the lip, falling a little ahead of the sheet; now and then a drift of mist
-      const u = 0.05 + Math.random() * 0.9, o = FALL_R + 0.03, R = side === 'R', out = 0.2 + Math.random() * 0.35;
+      const R = side === 'R', wr0 = waterRound(c), u0 = (wr0 ? wr0[R ? 1 : 3] : 0) + 0.05, u = u0 + Math.random() * (0.95 - u0), o = FALL_R + 0.03, out = 0.2 + Math.random() * 0.35;
       const px = R ? x + 1 + o : x + u, py = R ? y + u : y + 1 + o;
       emit({ x: px, y: py, z: z - FALL_R - 0.05, vx: R ? out : 0, vy: R ? 0 : out, vz: -0.8 - Math.random() * 1.2, grav: 6, life: 0.8 + Math.random() * 0.6, size: 0.9 + Math.random() * 0.8, color: Math.random() < 0.6 ? '#f4fbff' : '#cdeaff', kind: 'streak' });
       if (Math.random() < 0.06) emit({ x: px + (R ? 0.25 : 0), y: py + (R ? 0 : 0.25), z: z - 1.4 - Math.random(), vx: R ? 0.15 : 0, vy: R ? 0 : 0.15, vz: -0.25, drag: 0.3, life: 2.2, size: 14, color: '#eef7ff', kind: 'smoke' });
@@ -2623,7 +2637,8 @@ function drawWater(g, c, d, t) {
   } else if (texOK) {
     // one sheet of water across the tiles: an opaque, world-pinned surface (so tiles can overlap without seams),
     // glints drifting over it (along the current where it flows), and pale light where it laps against land
-    const big = growQuad([A, B, C, D], 0.6), fl = c.flow;
+    const wr = waterRound(c), fl = c.flow;
+    const big = wr ? growPoly(roundedOutline(wr).map(([u, v]) => proj(x + u, y + v, z)), 0.6) : growQuad([A, B, C, D], 0.6);
     g.fillStyle = '#4b98d2'; poly(g, big); g.fill();
     texTop(g, 'water', z, big);
     const sp = fl ? fl.s * 0.35 : 0, ox = fl ? fl.x * t * sp : t * 0.05, oy = fl ? fl.y * t * sp : t * 0.03;
