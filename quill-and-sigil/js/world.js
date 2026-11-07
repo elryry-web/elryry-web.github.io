@@ -1508,14 +1508,21 @@ function texPebbles(g, R, n, rx0, rx1) {
 }
 // Slabs for the raised stone. On tops, light falls from the back corner (texture top-left) to the front one;
 // on walls, from the top edge down. Each slab is painted inside its own clip, so nothing spills into the next.
-/* ?bond in the address lays the walls' slabs in running bond (each course offset half a block from the next), so a
-   wall of several blocks reads as one piece of masonry rather than a stack of cubes */
-const STONE_BOND = typeof location !== 'undefined' && /[?&]bond(=|&|$)/.test(location.search);
+/* Stone walls are laid in running bond (each course offset half a block from the next), so a wall of several blocks
+   reads as one piece of masonry rather than a stack of cubes; a lone block (no stone beside it along the wall) keeps
+   whole slabs, so it reads as one solid stone. ?stack in the address lays every wall as whole slabs, as before. */
+const STONE_BOND = !(typeof location !== 'undefined' && /[?&]stack(=|&|$)/.test(location.search));
+// the stone texture for a tile's R or L wall: running bond where the wall runs on into stone beside it
+function stoneWallTex(c, R) {
+  if (!STONE_BOND) return 'stoneSideStack';
+  const st = n => !!n && !n.void && !n.icy && n.h >= 1;
+  return st(R ? cellI(c.x, c.y - 1) : cellI(c.x - 1, c.y)) || st(R ? cellI(c.x, c.y + 1) : cellI(c.x + 1, c.y)) ? 'stoneSide' : 'stoneSideStack';
+}
 // how mossy a stone wall is: walls in shade (R) usually, walls in the light now and then; and each block's own tone
 const wallMossy = (x, y, R) => hash2(x * 3.7 + y * 5.3 + (R ? 0 : 9), 4.2) < (R ? 0.78 : 0.38);
 function blockTone(x, y) { const h = hash2(x * 1.31 + 0.7, y * 7.9 + 2.1); return h < 0.34 ? 'rgba(205,165,115,0.09)' : h < 0.67 ? 'rgba(105,115,132,0.1)' : 'rgba(100,122,70,0.08)'; }
-function texSlabs(g, R, wall, U = TEXU, N = TEXN, light = false) {
-  const n = Math.round(N / U), kk = U / 128, bond = wall && STONE_BOND;
+function texSlabs(g, R, wall, U = TEXU, N = TEXN, light = false, bond = false) {
+  const n = Math.round(N / U), kk = U / 128;
   for (let j = 0; j < n; j++) for (let i = bond ? -1 : 0; i < n; i++) {
     const x0 = i * U + (bond && j % 2 ? U / 2 : 0), y0 = j * U;
     g.save(); g.beginPath(); g.rect(x0, y0, U, U); g.clip();
@@ -1605,7 +1612,8 @@ const TEX_PAINT = {
   // the raised stone, as in the storybook: one big smooth slab to a tile on top, and one to each unit of height
   // on the walls, softly shaded from a lit edge to a shadowed one, bevelled, with the odd crack, chip and moss
   stoneTop(g, R) { texSlabs(g, R, false); },
-  stoneSide(g, R) { texSlabs(g, R, true); },
+  stoneSide(g, R) { texSlabs(g, R, true, TEXU, TEXN, false, true); },
+  stoneSideStack(g, R) { texSlabs(g, R, true); },
   // the earth under the grass: wavy layers of lighter and darker soil, pebbles, and fine roots
   soil(g, R) {
     let y = 0, dark = false;
@@ -1758,13 +1766,14 @@ function paintedTex(k, im) {
   const mk = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
   if (k === 'grass' || k === 'water' || k === 'ice' || k === 'fall' || k === 'wood' || k === 'runestone') TEX_SRC[k] = { c: im, u: U };
   else if (k === 'stone') {
-    for (const wall of [false, true]) {
+    // the top, the walls in running bond, and the walls of lone blocks in whole slabs
+    for (const [name, wall, bond] of [['stoneTop', false, false], ['stoneSide', true, true], ['stoneSideStack', true, false]]) {
       const c = mk(W, H), g = c.getContext('2d');
       g.drawImage(im, 0, 0);
       g.globalCompositeOperation = 'multiply'; g.fillStyle = wall ? '#b4ae8c' : '#e6d6aa'; g.fillRect(0, 0, W, H);
       g.globalCompositeOperation = 'source-over';
-      texSlabs(g, mulberry(wall ? 31 : 17), wall, U, W, true);
-      TEX_SRC[wall ? 'stoneSide' : 'stoneTop'] = { c, u: U };
+      texSlabs(g, mulberry(wall ? 31 : 17), wall, U, W, true, bond);
+      TEX_SRC[name] = { c, u: U };
     }
   } else if (k === 'soil') {
     TEX_SRC.soil = { c: im, u: U };
@@ -2116,7 +2125,7 @@ function cornerCurve(g, c, k) {
     const f = clamp(am / (Math.PI / 2), 0, 1), hl = Math.max(0, Math.sin((f - 0.45) * Math.PI)) * 18;
     const col = colR.map((v, j) => Math.round(v + (colL[j] - v) * f + hl));
     g.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`; poly(g, q); g.fill();
-    texSide(g, 'stoneSide', c, f < 0.5, q, 0.85);
+    texSide(g, stoneWallTex(c, f < 0.5), c, f < 0.5, q, 0.85);
     const gy0 = q[0][1], gy1 = q[3][1], sg = g.createLinearGradient(0, gy0, 0, gy1);
     sg.addColorStop(0, `rgba(16,14,24,${0.18 * (1 - f)})`); sg.addColorStop(1, `rgba(16,14,24,${0.55 - 0.13 * f})`);
     g.fillStyle = sg; poly(g, q); g.fill();
@@ -2211,14 +2220,14 @@ function drawSideFaces(g, c, d, t) {
         const zc = Math.min(cornerBase(c, k), top); if (zc <= sb + 0.01) continue;
         const at = (u, z) => R ? proj(x + 1, y + u, z) : proj(x + u, y + 1, z), Q = [at(ua, zc), at(ub, zc), at(ub, sb), at(ua, sb)];
         g.fillStyle = R ? '#575a48' : '#6c6f58'; poly(g, Q); g.fill();
-        if (texOK) texSide(g, 'stoneSide', c, R, Q);
+        if (texOK) texSide(g, stoneWallTex(c, R), c, R, Q);
         const qg = g.createLinearGradient(0, Q[0][1], 0, Q[2][1]);
         qg.addColorStop(0, `rgba(16,14,24,${R ? 0.3 : 0.14})`); qg.addColorStop(1, `rgba(16,14,24,${R ? 0.55 : 0.42})`);
         g.fillStyle = qg; poly(g, Q); g.fill();
       }
       const mossy = wallMossy(x, y, R), tall = top - sb;
       if (texOK) {
-        texSide(g, 'stoneSide', c, R, faceS(top, sb));
+        texSide(g, stoneWallTex(c, R), c, R, faceS(top, sb));
         g.fillStyle = blockTone(x, y); poly(g, faceS(top, sb)); g.fill();
         const wpt = u => R ? [x + 1, y + u] : [x + u, y + 1];
         if (SPRITE.stains) stainOn(g, wpt(u0), wpt(u1), faceS(top, sb), top, sb, mossy ? 1 : 0.7);
@@ -3351,7 +3360,7 @@ function drawGate(g, c, t) {
     const rs = TEX_SRC.runestone && !TEX_SRC.runestone.drawn;
     texturedBox(g, x + 0.08, y + 0.08, x + 0.92, y + 0.92, z, z + hh, rs
       ? { colT: '#6a6478', colL: '#5c5670', colR: '#4a4560', top: 'runestone', side: 'runestone', tint: 'rgba(40,24,70,0.12)', rim: 'rgba(220,200,255,0.4)' }
-      : { colT: '#8c84a8', colL: '#5c5280', colR: '#443a66', top: 'stoneTop', side: 'stoneSide', tint: 'rgba(70,46,120,0.32)', rim: 'rgba(220,200,255,0.4)' });
+      : { colT: '#8c84a8', colL: '#5c5280', colR: '#443a66', top: 'stoneTop', side: 'stoneSideStack', tint: 'rgba(70,46,120,0.32)', rim: 'rgba(220,200,255,0.4)' });
   }
   else prism(g, x + 0.08, y + 0.08, x + 0.92, y + 0.92, z, z + hh, '#8c84a8', '#5c5280', '#443a66', 'rgba(255,255,255,0.12)');
   // runes on faces
@@ -3448,7 +3457,7 @@ function drawBody(g, b, t) {
   if (b.kind === 'slab') {
     const r = b.r;
     if (b.lev > 0) { const [gx, gy] = proj(b.x, b.y, b.z); g.save(); g.globalCompositeOperation = 'lighter'; g.globalAlpha = 0.45 + 0.15 * Math.sin(t * 4); g.drawImage(glowSprite('#cdb0ff'), gx - 40 * s, gy - 14 * s, 80 * s, 40 * s); g.restore(); }
-    if (texOK) texturedBox(g, b.x - r, b.y - r, b.x + r, b.y + r, b.z, b.z + b.hgt, { colT: '#a29f80', colL: '#6c6f58', colR: '#575a48', top: 'stoneTop', side: 'stoneSide', tint: 'rgba(150,110,210,0.16)' });
+    if (texOK) texturedBox(g, b.x - r, b.y - r, b.x + r, b.y + r, b.z, b.z + b.hgt, { colT: '#a29f80', colL: '#6c6f58', colR: '#575a48', top: 'stoneTop', side: 'stoneSideStack', tint: 'rgba(150,110,210,0.16)' });
     else prism(g, b.x - r, b.y - r, b.x + r, b.y + r, b.z, b.z + b.hgt, '#bcb2cc', '#857a98', '#665c7a', 'rgba(255,255,255,0.25)');
     const P = proj(b.x, b.y, b.z + b.hgt);
     g.strokeStyle = `rgba(205,176,255,${0.5 + 0.3 * Math.sin(t * 3)})`; g.lineWidth = 1.2 * s;
