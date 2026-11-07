@@ -1451,7 +1451,7 @@ function lightSide(g, c, R, za, zb, quad) {
   let on = false;
   for (const l of LIGHTS) {
     const d = R ? l.x - (c.x + 1) : l.y - (c.y + 1); if (d < 0.05 || d > l.r) continue;
-    const u = R ? l.y - (c.y + 0.5) : l.x - (c.x + 0.5); if (Math.abs(u) > l.r + 0.6) continue;
+    const u = R ? l.y - (c.y + 0.5) : l.x - (c.x + 0.5); if (Math.abs(u) > (l.r - d) * 1.2 + 0.55) continue;
     if (l.z < zb - 0.2) continue;
     if (!on) { g.save(); poly(g, quad); g.clip(); g.globalCompositeOperation = 'lighter'; on = true; }
     const zc = clamp(l.z, zb, za), [px, py] = R ? proj(c.x + 1, l.y, zc) : proj(l.x, c.y + 1, zc), Rr = (l.r - d) * TW * 0.6 * cam.s;
@@ -1943,8 +1943,11 @@ function soilCornerCurve(g, c, k) {
   const x = c.x, y = c.y, st = Math.min(c.h, 0), bot = soilBot(c), r = SOIL_R, s = cam.s, C = [[0, 0], [1, 0], [1, 1], [0, 1]][k];
   const ox = C[0] ? C[0] - r : r, oy = C[1] ? C[1] - r : r;
   const span = { 1: [-Math.PI / 4, 0], 2: [0, Math.PI / 2], 3: [Math.PI / 2, Math.PI * 3 / 4] }[k]; if (!span) return;
-  const N = k === 2 ? 6 : 3, A = [];
+  const N = k === 2 ? 6 : 3, A = [], ext = Math.min(0.14, 1.6 / (r * TW * 0.5 * s));
   for (let i = 0; i <= N; i++) A.push(span[0] + (span[1] - span[0]) * i / N + (i === N ? 0.02 : 0));
+  // lap over the flat wall at each end that meets one (not the end that is the island's silhouette)
+  if (k !== 1) A[0] -= ext;
+  if (k !== 3) A[N] += ext;
   const wx = a => x + ox + Math.cos(a) * r, wy = a => y + oy + Math.sin(a) * r, P = (a, z) => proj(wx(a), wy(a), z);
   const strip = (z0, z1) => [...A.map(a => P(a, z0)), ...A.slice().reverse().map(a => P(a, z1))];
   const plane = k === 1, wv = soilWaveFor(c, plane);
@@ -1955,18 +1958,23 @@ function soilCornerCurve(g, c, k) {
   // the soil
   const soil = strip(st, bot), cA = mix(fR), cB = mix(fL);
   g.fillStyle = grad(`rgb(${cA})`, `rgb(${cB})`); poly(g, soil); g.fill();
-  const e0 = [wx(A[0]), wy(A[0])], e1 = [wx(A[N]), wy(A[N])], cv = [soilWave(e0[0], e0[1]), soilWave(e1[0], e1[1])], under = plane ? 'underR' : 'underL';
-  texChord(g, 'soil', e0, e1, soil, 1, cv); texChord(g, 'soilMacro', e0, e1, soil); texChord(g, under, e0, e1, soil, 1, cv);
-  // the rock below, leaning in and fading like the rest
+  // the soil's textures: each half of the curve carries on the textures of the flat wall it turns from, mapped as on
+  // that wall, so the layers run on unbroken from each wall and meet only at the corner's tip
+  const e0 = [wx(span[0]), wy(span[0])], e1 = [wx(span[1] + 0.02), wy(span[1] + 0.02)]; // the lip's grass is laid on this chord
+  const halves = k === 2 ? [[A[0], Math.PI / 4 + 0.03, true], [Math.PI / 4, A[N], false]] : [[A[0], A[N], k === 1]];
   const room = bot - ROCK_FLOOR;
-  if (room > 0.05) {
-    const low = A.slice().reverse().map(a => { const q = rockAt(wx(a), wy(a)); return proj(q[0], q[1], bot - Math.min(q[2] * rockKnot(wx(a), wy(a)), room)); });
-    texChord(g, under, e0, e1, [...A.map(a => P(a, bot)), ...low], 1, cv);
+  for (const [h0, h1, Rh] of halves) {
+    const as = [0, 1, 2, 3, 4].map(i => h0 + (h1 - h0) * i / 4), wv = soilWaveFor(c, Rh), un = Rh ? 'underR' : 'underL';
+    const Q = [...as.map(a => P(a, st)), ...as.slice().reverse().map(a => P(a, bot))];
+    texSide(g, 'soil', c, Rh, Q, 1, wv); texSide(g, 'soilMacro', c, Rh, Q); texSide(g, un, c, Rh, Q, 1, wv);
+    // the rock below, leaning in and fading like the rest
+    if (room > 0.05) {
+      const low = as.slice().reverse().map(a => { const q = rockAt(wx(a), wy(a)); return proj(q[0], q[1], bot - Math.min(q[2] * rockKnot(wx(a), wy(a)), room)); });
+      texSide(g, un, c, Rh, [...as.map(a => P(a, bot)), ...low], 1, wv);
+    }
   }
-  // the shaded side of the curve a touch darker, as on the walls
-  g.fillStyle = grad(`rgba(10,6,12,${(0.2 * (1 - fR)).toFixed(3)})`, `rgba(10,6,12,${(0.2 * (1 - fL)).toFixed(3)})`); poly(g, soil); g.fill();
   // the grass lip rolling round it, with its shadow
-  const sh = strip(st - 0.06, st - 0.42), sg = g.createLinearGradient(0, P(A[0], st - 0.06)[1], 0, P(A[0], st - 0.42)[1]);
+  const lo = Math.max(bot, st - 0.45), sh = strip(st - 0.06, lo), sg = g.createLinearGradient(0, P(A[0], st - 0.06)[1], 0, P(A[0], lo)[1]); // as on the flat walls
   sg.addColorStop(0, 'rgba(14,8,18,0.5)'); sg.addColorStop(1, 'rgba(14,8,18,0)');
   g.fillStyle = sg; poly(g, sh); g.fill();
   const dz = A.map(a => 0.13 + 0.05 * Math.sin(a * 9 + x * 1.7 + y));
@@ -1991,8 +1999,9 @@ function soilConcave(c, R) {
 }
 // drawn with the tile whose L wall turns the corner (the later of the two in drawing order)
 function soilFillet(g, c) {
-  const X = c.x, Y = c.y + 1, r = SOIL_R, st = Math.min(c.h, 0), bot = soilBot(c), s = cam.s, N = 5, A = [];
+  const X = c.x, Y = c.y + 1, r = SOIL_R, st = Math.min(c.h, 0), bot = soilBot(c), s = cam.s, N = 5, A = [], ext = Math.min(0.14, 1.6 / (r * TW * 0.5 * s));
   for (let i = 0; i <= N; i++) A.push(Math.PI + Math.PI / 2 * i / N);
+  A[0] -= ext; A[N] += ext; // lapping over both walls it joins
   const wx = a => X + r + Math.cos(a) * r, wy = a => Y + r + Math.sin(a) * r, P = (a, z) => proj(wx(a), wy(a), z);
   const strip = (z0, z1) => [...A.map(a => P(a, z0)), ...A.slice().reverse().map(a => P(a, z1))], wv = soilWaveFor(c, false);
   // the grass filling the corner
@@ -2002,17 +2011,22 @@ function soilFillet(g, c) {
   const soil = strip(st, bot), pa = P(A[0], st), pb = P(A[N], st), gr = g.createLinearGradient(pa[0], 0, pb[0], 0);
   gr.addColorStop(0, '#563a28'); gr.addColorStop(1, '#6e4c33');
   g.fillStyle = gr; poly(g, soil); g.fill();
-  const e0 = [wx(A[0]), wy(A[0])], e1 = [wx(A[N]), wy(A[N])], cv = [soilWave(e0[0], e0[1]), soilWave(e1[0], e1[1])];
-  texChord(g, 'soil', e0, e1, soil, 1, cv); texChord(g, 'soilMacro', e0, e1, soil); texChord(g, 'underL', e0, e1, soil, 1, cv);
-  const room = bot - ROCK_FLOOR;
-  if (room > 0.05) {
-    const low = A.slice().reverse().map(a => { const q = rockAt(wx(a), wy(a)); return proj(q[0], q[1], bot - Math.min(q[2] * rockKnot(wx(a), wy(a)), room)); });
-    texChord(g, 'underL', e0, e1, [...A.map(a => P(a, bot)), ...low], 1, cv);
+  // the textures carried on from each wall it joins (see soilCornerCurve): the R wall of the tile down and to the
+  // left (the plane x = X) on the one half, this tile's L wall on the other
+  const e0 = [wx(Math.PI), wy(Math.PI)], e1 = [wx(Math.PI * 1.5), wy(Math.PI * 1.5)]; // the lip's grass is laid on this chord
+  const room = bot - ROCK_FLOOR, wQ = [soilWave(X, Y), soilWave(X, Y + 1)], wL = soilWaveFor(c, false);
+  for (const [h0, h1, Rh] of [[A[0], Math.PI * 1.25 + 0.03, true], [Math.PI * 1.25, A[N], false]]) {
+    const as = [0, 1, 2, 3].map(i => h0 + (h1 - h0) * i / 3), wv = Rh ? wQ : wL, un = Rh ? 'underR' : 'underL';
+    const tex = (name, Q, w) => Rh ? texWall(g, name, true, X, Q, 1, w, Y) : texSide(g, name, c, false, Q, 1, w);
+    const Q = [...as.map(a => P(a, st)), ...as.slice().reverse().map(a => P(a, bot))];
+    tex('soil', Q, wv); tex('soilMacro', Q, null); tex(un, Q, wv);
+    if (room > 0.05) {
+      const low = as.slice().reverse().map(a => { const q = rockAt(wx(a), wy(a)); return proj(q[0], q[1], bot - Math.min(q[2] * rockKnot(wx(a), wy(a)), room)); });
+      tex(un, [...as.map(a => P(a, bot)), ...low], wv);
+    }
   }
-  const dg = g.createLinearGradient(pa[0], 0, pb[0], 0); dg.addColorStop(0, 'rgba(10,6,12,0.22)'); dg.addColorStop(1, 'rgba(10,6,12,0.04)');
-  g.fillStyle = dg; poly(g, soil); g.fill();
   // the lip and its shadow
-  const sh = strip(st - 0.06, st - 0.42), sg = g.createLinearGradient(0, P(A[0], st - 0.06)[1], 0, P(A[0], st - 0.42)[1]);
+  const lo = Math.max(bot, st - 0.45), sh = strip(st - 0.06, lo), sg = g.createLinearGradient(0, P(A[0], st - 0.06)[1], 0, P(A[0], lo)[1]); // as on the flat walls
   sg.addColorStop(0, 'rgba(14,8,18,0.5)'); sg.addColorStop(1, 'rgba(14,8,18,0)');
   g.fillStyle = sg; poly(g, sh); g.fill();
   const dz = A.map(a => 0.13 + 0.05 * Math.sin(a * 9 + X * 1.7 + Y));
@@ -2095,8 +2109,44 @@ function cornerCurve(g, c, k) {
     const cg = g.createLinearGradient(0, q2[0][1], 0, q2[3][1]); cg.addColorStop(0, 'rgba(255,240,205,0.45)'); cg.addColorStop(1, 'rgba(255,240,205,0.06)');
     g.fillStyle = cg; poly(g, q2); g.fill();
   }
+  if (texOK && SPRITE['moss-lip']) {
+    // the moss along the top and at the foot carries on round the corner (in shade on the half turned toward +x)
+    const ew = a => [x + ox + Math.cos(a) * r, y + oy + Math.sin(a) * r], P = (a, z) => proj(x + ox + Math.cos(a) * r, y + oy + Math.sin(a) * r, z);
+    const mid = (span[0] + span[1]) / 2, halves = k === 2 ? [[span[0], Math.PI / 4, true], [Math.PI / 4, span[1] + 0.02, false]] : [[span[0], span[1] + 0.02, k === 1]];
+    const tall = top - zb;
+    for (const [b0, b1, Rs] of halves) {
+      const As = [0, 1, 2, 3, 4].map(i => b0 + (b1 - b0) * i / 4), e0 = ew(b0), e1 = ew(b1);
+      const strip = (z0, z1) => [...As.map(a => P(a, z0)), ...As.slice().reverse().map(a => P(a, z1))];
+      const hz = Math.min(0.72, tall * 0.7);
+      mossOn(g, Rs ? 0.32 : 0, false, e0, e1, strip(top, Math.max(zb, top - hz - 0.02)), top, hz);
+      if (tall >= 0.3) { const hf = Math.min(0.42, tall * 0.4); mossOn(g, Rs ? 0.45 : 0.2, true, e0, e1, strip(zb + hf, zb), zb, hf); }
+    }
+  }
 }
 
+// the curved stretches of a tile's walls (its rounded corners, and the inward corner it fills), each as a polygon
+// with the flat wall it turns from (a tile and side), so light falls on it as on that wall
+function curveLightQuads(c) {
+  const out = [], rc = stoneCorners(c), sc = soilCorners(c), x = c.x, y = c.y;
+  const arcQ = (X, Y, r, ox, oy, a0, a1, z0, z1) => {
+    const as = [0, 1, 2, 3, 4].map(i => a0 + (a1 - a0) * i / 4), P = (a, z) => proj(X + ox + Math.cos(a) * r, Y + oy + Math.sin(a) * r, z);
+    return [...as.map(a => P(a, z0)), ...as.slice().reverse().map(a => P(a, z1))];
+  };
+  const corner = (k, r, z0, z1) => {
+    const C = CORN[k], ox = C[0] ? C[0] - r : r, oy = C[1] ? C[1] - r : r;
+    if (k === 2) { out.push([c, true, arcQ(x, y, r, ox, oy, 0, Math.PI / 4 + 0.03, z0, z1), z0, z1], [c, false, arcQ(x, y, r, ox, oy, Math.PI / 4, Math.PI / 2 + 0.02, z0, z1), z0, z1]); }
+    else if (k === 1) out.push([c, true, arcQ(x, y, r, ox, oy, -Math.PI / 4, 0.02, z0, z1), z0, z1]);
+    else if (k === 3) out.push([c, false, arcQ(x, y, r, ox, oy, Math.PI / 2, Math.PI * 0.75, z0, z1), z0, z1]);
+  };
+  if (rc && c.h > 0.01) for (const k of [1, 2, 3]) if (rc[k]) corner(k, ROUND_R, c.h, cornerBase(c, k));
+  if (sc) for (const k of [1, 2, 3]) if (sc[k]) corner(k, SOIL_R, Math.min(c.h, 0), soilBot(c));
+  if (soilConcave(c, false)) {
+    const X = x, Y = y + 1, r = SOIL_R, z0 = Math.min(c.h, 0), z1 = soilBot(c);
+    out.push([{ x: X - 1, y: Y }, true, arcQ(X, Y, r, r, r, Math.PI, Math.PI * 1.25 + 0.03, z0, z1), z0, z1], [c, false, arcQ(X, Y, r, r, r, Math.PI * 1.25, Math.PI * 1.5, z0, z1), z0, z1]);
+  }
+  return out;
+}
+function lightCurves(g, c) { for (const [o, R, Q, z0, z1] of curveLightQuads(c)) lightSide(g, o, R, z0, z1, Q); }
 function drawSideFaces(g, c, d, t) {
   const x = c.x, y = c.y, top = c.h, rc = stoneCorners(c), sc = soilCorners(c), cr = rc || sc, R0 = rc ? ROUND_R : SOIL_R;
   let fillet = false;
@@ -2190,6 +2240,9 @@ function drawSideFaces(g, c, d, t) {
       if (!texOK) { g.fillStyle = R ? '#4f6a32' : '#62803c'; poly(g, faceS(top, Math.max(sb, top - 0.1))); g.fill(); }
       else {
         const sd = x * 3.7 + y * 5.3 + (R ? 0 : 9), lip = Math.max(sb, top - 0.04);
+        mossFoot(g, c, R, top, sb, u0, u1);
+        // and along the foot of the squared-off wall below a rounded corner
+        for (const [k, ua, ub] of [[R ? 1 : 3, 0, u0], [2, u1, 1]]) if (rc && rc[k] && ub - ua > 0.001 && Math.min(cornerBase(c, k), top) > sb + 0.01) mossFoot(g, c, R, top, sb, ua, ub);
         if (!mossLip(g, c, R, top, sb, u0, u1)) {
         g.fillStyle = R ? '#56743a' : '#6a8a44'; poly(g, faceS(top, lip)); g.fill();
         for (let k = 0; k < 5; k++) {
@@ -2340,6 +2393,7 @@ function drawSideFaces(g, c, d, t) {
   if (rc && top > 0.01) for (const k of [1, 3, 2]) if (rc[k]) cornerCurve(g, c, k);
   if (sc) for (const k of [1, 3, 2]) if (sc[k]) soilCornerCurve(g, c, k);
   if (fillet) soilFillet(g, c);
+  if (!NO_LIGHT && LIGHTS.length) lightCurves(g, c);
 }
 
 function topColor(c, d) {
@@ -2390,7 +2444,8 @@ function drawCell(g, c, t, part) {
   const A = proj(x, y, z), B = proj(x + 1, y, z), C = proj(x + 1, y + 1, z), D = proj(x, y + 1, z);
   // grown a hair past its edges, so neighbouring tops overlap instead of leaving a faint seam between them
   // (a rounded block's top follows its rounded outline)
-  const radii = [0, 1, 2, 3].map(k => rc && rc[k] ? ROUND_R : sj && sj.jc[k] ? NOTCH_R : sc && sc[k] ? SOIL_R : 0), rounded = rc || sj || sc;
+  const lw = landWaterCorners(c);
+  const radii = [0, 1, 2, 3].map(k => rc && rc[k] ? ROUND_R : sj && sj.jc[k] ? NOTCH_R : sc && sc[k] ? SOIL_R : lw && lw[k] ? WATER_R : 0), rounded = rc || sj || sc || lw;
   if (sj) for (let k = 0; k < 4; k++) if (sj.jc[k]) cornerNotch(g, c, k);
   const outline = rounded ? roundedOutline(radii) : null;
   const big = rounded ? growPoly(outline.map(([u, v]) => proj(x + u, y + v, z)), 0.6) : growQuad([A, B, C, D], 0.6);
@@ -2440,7 +2495,16 @@ function drawCell(g, c, t, part) {
   } else for (let i = 0; i < 4; i++) {
     const n = nb[i]; if (n && !n.void && Math.abs(n.h - z) < 0.01) continue;
     if (lipped && (i === 1 || i === 2) && (!n || n.void || n.h < z)) continue;
-    inkPath(g, E[i][0], E[i][1], x * 7.3 + y * 13.1 + i * 2.9 + 100); inked = true;
+    let p = E[i][0], q = E[i][1];
+    const pc = n && poolCorners(n);
+    if (pc) {
+      // where the pool's corner is rounded, its own curve carries the rim; this edge's stops short of it
+      const k0 = i, k1 = (i + 1) % 4, mate = k => CORN.findIndex(m => m[0] === CORN[k][0] - EDGE_D[i][0] && m[1] === CORN[k][1] - EDGE_D[i][1]);
+      const along = (ka, kb, f) => proj(x + CORN[ka][0] + (CORN[kb][0] - CORN[ka][0]) * f, y + CORN[ka][1] + (CORN[kb][1] - CORN[ka][1]) * f, z);
+      if (pc[mate(k0)]) p = along(k0, k1, WATER_R);
+      if (pc[mate(k1)]) q = along(k1, k0, WATER_R);
+    }
+    inkPath(g, p, q, x * 7.3 + y * 13.1 + i * 2.9 + 100); inked = true;
   }
   if (inked) inkStroke(g, 'rgba(255,244,214,0.26)', 1.3);
   if (c.h >= 1 && !texOK) { // stone cracks & moss (the flagstone texture has its own)
@@ -2501,6 +2565,7 @@ function drawCell(g, c, t, part) {
 // what moves on a tile: its water, and whatever stands on it
 function drawCellTop(g, c, d, t) {
   const x = c.x, y = c.y, z = c.h, s = cam.s;
+  if (texOK && !isPool(c)) landShoreWater(g, c, t);
   // water / ice
   if (c.water != null && c.water > c.h) drawWater(g, c, d, t);
   // features
@@ -2533,6 +2598,81 @@ function fallProfile(L) {
 // Edges N (−y), R (+x), L (+y), W (−x) are s = 0..3; corners A, B, C, D are k = 0..3 (edge s runs from corner s to
 // corner s + 1). A corner whose two edges both pour is rounded (WATER_R), top and curtain alike.
 const WATER_R = 0.24, EDGE_D = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+/* Shores. Where water meets land level with it, neither keeps a sharp corner:
+   - a pool's corner that turns into the land (land on both its sides) is rounded, the land filling in behind the
+     curve (poolCorners: drawn by the pool, after its water);
+   - a land tile's corner that juts into the water (water on both its sides and beyond) is rounded, the water
+     filling in round it (landWaterCorners: the land's top is rounded, and it draws the water in the corner).
+   The pale light where water laps the bank follows each curve, drawn by every tile it crosses. */
+const CORN = [[0, 0], [1, 0], [1, 1], [0, 1]], DIAGK = [[-1, -1], [1, -1], [1, 1], [-1, 1]], ARC0 = [Math.PI, -Math.PI / 2, 0, Math.PI / 2];
+const isPool = n => !!n && !n.void && !n.ice && n.water != null && n.water > n.h + 0.01;
+const flushLand = (n, z) => !!n && !n.void && !n.icy && !isPool(n) && Math.abs(n.h - z) < 0.06;
+function poolCorners(c) {
+  if (!texOK || !isPool(c)) return null;
+  const z = c.water, at = d => cellI(c.x + d[0], c.y + d[1]);
+  const r = [0, 1, 2, 3].map(k => flushLand(at(EDGE_D[(k + 3) % 4]), z) && flushLand(at(EDGE_D[k]), z) && !isPool(at(DIAGK[k])) ? WATER_R : 0);
+  return r.some(v => v) ? r : null;
+}
+function landWaterCorners(c) {
+  if (!texOK || !c || c.void || c.icy || isPool(c)) return null;
+  const at = d => cellI(c.x + d[0], c.y + d[1]), wet = n => isPool(n) && Math.abs(n.water - c.h) < 0.06;
+  const r = [0, 1, 2, 3].map(k => wet(at(EDGE_D[(k + 3) % 4])) && wet(at(EDGE_D[k])) && wet(at(DIAGK[k])) ? WATER_R : 0);
+  return r.some(v => v) ? r : null;
+}
+// corner k's quarter arc (world points, from the edge before the corner round to the edge after) and its centre
+function cornerArc(X, Y, k, r, n = 6) {
+  const ox = CORN[k][0] ? CORN[k][0] - r : r, oy = CORN[k][1] ? CORN[k][1] - r : r, pts = [];
+  for (let i = 0; i <= n; i++) { const a = ARC0[k] + i / n * Math.PI / 2; pts.push([X + ox + Math.cos(a) * r, Y + oy + Math.sin(a) * r]); }
+  return { pts, cx: X + ox, cy: Y + oy };
+}
+// the cell beside c that shares c's corner k, and that cell's own number for the corner
+function cornerMate(c, d, k) {
+  const n = cellI(c.x + d[0], c.y + d[1]); if (!n) return null;
+  const px = CORN[k][0] - d[0], py = CORN[k][1] - d[1];
+  return { n, k: CORN.findIndex(q => q[0] === px && q[1] === py) };
+}
+// how the shore runs at a pool's corner k: round its own curve (inside), round a land tile's jutting corner
+// (outside), or not curved at all (null)
+function shoreAt(c, k, pc) {
+  if (pc && pc[k]) return { X: c.x, Y: c.y, k, inside: true };
+  for (const d of [EDGE_D[(k + 3) % 4], EDGE_D[k], DIAGK[k]]) {
+    const m = cornerMate(c, d, k); if (!m || m.k < 0) continue;
+    const lw = landWaterCorners(m.n); if (lw && lw[m.k]) return { X: m.n.x, Y: m.n.y, k: m.k, inside: false };
+  }
+  return null;
+}
+// the band of pale light along a curved shore, round centre (cx, cy) at radius r: inside it (the water within a
+// pool's rounded corner) or outside it (the water round a land tile's rounded corner); clipped to `clip`
+function shoreBand(g, cx, cy, z, r, inside, clip) {
+  const [px, py] = proj(cx, cy, z), K = TW * 0.7071 * cam.s, w = 0.2;
+  g.save(); poly(g, clip); g.clip(); g.translate(px, py); g.scale(1, 0.5);
+  const gr = inside ? g.createRadialGradient(0, 0, (r - w) * K, 0, 0, r * K) : g.createRadialGradient(0, 0, r * K, 0, 0, (r + w) * K);
+  if (inside) { gr.addColorStop(0, 'rgba(200,238,255,0)'); gr.addColorStop(0.65, 'rgba(200,238,255,0.18)'); gr.addColorStop(1, 'rgba(230,248,255,0.55)'); }
+  else { gr.addColorStop(0, 'rgba(230,248,255,0.55)'); gr.addColorStop(0.35, 'rgba(200,238,255,0.18)'); gr.addColorStop(1, 'rgba(200,238,255,0)'); }
+  const R = (r + w) * K; g.fillStyle = gr; g.fillRect(-R, -R, 2 * R, 2 * R);
+  g.restore();
+}
+// the painted water laid on a polygon P at height z, moving with the current fl, lit like a pool
+function waterSurface(g, c, P, z, fl, t) {
+  g.fillStyle = '#4b98d2'; poly(g, P); g.fill();
+  texTop(g, 'water', z, P);
+  const sp = fl ? fl.s * 0.35 : 0, ox = fl ? fl.x * t * sp : t * 0.05, oy = fl ? fl.y * t * sp : t * 0.03;
+  const gk = texSource('water').drawn ? 1 : 0.55;
+  texTop(g, 'ripple', z, P, (0.5 + 0.12 * Math.sin(t * 0.9)) * gk, ox, oy);
+  texTop(g, 'ripple', z, P, 0.3 * gk, -oy * 0.8 + 0.37, ox * 0.7 + 0.61);
+  lightTop(g, c, z, P);
+}
+// a land tile's jutting corners, filled with the water round them (drawn live, over its top)
+function landShoreWater(g, c, t) {
+  const lw = landWaterCorners(c); if (!lw) return;
+  for (let k = 0; k < 4; k++) {
+    if (!lw[k]) continue;
+    const W = cellI(c.x + DIAGK[k][0], c.y + DIAGK[k][1]), z = W.water, A = cornerArc(c.x, c.y, k, lw[k]);
+    const P = growPoly([[c.x + CORN[k][0], c.y + CORN[k][1]], ...A.pts].map(([u, v]) => proj(u, v, z)), 0.6);
+    waterSurface(g, c, P, z, W.flow, t);
+    shoreBand(g, A.cx, A.cy, z, lw[k], false, P);
+  }
+}
 const pours = (c, e) => { if (!c || c.void || c.ice || c.water == null || c.water <= c.h) return false; const n = cellI(c.x + EDGE_D[e][0], c.y + EDGE_D[e][1]); return !n || n.void; };
 function waterRound(c) {
   if (!texOK || c.ice) return null;
@@ -2614,8 +2754,10 @@ function drawSheets(g, c, d, t, front) {
   const z = c.water, zb = Math.min(c.h, 0) - SOIL_DEPTH - 2.3, hU = Math.round((FALL_ARC + (z - FALL_R - zb)) * 10) / 10, s = cam.s, PX = SHEET_PX;
   const runs = sheetRuns(c); if (!runs.length) return;
   const P = sheetPattern(g, hU, t); if (!P) return;
-  const Ls = [0, 0.5, 1].map(f => FALL_ARC * f), rest = hU - FALL_ARC;
-  for (const f of [0.08, 0.25, 0.5, 1]) Ls.push(FALL_ARC + rest * f);
+  // the sheet's outline follows its curve closely; the painting is laid on it in one piece, mapped along the
+  // straight line from its top to its foot (the curve is gentle enough that the painting doesn't show the difference)
+  const rest = hU - FALL_ARC, Ls = [0, 0.33, 0.67, 1].map(f => FALL_ARC * f);
+  for (const f of [0.04, 0.12, 0.25, 0.42, 0.62, 0.82, 1]) Ls.push(FALL_ARC + rest * f);
   // q[4], where set, draws the sheet in toward the cliff (0: flush with it), for the end of a fall beside land
   const at = (q, L) => { const [o0, dz] = fallProfile(L), o = o0 * (q[4] ?? 1); return proj(q[0] + q[2] * o, q[1] + q[3] * o, z - dz); };
   const lerpQ = (q1, q2, f) => q1.map((v, i) => v + (q2[i] - v) * f);
@@ -2642,11 +2784,14 @@ function drawSheets(g, c, d, t, front) {
       if (Math.abs(c2 - c1) < 0.3) continue;
       segs.push([q1, q2]);
       g.globalAlpha = ga * al * (front ? 1 : 0.85); g.fillStyle = P;
-      for (let i = 0; i + 1 < Ls.length; i++) {
-        const L0 = Ls[i], L1 = Ls[i + 1], a0 = at(q1, L0), b0 = at(q2, L0), a1 = at(q1, L1), b1 = at(q2, L1), r0 = L0 * PX, r1 = L1 * PX;
-        const ax = (b0[0] - a0[0]) / (c2 - c1), ay = (b0[1] - a0[1]) / (c2 - c1), rx = (a1[0] - a0[0]) / (r1 - r0), ry = (a1[1] - a0[1]) / (r1 - r0);
-        P.setTransform(new DOMMatrix([ax, ay, rx, ry, a0[0] - c1 * ax - r0 * rx, a0[1] - c1 * ay - r0 * ry]));
-        g.beginPath(); g.moveTo(a0[0], a0[1]); g.lineTo(b0[0], b0[1]); g.lineTo(b1[0], b1[1]); g.lineTo(a1[0], a1[1]); g.closePath(); g.fill();
+      {
+        const a0 = at(q1, 0), b0 = at(q2, 0), a1 = at(q1, hU), r1 = hU * PX;
+        const ax = (b0[0] - a0[0]) / (c2 - c1), ay = (b0[1] - a0[1]) / (c2 - c1), rx = (a1[0] - a0[0]) / r1, ry = (a1[1] - a0[1]) / r1;
+        P.setTransform(new DOMMatrix([ax, ay, rx, ry, a0[0] - c1 * ax, a0[1] - c1 * ay]));
+        g.beginPath();
+        Ls.forEach((L, i) => { const q = at(q1, L); (i ? g.lineTo : g.moveTo).call(g, q[0], q[1]); });
+        for (let i = Ls.length - 1; i >= 0; i--) { const q = at(q2, Ls[i]); g.lineTo(q[0], q[1]); }
+        g.closePath(); g.fill();
       }
     }
   }
@@ -2747,20 +2892,45 @@ function drawWater(g, c, d, t) {
   } else if (texOK) {
     // one sheet of water across the tiles: an opaque, world-pinned surface (so tiles can overlap without seams),
     // glints drifting over it (along the current where it flows), and pale light where it laps against land
-    const wr = waterRound(c), fl = c.flow;
-    const big = wr ? growPoly(roundedOutline(wr).map(([u, v]) => proj(x + u, y + v, z)), 0.6) : growQuad([A, B, C, D], 0.6);
-    g.fillStyle = '#4b98d2'; poly(g, big); g.fill();
-    texTop(g, 'water', z, big);
-    const sp = fl ? fl.s * 0.35 : 0, ox = fl ? fl.x * t * sp : t * 0.05, oy = fl ? fl.y * t * sp : t * 0.03;
-    const gk = texSource('water').drawn ? 1 : 0.55;
-    texTop(g, 'ripple', z, big, (0.5 + 0.12 * Math.sin(t * 0.9)) * gk, ox, oy);
-    texTop(g, 'ripple', z, big, 0.3 * gk, -oy * 0.8 + 0.37, ox * 0.7 + 0.61);
-    lightTop(g, c, z, big);
+    const wr = waterRound(c), pc = poolCorners(c), fl = c.flow;
+    const rr = wr || pc ? [0, 1, 2, 3].map(k => Math.max(wr ? wr[k] : 0, pc ? pc[k] : 0)) : null;
+    const big = rr ? growPoly(roundedOutline(rr).map(([u, v]) => proj(x + u, y + v, z)), 0.6) : growQuad([A, B, C, D], 0.6);
+    waterSurface(g, c, big, z, fl, t);
     // a bank is land at or above the water (open edges, over the void or lower ground, have the fall's foam instead)
     const bank = n => !!n && !n.void && !(n.water != null && n.water > n.h && Math.abs(n.water - z) < 0.02) && n.h >= z - 0.01;
     const nb = [cellI(x, y - 1), cellI(x + 1, y), cellI(x, y + 1), cellI(x - 1, y)];
+    const shores = [0, 1, 2, 3].map(k => shoreAt(c, k, pc)), sq = k => {
+      const [cx, cy] = CORN[k], r = WATER_R, ex = cx ? -r : r, ey = cy ? -r : r;
+      return [[cx, cy], [cx + ex, cy], [cx + ex, cy + ey], [cx, cy + ey]].map(([u, v]) => proj(x + u, y + v, z));
+    };
+    const curved = shores.some(Boolean);
+    if (curved) {
+      // the straight bands kept out of the corners where the shore curves
+      g.save(); g.beginPath();
+      big.forEach((q, i) => (i ? g.lineTo : g.moveTo).call(g, q[0], q[1])); g.closePath();
+      shores.forEach((sh, k) => { if (!sh) return; const Q = sq(k); g.moveTo(Q[0][0], Q[0][1]); for (let i = 3; i >= 1; i--) g.lineTo(Q[i][0], Q[i][1]); g.closePath(); });
+      g.clip('evenodd');
+    }
     edgeBands(g, x, y, z, nb.map(bank), DIAG.map(([dx, dy]) => bank(cellI(x + dx, y + dy))), 0.2,
       [[0, 'rgba(230,248,255,0.55)'], [0.35, 'rgba(200,238,255,0.18)'], [1, 'rgba(200,238,255,0)']]);
+    if (curved) {
+      g.restore();
+      shores.forEach((sh, k) => {
+        if (!sh) return;
+        const A2 = cornerArc(sh.X, sh.Y, sh.k, WATER_R);
+        g.save(); poly(g, big); g.clip(); shoreBand(g, A2.cx, A2.cy, z, WATER_R, sh.inside, sq(k)); g.restore();
+      });
+    }
+    // behind each of its own rounded corners, the land fills in, level with the land beside it
+    if (pc) for (let k = 0; k < 4; k++) {
+      if (!pc[k]) continue;
+      const L = cellI(x + EDGE_D[(k + 3) % 4][0], y + EDGE_D[(k + 3) % 4][1]), zl = L.h, Ar = cornerArc(x, y, k, pc[k]);
+      const T = growPoly([[x + CORN[k][0], y + CORN[k][1]], ...Ar.pts].map(([u, v]) => proj(u, v, zl)), 0.5);
+      g.fillStyle = topColor(L, World.deco[L.y * World.W + L.x]); poly(g, T); g.fill();
+      texTop(g, 'grass', zl, T); lightTop(g, L, zl, T);
+      g.beginPath(); Ar.pts.forEach(([u, v], i) => { const q = proj(u, v, zl); (i ? g.lineTo : g.moveTo).call(g, q[0], q[1]); });
+      inkStroke(g, 'rgba(255,244,214,0.26)', 1.3);
+    }
   } else {
     g.fillStyle = 'rgba(52,118,196,0.72)'; poly(g, [A, B, C, D]); g.fill();
     g.save(); poly(g, [A, B, C, D]); g.clip();
@@ -2804,16 +2974,36 @@ function ivyFor(seed) {
 /* Moss along a stone block's top edge: the painted strip, repeating along the wall (by u = x - y, so it runs on
    unbroken from block to block), its dense band just at the edge and its drips hanging down the stone. */
 const lipPats = new WeakMap(), LIP_EDGE = 36;
-function mossLip(g, c, R, top, sb, u0, u1) {
-  const src = R ? shadedSprite('moss-lip', 0.32) : SPRITE['moss-lip']; if (!src) return false;
+// the moss strip as a pattern on this canvas, darkened by f (for walls in shade, and the shadowed foot of a wall)
+function mossPat(g, f) {
+  const src = f ? shadedSprite('moss-lip', f) : SPRITE['moss-lip']; if (!src) return null;
   let m = lipPats.get(g); if (!m) lipPats.set(g, m = {});
-  const P = m[R ? 'R' : 'L'] || (m[R ? 'R' : 'L'] = g.createPattern(src, 'repeat-x')); if (!P) return false;
-  const W = src.width, H = src.height, hz = Math.min(0.72, (top - sb) * 0.7), UX = W / 1.5, UY = H / hz, s = cam.s;
-  const pc = R ? c.x + 1 : c.y + 1, z0 = top + LIP_EDGE / UY, o = proj(pc, pc, z0), sl = R ? -TH * 0.5 : TH * 0.5;
-  P.setTransform(new DOMMatrix([TW * 0.5 * s / UX, sl * s / UX, 0, TZ * s / UY, o[0], o[1]]));
-  const at = (u, z) => R ? proj(c.x + 1, c.y + u, z) : proj(c.x + u, c.y + 1, z), zb = Math.max(sb, z0 - hz - 0.02);
-  g.fillStyle = P; poly(g, [at(u0, top), at(u1, top), at(u1, zb), at(u0, zb)]); g.fill();
+  return m[f] || (m[f] = g.createPattern(src, 'repeat-x'));
+}
+// lays the strip on a stretch of upright wall between world points e0 and e1, filling `quad`: its dense edge at
+// height zEdge, hanging hz down from it, or at a wall's foot (foot) growing hz up from it. Across, it runs by
+// u = x - y like the wall textures, so it carries on unbroken from wall to wall and round a curved corner.
+function mossOn(g, f, foot, e0, e1, quad, zEdge, hz) {
+  const P = mossPat(g, f); if (!P) return false;
+  const im = SPRITE['moss-lip'], W = im.naturalWidth, H = im.naturalHeight, UX = W / (foot ? 1.2 : 1.5), UY = H / hz, s = cam.s;
+  const u0 = e0[0] - e0[1], du = (e1[0] - e1[1]) - u0, Y0 = (e0[0] + e0[1]) * TH * 0.5, Y1 = (e1[0] + e1[1]) * TH * 0.5;
+  const m = Math.abs(du) > 1e-4 ? (Y1 - Y0) / du : 0, zo = foot ? zEdge - LIP_EDGE / UY : zEdge + LIP_EDGE / UY;
+  const a = TW * 0.5 * s / UX, b = m * s / UX, sh = foot ? 0.37 * UX : 0;
+  P.setTransform(new DOMMatrix([a, b, 0, (foot ? -TZ : TZ) * s / UY, cam.ox + sh * a, cam.oy + (Y0 - u0 * m) * s - zo * TZ * s + sh * b]));
+  g.fillStyle = P; poly(g, quad); g.fill();
   return true;
+}
+function mossLip(g, c, R, top, sb, u0, u1) {
+  if (!SPRITE['moss-lip']) return false;
+  const hz = Math.min(0.72, (top - sb) * 0.7), at = (u, z) => R ? proj(c.x + 1, c.y + u, z) : proj(c.x + u, c.y + 1, z), w = u => R ? [c.x + 1, c.y + u] : [c.x + u, c.y + 1];
+  const zb = Math.max(sb, top - hz - 0.02);
+  return mossOn(g, R ? 0.32 : 0, false, w(u0), w(u1), [at(u0, top), at(u1, top), at(u1, zb), at(u0, zb)], top, hz);
+}
+// moss and grass creeping up the foot of a stone wall from the ground it stands on
+function mossFoot(g, c, R, top, sb, u0, u1) {
+  if (!SPRITE['moss-lip'] || top - sb < 0.3 || u1 - u0 < 0.01) return;
+  const hz = Math.min(0.42, (top - sb) * 0.4), at = (u, z) => R ? proj(c.x + 1, c.y + u, z) : proj(c.x + u, c.y + 1, z), w = u => R ? [c.x + 1, c.y + u] : [c.x + u, c.y + 1];
+  mossOn(g, R ? 0.45 : 0.2, true, w(u0), w(u1), [at(u0, sb + hz), at(u1, sb + hz), at(u1, sb), at(u0, sb)], sb, hz);
 }
 // a drape of moss hanging from a wall's top edge at p: wU wide along the edge, hZ tall, sheared to lie on the wall
 function hangDrape(g, R, p, wU, hZ, flip) {
@@ -3244,7 +3434,7 @@ function drawXray(g, c, t, xr) {
    and laid down from it each frame; its light, its water and whatever stands on it are still drawn live over it.
    A tile is painted afresh when it or a tile near it changes (once things settle), or the view moves or rescales. */
 const TC = { on: true, gkey: '', cells: null, map: new Map(), keys: [], calm: new Map() };
-const cellStateKey = c => c.void ? 'v' : c.h.toFixed(3) + '|' + c.th + '|' + c.water + '|' + c.ice + '|' + c.icy + '|' + c.frost + '|' +
+const cellStateKey = c => c.void ? 'v' : c.h.toFixed(3) + '|' + c.th + '|' + (c.water == null ? '' : c.water.toFixed(3)) + '|' + c.ice + '|' + c.icy + '|' + c.frost + '|' +
   (c.wet || 0).toFixed(2) + '|' + (c.ash || 0).toFixed(2) + '|' + c.feat + '|' + c.burn;
 function tileCacheFrame() {
   const D = typeof DPR !== 'undefined' ? DPR : 1;
@@ -3283,15 +3473,20 @@ function tileLights(g, c) {
   for (const l of LIGHTS) { const dx = c.x + 0.5 - l.x, dy = c.y + 0.5 - l.y; if (dx * dx + dy * dy < (l.r + 1.2) ** 2) { near = true; break; } }
   if (!near) return;
   const x = c.x, y = c.y, z = c.h;
+  const rc0 = stoneCorners(c), sc0 = soilCorners(c), cr = rc0 || sc0, R0 = rc0 ? ROUND_R : SOIL_R;
   for (const R of [true, false]) {
     if (c.icy) continue;
     const n = R ? cellI(x + 1, y) : cellI(x, y + 1), bot = !n || n.void ? soilBot(c) : n.h;
     if (bot >= z - 0.001) continue;
-    lightSide(g, c, R, z, bot, R ? [proj(x + 1, y, z), proj(x + 1, y + 1, z), proj(x + 1, y + 1, bot), proj(x + 1, y, bot)]
-      : [proj(x, y + 1, z), proj(x + 1, y + 1, z), proj(x + 1, y + 1, bot), proj(x, y + 1, bot)]);
+    // the straight stretch of the wall (its curved ends take their light in lightCurves)
+    let u0 = cr && (R ? cr[1] : cr[3]) ? R0 : 0, u1 = cr && cr[2] ? 1 - R0 : 1;
+    if (soilConcave(c, R)) u0 = SOIL_R;
+    lightSide(g, c, R, z, bot, R ? [proj(x + 1, y + u0, z), proj(x + 1, y + u1, z), proj(x + 1, y + u1, bot), proj(x + 1, y + u0, bot)]
+      : [proj(x + u0, y + 1, z), proj(x + u1, y + 1, z), proj(x + u1, y + 1, bot), proj(x + u0, y + 1, bot)]);
   }
-  const rc = stoneCorners(c), sj = stoneJoins(c, rc), sc = soilCorners(c), rounded = rc || sj || sc;
-  const radii = [0, 1, 2, 3].map(k => rc && rc[k] ? ROUND_R : sj && sj.jc[k] ? NOTCH_R : sc && sc[k] ? SOIL_R : 0);
+  if (!c.icy) lightCurves(g, c);
+  const rc = stoneCorners(c), sj = stoneJoins(c, rc), sc = soilCorners(c), lw = landWaterCorners(c), rounded = rc || sj || sc || lw;
+  const radii = [0, 1, 2, 3].map(k => rc && rc[k] ? ROUND_R : sj && sj.jc[k] ? NOTCH_R : sc && sc[k] ? SOIL_R : lw && lw[k] ? WATER_R : 0);
   const big = rounded ? growPoly(roundedOutline(radii).map(([u, v]) => proj(x + u, y + v, z)), 0.6)
     : growQuad([proj(x, y, z), proj(x + 1, y, z), proj(x + 1, y + 1, z), proj(x, y + 1, z)], 0.6);
   lightTop(g, c, z, big);
