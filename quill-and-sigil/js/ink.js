@@ -15,10 +15,10 @@ const isTouch = () => document.body.classList.contains('touch');
 const tideCurrent = sp => sp.sigil === 'tide' && !!sp.dir && (sp.sats || []).some(s => s.id === 'gale');
 // how signs work — shown on the grimoire's left page, and on the Notes leaf on phones
 const SIGN_NOTES = {
-  plain: 'A sign is a stroke drawn outward through one of the eight small circles: it points the spell as the world lies. A short barb across it adds strength — two for the most. Unadorned, stone, fire, ice and water set one tile; each sign is its own arm: opposite signs make one line through your mark; signs at right angles fill the ground between.',
+  plain: 'A sign is a stroke drawn outward through one of the eight small circles: it points the spell as the world lies. A short barb across it adds strength, two at most. Unadorned, stone, fire, ice and water set one tile; each sign is its own arm: opposite signs make one line through your mark; signs at right angles fill the ground between.',
   // added to the plain notes only once Featherfall II has taught the outer circle (ringTaught)
   ring: ' A second ring around the seal widens the spell; around Luna, it doubles how far the float carries.',
-  combos: 'A sign points the spell as the world lies; each barb across it adds strength. On Luna, the sign and barbs aim and strengthen only what rides on its ring. Each place on the ring holds one mark. A small sigil in a slot infuses the spell — behind the sign (red) it acts at once; beside it (blue), along the way; ahead of it (green), on arrival.',
+  combos: 'A sign points the spell as the world lies; each barb across it adds strength. On Luna, the sign and barbs aim and strengthen only what rides on its ring. Each place on the ring holds one mark. A small sigil in a slot infuses the spell: behind the sign (red) it acts at once; beside it (blue), along the way; ahead of it (green), on arrival.',
 };
 // has the outer circle been taught yet? (Featherfall II teaches it; before that nothing mentions or shows it)
 function ringTaught(L = Game.level) {
@@ -43,7 +43,7 @@ function mulberry(seed) {
 /* ---------------- Sigils ---------------- */
 const SIGILS = {
   gale:  { id: 'gale',  name: 'Ventus', en: 'Gale',  color: '#9ff0d6', glyph: 'spiral',   words: 'VENTVS · AERIS · SPIRITVS · ',     desc: 'The spiral. Wind thrusts all within the seal.' },
-  stone: { id: 'stone', name: 'Petra',  en: 'Stone', color: '#ecc890', glyph: 'square',   words: 'PETRA · FVNDAMENTVM · TERRAE · ',  desc: 'The square. Raises stone — even from empty air.' },
+  stone: { id: 'stone', name: 'Petra',  en: 'Stone', color: '#ecc890', glyph: 'square',   words: 'PETRA · FVNDAMENTVM · TERRAE · ',  desc: 'The square. Raises stone, even from empty air.' },
   flame: { id: 'flame', name: 'Ignis',  en: 'Flame', color: '#ffa04d', glyph: 'triangle', words: 'IGNIS · ARDOR · FLAMMA · ',         desc: 'The triangle. Kindles what burns; melts ice.' },
   tide:  { id: 'tide',  name: 'Unda',   en: 'Tide',  color: '#6fc2ff', glyph: 'wave',     words: 'VNDA · FLVMEN · MARIS · ',          desc: 'The wave. Fills hollows; Ventus on its ring makes it flow.' },
   frost: { id: 'frost', name: 'Gelu',   en: 'Frost', color: '#d6f2ff', glyph: 'star',     words: 'GELV · GLACIES · HIEMS · ',         desc: 'The star. Freezes water and rimes the ground.' },
@@ -493,20 +493,20 @@ function worldDirArrow(d) {
 function buildSpell(draft, rules) {
   const A = draft.a;
   if (Array.isArray(rules)) rules = { centers: rules, sats: rules };
-  if (!A.seal) return { err: 'Every spell begins with a seal — one closed circle.' };
+  if (!A.seal) return { err: 'Every spell begins with a seal: one closed circle.' };
   if (!A.sigil) return { err: 'The seal stands empty. Inscribe a sigil within it.' };
-  if (!A.sigil.ok) return { err: 'The sigil is unclear — the ink will not answer.' };
+  if (!A.sigil.ok) return { err: 'The sigil is unclear. Draw it again, closer to its shape.' };
   const id = A.sigil.id;
   if (rules && !rules.centers.includes(id)) {
-    return { err: rules.sats.includes(id) ? `${SIGILS[id].name} may only whisper from the ring in this lesson.` : `${SIGILS[id].name} is not yet written in this lesson's folio.` };
+    return { err: rules.sats.includes(id) ? `${SIGILS[id].name} can only go on the ring in this lesson.` : `${SIGILS[id].name} is not yet written in this lesson's folio.` };
   }
-  if (rules && rules.combos === false && A.sats.length) return { err: 'Only signs may enter the small circles for now — draw your sign out from the seal into one. Sigils in the circles belong to the second folio.' };
+  if (rules && rules.combos === false && A.sats.length) return { err: 'Only signs may enter the small circles for now: draw your sign out from the seal into one. Sigils in the circles belong to the second folio.' };
   for (const s of A.sats) {
-    if (!s.ok) return { err: 'A ring-sigil is unclear — redraw it inside its slot.' };
+    if (!s.ok) return { err: 'A ring-sigil is unclear. Redraw it inside its slot.' };
     if (rules && !rules.sats.includes(s.id)) return { err: `${SIGILS[s.id].name} cannot be set upon the ring in this lesson.` };
   }
   // each of the eight positions holds one mark: a sign or a ring-sigil
-  for (const s of A.sats) if (A.signs.some(g => g.pos === s.slot)) return { err: 'Each place on the ring holds one mark — a sign or a ring-sigil, not both.' };
+  for (const s of A.sats) if (A.signs.some(g => g.pos === s.slot)) return { err: 'Each place on the ring holds one mark: a sign or a ring-sigil, not both.' };
   // signs give the way (several are averaged); barbs give the strength
   const signs = A.signs;
   let sx = 0, sy = 0;
@@ -1007,7 +1007,8 @@ const Grim = {
     const A = L.area, r = A.half * GUIDE_R;
     if (name === 'guide') return { x: A.cx - r, y: A.cy - r, w: r * 2, h: r * 2, round: true };
     if (name === 'centre') return { x: A.cx - r * 0.55, y: A.cy - r * 0.55, w: r * 1.1, h: r * 1.1, round: true };
-    if (name === 'area') { const R = r * (SLOT_R + SLOT_SIZE) + 6; return { x: A.cx - R, y: A.cy - R, w: R * 2, h: R * 2 }; }
+    // (the whole seal, ringed where its outer circle goes, just beyond the small circles)
+    if (name === 'area') { const R = r * (SLOT_R + SLOT_SIZE) + 6; return { x: A.cx - R, y: A.cy - R, w: R * 2, h: R * 2, round: true }; }
     if (name.startsWith('slot:')) {
       const k = +name.slice(5), a = k * TAU / 8, sr = r * SLOT_SIZE + 4;
       return { x: A.cx + Math.cos(a) * r * SLOT_R - sr, y: A.cy + Math.sin(a) * r * SLOT_R - sr, w: sr * 2, h: sr * 2, round: true };
@@ -1129,14 +1130,14 @@ const Grim = {
   },
   keep() {
     const sp = buildSpell(this.draft, null);
-    if (sp.err) { this.status = 'Only a finished spell can be kept — ' + sp.err.charAt(0).toLowerCase() + sp.err.slice(1); this.statusCol = '#8a2a1a'; this.shake = 0.3; Sfx.play('fizzle'); return false; }
+    if (sp.err) { this.status = 'Only a finished spell can be kept: ' + sp.err.charAt(0).toLowerCase() + sp.err.slice(1); this.statusCol = '#8a2a1a'; this.shake = 0.3; Sfx.play('fizzle'); return false; }
     const A = this.draft.a;
     const strokes = this.draft.strokes.filter((s, i) => A.roles[i] !== 'stray');
-    if (!Satchel.add(strokes)) { this.status = 'Thy satchel is full — let a kept spell go first.'; this.statusCol = '#8a2a1a'; Sfx.play('fizzle'); return false; }
+    if (!Satchel.add(strokes)) { this.status = 'Your satchel is full. Let a kept spell go first.'; this.statusCol = '#8a2a1a'; Sfx.play('fizzle'); return false; }
     Sfx.play('sigil', sp.sigil);
     this.status = isTouch()
-      ? `Kept in thy satchel as spell ${Satchel.list.length} — tap its slot beside the grimoire button to cast it.`
-      : `Kept in thy satchel as spell ${Satchel.list.length} — press ${Satchel.list.length} in the world to cast it.`;
+      ? `Kept in your satchel as spell ${Satchel.list.length}. Tap its slot beside the grimoire button to cast it.`
+      : `Kept in your satchel as spell ${Satchel.list.length}. Press ${Satchel.list.length} in the world to cast it.`;
     this.statusCol = '#2b2040';
     this.flash = 0.6;
     return true;
@@ -1144,9 +1145,9 @@ const Grim = {
   updateStatus() {
     const A = this.draft.a, allowed = lessonRules();
     this.statusCol = '#4a3220';
-    if (!this.draft.strokes.length) { this.status = 'Begin with the seal — draw one closed circle.'; return; }
+    if (!this.draft.strokes.length) { this.status = 'Begin with the seal: draw one closed circle.'; return; }
     if (!A.seal && A.loneSigil) { this.status = `${SIGILS[A.loneSigil].name} is written. Now draw the seal around it: one closed circle, on the dotted ring.`; return; }
-    if (!A.seal) { this.status = 'The seal must close upon itself — a round, unbroken circle.'; this.statusCol = '#8a2a1a'; return; }
+    if (!A.seal) { this.status = 'The seal must close upon itself: a round, unbroken circle.'; this.statusCol = '#8a2a1a'; return; }
     if (!A.sigil) { this.status = 'The seal is set. Now inscribe a sigil within it.'; return; }
     const sp = buildSpell(this.draft, allowed);
     if (sp.err) {
@@ -1155,7 +1156,7 @@ const Grim = {
       return;
     }
     this.status = describeSpell(sp);
-    if (A.notes.includes('dupSign')) this.status += ' · one sign to a place — the extra is ignored';
+    if (A.notes.includes('dupSign')) this.status += ' · one sign to a place; the extra is ignored';
     else if (A.notes.includes('tooManyBarbs')) this.status += ' · a sign bears but two barbs';
     else if (A.roles.includes('stray')) this.status += ' · stray marks are ignored';
     this.statusCol = '#2b2040';

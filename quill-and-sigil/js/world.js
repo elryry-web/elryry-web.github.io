@@ -2098,7 +2098,7 @@ function cornerNotch(g, c, k) {
   const ox = C[0] ? C[0] - r : r, oy = C[1] ? C[1] - r : r, a0 = [Math.PI, -Math.PI / 2, 0, Math.PI / 2][k];
   const pts = [[C[0], C[1]]];
   for (let i = 0; i <= 6; i++) { const a = a0 + i / 6 * Math.PI / 2; pts.push([ox + Math.cos(a) * r, oy + Math.sin(a) * r]); }
-  g.fillStyle = 'rgba(26,24,18,0.85)'; poly(g, growPoly(pts.map(([u, v]) => proj(x + u, y + v, z)), 0.4)); g.fill();
+  g.fillStyle = 'rgba(26,24,18,0.45)'; poly(g, growPoly(pts.map(([u, v]) => proj(x + u, y + v, z)), 0.4)); g.fill();
 }
 // the ground level beside corner k: the highest neighbour there that is lower than the block (or the soil's top)
 function cornerBase(c, k) {
@@ -2221,13 +2221,16 @@ function drawSideFaces(g, c, d, t) {
     if (!n || n.void) { bot = soilBot(c); toVoid = true; }
     else bot = n.h;
     if (bot >= top - 0.001 && !(toVoid && bot > ROCK_FLOOR + 0.05)) continue; // (a groove's floor over the void still has its rock below)
-    const P = side === 'R' ? [proj(x + 1, y, top), proj(x + 1, y + 1, top), proj(x + 1, y + 1, bot), proj(x + 1, y, bot)]
-      : [proj(x, y + 1, top), proj(x + 1, y + 1, top), proj(x + 1, y + 1, bot), proj(x, y + 1, bot)];
-    const face = (za, zb) => side === 'R' ? [proj(x + 1, y, za), proj(x + 1, y + 1, za), proj(x + 1, y + 1, zb), proj(x + 1, y, zb)]
-      : [proj(x, y + 1, za), proj(x + 1, y + 1, za), proj(x + 1, y + 1, zb), proj(x, y + 1, zb)];
+    // each wall runs a pixel past its square ends, into its neighbour's: two walls meeting edge to edge, each with a
+    // softened edge, leave a hairline through which the sky shows (on a sharp screen, a pale line down the wall)
+    const ep = 1 / (TW * 0.5 * cam.s);
+    const P = side === 'R' ? [proj(x + 1, y - ep, top), proj(x + 1, y + 1 + ep, top), proj(x + 1, y + 1 + ep, bot), proj(x + 1, y - ep, bot)]
+      : [proj(x - ep, y + 1, top), proj(x + 1 + ep, y + 1, top), proj(x + 1 + ep, y + 1, bot), proj(x - ep, y + 1, bot)];
+    const face = (za, zb) => side === 'R' ? [proj(x + 1, y - ep, za), proj(x + 1, y + 1 + ep, za), proj(x + 1, y + 1 + ep, zb), proj(x + 1, y - ep, zb)]
+      : [proj(x - ep, y + 1, za), proj(x + 1 + ep, y + 1, za), proj(x + 1 + ep, y + 1, zb), proj(x - ep, y + 1, zb)];
     const R = side === 'R', s = cam.s, a0 = R ? y : x;
     // where a rounded block's wall starts and ends along its edge
-    let u0 = cr && (R ? cr[1] : cr[3]) ? R0 : 0, u1 = cr && cr[2] ? 1 - R0 : 1, su0 = sc ? u0 : 0, su1 = sc ? u1 : 1;
+    let u0 = cr && (R ? cr[1] : cr[3]) ? R0 : -ep, u1 = cr && cr[2] ? 1 - R0 : 1 + ep, su0 = sc ? u0 : -ep, su1 = sc ? u1 : 1 + ep;
     const cc = soilConcave(c, R);
     if (cc) { u0 = SOIL_R; su0 = SOIL_R; if (!R) fillet = true; }
     const faceS = (za, zb) => side === 'R' ? [proj(x + 1, y + u0, za), proj(x + 1, y + u1, za), proj(x + 1, y + u1, zb), proj(x + 1, y + u0, zb)]
@@ -2275,7 +2278,7 @@ function drawSideFaces(g, c, d, t) {
           const cap = Math.min(0.16, (top - sb) * 0.3);
           if (cap > 0.04) {
             const cg = g.createLinearGradient(0, Z(top), 0, Z(top - cap));
-            cg.addColorStop(0, 'rgba(255,240,205,0.5)'); cg.addColorStop(0.3, 'rgba(255,240,205,0.2)'); cg.addColorStop(1, 'rgba(255,240,205,0.08)');
+            cg.addColorStop(0, 'rgba(255,240,205,0.3)'); cg.addColorStop(0.3, 'rgba(255,240,205,0.12)'); cg.addColorStop(1, 'rgba(255,240,205,0.04)');
             g.fillStyle = cg; g.fillRect(a + u0 * U, Z(top), (u1 - u0) * U, Z(top - cap) - Z(top));
             const ug = g.createLinearGradient(0, Z(top - cap), 0, Z(top - cap - 0.14));
             ug.addColorStop(0, 'rgba(18,14,10,0.42)'); ug.addColorStop(1, 'rgba(18,14,10,0)');
@@ -2572,7 +2575,7 @@ function drawCell(g, c, t, part) {
     const drops = n => !n || n.void || n.h < z - 0.01;
     g.save(); poly(g, big); g.clip();
     edgeBands(g, x, y, z, nb.map(drops), [false, false, false, false], 0.1,
-      [[0, 'rgba(255,240,205,0.3)'], [0.4, 'rgba(255,240,205,0.1)'], [1, 'rgba(255,240,205,0)']]);
+      [[0, 'rgba(255,240,205,0.17)'], [0.4, 'rgba(255,240,205,0.06)'], [1, 'rgba(255,240,205,0)']]);
     if (sj) {
       // a groove where this block meets the next: dark in the joint, with a rounded, lit edge just inside it
       const nf = [false, false, false, false];
@@ -2638,7 +2641,7 @@ function drawCell(g, c, t, part) {
     }
   }
   // decorations
-  if (!c.feat && c.water == null && c.h >= 0 && !c.ash) {
+  if (!c.feat && c.water == null && c.h >= 0 && c.h < 1 && !c.ash) {
     for (const k of d.tufts) {
       const p = proj(x + k.u, y + k.v, z);
       if (k.k === 'tuft') {
@@ -2984,7 +2987,7 @@ function drawSheets(g, c, d, t, front) {
     }
     const vx = Math.floor((q1[0] + q2[0]) * 0.5 + (q1[2] + q2[2]) * 0.3), vy = Math.floor((q1[1] + q2[1]) * 0.5 + (q1[3] + q2[3]) * 0.3);
     const solid = (X, Y) => { const n = cellI(X, Y); return !!n && !n.void; };
-    if (Math.random() < 0.5 * len && !solid(vx + 1, vy) && !solid(vx, vy + 1) && !solid(vx + 1, vy + 1)) {
+    if (Math.random() < 0.5 * len * AMB.k && !solid(vx + 1, vy) && !solid(vx, vy + 1) && !solid(vx + 1, vy + 1)) {
       const q = lerpQ(q1, q2, Math.random()), o = FALL_R + 0.03, out = 0.2 + Math.random() * 0.35;
       emit({ x: q[0] + q[2] * o, y: q[1] + q[3] * o, z: z - FALL_R - 0.05, vx: q[2] * out, vy: q[3] * out, vz: -0.8 - Math.random() * 1.2, grav: 6, life: 0.4 + Math.random() * 0.35, size: 0.8 + Math.random() * 0.7, color: Math.random() < 0.6 ? '#f4fbff' : '#cdeaff', kind: 'streak', fade: 0.5 });
       if (Math.random() < 0.06) emit({ x: q[0] + q[2] * 0.4, y: q[1] + q[3] * 0.4, z: z - 1.4 - Math.random(), vx: q[2] * 0.15, vy: q[3] * 0.15, vz: -0.25, drag: 0.3, life: 2.2, size: 14, color: '#eef7ff', kind: 'smoke' });
@@ -3036,7 +3039,7 @@ function drawWater(g, c, d, t) {
       g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
       }
     } else { g.fillStyle = c.ice ? 'rgba(190,230,250,0.8)' : 'rgba(70,140,210,0.55)'; poly(g, P); g.fill(); }
-    if (!c.ice && (!n || n.void) && !sheetsOn() && Math.random() < 0.5) {
+    if (!c.ice && (!n || n.void) && !sheetsOn() && Math.random() < 0.5 * AMB.k) {
       // spray: fine white streaks thrown off the lip, falling a little ahead of the sheet; now and then a drift of mist
       const R = side === 'R', wr0 = waterRound(c), u0 = (wr0 ? wr0[R ? 1 : 3] : 0) + 0.05, u = u0 + Math.random() * (0.95 - u0), o = FALL_R + 0.03, out = 0.2 + Math.random() * 0.35;
       const px = R ? x + 1 + o : x + u, py = R ? y + u : y + 1 + o;
@@ -3425,7 +3428,7 @@ function drawBrazier(g, c, t) {
       eg.addColorStop(0, '#fff0b0'); eg.addColorStop(0.35, '#ffa040'); eg.addColorStop(1, 'rgba(160,50,20,0.9)');
       g.fillStyle = eg; g.fillRect(bx - rx, byy - ry, rx * 2, ry * 2);
       g.restore();
-      if (Math.random() < 0.9) flameP(x + 0.5 + (Math.random() - .5) * 0.22, y + 0.5 + (Math.random() - .5) * 0.22, bz + 0.05, 1.1);
+      if (Math.random() < 0.9 * AMB.k) flameP(x + 0.5 + (Math.random() - .5) * 0.22, y + 0.5 + (Math.random() - .5) * 0.22, bz + 0.05, 1.1);
     } else {
       const pulse = 0.5 + 0.5 * Math.sin(t * 2.2 + c.x);
       g.strokeStyle = `rgba(255,170,80,${0.3 + pulse * 0.4})`; g.lineWidth = 1.5; g.beginPath(); g.ellipse(bx, byy, rx * 0.9, ry * 0.9, 0, 0, TAU); g.stroke();
@@ -3433,7 +3436,7 @@ function drawBrazier(g, c, t) {
       g.strokeStyle = '#ffb060'; g.lineWidth = 2 * s;
       g.beginPath(); g.ellipse(G[0], G[1], (26 + pulse * 6) * s, (13 + pulse * 3) * s, 0, 0, TAU); g.stroke();
       g.restore();
-      if (Math.random() < 0.04) emit({ x: c.x + 0.5 + (Math.random() - .5) * 0.3, y: c.y + 0.5 + (Math.random() - .5) * 0.3, z: bz, vz: 0.6, life: 1.2, size: 2.2, color: '#ffb060', kind: 'glow' });
+      if (Math.random() < 0.04 * AMB.k) emit({ x: c.x + 0.5 + (Math.random() - .5) * 0.3, y: c.y + 0.5 + (Math.random() - .5) * 0.3, z: bz, vz: 0.6, life: 1.2, size: 2.2, color: '#ffb060', kind: 'glow' });
     }
     return;
   }
@@ -3445,7 +3448,7 @@ function drawBrazier(g, c, t) {
   g.beginPath(); g.ellipse(P[0], P[1], 16 * s, 7 * s, 0, 0, TAU); g.moveTo(P[0] + 15 * s, P[1] + 2 * s); g.ellipse(P[0], P[1] + 3 * s, 15 * s, 8 * s, 0, 0.3, Math.PI - 0.3); inkStroke(g, INK, 1.3);
   g.fillStyle = c.lit ? '#ff9a3a' : '#2a2026'; g.beginPath(); g.ellipse(P[0], P[1], 12.5 * s, 5 * s, 0, 0, TAU); g.fill();
   if (c.lit) {
-    if (Math.random() < 0.9) flameP(x + 0.5 + (Math.random() - .5) * 0.25, y + 0.5 + (Math.random() - .5) * 0.25, z + 0.72, 1.1);
+    if (Math.random() < 0.9 * AMB.k) flameP(x + 0.5 + (Math.random() - .5) * 0.25, y + 0.5 + (Math.random() - .5) * 0.25, z + 0.72, 1.1);
   } else {
     // unlit: a faint, slow-pulsing ember so it can be found at a glance
     const pulse = 0.5 + 0.5 * Math.sin(t * 2.2 + c.x);
@@ -3455,7 +3458,7 @@ function drawBrazier(g, c, t) {
     g.strokeStyle = '#ffb060'; g.lineWidth = 2 * s;
     g.beginPath(); g.ellipse(G[0], G[1], (26 + pulse * 6) * s, (13 + pulse * 3) * s, 0, 0, TAU); g.stroke();
     g.restore();
-    if (Math.random() < 0.04) emit({ x: c.x + 0.5 + (Math.random() - .5) * 0.3, y: c.y + 0.5 + (Math.random() - .5) * 0.3, z: z + 0.7, vz: 0.6, life: 1.2, size: 2.2, color: '#ffb060', kind: 'glow' });
+    if (Math.random() < 0.04 * AMB.k) emit({ x: c.x + 0.5 + (Math.random() - .5) * 0.3, y: c.y + 0.5 + (Math.random() - .5) * 0.3, z: z + 0.7, vz: 0.6, life: 1.2, size: 2.2, color: '#ffb060', kind: 'glow' });
   }
 }
 
@@ -3517,7 +3520,7 @@ function drawFont(g, c, t) {
     g.beginPath(); g.arc(0, 0, irx * 0.72, 0, TAU); g.stroke();
     for (let k = 0; k < 8; k++) { g.rotate(TAU / 8); g.beginPath(); g.moveTo(irx * 0.58, 0); g.lineTo(irx * 0.84, 0); g.moveTo(irx * 0.71, -3 * s); g.lineTo(irx * 0.71, 3 * s); g.stroke(); }
     g.restore();
-    if (Math.random() < 0.25) emit({ x: x + 0.5 + (Math.random() - .5) * 0.45, y: y + 0.5 + (Math.random() - .5) * 0.45, z: z + 0.05, vz: 0.8 + Math.random(), life: 1.6, size: 3, color: '#8ff4ff', kind: 'glow' });
+    if (Math.random() < 0.25 * AMB.k) emit({ x: x + 0.5 + (Math.random() - .5) * 0.45, y: y + 0.5 + (Math.random() - .5) * 0.45, z: z + 0.05, vz: 0.8 + Math.random(), life: 1.6, size: 3, color: '#8ff4ff', kind: 'glow' });
     return;
   }
   const rx = 0.42 * TW * 0.7071 * s * 1.25, ry = rx * 0.5;
@@ -3538,7 +3541,7 @@ function drawFont(g, c, t) {
   g.beginPath(); g.arc(0, 0, rx * 0.62, 0, TAU); g.stroke();
   for (let k = 0; k < 8; k++) { g.rotate(TAU / 8); g.beginPath(); g.moveTo(rx * 0.5, 0); g.lineTo(rx * 0.7, 0); g.moveTo(rx * 0.6, -3 * s); g.lineTo(rx * 0.6, 3 * s); g.stroke(); }
   g.restore();
-  if (Math.random() < 0.25) emit({ x: x + 0.5 + (Math.random() - .5) * 0.5, y: y + 0.5 + (Math.random() - .5) * 0.5, z: z + 0.05, vz: 0.8 + Math.random(), life: 1.6, size: 3, color: '#8ff4ff', kind: 'glow' });
+  if (Math.random() < 0.25 * AMB.k) emit({ x: x + 0.5 + (Math.random() - .5) * 0.5, y: y + 0.5 + (Math.random() - .5) * 0.5, z: z + 0.05, vz: 0.8 + Math.random(), life: 1.6, size: 3, color: '#8ff4ff', kind: 'glow' });
 }
 
 function drawShadow(g, b) {
@@ -3877,12 +3880,16 @@ function refreshCanvases() {
   releaseBuffers();
 }
 let frameNo = 0, SKY_LAYER = null, XR = null;
+// what the drawing code emits as it draws (flames, spray, the font's sparks) is scaled by AMB.k, the time since the
+// last frame in sixtieths of a second: a faster screen draws more frames, and would otherwise pour out more of them
+const AMB = { k: 1, t: 0 };
 // ?debug: parts of the scene left out, one at a time (tapping the readout cycles them)
 const DBGOFF = { particles: false, sky: false, water: false, vines: false, lights: false, land: false, world: false };
 // how long (ms) a frame may spend painting tiles into the cache (main.js lowers it on phones)
 let TC_BUDGET = 10;
 function render(g, w, h, t, overlay) {
   frameNo++;
+  AMB.k = AMB.t ? clamp((t - AMB.t) * 60, 0, 3) : 1; AMB.t = t;
   // the game's own canvas has its sky on a layer of its own behind it (main.js repaints that a little less often and
   // at a lower resolution, the sky being soft and slow): here the frame is only cleared. Other canvases (snapshots)
   // still paint the sky in.

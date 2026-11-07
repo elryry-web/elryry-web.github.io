@@ -73,7 +73,7 @@ const Tips = (() => {
   const T = [
     // the world, first lesson
     { id: 'orb', when: () => play() && lv('First Breath') && !Game.casts, at: orbRect,
-      text: 'This is the orb — a mote of light, fallen from its font.' },
+      text: 'This is the orb, a mote of light fallen from its font.' },
     { id: 'font', when: () => play() && lv('First Breath') && !Game.casts, at: () => cellRect(font()),
       text: 'And this is the font. Bring the orb home to it to finish the lesson.' },
     { id: 'aims', when: () => play() && lv('First Breath') && !Game.casts, at: () => elRect('#objs'),
@@ -136,7 +136,7 @@ const Tips = (() => {
       text: () => 'The glowing tiles show where the stone will rise' + (lv('From the Abyss') ? '. Set your mark at the near edge of the gap, so the arm reaches across.' : '.'),
       done: () => Game.state !== 'aim' },
     ...['flame', 'frost', 'tide'].map(id => ({ id: 'placed.' + id, when: () => page() && sigilIs(id) && D().signs.length && spell(), at: () => Grim.anchor('sign'),
-      text: () => `${SIGILS[id].name} is placed as Petra is: each sign is an arm of ${{ flame: 'fire', frost: 'ice', tide: 'water' }[id]} running from your mark, not a push.` })),
+      text: () => `${SIGILS[id].name} is placed as Petra is: each sign is an arm of ${{ flame: 'fire', frost: 'ice', tide: 'water' }[id]} running from your mark.` })),
 
     // Luna: its outer circle doubles the float; its sign only aims what rides on its ring
     { id: 'luna.ring2', when: () => page() && lv('Featherfall II') && sigilIs('luna') && !D().amp, at: () => Grim.anchor('area'),
@@ -161,7 +161,7 @@ const Tips = (() => {
     { id: 'brazier', when: () => play() && World.braziers.some(b => !b.lit), at: () => cellRect(World.braziers.find(b => !b.lit)),
       text: 'A brazier. Every brazier must burn before the lesson is done.' },
     { id: 'bramble', when: () => play() && firstCell(c => c.feat === 'bramble'), at: () => cellRect(firstCell(c => c.feat === 'bramble')),
-      text: 'Bramble. Nothing rolls through it — but it burns.' },
+      text: 'Bramble. Nothing rolls through it, but it burns.' },
     { id: 'crate', when: () => play() && World.bodies.some(b => b.kind === 'crate' && b.alive), at: () => { const b = World.bodies.find(b => b.kind === 'crate' && b.alive); return b && worldRect(b.x, b.y, b.z + 0.4, 30 * cam.s + 8); },
       text: 'A crate: heavy, but the wind can move it, gently.' },
     { id: 'gate', when: () => play() && firstCell(c => c.feat === 'gate'), at: () => cellRect(firstCell(c => c.feat === 'gate')),
