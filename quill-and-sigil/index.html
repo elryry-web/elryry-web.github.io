@@ -151,8 +151,12 @@
   .card .sheet, #satchel .sheet { position: relative; width: min(560px, 92vw); max-height: 90vh; overflow: auto; padding: 34px 40px 28px; color: #2e1f14; text-align: center;
     background: radial-gradient(ellipse at 50% 35%, #fbf2da, #e7d3a6 70%, #d4b880); border-radius: 4px;
     box-shadow: inset 0 0 40px rgba(120,80,30,.45), inset 0 0 0 1px #8a6a3a, inset 0 0 0 6px rgba(255,255,255,.2), inset 0 0 0 7px rgba(138,106,58,.6), 0 20px 60px rgba(0,0,0,.7);
-    transform: translateY(16px) scale(.98); transition: transform .5s; }
-  .card.show .sheet, #satchel.show .sheet { transform: none; }
+  }
+  /* (no sliding transform on the sheets: on iPhones a transformed, scrollable sheet becomes a GPU layer of its own,
+     and under load Safari dropped tiles of it, leaving blank patches on the win card) */
+  #satchel .sheet { transform: translateY(16px) scale(.98); transition: transform .5s; }
+  #satchel.show .sheet { transform: none; }
+  #win .sheet { overflow: visible; max-height: none; }
   .sheet .num { font-family: Cinzel, serif; letter-spacing: .3em; color: #8e2f22; font-size: 13px; }
   .sheet h3 { font-family: 'Cinzel Decorative', serif; font-weight: 700; font-size: 32px; margin: 4px 0 0; color: #2a1830; }
   .sheet .div { height: 40px; background: var(--divider) center/contain no-repeat; margin: 2px 0 8px; }
@@ -528,9 +532,9 @@
   </div>
 </div>
 
-<script src="js/ink.js?v=110"></script>
-<script src="js/world.js?v=110"></script>
-<script src="js/tips.js?v=110"></script>
-<script src="js/main.js?v=110"></script>
+<script src="js/ink.js?v=111"></script>
+<script src="js/world.js?v=111"></script>
+<script src="js/tips.js?v=111"></script>
+<script src="js/main.js?v=111"></script>
 </body>
 </html>

@@ -743,8 +743,10 @@ function updateWisps(dt) {
 /* ---------------- Particles ---------------- */
 const parts = [];
 const MAXP = 3000;
+let smokeN = 0;
 function emit(o) {
   if (parts.length >= MAXP) return;
+  if (o.kind === 'smoke') { if (smokeN >= 36) return; smokeN++; }
   parts.push({ x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, age: 0, life: 1, size: 4, color: '#fff', kind: 'glow', grav: 0, drag: 0, rot: Math.random() * TAU, vr: 0, ...o });
 }
 function flameP(x, y, z, k = 1) {
@@ -759,10 +761,12 @@ function splash(x, y, z, n) { for (let i = 0; i < n; i++) { const a = Math.rando
 function burst(x, y, z, col, n, sp) { for (let i = 0; i < n; i++) { const a = Math.random() * TAU; emit({ x, y, z, vx: Math.cos(a) * sp * Math.random(), vy: Math.sin(a) * sp * Math.random(), vz: Math.random() * sp, drag: 2, life: 0.8 + Math.random() * .6, size: 4, color: col, kind: 'glow' }); } }
 function ring(x, y, z, col, R) { emit({ x, y, z: z + 0.03, life: 0.8, size: R, color: col, kind: 'ring' }); }
 function updateParticles(dt) {
+  smokeN = 0;
   for (let i = parts.length - 1; i >= 0; i--) {
     const p = parts[i];
     p.age += dt;
     if (p.age >= p.life) { parts[i] = parts[parts.length - 1]; parts.pop(); continue; }
+    if (p.kind === 'smoke') smokeN++;
     if (p.drag) { const f = Math.exp(-p.drag * dt); p.vx *= f; p.vy *= f; p.vz *= f; }
     p.vz -= p.grav * dt;
     p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt; p.rot += p.vr * dt;
@@ -1870,7 +1874,12 @@ function onPlane(g, c, R, fn) {
 const SOIL_DEPTH = 1.0, ROCK_FLOOR = -3.5;
 // the foot of a tile's soil over the void: a depth below its ground, or (under a pool) below the water's surface,
 // so a pool's bed sitting a little low doesn't leave its earth hanging lower than the land's beside it
-const soilBot = c => Math.min(c.water != null && c.water > c.h ? Math.max(c.water, c.h) : c.h, 0) - SOIL_DEPTH;
+// Sunken ground (a trench, a pit) is a groove cut into the land: under its floor is the island's rock, not a slab of
+// soil of its own hanging lower than the land around it. So its soil stops at its floor, or at the land's soil foot.
+const soilBot = c => c.water != null && c.water > c.h ? Math.min(Math.max(c.water, c.h), 0) - SOIL_DEPTH : Math.min(c.h, -SOIL_DEPTH);
+// the rock's lower edge under world point (wx, wy): measured from the land's soil foot, so it is one line all round the
+// island whatever the ground above it does; at least a little below `bot`, and never below the floor
+function rockBottom(wx, wy, bot) { const L = rockAt(wx, wy)[2] * rockKnot(wx, wy); return Math.max(ROCK_FLOOR, Math.min(-SOIL_DEPTH - L, bot - 0.12)); }
 // how far the rock hangs at a point on the rim, as a share of its usual reach: soft lumps that run on unbroken
 // from wall to wall and round every corner
 function rockKnot(wx, wy) { return 1 + 0.17 * Math.sin(wx * 2.9 + wy * 1.3 + 0.4) + 0.12 * Math.sin(wy * 3.7 - wx * 1.7 + 2.1); }
@@ -1969,7 +1978,7 @@ function soilCornerCurve(g, c, k) {
     texSide(g, 'soil', c, Rh, Q, 1, wv); texSide(g, 'soilMacro', c, Rh, Q); texSide(g, un, c, Rh, Q, 1, wv);
     // the rock below, leaning in and fading like the rest
     if (room > 0.05) {
-      const low = as.slice().reverse().map(a => { const q = rockAt(wx(a), wy(a)); return proj(q[0], q[1], bot - Math.min(q[2] * rockKnot(wx(a), wy(a)), room)); });
+      const low = as.slice().reverse().map(a => { const q = rockAt(wx(a), wy(a)); return proj(q[0], q[1], rockBottom(wx(a), wy(a), bot)); });
       texSide(g, un, c, Rh, [...as.map(a => P(a, bot)), ...low], 1, wv);
     }
   }
@@ -2021,7 +2030,7 @@ function soilFillet(g, c) {
     const Q = [...as.map(a => P(a, st)), ...as.slice().reverse().map(a => P(a, bot))];
     tex('soil', Q, wv); tex('soilMacro', Q, null); tex(un, Q, wv);
     if (room > 0.05) {
-      const low = as.slice().reverse().map(a => { const q = rockAt(wx(a), wy(a)); return proj(q[0], q[1], bot - Math.min(q[2] * rockKnot(wx(a), wy(a)), room)); });
+      const low = as.slice().reverse().map(a => { const q = rockAt(wx(a), wy(a)); return proj(q[0], q[1], rockBottom(wx(a), wy(a), bot)); });
       tex(un, [...as.map(a => P(a, bot)), ...low], wv);
     }
   }
@@ -2155,7 +2164,7 @@ function drawSideFaces(g, c, d, t) {
     let bot, toVoid = false;
     if (!n || n.void) { bot = soilBot(c); toVoid = true; }
     else bot = n.h;
-    if (bot >= top - 0.001) continue;
+    if (bot >= top - 0.001 && !(toVoid && bot > ROCK_FLOOR + 0.05)) continue; // (a groove's floor over the void still has its rock below)
     const P = side === 'R' ? [proj(x + 1, y, top), proj(x + 1, y + 1, top), proj(x + 1, y + 1, bot), proj(x + 1, y, bot)]
       : [proj(x, y + 1, top), proj(x + 1, y + 1, top), proj(x + 1, y + 1, bot), proj(x, y + 1, bot)];
     const face = (za, zb) => side === 'R' ? [proj(x + 1, y, za), proj(x + 1, y + 1, za), proj(x + 1, y + 1, zb), proj(x + 1, y, zb)]
@@ -2269,12 +2278,12 @@ function drawSideFaces(g, c, d, t) {
     }
     // the earth beneath
     const st = Math.min(top, 0);
-    if (bot < st - 0.001) {
-      const Q = (sc || cc) ? faceS(st, bot) : face(st, bot), low = c.h < 0;
-      g.fillStyle = low ? (R ? '#3e3226' : '#4c3e2e') : (R ? '#563a28' : '#6e4c33');
-      poly(g, Q); g.fill();
+    if (bot < st - 0.001 || (toVoid && bot > ROCK_FLOOR + 0.05)) {
+      const Q = (sc || cc) ? faceS(st, bot) : face(st, bot), low = c.h < 0, soilFace = bot < st - 0.001;
       const wv = soilWaveFor(c, R);
-      if (texOK) {
+      if (soilFace) { g.fillStyle = low ? (R ? '#3e3226' : '#4c3e2e') : (R ? '#563a28' : '#6e4c33'); poly(g, Q); g.fill(); }
+      if (!soilFace) { /* a groove's floor sits right on the rock */ }
+      else if (texOK) {
         texSide(g, 'soil', c, R, Q, 1, wv);
         texSide(g, 'soilMacro', c, R, Q);
         if (toVoid) texSide(g, R ? 'underR' : 'underL', c, R, Q, 1, wv);
@@ -2290,12 +2299,12 @@ function drawSideFaces(g, c, d, t) {
         const pts = [], room = bot - ROCK_FLOOR;
         for (let i = 16; i >= 0; i--) {
           const u = su0 + (su1 - su0) * i / 16, wpx = R ? x + 1 : x + u, wpy = R ? y + u : y + 1;
-          const [rx, ry, L0] = rockAt(wpx, wpy);
-          pts.push([rx, ry, Math.min(L0 * rockKnot(wpx, wpy), room)]);
+          const [rx, ry] = rockAt(wpx, wpy);
+          pts.push([rx, ry, rockBottom(wpx, wpy, bot)]);
         }
         if (room > 0.05) {
           const end = u => R ? proj(x + 1, y + u, bot) : proj(x + u, y + 1, bot);
-          const poly5 = [end(su0), end(su1), ...pts.map(p => proj(p[0], p[1], bot - p[2]))];
+          const poly5 = [end(su0), end(su1), ...pts.map(p => proj(p[0], p[1], p[2]))];
           if (texOK) texSide(g, R ? 'underR' : 'underL', c, R, poly5, 1, wv);
           else { g.fillStyle = 'rgba(46,32,42,0.8)'; poly(g, poly5); g.fill(); }
         }
@@ -3397,18 +3406,19 @@ function drawSeal(g, sp, x, y, z, R, alpha, rot, prog, t) {
   g.globalAlpha = alpha;
   const lw = 1 / k;
   g.lineCap = 'round'; g.lineJoin = 'round';
-  g.strokeStyle = sp.color; g.shadowColor = sp.color; g.shadowBlur = 12;
-  g.lineWidth = 2 * lw; g.beginPath(); g.arc(0, 0, 1.0, 0, TAU * Math.min(1, prog * 1.5)); g.stroke();
-  g.lineWidth = 1 * lw; g.beginPath(); g.arc(0, 0, 1.16, 0, TAU); g.stroke();
-  g.fillStyle = hexA(sp.color, 0.9); g.shadowBlur = 0;
+  g.strokeStyle = sp.color;
+  // each line stroked wide and faint, then narrower, then sharp: a soft glow (canvas shadowBlur is very slow on phones)
+  const glow = (w) => { for (const [k, a] of [[5, 0.12], [2.6, 0.25], [1, 1]]) { g.globalAlpha = alpha * a; g.lineWidth = w * k * lw; g.stroke(); } g.globalAlpha = alpha; };
+  g.beginPath(); g.arc(0, 0, 1.0, 0, TAU * Math.min(1, prog * 1.5)); glow(2);
+  g.beginPath(); g.arc(0, 0, 1.16, 0, TAU); glow(1);
+  g.fillStyle = hexA(sp.color, 0.9);
   g.save(); g.scale(1 / 100, 1 / 100); textOnCircle(g, SIGILS[sp.sigil].words, 0, 0, 108, -rot * 2, 9); g.restore();
-  g.shadowBlur = 10;
   // the caster's own strokes
   for (const st of sp.art) {
     const n = Math.max(2, Math.floor(st.pts.length * clamp(prog * 1.4, 0, 1)));
     g.beginPath();
     for (let i = 0; i < n; i++) { const p = st.pts[i]; i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y); }
-    g.lineWidth = 2.2 * lw; g.stroke();
+    glow(2.2);
   }
   g.restore();
 }

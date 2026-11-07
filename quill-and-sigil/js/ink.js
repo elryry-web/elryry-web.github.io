@@ -1393,12 +1393,14 @@ const Grim = {
     this.inkDirty = false; this.glowDirty = true;
   },
   renderGlow(col) {
-    const src = this.inkLayer, L = this.glowLayer || (this.glowLayer = document.createElement('canvas'));
-    if (L.width !== src.width || L.height !== src.height) { L.width = src.width; L.height = src.height; }
+    // blurred at a third of the page's resolution (the glow is soft anyway, and a full-size blur stalls phones)
+    const src = this.inkLayer, L = this.glowLayer || (this.glowLayer = document.createElement('canvas')), q = 3;
+    const w = Math.max(1, Math.round(src.width / q)), h = Math.max(1, Math.round(src.height / q));
+    if (L.width !== w || L.height !== h) { L.width = w; L.height = h; }
     const g = L.getContext('2d');
-    g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, L.width, L.height);
-    g.shadowColor = col; g.shadowBlur = 13 * this.dpr;
-    g.drawImage(src, 0, 0);
+    g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, w, h);
+    g.shadowColor = col; g.shadowBlur = 13 * this.dpr / q;
+    g.drawImage(src, 0, 0, w, h);
     g.shadowBlur = 0;
     this.glowCol = col; this.glowDirty = false;
   },

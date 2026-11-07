@@ -685,8 +685,9 @@ let DPR = 1;
 /* Quality steps, tried in turn when frames come too slowly (on phones, mostly): first the soft glow goes, then the
    world is drawn at a lower resolution. The step reached is remembered for next time. */
 const QUALITY = [{ dpr: 2, bloom: true }, { dpr: 2, bloom: false }, { dpr: 1.5, bloom: false }, { dpr: 1.25, bloom: false }];
-let qTier = 0;
-try { qTier = clamp(Math.round(+localStorage.getItem('quillsigil.quality') || 0), 0, QUALITY.length - 1); } catch (e) { }
+// phones start without the soft glow (it copies the whole frame each frame, which phones feel most)
+let qTier = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches ? 1 : 0;
+try { const q = localStorage.getItem('quillsigil.quality'); if (q != null) qTier = clamp(Math.round(+q || 0), 0, QUALITY.length - 1); } catch (e) { }
 const PERF = { n: 0, sum: 0, last: 0, hold: 0, good: 0, probed: false, fellFrom: -1 };
 function setQuality(k, now) {
   qTier = k; PERF.hold = now + 1500; PERF.n = 0; PERF.sum = 0; PERF.good = 0;
@@ -698,7 +699,7 @@ function perfWatch(now, drew) {
   const dt = now - PERF.last; PERF.last = now;
   if (!drew || document.hidden || dt > 250 || now < PERF.hold) { PERF.n = 0; PERF.sum = 0; return; }
   PERF.n++; PERF.sum += dt;
-  if (PERF.n < 90) return;
+  if (PERF.n < 60) return;
   const avg = PERF.sum / PERF.n; PERF.n = 0; PERF.sum = 0;
   if (avg > 20 && qTier < QUALITY.length - 1) { PERF.fellFrom = qTier; PERF.good = 0; setQuality(qTier + 1, now); return; }
   // a step remembered from a slower moment (another tab busy, low power) is tried back up once, after a steady spell
@@ -934,7 +935,8 @@ function tick(now) {
   // between their last two steps, by how far time has run into the next one; a jump (a respawn) is drawn as it is.
   // once a card has settled over the world, the world behind it holds still and isn't redrawn (it saves the phone's
   // strength, and a canvas busy redrawing under the card can leave holes in it on some phones)
-  const covered = Game.coverAt && now - Game.coverAt > 700;
+  // (and likewise while the grimoire lies open over it: the world is paused then anyway)
+  const covered = (Game.coverAt && now - Game.coverAt > 700) || (Grim.open && Grim.anim >= 1);
   if (!covered) {
     const k = WORLD_PAUSED.has(Game.state) ? 1 : acc / FIXED, held = [];
     if (k < 1) for (const b of World.bodies) {
