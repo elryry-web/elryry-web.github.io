@@ -210,7 +210,7 @@ function cellsNear(x, y, R) {
 }
 function stepBody(b, dt) {
   if (!b.alive) return;
-  // a Luna float (v63) is measured in tiles carried, not seconds: b.levRange is what is left of it
+  // a Luna float is measured in tiles carried, not seconds: b.levRange is what is left of it
   if (b.levRange != null && b.lev <= 0) b.levRange = null;
   const x0 = b.x, y0 = b.y;
   if (b.arrive) arrivalCheck(b, dt);
@@ -414,9 +414,9 @@ function spellRadius(sp) {
   if (sp.reach && r > 0) r += sp.reach * 0.5;
   return r;
 }
-// how long Luna holds a thing aloft (v62): only the outer circle changes it, doubling the float. Luna's sign and barbs
+// how long Luna holds a thing aloft: only the outer circle changes it, doubling the float. Luna's sign and barbs
 // never touch Luna itself: they aim, and give strength to, whatever rides on its ring
-// v63: the float is a distance — a lifted thing hangs where it rose until moved, and settles once carried this far
+// the float is a distance — a lifted thing hangs where it rose until moved, and settles once carried this far
 const LUNA_RANGE = 10, LUNA_RANGE_RING = 20;
 function lunaRange(sp) { return sp.amp ? LUNA_RANGE_RING : LUNA_RANGE; }
 // The placing sigils — Petra, Ignis, Gelu and Unda — all set their element by the same shapes (petraShape):
@@ -562,7 +562,7 @@ function baseSpell(sp, tx, ty, tz, out) {
         if (b.captured) continue;
         b.lev = 1e6; b.levRange = lunaRange(sp); b.levAge = 0; b.levUntilStop = false; // (1e6, not Infinity: rewind snapshots are JSON)
         out.bodies.push(b);
-        b.drift = null; b.vx *= 0.3; b.vy *= 0.3; // Luna lifts; it does not lead — only wind or water moves what it holds
+        b.drift = null; b.vx *= 0.3; b.vy *= 0.3; // Luna only lifts: wind or water moves what it holds
         b.vz += 3;
         for (let i = 0; i < 26; i++) { const a = Math.random() * TAU; emit({ x: b.x + Math.cos(a) * 0.5, y: b.y + Math.sin(a) * 0.5, z: b.z, vx: -Math.cos(a) * 0.4, vy: -Math.sin(a) * 0.4, vz: 1.5 + Math.random() * 2, drag: 1.5, life: 1.4, size: 5, color: '#d8c2ff', kind: 'glow' }); }
       }
@@ -623,7 +623,7 @@ function applySpell(sp, tx, ty, tz) {
   // (the ferry's other ring-sigils ride on its slab: Ignis on arrival kindles where it comes to rest)
   const ferryRest = (slabs, used) => { for (const s of inf) if (!used(s)) for (const b of slabs) infuseBody(b, s, sp); };
   if (sp.sigil === 'luna' && cnt('stone')) return ferryRest(spawnFerry(sp, tx, ty, tz, cnt('stone'), cnt('gale')), s => s.id === 'stone' || s.id === 'gale');
-  // the ferry (v60): Ventus at the centre with Luna and Petra both on its ring at once (behind the sign) raises a
+  // the ferry: Ventus at the centre with Luna and Petra both on its ring at once (behind the sign) raises a
   // floating slab beneath what you touch, and the wind sails it the way of the sign, rider and all
   const now = id => inf.filter(s => s.id === id && s.rel === 'now').reduce((a, s) => a + s.n, 0);
   if (sp.sigil === 'gale' && sp.dir && now('stone') && now('luna'))
@@ -923,6 +923,8 @@ function setClassic(on) {
   }
   refreshCanvases();
 }
+// the screen's pixel ratio (DPR lives in main.js; world.js also runs in Node for the level simulations, without it)
+const dprNow = () => typeof DPR !== 'undefined' ? DPR : 1;
 function paintedSky(w, h) {
   const want = w >= h ? 'wide' : 'tall';
   return PAINTED[want] || PAINTED[want === 'wide' ? 'tall' : 'wide'] || null;
@@ -930,7 +932,7 @@ function paintedSky(w, h) {
 /* the deep, unchanging part of the sky, drawn once per screen size */
 function skyBase(w, h) {
   if (SKY.base && SKY.base.w === w && SKY.base.h === h) return SKY.base.c;
-  const dpr = Math.min(2, typeof DPR !== 'undefined' ? DPR : 1);
+  const dpr = Math.min(2, dprNow());
   const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w * dpr)); c.height = Math.max(1, Math.round(h * dpr));
   const g = c.getContext('2d'), R = mulberry(7), m = Math.min(w, h);
   g.scale(dpr, dpr);
@@ -1022,7 +1024,7 @@ function drawIsle(g, I, x, y, s, t, haze) {
   isleLayer(g, I, x, y, s, t, haze, 'front');
 }
 function isleSprite(I, s, haze) {
-  const dpr = Math.min(2, typeof DPR !== 'undefined' ? DPR : 1);
+  const dpr = Math.min(2, dprNow());
   if (I.spr && I.spr.s === s && I.spr.dpr === dpr) return I.spr;
   // room for the tallest tree above and the deepest point of rock below
   const ox = s * 1.4 + 4, oy = s * 1.75 + 4, w = ox * 2, h = oy + s * (I.ry * 1.15 + 0.12) + Math.max(...I.bot) * s * 1.1 + 6;
@@ -3749,7 +3751,7 @@ const TC = { on: true, gkey: '', cells: null, map: new Map(), keys: [], skeys: [
 const cellStateKey = c => c.void ? 'v' : c.h.toFixed(3) + '|' + c.th + '|' + (c.water == null ? '' : c.water.toFixed(3)) + '|' + c.ice + '|' + c.icy;
 const cellSurfaceKey = c => c.void ? '' : c.frost + '|' + (c.wet || 0).toFixed(2) + '|' + (c.ash || 0).toFixed(2) + '|' + c.feat + '|' + c.burn;
 function tileCacheFrame(t) {
-  const D = typeof DPR !== 'undefined' ? DPR : 1;
+  const D = dprNow();
   const gk = cam.s + '|' + cam.ox.toFixed(2) + '|' + cam.oy.toFixed(2) + '|' + D + '|' + Object.keys(SPRITE).length + '|' + TEX_VER + '|' + texOK + '|' + LIGHT_SIG
     + '|' + (XR ? [...XR.set].map(c => c.x + ',' + c.y).join(';') : '');
   if (gk !== TC.gkey || TC.cells !== World.cells) { TC.gkey = gk; TC.cells = World.cells; for (const e of TC.map.values()) tileDrop(e); TC.map.clear(); TC.keys = []; TC.skeys = []; atlasReset(); TC.gkAt = frameNo; }
@@ -3822,7 +3824,7 @@ function releaseBuffers() {
   if (SKY.ribbonGlow) { SKY.ribbonGlow.width = 1; SKY.ribbonGlow.height = 1; SKY.ribbonDrawn = false; }
 }
 function buildTile(c, t) {
-  const s = cam.s, D = typeof DPR !== 'undefined' ? DPR : 1;
+  const s = cam.s, D = dprNow();
   let zLow = c.h;
   for (const R of [true, false]) { const n = R ? cellI(c.x + 1, c.y) : cellI(c.x, c.y + 1); zLow = Math.min(zLow, !n || n.void ? ROCK_FLOOR - 0.4 : n.h); }
   const X0 = Math.floor((proj(c.x, c.y + 1, 0)[0] - 0.4 * TW * s) * D) / D, X1 = Math.ceil((proj(c.x + 1, c.y, 0)[0] + 0.4 * TW * s) * D) / D;
@@ -3917,7 +3919,7 @@ function refreshCanvases() {
   for (const k in TEX_IMAGES) { try { paintedTex(k, TEX_IMAGES[k]); } catch (e) { console.warn('texture', k, e); } }
   TEX_VER++;
   lipPats = new WeakMap(); weatherPats = new WeakMap();
-  SKY.base = null; SEA.bands.length = 0; _moon = null; _vig = null;
+  SKY.base = null; SEA.bands.length = 0; _moon = null;
   for (const I of SKY.isles) I.spr = null;
   releaseBuffers();
 }
@@ -4052,18 +4054,6 @@ function bloom(g) {
   hz.addColorStop(0, 'rgba(120,90,160,0.03)'); hz.addColorStop(0.6, 'rgba(255,170,130,0.05)'); hz.addColorStop(1, 'rgba(255,180,140,0.09)');
   g.globalAlpha = 1; g.fillStyle = hz; g.fillRect(0, 0, W, H);
   g.restore();
-}
-/* the vignette is a smooth gradient, so it is painted once per screen size at a quarter scale and stretched */
-let _vig = null;
-function vignette(w, h) {
-  if (_vig && _vig.w === w && _vig.h === h) return _vig.c;
-  const q = 0.25, c = document.createElement('canvas'); c.width = Math.max(2, Math.round(w * q)); c.height = Math.max(2, Math.round(h * q));
-  const g = c.getContext('2d'); g.scale(c.width / w, c.height / h);
-  const vg = g.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.35, w / 2, h / 2, Math.max(w, h) * 0.75);
-  vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(6,3,16,0.6)');
-  g.fillStyle = vg; g.fillRect(0, 0, w, h);
-  _vig = { w, h, c };
-  return c;
 }
 
 /* Ambient motes */

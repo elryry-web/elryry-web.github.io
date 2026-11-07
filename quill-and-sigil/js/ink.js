@@ -143,7 +143,7 @@ const TEMPLATES = [];
   add('luna', moon, true, 'mid'); add('luna', mx(moon), true, 'mid');
   const arc = [];
   for (let i = 0; i <= 40; i++) { const a = (45 + 270 * i / 40) * Math.PI / 180; arc.push([Math.cos(a), Math.sin(a)]); }
-  // (any turn, as the closed crescents: v72 — an open C opening up or down went unread)
+  // (any turn, as the closed crescents, so an open C opening up or down still reads)
   add('luna', arc, false, 'all'); add('luna', mx(arc), false, 'all');
   // thin, banana-like crescents (outer circle r=1, bitten by a circle offset d with radius ri), any orientation
   for (const [d, ri] of [[0.3, 0.92], [0.45, 0.95], [0.2, 0.98], [0.55, 0.85]]) {
@@ -225,8 +225,8 @@ function tplDist(c, t, shift, cs, sn) {
   return d / RN;
 }
 const SIGIL_ACCEPT = 0.135;
-/* A closed shape is often drawn with a little hook or overshoot where the pen comes back to its start (user report, v72:
-   a crescent read as Ignis because its hook counted as a third corner). Keep just the loop: from the point near the
+/* A closed shape is often drawn with a little hook or overshoot where the pen comes back to its start (a crescent
+   once read as Ignis because its hook counted as a third corner). Keep just the loop: from the point near the
    start to the point near the end where the stroke closes best — only when that closes it much better than its own ends,
    and only within the first and last fifth of the stroke, so open shapes (spirals, waves, an open C) are never cut. */
 function trimLoop(raw) {
@@ -271,7 +271,7 @@ function recognize(raw) {
   } else if (sharp > 1.15) best.none += 0.06;
   // an open stroke (ends far apart) is never a plain circle
   const gap = endGap(raw);
-  // (0.42 ≈ a circle left open by 50°: less open than that it is still a circle, never an open-C Luna — v72)
+  // (0.42 ≈ a circle left open by 50°: less open than that it is still a circle, never an open-C Luna)
   if (gap > 0.42) best.none += 0.1;
   // closed polygons: count the corners so a triangle is a triangle whichever way it points
   if (gap < 0.3 && sp.turns < 1.25) {
@@ -470,7 +470,6 @@ function lessonRules() {
 const REL_NAME = { now: 'at once', along: 'along the way', arrive: 'on arrival' };
 // the small circles' colours in the second folio: when a ring-sigil there would act
 const REL_COL = { now: '#b3392a', along: '#2d6fb3', arrive: '#2f8a4c' };
-const REL_WORD = { now: 'red', along: 'blue', arrive: 'green' };
 
 /* Convert a page-space direction into a world direction (inverse isometric), snapped to 8 ways */
 const DIR8 = [];
@@ -645,7 +644,7 @@ function placeReach(sp) {
 }
 // Ventus with Luna and Petra both on its ring at once: the ferry (applySpell in world.js)
 function isFerry(sp) { const now = id => (sp.sats || []).some(s => s.id === id && s.rel === 'now'); return sp.sigil === 'gale' && !!sp.dir && now('luna') && now('stone'); }
-// short: the aim bar's compact form (v75: on a phone the full read-back filled a third of the screen); the grimoire keeps it whole
+// short: the aim bar's compact form (on a phone the full read-back would fill a third of the screen); the grimoire keeps it whole
 function describeSpell(sp, short = false) {
   const S = SIGILS[sp.sigil];
   let t = short ? S.name : `${S.name} — ${S.en}`;

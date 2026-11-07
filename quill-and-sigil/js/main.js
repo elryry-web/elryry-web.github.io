@@ -255,7 +255,7 @@ const LEVELS = [
     o: ['.....#..........', '.....#..........', '.....#..........', '..O..#.......DG.', '.....#...B......', '.....#..........', '.....#..........', '.....#..........'],
     flows: [{ x0: 7, x1: 8, y0: 0, y1: 7, dx: 0, dy: 1, s: 3 }],
   },
-  /* ---------- The Third Folio: lands of strange shape (v67) ----------
+  /* ---------- The Third Folio: lands of strange shape ----------
      Each lesson was simulated (world.js in Node) with its intended seals at nine cast offsets: all win 9/9.
      The notes say which shortcuts were checked and fail. */
   // Beads touching only at their corners, along the land's diagonal (a sign straight across the page). Two beads are
@@ -643,7 +643,7 @@ function aimOverlay(g, t) {
         g.strokeStyle = 'rgba(220,244,255,0.95)'; g.lineWidth = 1.6; poly(g, P); g.stroke();
       }
       const where = F.wet ? 'the pool' : 'the hollow', f = (F.lvl - F.h0) / (F.rim - F.h0);
-      // kept short: the aim bar must not cover the world on a phone (v75)
+      // kept short: the aim bar must not cover the world on a phone
       note = F.want > F.rim + 0.3 ? `brims over ${where}` : f > 0.97 ? `fills ${where}`
         : f < 0.13 ? `barely wets ${where}` : `fills ${where} ${['¼', '¼', '½', '¾', 'nearly'][Math.round(f * 4)]}`;
     } else if (F) note = 'runs off here';
@@ -692,13 +692,14 @@ let DPR = 1;
 // (never below 1.5: on a sharp phone screen anything less looks blurred and blocky)
 const QUALITY = [{ dpr: 2, bloom: true }, { dpr: 2, bloom: false }, { dpr: 1.75, bloom: false }, { dpr: 1.5, bloom: false }];
 // phones start without the soft glow (it copies the whole frame each frame, which phones feel most)
-let qTier = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches ? 1 : 0;
+const COARSE = matchMedia('(pointer: coarse)').matches;
+let qTier = COARSE ? 1 : 0;
 // (a new name: steps remembered under the old one were taken too eagerly, and are let go)
 try { const q = localStorage.getItem('quillsigil.quality3'); if (q != null) qTier = clamp(Math.round(+q || 0), 0, QUALITY.length - 1); } catch (e) { }
 // (block[k]: until when step k isn't tried again after it proved too slow; wait[k]: how long the next wait is)
 const PERF = { n: 0, sum: 0, last: 0, hold: 0, good: 0, bad: 0, block: [], wait: [], mode: '' };
 // phones never try the soft glow (the step above 1) by themselves
-const QMIN = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches ? 1 : 0;
+const QMIN = COARSE ? 1 : 0;
 function setQuality(k, now) {
   qTier = k; PERF.hold = now + 1500; PERF.n = 0; PERF.sum = 0; PERF.good = 0;
   try { localStorage.setItem('quillsigil.quality3', String(k)); } catch (e) { }
@@ -733,7 +734,7 @@ function debugFrame(now, renderMs) {
   if (DBG.bench) { benchFrame(now, dt, renderMs); return; }
   DBG.n++; DBG.iv += dt; DBG.rd += renderMs; DBG.worst = Math.max(DBG.worst, dt);
   if (DBG.n < 30) return;
-  const cached = typeof TC !== 'undefined' ? TC.map.size : 0, tiles = World.cells.filter(c => !c.void).length;
+  const cached = TC.map.size, tiles = World.cells.filter(c => !c.void).length;
   const off = Object.keys(DBGOFF).find(k => DBGOFF[k]);
   DBG.el.textContent = (DBG.table ? DBG.table + '\n' : '') + `v${GAME_VERSION}  ${off ? 'no ' + off : 'all on'}  ops ${Math.round(DBG.ops / DBG.n)}  clips ${Math.round(DBG.clips / DBG.n)}\n${(1000 / (DBG.iv / DBG.n)).toFixed(0)} fps  frame ${(DBG.iv / DBG.n).toFixed(1)}ms  worst ${DBG.worst.toFixed(0)}ms
 draw ${(DBG.rd / DBG.n).toFixed(1)}ms  quality ${qTier}  dpr ${DPR}  ${PACE.iv < 11 ? (PACE.full ? '120Hz' : '60 of 120Hz') : ''}
@@ -1017,7 +1018,7 @@ function loop(now) {
 function tick(now) {
   const dt = clamp((now - lastT) / 1000, 0, 0.05); lastT = Math.max(lastT, now);
   const t = now / 1000;
-  // the world holds still while you read, draft in the grimoire, or choose where a seal shall fall
+  // the world holds still while you read, draft in the grimoire, or choose where a seal will fall
   if (!WORLD_PAUSED.has(Game.state)) {
     acc += dt;
     let n = 0;
