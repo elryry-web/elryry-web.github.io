@@ -3613,17 +3613,21 @@ function drawXray(g, c, t, xr) {
    soil, rock, moss and vines) takes dozens of fills. So a still tile is painted once into a small bitmap of its own
    and laid down from it each frame; its light, its water and whatever stands on it are still drawn live over it.
    A tile is painted afresh when it or a tile near it changes (once things settle), or the view moves or rescales. */
-const TC = { on: true, gkey: '', cells: null, map: new Map(), keys: [], calm: new Map() };
-const cellStateKey = c => c.void ? 'v' : c.h.toFixed(3) + '|' + c.th + '|' + (c.water == null ? '' : c.water.toFixed(3)) + '|' + c.ice + '|' + c.icy + '|' + c.frost + '|' +
-  (c.wet || 0).toFixed(2) + '|' + (c.ash || 0).toFixed(2) + '|' + c.feat + '|' + c.burn;
+const TC = { on: true, gkey: '', cells: null, map: new Map(), keys: [], skeys: [], calm: new Map() };
+// A tile's state in two parts: its shape (height, water, ice, the void), which the tiles round it are drawn against,
+// and its surface (frost, damp, ash, what stands on it, fire), which only it is. A change of shape repaints the
+// tiles round it too; a change of surface (a hedge burning to ash, frost spreading) repaints only the tile itself.
+const cellStateKey = c => c.void ? 'v' : c.h.toFixed(3) + '|' + c.th + '|' + (c.water == null ? '' : c.water.toFixed(3)) + '|' + c.ice + '|' + c.icy;
+const cellSurfaceKey = c => c.void ? '' : c.frost + '|' + (c.wet || 0).toFixed(2) + '|' + (c.ash || 0).toFixed(2) + '|' + c.feat + '|' + c.burn;
 function tileCacheFrame() {
   const D = typeof DPR !== 'undefined' ? DPR : 1;
   const gk = cam.s + '|' + cam.ox.toFixed(2) + '|' + cam.oy.toFixed(2) + '|' + D + '|' + Object.keys(SPRITE).length + '|' + TEX_VER + '|' + texOK + '|' + LIGHT_SIG
     + '|' + (XR ? [...XR.set].map(c => c.x + ',' + c.y).join(';') : '');
-  if (gk !== TC.gkey || TC.cells !== World.cells) { TC.gkey = gk; TC.cells = World.cells; for (const e of TC.map.values()) tileDrop(e); TC.map.clear(); TC.keys = []; }
+  if (gk !== TC.gkey || TC.cells !== World.cells) { TC.gkey = gk; TC.cells = World.cells; for (const e of TC.map.values()) tileDrop(e); TC.map.clear(); TC.keys = []; TC.skeys = []; }
   const cs = World.cells;
   for (let i = 0; i < cs.length; i++) {
-    const c = cs[i], k = cellStateKey(c);
+    const c = cs[i], k = cellStateKey(c), sk = cellSurfaceKey(c);
+    if (TC.skeys[i] !== sk) { TC.skeys[i] = sk; tileDrop(TC.map.get(c)); TC.map.delete(c); TC.calm.set(c, frameNo); }
     if (TC.keys[i] === k) continue;
     TC.keys[i] = k;
     for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
