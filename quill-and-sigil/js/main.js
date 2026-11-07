@@ -738,6 +738,11 @@ function resize() {
   fitCamera(innerWidth, innerHeight);
 }
 window.addEventListener('resize', resize);
+// coming back to the page (or the browser restoring a lost canvas): every kept drawing is made afresh, in case the
+// browser wiped them while the page was away
+function refreshAll() { try { refreshCanvases(); } catch (e) { console.warn(e); } Grim.bookDirty = true; Grim.inkDirty = true; }
+document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshAll(); });
+wc.addEventListener('contextrestored', refreshAll);
 
 // ?touch makes the game behave as on a touch screen even with a mouse (the desktop phone preview uses it)
 const QP = new URLSearchParams(location.search);

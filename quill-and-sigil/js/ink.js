@@ -885,6 +885,8 @@ function textOnCircle(g, text, cx, cy, r, a0, size) {
 
 /* Parchment texture (cached) */
 let _parch = null;
+// (let go when the page comes back from the background, in case the browser wiped it)
+document.addEventListener('visibilitychange', () => { if (!document.hidden) _parch = null; });
 function parchment() {
   if (_parch) return _parch;
   const c = document.createElement('canvas'); c.width = c.height = 512;

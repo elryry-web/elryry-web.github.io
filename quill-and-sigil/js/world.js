@@ -1758,12 +1758,12 @@ function texUnder(g, R, dark, U, W, soil) {
 /* Painted textures (art/tex-*.jpg, made in the storybook painting's style) take over from the drawn ones as
    they load. `span` is how many world units one copy of a painting covers. Stone keeps the drawn slab edges and
    shading over the painting; the soil also makes the painted rock below the rim. */
-const TEX_SRC = {};
+const TEX_SRC = {}, TEX_IMAGES = {};
 const TEX_ART = { grass: { file: 'tex-grass', span: 3 }, stone: { file: 'tex-stone', span: 2 }, soil: { file: 'tex-soil', span: 2.5 }, water: { file: 'tex-water', span: 5 }, ice: { file: 'tex-ice', span: 2 }, fall: { file: 'tex-fall', span: 2 }, wood: { file: 'tex-wood', span: 1 }, runestone: { file: 'tex-runestone', span: 1.6 } };
 for (const k in TEX_ART) {
   if (typeof Image === 'undefined') break;
   const im = new Image();
-  im.onload = () => { try { paintedTex(k, im); } catch (e) { console.warn('texture', k, e); } };
+  im.onload = () => { TEX_IMAGES[k] = im; try { paintedTex(k, im); } catch (e) { console.warn('texture', k, e); } };
   im.src = `art/${TEX_ART[k].file}.jpg?v=3`;
 }
 let TEX_VER = 0;
@@ -3063,12 +3063,21 @@ function ivyFor(seed) {
 }
 /* Moss along a stone block's top edge: the painted strip, repeating along the wall (by u = x - y, so it runs on
    unbroken from block to block), its dense band just at the edge and its drips hanging down the stone. */
-const lipPats = new WeakMap(), LIP_EDGE = 34;
+let lipPats = new WeakMap(); const LIP_EDGE = 34;
 // the moss strip as a pattern on this canvas, darkened by f (for walls in shade, and the shadowed foot of a wall)
+// The strip is padded with clear space one strip-height above and below: Chrome on Android doesn't always keep a
+// 'repeat-x' pattern from repeating up and down a slanted fill, and with the padding any such repeat is invisible.
+// (Its rows therefore start MOSS_PAD down the pattern.)
+const mossPadded = {};
+let MOSS_PAD = 0;
 function mossPat(g, f) {
   const src = f ? shadedSprite('moss-lip', f) : SPRITE['moss-lip']; if (!src) return null;
+  const H = src.naturalHeight || src.height, W = src.naturalWidth || src.width; MOSS_PAD = H;
+  let pc = mossPadded[f];
+  if (!pc || pc.src !== src) { const c = document.createElement('canvas'); c.width = W; c.height = H * 3; c.getContext('2d').drawImage(src, 0, H); pc = mossPadded[f] = { src, c }; }
   let m = lipPats.get(g); if (!m) lipPats.set(g, m = {});
-  return m[f] || (m[f] = g.createPattern(src, 'repeat-x'));
+  if (!m[f] || m[f].src !== pc.c) m[f] = { src: pc.c, p: g.createPattern(pc.c, 'repeat-x') };
+  return m[f].p;
 }
 // lays the strip on a stretch of upright wall between world points e0 and e1, filling `quad`: its dense edge at
 // height zEdge, hanging hz down from it, or at a wall's foot (foot) growing hz up from it. Across, it runs by
@@ -3079,7 +3088,8 @@ function mossOn(g, f, foot, e0, e1, quad, zEdge, hz) {
   const u0 = e0[0] - e0[1], du = (e1[0] - e1[1]) - u0, Y0 = (e0[0] + e0[1]) * TH * 0.5, Y1 = (e1[0] + e1[1]) * TH * 0.5;
   const m = Math.abs(du) > 1e-4 ? (Y1 - Y0) / du : 0, zo = foot ? zEdge - LIP_EDGE / UY : zEdge + LIP_EDGE / UY;
   const a = TW * 0.5 * s / UX, b = m * s / UX, sh = foot ? 0.37 * UX : 0;
-  P.setTransform(new DOMMatrix([a, b, 0, (foot ? -TZ : TZ) * s / UY, cam.ox + sh * a, cam.oy + (Y0 - u0 * m) * s - zo * TZ * s + sh * b]));
+  const d = (foot ? -TZ : TZ) * s / UY;
+  P.setTransform(new DOMMatrix([a, b, 0, d, cam.ox + sh * a, cam.oy + (Y0 - u0 * m) * s - zo * TZ * s + sh * b - MOSS_PAD * d]));
   g.fillStyle = P; poly(g, quad); g.fill();
   return true;
 }
@@ -3107,8 +3117,12 @@ function mossTop(g, c, z, top, drops) {
     const e = i === 0 ? [0, c.y] : i === 2 ? [0, c.y + 1] : i === 1 ? [c.x + 1, 0] : [c.x, 0];
     const o = [e[0] - n[0] * LIP_EDGE / UY, e[1] - n[1] * LIP_EDGE / UY];
     const ax = J(along[0] / UX, along[1] / UX), ay = J(n[0] / UY, n[1] / UY), oo = J(o[0], o[1]);
-    P.setTransform(new DOMMatrix([ax[0], ax[1], ay[0], ay[1], cam.ox + oo[0], cam.oy + oo[1] - z * TZ * s]));
-    g.fillStyle = P; poly(g, top); g.fill();
+    P.setTransform(new DOMMatrix([ax[0], ax[1], ay[0], ay[1], cam.ox + oo[0] - MOSS_PAD * ay[0], cam.oy + oo[1] - z * TZ * s - MOSS_PAD * ay[1]]));
+    // filled only over the band along this edge (Chrome on Android doesn't keep a 'repeat-x' pattern from
+    // repeating across a slanted fill, and the strip then tiled over the whole top)
+    const k0 = i, k1 = (i + 1) % 4, A0 = [c.x + CORN[k0][0], c.y + CORN[k0][1]], A1 = [c.x + CORN[k1][0], c.y + CORN[k1][1]];
+    const band = [A0, A1, [A1[0] + n[0] * dep, A1[1] + n[1] * dep], [A0[0] + n[0] * dep, A0[1] + n[1] * dep]].map(([u, v]) => proj(u, v, z));
+    g.fillStyle = P; poly(g, band); g.fill();
   }
   g.restore();
 }
@@ -3116,7 +3130,7 @@ function mossTop(g, c, z, top, drops) {
    under its top, the damp patches at its foot), whatever its height, and repeat every 4 tiles across, so their
    faint upright lines fall on the joints between blocks; they are multiplied over the stone. Lichen is scattered on
    walls and tops, pinned to the world, darker on walls in shade. */
-const weatherPats = new WeakMap();
+let weatherPats = new WeakMap();
 function weatherPat(g, key, src, rep) {
   let m = weatherPats.get(g); if (!m) weatherPats.set(g, m = {});
   return m[key] || (m[key] = g.createPattern(src, rep));
@@ -3683,6 +3697,19 @@ function drawTile(g, c, t) {
   g.drawImage(e.cv, e.X0, e.Y0, e.w, e.h);
   tileLights(g, c);
   drawCell(g, c, t, 'top');
+}
+/* Chrome on Android may wipe a page's canvases while it is in the background (or short of memory), leaving them
+   blank: the painted textures, the tile bitmaps, every sprite made once and kept. So on coming back (and whenever
+   the world canvas reports its context restored) all of them are let go and made again as they're next needed. */
+function refreshCanvases() {
+  for (const o of [glowCache, softCache, lightCache, shadeCache, charCache, litCache, ringCache, mossPadded]) for (const k in o) delete o[k];
+  for (const k in TEX_SRC) delete TEX_SRC[k];
+  for (const k in TEX_IMAGES) { try { paintedTex(k, TEX_IMAGES[k]); } catch (e) { console.warn('texture', k, e); } }
+  TEX_VER++;
+  lipPats = new WeakMap(); weatherPats = new WeakMap();
+  SKY.base = null; SEA.bands.length = 0; _moon = null; _vig = null;
+  for (const I of SKY.isles) I.spr = null;
+  releaseBuffers();
 }
 let frameNo = 0;
 function render(g, w, h, t, overlay) {
