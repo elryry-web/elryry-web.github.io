@@ -684,6 +684,7 @@ const wc = document.getElementById('world'), wg = wc.getContext('2d');
 // the sky on its own canvas behind the world's: repainted about 25 times a second, at no more than 1.25x resolution
 const skc = document.getElementById('sky'), skg = skc.getContext('2d', { alpha: false });
 const SKYP = { dpr: 1, last: -1e9 };
+const PACE = { last: 0, iv: 16.7, n: 0 };
 SKY_LAYER = wc;
 let DPR = 1;
 /* Quality steps, tried in turn when frames come too slowly (on phones, mostly): first the soft glow goes, then the
@@ -976,7 +977,13 @@ function tick(now) {
   if (covered && Game.coverAt && !Game.released) { Game.released = true; releaseBuffers(); Grim.releaseLayers(); }
   if (!covered) Game.released = false;
   let r0 = 0;
-  if (!covered) {
+  // On a 120 Hz screen the world is drawn every other refresh (60 a second): a frame that can't be made in 8 ms
+  // otherwise drops Chrome to a steady 30. The world still steps every refresh, so motion keeps its pace.
+  const rdt = now - PACE.last; PACE.last = now;
+  if (rdt > 0 && rdt < 250) PACE.iv = PACE.iv * 0.95 + rdt * 0.05;
+  PACE.n++;
+  const skipDraw = PACE.iv < 11 && PACE.n % 2 === 1;
+  if (!covered && !skipDraw) {
     const k = WORLD_PAUSED.has(Game.state) ? 1 : acc / FIXED, held = [];
     if (k < 1) for (const b of World.bodies) {
       if (b._px == null || Math.abs(b.x - b._px) + Math.abs(b.y - b._py) + Math.abs(b.z - b._pz) > 1) continue;
@@ -988,8 +995,8 @@ function tick(now) {
     try { render(wg, innerWidth, innerHeight, t, aimOverlay); }
     finally { for (let i = 0; i < held.length; i += 4) { const b = held[i]; b.x = held[i + 1]; b.y = held[i + 2]; b.z = held[i + 3]; } }
   }
-  perfWatch(now, !covered && !PV.isOpen);
-  if (DEBUG) debugFrame(now, covered ? 0 : performance.now() - r0);
+  if (!skipDraw) perfWatch(now, !covered && !PV.isOpen);
+  if (DEBUG && !skipDraw) debugFrame(now, covered ? 0 : performance.now() - r0);
   Grim.frame(dt, t);
   Game.update(dt);
   try { Tips.update(dt); } catch (e) { console.error(e); } // a tip must never stop the game

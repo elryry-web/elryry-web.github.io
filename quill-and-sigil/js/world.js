@@ -2810,7 +2810,8 @@ function sheetRuns(c) {
 const SHEET_PX = 64, _sheetC = {};
 let _sheetF = -1;
 function sheetPattern(g, hU, t) {
-  if (_sheetF !== frameNo) { _sheetF = frameNo; for (const k in _sheetC) _sheetC[k].fresh = false; }
+  // (the strip is painted afresh every other frame: the fall moves smoothly enough at that rate)
+  if (frameNo - _sheetF >= 2) { _sheetF = frameNo; for (const k in _sheetC) _sheetC[k].fresh = false; }
   const key = Math.round(hU * 10);
   let E = _sheetC[key];
   if (!E) E = _sheetC[key] = { c: document.createElement('canvas'), fresh: false, pats: new WeakMap() };
@@ -3617,7 +3618,8 @@ const cellStateKey = c => c.void ? 'v' : c.h.toFixed(3) + '|' + c.th + '|' + (c.
   (c.wet || 0).toFixed(2) + '|' + (c.ash || 0).toFixed(2) + '|' + c.feat + '|' + c.burn;
 function tileCacheFrame() {
   const D = typeof DPR !== 'undefined' ? DPR : 1;
-  const gk = cam.s + '|' + cam.ox.toFixed(2) + '|' + cam.oy.toFixed(2) + '|' + D + '|' + Object.keys(SPRITE).length + '|' + TEX_VER + '|' + texOK + '|' + LIGHT_SIG;
+  const gk = cam.s + '|' + cam.ox.toFixed(2) + '|' + cam.oy.toFixed(2) + '|' + D + '|' + Object.keys(SPRITE).length + '|' + TEX_VER + '|' + texOK + '|' + LIGHT_SIG
+    + '|' + (XR ? [...XR.set].map(c => c.x + ',' + c.y).join(';') : '');
   if (gk !== TC.gkey || TC.cells !== World.cells) { TC.gkey = gk; TC.cells = World.cells; for (const e of TC.map.values()) tileDrop(e); TC.map.clear(); TC.keys = []; }
   const cs = World.cells;
   for (let i = 0; i < cs.length; i++) {
@@ -3657,7 +3659,17 @@ function buildTile(c, t) {
   const lg = cv.getContext('2d'); lg.setTransform(D, 0, 0, D, -X0 * D, -Y0 * D);
   const h0 = HANG.length; LIGHT_ONLY = 'still';
   try { drawCell(lg, c, t, 'base'); } finally { LIGHT_ONLY = null; }
-  const e = { cv, X0, Y0, w: w / D, h: h / D, hang: HANG.slice(h0) };
+  // a block standing in front of the goal has the soft window round the goal cut into its bitmap (see drawXray)
+  const xr = XR && XR.set.has(c);
+  if (xr) {
+    lg.globalCompositeOperation = 'destination-out';
+    const gr = lg.createRadialGradient(XR.cx, XR.cy, 0, XR.cx, XR.cy, XR.R);
+    gr.addColorStop(0, 'rgba(0,0,0,0.62)'); gr.addColorStop(0.5, 'rgba(0,0,0,0.5)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    lg.fillStyle = gr; lg.fillRect(XR.cx - XR.R, XR.cy - XR.R, XR.R * 2, XR.R * 2);
+    lg.globalCompositeOperation = 'source-over';
+  }
+  // (top: whether anything is drawn over it live: water at a jutting corner, or something standing on it)
+  const e = { cv, X0, Y0, w: w / D, h: h / D, hang: HANG.slice(h0), xr, top: !!(c.feat || landWaterCorners(c)) };
   TC.map.set(c, e); TC.built++;
   return e;
 }
@@ -3695,10 +3707,10 @@ function drawTile(g, c, t) {
   let e = still ? TC.map.get(c) : null;
   if (still && !e && TC.built < 8) e = buildTile(c, t); // a few a frame, so settling never makes one long frame
   else if (e) for (const v of e.hang) HANG.push(v);
-  if (!e) { drawCell(g, c, t); return; }
+  if (!e) { if (XR && XR.set.has(c)) drawXray(g, c, t, XR); else drawCell(g, c, t); return; }
   g.drawImage(e.cv, e.X0, e.Y0, e.w, e.h);
-  tileLights(g, c);
-  drawCell(g, c, t, 'top');
+  if (!e.xr) tileLights(g, c);
+  if (e.top) drawCell(g, c, t, 'top');
 }
 /* Chrome on Android may wipe a page's canvases while it is in the background (or short of memory), leaving them
    blank: the painted textures, the tile bitmaps, every sprite made once and kept. So on coming back (and whenever
@@ -3713,7 +3725,7 @@ function refreshCanvases() {
   for (const I of SKY.isles) I.spr = null;
   releaseBuffers();
 }
-let frameNo = 0, SKY_LAYER = null;
+let frameNo = 0, SKY_LAYER = null, XR = null;
 function render(g, w, h, t, overlay) {
   frameNo++;
   // the game's own canvas has its sky on a layer of its own behind it (main.js repaints that a little less often and
@@ -3724,6 +3736,7 @@ function render(g, w, h, t, overlay) {
   if (!World.W) return;
   easeCamera();
   gatherLights(t);
+  XR = xrayFor();
   tileCacheFrame();
   g.save();
   if (cam.shake > 0) g.translate((Math.random() - .5) * cam.shake * 14, (Math.random() - .5) * cam.shake * 10);
@@ -3738,10 +3751,12 @@ function render(g, w, h, t, overlay) {
   items.sort((a, b) => a.k - b.k || a.sub - b.sub);
   // ground-plane seals underneath bodies: draw seals (normal) after terrain items of their diagonal — simpler: draw all terrain, then seals, but bodies keep order
   HANG.length = 0; hangAt = 0;
-  const xr = xrayFor();
+  const xr = XR;
   for (const it of items) {
     if (hangAt < HANG.length) flushHang(g, t, it.k - 2);
-    if (it.c) { if (xr && xr.set.has(it.c)) drawXray(g, it.c, t, xr); else drawTile(g, it.c, t); }
+    // a see-through block is drawn from its cached bitmap (the window cut into it) unless something stands on it,
+    // whose drawing must be cut too
+    if (it.c) { if (xr && xr.set.has(it.c) && it.c.feat) drawXray(g, it.c, t, xr); else drawTile(g, it.c, t); }
     else drawBody(g, it.b, t);
   }
   flushHang(g, t, Infinity);
