@@ -732,8 +732,7 @@ function describeSpell(sp, short = false) {
 
 /* what a ring-sigil does to a placed spell (the fifth folio's pairings), for the aim preview */
 function placedWhat(sp, s) {
-  const lunas = (sp.sats || []).filter(x => x.id === 'luna').reduce((a, x) => a + x.n, 0);
-  if (sp.sigil === 'stone' && s.id === 'luna') return `: the stone floats where it rises, ${6 + 2 * lunas}s`;
+  if (sp.sigil === 'stone' && s.id === 'luna') return ': the stone hangs where it rises';
   if (sp.sigil === 'stone' && s.id === 'frost') return ': raised as ice, slick underfoot';
   if (sp.sigil === 'tide' && s.id === 'frost') return ': the water freezes as it pours';
   if (sp.sigil === 'tide' && s.id === 'luna') return `: a bubble lifts what the water holds, ${3 + 2 * s.n}s${sp.dir ? ' · drifting ' + worldDirArrow(sp.dir) : ''}`;
@@ -890,13 +889,45 @@ function fleuron(g, x, y, s, ink, gold) {
   g.fillStyle = gold; g.beginPath(); g.arc(0, 0, 2.2, 0, TAU); g.fill();
   g.restore();
 }
+// the crescent's lines sit left of its centre (its bounds run -0.80 to +0.47): drawn, it is moved right to sit in its ring
+// (the recognizer still matches against glyphLines as they are)
+const GLYPH_NUDGE = { moon: 0.165 };
 function drawGlyph(g, id, cx, cy, r, col, w) {
   g.save(); g.strokeStyle = col; g.lineWidth = w; g.lineCap = 'round'; g.lineJoin = 'round';
-  for (const line of glyphLines(SIGILS[id].glyph)) {
+  const gl = SIGILS[id].glyph; cx += (GLYPH_NUDGE[gl] || 0) * r;
+  for (const line of glyphLines(gl)) {
     g.beginPath(); line.forEach(([x, y], i) => i ? g.lineTo(cx + x * r, cy + y * r) : g.moveTo(cx + x * r, cy + y * r)); g.stroke();
   }
   g.restore();
 }
+// Cinzel Decorative fuses a lowercase h to an e after it (one shared stem: Featherfall read as FEAT-HE-RFALL), and no font
+// feature switch turns it off; so in that face every h is set as plain Cinzel's capital H (that face's lowercase letters
+// are capitals of the same height, and its own capital H is a tall swash that stood above The Hanging Stones).
+// paint(t, x, y) draws a run (fillText / strokeText) left-aligned; decoText honours g.textAlign for the whole string.
+function decoRuns(g, text) {
+  const deco = g.font, plain = deco.replace(/"Cinzel Decorative"/, 'Cinzel');
+  if (deco === plain || !/h/i.test(text)) return null;
+  return String(text).split(/(h+)/i).filter(Boolean).map(t => {
+    const isH = /h/i.test(t[0]), f = isH ? plain : deco; if (isH) t = t.toUpperCase();
+    g.font = f; const w = g.measureText(t).width; g.font = deco;
+    return { t, f, w };
+  });
+}
+function decoWidth(g, text) {
+  const runs = decoRuns(g, text);
+  return runs ? runs.reduce((a, r) => a + r.w, 0) : g.measureText(text).width;
+}
+function decoText(g, text, x, y, paint) {
+  const runs = decoRuns(g, text);
+  if (!runs) { paint(text, x, y); return; }
+  const deco = g.font, align = g.textAlign, w = runs.reduce((a, r) => a + r.w, 0);
+  let cx = x - (align === 'center' ? w / 2 : align === 'right' || align === 'end' ? w : 0);
+  g.textAlign = 'left';
+  for (const r of runs) { g.font = r.f; paint(r.t, cx, y); cx += r.w; }
+  g.font = deco; g.textAlign = align;
+}
+// the same for the page: a name for innerHTML, its h's in a span set as Cinzel capitals (.dh)
+const decoHTML = t => String(t).replace(/[&<>"]/g, c => `&#${c.charCodeAt(0)};`).replace(/h+/gi, '<span class="dh">$&</span>');
 function wrapText(g, text, x, y, maxW, lh) {
   const words = text.split(' '); let line = '';
   for (const w of words) {
@@ -1008,8 +1039,8 @@ function goldText(g, text, x, y, size) {
   gr.addColorStop(0, '#f7e29a'); gr.addColorStop(0.42, '#d2a24a'); gr.addColorStop(0.58, '#9c6a22'); gr.addColorStop(1, '#dcb45c');
   g.save(); g.lineJoin = 'round';
   g.shadowColor = 'rgba(70,40,10,0.35)'; g.shadowOffsetY = Math.max(1, size * 0.04); g.shadowBlur = size * 0.06;
-  g.strokeStyle = 'rgba(66,36,12,0.9)'; g.lineWidth = Math.max(1.2, size * 0.075); g.strokeText(text, x, y);
-  g.shadowColor = 'transparent'; g.fillStyle = gr; g.fillText(text, x, y);
+  g.strokeStyle = 'rgba(66,36,12,0.9)'; g.lineWidth = Math.max(1.2, size * 0.075); decoText(g, text, x, y, (t, x, y) => g.strokeText(t, x, y));
+  g.shadowColor = 'transparent'; g.fillStyle = gr; decoText(g, text, x, y, (t, x, y) => g.fillText(t, x, y));
   g.restore();
 }
 // a sigil in its knotwork roundel (whose outer edge is (r + 3) / 0.6)
@@ -1499,16 +1530,16 @@ const Grim = {
       g.drawImage(BAND, P.x + (P.w - bw) / 2, by, bw, bh);
       let fs = Math.min(22 * s, bh * 0.3);
       g.font = `700 ${Math.round(fs)}px "Cinzel Decorative", serif`;
-      const tw = g.measureText(lv.name).width; if (tw > bw * 0.5) { fs *= bw * 0.5 / tw; g.font = `700 ${Math.round(fs)}px "Cinzel Decorative", serif`; }
+      const tw = decoWidth(g, lv.name); if (tw > bw * 0.5) { fs *= bw * 0.5 / tw; g.font = `700 ${Math.round(fs)}px "Cinzel Decorative", serif`; }
       // centred on the letters' own ink, not the font's em box (Cinzel's 'middle' sits the capitals high on the panel)
       g.fillStyle = '#5a1c14'; g.textBaseline = 'middle';
       const nm = g.measureText(lv.name), lift = (nm.actualBoundingBoxAscent - nm.actualBoundingBoxDescent) / 2 || 0;
-      g.fillText(lv.name, P.x + P.w / 2, by + bh * 0.5 + lift); g.textBaseline = 'alphabetic';
+      decoText(g, lv.name, P.x + P.w / 2, by + bh * 0.5 + lift, (t, x, y) => g.fillText(t, x, y)); g.textBaseline = 'alphabetic';
       y = by + bh + 16 * s;
     } else {
       y += 34 * s;
       g.font = `700 ${Math.round(26 * s)}px "Cinzel Decorative", serif`;
-      g.fillStyle = ink; g.fillText(lv.name, P.x + P.w / 2, y);
+      g.fillStyle = ink; decoText(g, lv.name, P.x + P.w / 2, y, (t, x, y) => g.fillText(t, x, y));
       y += 14 * s; fleuron(g, P.x + P.w / 2, y + 6 * s, s * 0.8, ink, gold); y += 30 * s;
     }
     // master's note with illuminated initial
@@ -1643,18 +1674,44 @@ const Grim = {
       g.setLineDash([2, 3]); g.beginPath(); g.arc(dx - dr * 1.0, dy - dr * 1.0, dr * 0.42, 0, TAU); g.stroke(); g.setLineDash([]);
       drawGlyph(g, 'flame', dx - dr * 1.0, dy - dr * 1.0, dr * 0.32, ink, 1);
     }
-    const end = wrapText(g, signNotes(lv), dx + dr * 2.4, y + 10 * s, w - dr * 2.6 - 12 * s, 15 * s);
-    this.codexInfo = { k, twoCol, rowH, notesEnd: end, pageEnd: P.y + P.h - Math.min(P.w, P.h) * 0.035 }; // for checking the layout
-    const foot = P.y + P.h - B.m - B.vh - 10 * s, free = foot - end - 6 * s;
+    const nx = dx + dr * 2.4, ny = y + 10 * s, foot = P.y + P.h - B.m - B.vh - 10 * s, fullW = w - dr * 2.6 - 12 * s;
+    // the notes laid out in lines: full width, or, beside a map in the corner, narrower once they reach its top
+    const layNotes = (sc, M) => {
+      const lh = 15 * s * sc, out = []; let yy = ny, ln = '';
+      g.font = `italic ${Math.round(12.2 * s * sc)}px "IM Fell English", serif`;
+      const wAt = yy => M && yy + 4 * s > M.y - 4 * s ? M.x - 10 * s - nx : fullW;
+      for (const wd of notesText.split(' ')) {
+        const t = ln ? ln + ' ' + wd : wd;
+        if (g.measureText(t).width > wAt(yy) && ln) { out.push([ln, yy]); yy += lh; ln = wd; } else ln = t;
+      }
+      if (ln) { out.push([ln, yy]); yy += lh; }
+      return { lines: out, end: yy, sc };
+    };
+    let N = layNotes(1, null);
     // on the spread the map of the land lies on this page (the drawing page kept free): centred at the foot of the
-    // page, or beside the sigils only when the writing leaves no room at the foot
+    // page, or beside the sigils when the writing leaves no room at the foot, or, on a page crowded with both, in the
+    // corner at the foot with the notes running round it, a little smaller if they must (the late lessons had lost
+    // their map altogether)
     this.mapAt = null;
     if (!this.L.single && World.W) {
       const right = Math.min(x0 + w + P.w * 0.05, P.x + P.w - B.m - B.vh - 10 * s);
       const beside = twoCol ? null : { x0: textR + 14 * s, x1: right, y0: rowsTop - 4 * s, y1: rowsEnd + 2 * s };
-      const atFoot = { x0: x0, x1: x0 + w, y0: end + 4 * s, y1: foot };
+      const atFoot = { x0: x0, x1: x0 + w, y0: N.end + 4 * s, y1: foot };
       this.mapAt = this.mapFit(atFoot, true, s) || (beside && this.mapFit(beside, false, s));
+      corner: for (const sc of [1, 0.95, 0.9, 0.85]) for (const f of [0.5, 0.44, 0.38, 0.32, 0.27]) {
+        if (this.mapAt) break corner;
+        const R = { x0: right - w * f, x1: right, y0: rowsEnd + 6 * s, y1: foot }, C = this.mapFit(R, true, s);
+        if (!C || C.x - 10 * s - nx < w * 0.3) continue;
+        C.x = R.x1 - C.w; C.y = R.y1 - C.h; // tucked into the corner
+        const T = layNotes(sc, C);
+        if (T.end - 15 * s * sc + 4 * s <= foot) { this.mapAt = C; N = T; }
+      }
     }
+    g.font = `italic ${Math.round(12.2 * s * N.sc)}px "IM Fell English", serif`;
+    for (const [t, yy] of N.lines) g.fillText(t, nx, yy);
+    const end = N.end;
+    this.codexInfo = { k, twoCol, rowH, notesEnd: end, notesScale: N.sc, rowsEnd, foot, pageEnd: P.y + P.h - Math.min(P.w, P.h) * 0.035 }; // for checking the layout
+    const free = foot - end - 6 * s;
     if (TRI && !(this.mapAt && this.mapAt.foot)) {
       // a spiral tailpiece in the room left at the foot of the page, if there is room for one
       if (free > 70 * s) {
@@ -1672,7 +1729,7 @@ const Grim = {
     g.textAlign = 'center'; g.fillStyle = ink;
     g.font = `700 ${Math.round(20 * s + 4)}px "Cinzel Decorative", serif`;
     if (MD) goldText(g, lv.name, P.x + P.w / 2, top, 20 * s + 4);
-    else g.fillText(lv.name, P.x + P.w / 2, top);
+    else decoText(g, lv.name, P.x + P.w / 2, top, (t, x, y) => g.fillText(t, x, y));
     this.codexRects = [];
     // the row keeps inside the knotwork border (its first and last names were clipped by it)
     const B = this.borderSize(P), inner = MD ? P.w - 2 * (B.m + B.vh) - 14 : P.w - 20;

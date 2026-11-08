@@ -419,16 +419,16 @@ const LEVELS = [
   // heavy orb, and each lesson keeps to the one pairing it teaches.
   // A chasm six tiles wide (x 4–9) between two plateaus at height 2; orb (1,3), font (12,3). Seal 1: Petra cast on the
   // last tile of ground (3.5,3.5), its sign toward the font, Luna and Ventus on its ring: the slabs rise out over the void
-  // and hang there (6s with one Luna, 2s more per Luna). Seal 2: Ventus on the orb toward the font, two barbs, before the
-  // slabs drop. Wins 9/9 with no barb and 2+ Ventus, one barb and 2+ Ventus, two barbs and 1+ Ventus, at any Luna count.
+  // and hang there for good (they once fell after 6s, 2s more per Luna). Seal 2: Ventus on the orb toward the font, two
+  // barbs. Wins 9/9 with no barb and 2+ Ventus, one barb and 2+ Ventus, two barbs and 1+ Ventus, at any Luna count.
   // Fails 0/9: shorter bridges (no barb with 0–1 Ventus, one barb with 0–1, two barbs with none: the arm stops short of the
   // far side); a one-barb gust over the bridge; the bridge cast on the void (it starts a tile out); opposite signs; a
   // plain gust of any strength; a plain Petra line without Luna (it falls into the void).
   {
     name: 'The Hanging Stones', sigils: ['gale', 'stone', 'luna'], centers: ['gale', 'stone'], ringOf: { gale: [], stone: ['luna', 'gale'] },
     par: 2, ink: 2, combos: true, opens: 'The Fifth Folio',
-    lesson: 'The fifth folio, where the small sigils ride on stone and water. A chasm too wide for any gust lies between the orb and the font. An arm of Petra cast out over empty air falls away, but Luna on Petra’s ring makes the stone hang where it rises, for a while. Ventus on Petra’s ring stretches the arm farther. In this folio each sigil takes only certain sigils on its ring.',
-    hint: 'Petra in the centre, cast on the last tile of ground before the chasm, its sign toward the font (lower right) crossed by two barbs. On its ring a small Luna and a small Ventus, in any slots. Then, while the stones still hang, Ventus on the orb toward the font, crossed by two barbs.',
+    lesson: 'The fifth folio, where the small sigils ride on stone and water. A chasm too wide for any gust lies between the orb and the font. An arm of Petra cast out over empty air falls away, but Luna on Petra’s ring makes the stone hang where it rises. Ventus on Petra’s ring stretches the arm farther. In this folio each sigil takes only certain sigils on its ring.',
+    hint: 'Petra in the centre, cast on the last tile of ground before the chasm, its sign toward the font (lower right) crossed by two barbs. On its ring a small Luna and a small Ventus, in any slots. Then Ventus on the orb toward the font, crossed by two barbs.',
     t: [' 222      2222 ', '2222      22222', '2222      22222', '2222      22222', '2222      22222', '2222      22222', ' 222      2222 '],
     o: ['...............', '...............', '...............', '.O..........G..', '...............', '...............', '...............'],
   },
@@ -523,7 +523,7 @@ const NUDGES = {
   'The Timber Run': 'No wind carries the crates that far, but moving water will. Where does the race end, and what would lie there?',
   'The Icebound Font': 'Fire would melt the wall, and the frozen race under the orb with it. Something heavy breaks ice without melting it.',
   'The Thaw': 'The fire must cross the race to reach both braziers, and a thawed race carries everything over the falls. Cross while it is still frozen.',
-  'The Hanging Stones': 'Stone cast out over empty air falls away. Something on its ring could hold it where it rises, long enough to cross.',
+  'The Hanging Stones': 'Stone cast out over empty air falls away. Something on its ring could hold it where it rises.',
   'The Moon Pool': 'No wind lifts the orb out of its pool, but water would. What could carry the water’s float on across the gap?',
   'The Glass Floor': 'Once in the trench, the orb never climbs out. Fill the trench, and make what fills it hold still.',
   'The Glass Bridge': 'A long enough bridge is not enough: the orb slows on stone and stops before it arrives. What would keep it from slowing?',
@@ -636,7 +636,7 @@ const Game = {
     const box = $('#lessonGrid'); box.innerHTML = '';
     LEVELS.forEach((L, i) => {
       const locked = i >= Save.data.unlocked, st = Save.data.stars[i] || 0;
-      if (L.opens) { const h = document.createElement('div'); h.className = 'fhead'; h.textContent = L.opens; box.appendChild(h); }
+      if (L.opens) { const h = document.createElement('div'); h.className = 'fhead'; h.innerHTML = decoHTML(L.opens); box.appendChild(h); }
       const el = document.createElement('button');
       el.className = 'lcard' + (locked ? ' locked' : '');
       el.innerHTML = `<div class="lr">${L.roman}</div><div class="ln">${locked ? '· sealed ·' : L.name}</div><div class="ls">${st ? '<i class="on" title="Solved"></i>' : ''}</div>`;
@@ -669,7 +669,7 @@ const Game = {
     VIEW.z = 1; fitCamera(innerWidth, innerHeight);
     $('#lnum').textContent = `Lesson ${this.level.roman}`;
     $('#par').textContent = this.level.par;
-    $('#ltitle').textContent = this.level.name;
+    $('#ltitle').innerHTML = decoHTML(this.level.name);
     this.updateCasts();
     $('#hud').classList.add('show');
     this.state = 'play';
@@ -808,7 +808,7 @@ const Game = {
       if (this.state !== 'won' || this.idx !== wonIdx) return; // the player has already moved on
       // the last lesson of each folio says so; the very last closes the book
       const end = L.folioEnd || (last && { title: 'The Folio is Complete', text: 'Your seals have carried the light across the sky. The master closes the folio.' });
-      $('#winTitle').textContent = end ? end.title : 'Lesson Complete';
+      $('#winTitle').innerHTML = decoHTML(end ? end.title : 'Lesson Complete');
       const tally = `${this.casts} seal${this.casts === 1 ? '' : 's'} cast. The master's mark is ${par}.`;
       $('#winText').textContent = end ? `${end.text} ${tally}` : tally;
       $('#bNext').style.display = last ? 'none' : '';
@@ -848,7 +848,7 @@ const Game = {
     const illum = !(typeof CLASSIC !== 'undefined' && CLASSIC.on) && !!GART.page;
     $('#notes').classList.toggle('illum', illum);
     $('#nNum').textContent = `Lesson ${L.roman}`;
-    $('#nTitle span').textContent = L.name; $('#nTitle span').style.fontSize = '';
+    $('#nTitle span').innerHTML = decoHTML(L.name); $('#nTitle span').style.fontSize = '';
     const nt = $('#nText'); nt.textContent = illum ? L.lesson.slice(1) : L.lesson;
     if (illum) { const c = document.createElement('span'), i = document.createElement('i'); c.className = 'cap'; i.textContent = L.lesson[0]; c.append(i); nt.prepend(c); }
     const box = $('#nSigils'); box.innerHTML = '';
@@ -1356,7 +1356,7 @@ Grim.init(document.getElementById('page'));
 resize();
 Game.title();
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { Grim.bookDirty = true; });
-['700 30px "Cinzel Decorative"', '30px "Pinyon Script"', 'italic 16px "IM Fell English"', '600 12px Cinzel'].forEach(f => { try { document.fonts.load(f).then(() => { Grim.bookDirty = true; }); } catch (e) { } });
+['700 30px "Cinzel Decorative"', '30px "Pinyon Script"', 'italic 16px "IM Fell English"', '600 12px Cinzel', '700 30px Cinzel'].forEach(f => { try { document.fonts.load(f).then(() => { Grim.bookDirty = true; }); } catch (e) { } });
 
 let lastT = performance.now(), acc = 0;
 const WORLD_PAUSED = new Set(['menu', 'draw', 'aim']);

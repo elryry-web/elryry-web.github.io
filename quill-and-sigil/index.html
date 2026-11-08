@@ -14,7 +14,7 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=Cinzel:wght@400;600&family=IM+Fell+English:ital@0;1&family=Pinyon+Script&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=Cinzel:wght@400;600;700&family=IM+Fell+English:ital@0;1&family=Pinyon+Script&display=swap" rel="stylesheet">
 <style>
   :root {
     --ink: #2a1d3a; --gold: #e8c27a; --gold2: #b8893e; --parch: #f1e4c6; --night: #120d26;
@@ -297,6 +297,8 @@
   .nsub { font-style: italic; font-size: 13px; color: #6a4a30; margin: -2px 0 4px; }
   #nBg, #nFr, .ntail { display: none; }
   #nTitle span { display: inline-block; }
+  /* Cinzel Decorative fuses an h to the e after it; its h's are set in plain Cinzel (decoHTML in ink.js) */
+  .dh { font-family: Cinzel, serif; text-transform: uppercase; }
   /* the painted look (v156): the Notes leaf is the codex page of the illuminated grimoire. The page, its knotwork band
      and the corner bosses are painted on #nBg by Grim.notesBackdrop (the same pageBorderArt as the book); the writing
      scrolls inside the border; the name in the cartouche, the drop cap in its lapis frame, the sigils in roundels. */
@@ -515,7 +517,7 @@
 <div id="satchel">
   <div class="sheet">
     <div class="num">kept spells</div>
-    <h3>Your Satchel</h3>
+    <h3>Your Satc<span class="dh">h</span>el</h3>
     <div class="div"></div>
     <div id="satList"></div>
     <div class="row">
@@ -584,7 +586,7 @@
 </div>
 
 <div id="levels" class="screen">
-  <h2>The Folio</h2>
+  <h2>T<span class="dh">h</span>e Folio</h2>
   <div class="orn"></div>
   <button class="btn primary" id="bResume" style="margin-bottom:16px">.</button>
   <div id="lessonGrid"></div>
@@ -614,9 +616,9 @@
   </div>
 </div>
 
-<script src="js/ink.js?v=159"></script>
-<script src="js/world.js?v=159"></script>
-<script src="js/tips.js?v=159"></script>
-<script src="js/main.js?v=159"></script>
+<script src="js/ink.js?v=160"></script>
+<script src="js/world.js?v=160"></script>
+<script src="js/tips.js?v=160"></script>
+<script src="js/main.js?v=160"></script>
 </body>
 </html>

@@ -737,9 +737,11 @@ function raiseSlab(x, y, tz, T, drift) {
   return b;
   for (let i = 0; i < 14; i++) emit({ x: x + Math.random(), y: y + Math.random(), z: z - 0.4, vx: 0, vy: 0, vz: 1 + Math.random() * 2, life: 1.2, size: 4, color: i % 2 ? '#cdb0ff' : '#c8bca8', kind: 'glow' });
 }
-/* Petra + Luna on the ring: Petra's shape, raised as stone that floats where it stands */
+/* Petra + Luna on the ring: Petra's shape, raised as stone that floats where it stands, and stays: it once hung 6s
+   (2s more per Luna) and fell, and a player who looked away came back to find the bridge sunk a level below the land,
+   with nothing to say time had anything to do with it. (1e6, not Infinity: rewind snapshots are JSON) */
 function spawnSlabs(sp, tx, ty, tz, n) {
-  for (const [x, y] of spellCells(sp, tx, ty)) raiseSlab(x, y, tz, 6 + 2 * n, null);
+  for (const [x, y] of spellCells(sp, tx, ty)) raiseSlab(x, y, tz, 1e6, null);
   ring(tx, ty, tz, '#cdb0ff', 1.1); cam.shake = Math.max(cam.shake, 0.15);
 }
 /* Luna + Petra on the ring: a floating slab beneath the target, riders and all — and with Ventus on the ring too, it sails the way of the sign */
@@ -3779,20 +3781,22 @@ function sealRing(sp) {
 }
 function drawSeal(g, sp, x, y, z, R, alpha, rot, prog, t) {
   const [cx, cy] = proj(x, y, z), k = R * TW * 0.7071 * cam.s;
-  g.save(); g.translate(cx, cy); g.scale(k, k * 0.5); g.rotate(rot);
+  // only the rings and their lettering turn: the caster's strokes hold still, so the sign drawn through the seal points
+  // the one way the spell will go (turning, it read as a clock hand, as if the moment of casting chose the way)
+  g.save(); g.translate(cx, cy); g.scale(k, k * 0.5);
   g.globalAlpha = alpha;
   const lw = 1 / k;
   g.lineCap = 'round'; g.lineJoin = 'round';
   g.strokeStyle = sp.color;
   // each line stroked wide and faint, then narrower, then sharp: a soft glow (canvas shadowBlur is very slow on phones)
   const glow = (w) => { for (const [k, a] of [[5, 0.12], [2.6, 0.25], [1, 1]]) { g.globalAlpha = alpha * a; g.lineWidth = w * k * lw; g.stroke(); } g.globalAlpha = alpha; };
-  g.beginPath(); g.arc(0, 0, 1.0, 0, TAU * Math.min(1, prog * 1.5)); glow(2);
+  g.beginPath(); g.arc(0, 0, 1.0, rot, rot + TAU * Math.min(1, prog * 1.5)); glow(2);
   g.beginPath(); g.arc(0, 0, 1.16, 0, TAU); glow(1);
   g.fillStyle = hexA(sp.color, 0.9);
   // (lettering 60 letters along a squashed circle each frame was most of a phone's frame while casting)
   const ring = sealRing(sp);
-  if (ring) { g.save(); g.rotate(-rot * 2); g.drawImage(ring, -1.3, -1.3, 2.6, 2.6); g.restore(); }
-  else { g.save(); g.scale(1 / 100, 1 / 100); textOnCircle(g, SIGILS[sp.sigil].words, 0, 0, 108, -rot * 2, 9); g.restore(); }
+  if (ring) { g.save(); g.rotate(-rot); g.drawImage(ring, -1.3, -1.3, 2.6, 2.6); g.restore(); }
+  else { g.save(); g.scale(1 / 100, 1 / 100); textOnCircle(g, SIGILS[sp.sigil].words, 0, 0, 108, -rot, 9); g.restore(); }
   // the caster's own strokes
   for (const st of sp.art) {
     const n = Math.max(2, Math.floor(st.pts.length * clamp(prog * 1.4, 0, 1)));
