@@ -89,9 +89,11 @@
   #pagebtns .btn.primary { font-size: 14px; padding: 8px 16px; }
   /* the painted look: each page button is a parchment plaque in a knotwork frame, Inscribe a gilded one */
   #pagebtns.plaques .btn { border: solid transparent; border-width: 10px 11px; border-radius: 0;
-    border-image: url(art/grim-btn.png?v=1) 58 62 fill / 10px 11px stretch; background: none;
+    border-image: url(art/grim-btn.png?v=1) 58 62 / 10px 11px round;
+    /* the knotwork tiles along the edges (stretched, a wide plaque smeared it); the field is the same art laid whole beneath, so it never tiles */
+    background: url(art/grim-btn.png?v=1) 50% 50% / calc((100% - 22px) * 1.3483) calc((100% - 20px) * 1.9587) no-repeat border-box;
     box-shadow: none; filter: drop-shadow(0 2px 3px rgba(0,0,0,.45)); padding: 1px 3px; }
-  #pagebtns.plaques .btn.primary { border-image-source: url(art/grim-btn-gold.png?v=1); color: #3a1a0c; padding: 2px 8px; }
+  #pagebtns.plaques .btn.primary { border-image-source: url(art/grim-btn-gold.png?v=1); background-image: url(art/grim-btn-gold.png?v=1); color: #3a1a0c; padding: 2px 8px; }
   #pagebtns.tight { gap: 3px; } #pagebtns.tight .btn { letter-spacing: 0; padding-left: 0; padding-right: 0; font-size: 10px; }
   #pagebtns.tight .btn.primary { font-size: 11px; padding-left: 3px; padding-right: 3px; }
   #pagebtns.plaques .btn:hover { box-shadow: none; filter: drop-shadow(0 0 6px rgba(232,194,122,.8)) drop-shadow(0 2px 3px rgba(0,0,0,.45)); }
@@ -302,12 +304,17 @@
   #notes.illum #nBg, #notes.illum #nFr { display: block; position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
   #notes.illum #nFr { z-index: 2; } /* the border above the writing, so lines scroll in under the knotwork */
   #notes.illum .nin { position: relative; max-height: 94vh; overflow: auto; padding: var(--nb, 34px) calc(var(--nb, 34px) + 2px); overscroll-behavior: contain;
-    clip-path: inset(var(--nc, 22px) 0); scrollbar-width: none; }
+    /* the writing fades out before it reaches the rows of the corner bosses, top and bottom (it used to scroll on in
+       under the border, and its lines showed through and round the bosses' open knotwork); the page starts below the
+       upper pair, and the last lines can scroll up clear of the lower */
+    --k: var(--nk, 34px); padding-top: calc(var(--k) + 2px); padding-bottom: calc(var(--k) + 10px); scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(transparent calc(var(--k) - 6px), #000 calc(var(--k) + 6px), #000 calc(100% - var(--k) - 6px), transparent calc(100% - var(--k) + 6px));
+    mask-image: linear-gradient(transparent calc(var(--k) - 6px), #000 calc(var(--k) + 6px), #000 calc(100% - var(--k) - 6px), transparent calc(100% - var(--k) + 6px)); }
   #notes.illum .nin::-webkit-scrollbar { display: none; }
   #notes.illum .div { display: none; }
   #notes.illum .num { font-size: 12px; margin-top: 6px; }
-  #notes.illum h3 { width: 88%; aspect-ratio: 1100 / 239; margin: 6px auto 12px; display: flex; align-items: center; justify-content: center;
-    background: url(art/grim-band.png?v=1) center / 100% 100% no-repeat; font-size: 22px; color: #5a1c14; white-space: nowrap; line-height: 1; }
+  #notes.illum h3 { width: 88%; aspect-ratio: 1400 / 386; margin: 6px auto 12px; display: flex; align-items: center; justify-content: center;
+    background: url(art/grim-title.png?v=1) center / 100% 100% no-repeat; font-size: 22px; color: #5a1c14; white-space: nowrap; line-height: 1; }
   #notes.illum #nText::first-letter { all: unset; }
   #notes.illum .cap { float: left; position: relative; isolation: isolate; width: 50px; height: 50px; margin: 9px 18px 4px 9px;
     display: flex; align-items: center; justify-content: center; }
@@ -328,9 +335,11 @@
   #notes.illum .ntail { display: block; height: 44px; margin: 4px 0 10px; background: url(art/grim-triskele.png?v=1) center / contain no-repeat; opacity: .9; }
   /* the page's buttons as the book's knotwork plaques, Back the gilded one */
   #notes.illum .row .btn { border: solid transparent; border-width: 10px 11px; border-radius: 0; color: #2e1f14;
-    border-image: url(art/grim-btn.png?v=1) 58 62 fill / 10px 11px stretch; background: none;
+    border-image: url(art/grim-btn.png?v=1) 58 62 / 10px 11px round;
+    /* the knotwork tiles along the edges (stretched, a wide plaque smeared it); the field is the same art laid whole beneath, so it never tiles */
+    background: url(art/grim-btn.png?v=1) 50% 50% / calc((100% - 22px) * 1.3483) calc((100% - 20px) * 1.9587) no-repeat border-box;
     box-shadow: none; filter: drop-shadow(0 2px 3px rgba(0,0,0,.35)); padding: 3px 8px; font-size: 14px; }
-  #notes.illum .row .btn.primary { border-image-source: url(art/grim-btn-gold.png?v=1); color: #3a1a0c; }
+  #notes.illum .row .btn.primary { border-image-source: url(art/grim-btn-gold.png?v=1); background-image: url(art/grim-btn-gold.png?v=1); color: #3a1a0c; }
   #notes.illum .row .btn::before, #notes.illum .row .btn::after { display: none; }
 
   /* ---------- desktop phone preview ---------- */
@@ -604,9 +613,9 @@
   </div>
 </div>
 
-<script src="js/ink.js?v=156"></script>
-<script src="js/world.js?v=156"></script>
-<script src="js/tips.js?v=156"></script>
-<script src="js/main.js?v=156"></script>
+<script src="js/ink.js?v=157"></script>
+<script src="js/world.js?v=157"></script>
+<script src="js/tips.js?v=157"></script>
+<script src="js/main.js?v=157"></script>
 </body>
 </html>

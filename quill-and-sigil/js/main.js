@@ -855,11 +855,14 @@ const Game = {
       this._notesRO = new ResizeObserver(() => { if ($('#notes').classList.contains('illum')) this.fitNotes(); });
       this._notesRO.observe(sh);
     }
-    const room = t.clientWidth * 0.6; let fs = Math.min(22, t.clientHeight * 0.36);
+    const room = t.clientWidth * 0.5; let fs = Math.min(22, t.clientHeight * 0.36);
     sp.style.fontSize = fs + 'px';
     if (sp.offsetWidth > room) { fs = Math.max(9, fs * room / sp.offsetWidth); sp.style.fontSize = fs + 'px'; }
     const e = Grim.notesBackdrop($('#nBg'), $('#nFr'));
-    if (e) { sh.style.setProperty('--nb', Math.round(e + 12) + 'px'); sh.style.setProperty('--nc', Math.round(e + 1) + 'px'); }
+    if (e) {
+      sh.style.setProperty('--nb', Math.round(e + 12) + 'px');
+      sh.style.setProperty('--nk', Math.round(Math.max(Grim.notesBoss || 0, e + 1)) + 'px');
+    }
   },
   closeNotes() { if (this.notesOpen()) { $('#notes').classList.remove('show'); Sfx.play('page'); } },
   notesOpen() { return $('#notes').classList.contains('show'); },

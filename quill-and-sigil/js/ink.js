@@ -964,7 +964,7 @@ function parchment() {
    cartouche, a framed map, roundels round the sigils and the seal's eight places, a lapis drop cap, a triskele
    tailpiece. The v150 vine, rosettes, rim, ribbon, medals and plaques stay in art/ but are no longer loaded.) */
 const GART = {};
-for (const f of ['page.jpg', 'leather.jpg', 'cap.png', 'knot.png', 'boss.png', 'band.png', 'frame.png', 'roundel.png', 'capframe.png', 'triskele.png']) {
+for (const f of ['page.jpg', 'leather.jpg', 'cap.png', 'knot.png', 'boss.png', 'title.png', 'frame.png', 'roundel.png', 'capframe.png', 'triskele.png']) {
   const k = f.split('.')[0], im = new Image();
   im.onload = () => { GART[k] = im; Grim.bookDirty = true; };
   im.src = `art/grim-${f}?v=1`;
@@ -1443,7 +1443,8 @@ const Grim = {
     cg.addColorStop(0, 'rgba(255,214,140,0.16)'); cg.addColorStop(0.55, 'rgba(255,190,110,0.04)'); cg.addColorStop(1, 'rgba(70,35,10,0.14)');
     g.fillStyle = cg; g.fillRect(0, 0, w, h);
     const keep = this.dpr; this.dpr = dpr; this.pageBorderArt(fr.getContext('2d'), P); this.dpr = keep;
-    const { m, vh } = this.borderSize(P); return m + vh;
+    // how far in the corner bosses reach (the writing scrolls clear of them, not in under their open knotwork)
+    const { m, vh, bs } = this.borderSize(P); this.notesBoss = GART.boss ? m + bs * 0.9 + 2 : 0; return m + vh;
   },
   pageBorderArt(g, P) {
     const ink = '#4a2e1a', dpr = this.dpr, { m, vh, bs } = this.borderSize(P);
@@ -1491,14 +1492,14 @@ const Grim = {
     g.textAlign = 'center'; g.textBaseline = 'alphabetic';
     g.fillStyle = red; g.font = `${Math.round(13 * s)}px Cinzel, serif`;
     g.fillText(`LESSON ${lv.roman}`, P.x + P.w / 2, y);
-    const BAND = gart('band'), IN = gart('capframe'), MD = gart('roundel'), TRI = gart('triskele');
+    const BAND = gart('title'), IN = gart('capframe'), MD = gart('roundel'), TRI = gart('triskele');
     if (BAND) {
-      // the lesson's name on the cream panel of a knotwork cartouche (smaller type for a long name)
+      // the lesson's name on the cream panel of the title box, ivy and beasts in the knotwork round it (v157; smaller type for a long name)
       const bw = w * 0.84, bh = bw * BAND.naturalHeight / BAND.naturalWidth, by = y + 8 * s;
       g.drawImage(BAND, P.x + (P.w - bw) / 2, by, bw, bh);
       let fs = Math.min(22 * s, bh * 0.3);
       g.font = `700 ${Math.round(fs)}px "Cinzel Decorative", serif`;
-      const tw = g.measureText(lv.name).width; if (tw > bw * 0.54) { fs *= bw * 0.54 / tw; g.font = `700 ${Math.round(fs)}px "Cinzel Decorative", serif`; }
+      const tw = g.measureText(lv.name).width; if (tw > bw * 0.5) { fs *= bw * 0.5 / tw; g.font = `700 ${Math.round(fs)}px "Cinzel Decorative", serif`; }
       g.fillStyle = '#5a1c14'; g.textBaseline = 'middle'; g.fillText(lv.name, P.x + P.w / 2, by + bh * 0.5); g.textBaseline = 'alphabetic';
       y = by + bh + 16 * s;
     } else {
@@ -1642,15 +1643,14 @@ const Grim = {
     const end = wrapText(g, signNotes(lv), dx + dr * 2.4, y + 10 * s, w - dr * 2.6 - 12 * s, 15 * s);
     this.codexInfo = { k, twoCol, rowH, notesEnd: end, pageEnd: P.y + P.h - Math.min(P.w, P.h) * 0.035 }; // for checking the layout
     const foot = P.y + P.h - B.m - B.vh - 10 * s, free = foot - end - 6 * s;
-    // on the spread the map of the land lies on this page (the drawing page kept free): beside the sigils if the
-    // writing leaves room there, else at the foot of the page — wherever it is drawn the larger
+    // on the spread the map of the land lies on this page (the drawing page kept free): centred at the foot of the
+    // page, or beside the sigils only when the writing leaves no room at the foot
     this.mapAt = null;
     if (!this.L.single && World.W) {
       const right = Math.min(x0 + w + P.w * 0.05, P.x + P.w - B.m - B.vh - 10 * s);
       const beside = twoCol ? null : { x0: textR + 14 * s, x1: right, y0: rowsTop - 4 * s, y1: rowsEnd + 2 * s };
       const atFoot = { x0: x0, x1: x0 + w, y0: end + 4 * s, y1: foot };
-      const fb = beside && this.mapFit(beside, false, s), ff = this.mapFit(atFoot, true, s);
-      this.mapAt = fb && (!ff || fb.tw >= ff.tw * 0.85) ? fb : ff;
+      this.mapAt = this.mapFit(atFoot, true, s) || (beside && this.mapFit(beside, false, s));
     }
     if (TRI && !(this.mapAt && this.mapAt.foot)) {
       // a spiral tailpiece in the room left at the foot of the page, if there is room for one
@@ -1990,10 +1990,14 @@ const Grim = {
   mapFit(R, foot, s) {
     const W = World.W, H = World.H, d = 15 * s, pad = d * 0.9;
     let hi = 0, lo = 0; for (const c of World.cells) if (!c.void) { hi = Math.max(hi, c.h); lo = Math.min(lo, c.h); }
-    const fixW = 4 + 2 * pad, fixH = 2 * pad + 16 * s + 8, perW = W + H + 2, perH = (W + H) / 2 + 1 + 0.45 * (hi - lo + 2);
+    const fixW = 4 + 2 * pad, fixH = 2 * pad + 21 * s + 8, perW = W + H + 2, perH = (W + H) / 2 + 1 + 0.45 * (hi - lo + 2);
     const tw = Math.min(8.5 * s * Math.min(1, 12 / Math.max(W, H)), (R.x1 - R.x0 - fixW) / perW, (R.y1 - R.y0 - fixH) / perH);
     if (!(tw >= 2.6 * s)) return null;
-    const w = fixW + perW * tw, h = fixH + perH * tw;
+    // the panel no narrower than its caption (a small map beside the sigils left the words standing out past the frame)
+    const mg = this._mg || (this._mg = document.createElement('canvas').getContext('2d'));
+    mg.font = `italic ${Math.round(11 * s)}px "IM Fell English", serif`;
+    const w = Math.max(fixW + perW * tw, mg.measureText('the land as it lies').width + 2 * d + 8 * s), h = fixH + perH * tw;
+    if (w > R.x1 - R.x0) return null;
     return { tw, w, h, x: (R.x0 + R.x1 - w) / 2, y: (R.y0 + R.y1 - h) / 2, foot, hi, d, pad };
   },
   drawMiniMap(g, t) {
@@ -2004,7 +2008,7 @@ const Grim = {
     const FR = gart('frame') && gart('page') && typeof TEX_IMAGES !== 'undefined' ? GART.frame : null;
     const W = World.W, size = MA.tw, tw = size, th = tw * 0.5, { d, pad } = MA;
     const right = MA.x + MA.w, fy = MA.y;
-    const ox = right - pad - (W + 1) * tw - 2, oy = fy + pad + 16 * s + (MA.hi + 1) * th * 0.9 + 2;
+    const ox = right - pad - (W + 1) * tw - 2, oy = fy + pad + 21 * s + (MA.hi + 1) * th * 0.9 + 2;
     const fr = FR ? { right, fy, d, pad } : null;
     g.save();
     if (gart('page') && typeof TEX_IMAGES !== 'undefined') {
@@ -2014,7 +2018,7 @@ const Grim = {
       const M = this._mm;
       if (fr) {
         // the panel, its caption inside it with the land
-        const { d, pad, fy } = fr, fx = M.x - pad, fw = fr.right - fx, fh = M.y + M.h + pad - fy;
+        const { d, pad, fy } = fr, fx = Math.min(M.x - pad, MA.x), fw = fr.right - fx, fh = M.y + M.h + pad - fy;
         g.fillStyle = 'rgba(255,248,226,0.35)'; g.fillRect(fx + d * 0.5, fy + d * 0.5, fw - d, fh - d);
         nineSlice(g, FR, fx, fy, fw, fh, 96, d);
         fr.lx = fx + fw / 2;
@@ -2035,7 +2039,7 @@ const Grim = {
       g.fillStyle = '#d99a20'; g.beginPath(); g.arc(px, py, size * 0.4 + Math.sin(t * 4) * 0.6, 0, TAU); g.fill();
     }
     g.fillStyle = '#4a2e1a'; g.font = `italic ${Math.round(11 * s)}px "IM Fell English", serif`; g.textAlign = 'center';
-    g.fillText('the land as it lies', fr ? fr.lx : MA.x + MA.w / 2, fy + pad + 10 * s);
+    g.fillText('the land as it lies', fr ? fr.lx : MA.x + MA.w / 2, fy + pad + 15 * s); // (the caption kept clear of the frame's top edge)
     g.restore();
   },
 };
