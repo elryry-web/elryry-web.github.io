@@ -556,6 +556,7 @@ const Game = {
     $('#note').classList.remove('show');
     VIEW.z = 1; fitCamera(innerWidth, innerHeight);
     $('#lnum').textContent = `Lesson ${this.level.roman}`;
+    $('#par').textContent = this.level.par;
     $('#ltitle').textContent = this.level.name;
     this.updateCasts();
     $('#hud').classList.add('show');
@@ -598,6 +599,7 @@ const Game = {
     parts.length = 0; Sfx.play('rewind'); this.toast('The page turns back.');
   },
   updateCasts() {
+    $('#casts').textContent = this.casts;
     const L = this.level, w = $('#inkwell');
     if (L && L.ink) { w.style.display = ''; w.innerHTML = 'ink ' + Array.from({ length: L.ink }, (_, k) => `<i class="${k < L.ink - this.casts ? 'on' : ''}"></i>`).join(''); }
     else w.style.display = 'none';
@@ -694,7 +696,8 @@ const Game = {
       // the last lesson of each folio says so; the very last closes the book
       const end = L.folioEnd || (last && { title: 'The Folio is Complete', text: 'Your seals have carried the light across the sky. The master closes the folio.' });
       $('#winTitle').textContent = end ? end.title : 'Lesson Complete';
-      $('#winText').textContent = end ? end.text : L.name;
+      const tally = `${this.casts} seal${this.casts === 1 ? '' : 's'} cast. The master's mark is ${par}.`;
+      $('#winText').textContent = end ? `${end.text} ${tally}` : tally;
       $('#bNext').style.display = last ? 'none' : '';
       this.showScreen('win');
     }, 1300);
