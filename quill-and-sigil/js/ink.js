@@ -1061,19 +1061,27 @@ const Grim = {
     } else if (!single) {
       const bw = Math.min(vw - 40, (vh - 30) * 1.52, 1500), bh = bw / 1.52;
       L.bx = (vw - bw) / 2; L.by = (vh - bh) / 2; L.bw = bw; L.bh = bh;
-      const pad = bw * 0.018;
-      L.left = { x: L.bx + pad, y: L.by + pad, w: bw / 2 - pad, h: bh - pad * 2 };
+      const pad = 6; // the pages run out to the cover (only a sliver of the leaves beneath shows): more room on each
+      L.left ={ x: L.bx + pad, y: L.by + pad, w: bw / 2 - pad, h: bh - pad * 2 };
       L.right = { x: L.bx + bw / 2, y: L.by + pad, w: bw / 2 - pad, h: bh - pad * 2 };
-      const P = L.right;
-      const size = Math.min(P.w - P.w * 0.24, P.h - P.h * 0.34);
-      L.area = { x: P.x + (P.w - size) / 2, y: P.y + P.h * 0.13, size };
+      const P = L.right, mn = Math.min(P.w, P.h), s = mn / 520;
+      const B = { m: mn * 0.035, vh: Math.max(9, mn * 0.03) }; // (as borderSize gives, before this.L exists)
+      // the page is the circle's (no heading, the map on the lesson page): from just under the top border, as wide
+      // as clears the corner bosses; under it (its ring 4% outside the box) the name, two lines of read-back, then
+      // the buttons (as tall as they measured) above the bottom border — on a short page the circle gives that up
+      const top = P.y + B.m + B.vh + 10 * s;
+      const room = (P.y + P.h - B.m - B.vh - 8 - (this.spreadBtnH || 90) - 78 * s - 12 - top) / 1.02;
+      const size = Math.min(P.w * 0.8, room);
+      // (any height to spare is shared above and below)
+      L.area = { x: P.x + (P.w - size) / 2, y: top + Math.max(0, room - size) * 0.5, size };
     } else {
       // upright: the circle takes nearly the page's full width (the width is what limits it) and the book grows
       // as tall as it needs — header, circle, then the status, the buttons (as tall as they measured) and the
       // bottom border with its corner bosses
       const HEAD = 140, pad = 6;
       const bw = Math.min(vw - 10, 640), pw = bw - pad * 2;
-      const FOOT = 64 + (this.btnH || 70) + pw * (0.035 + 0.14 * 0.9) + 8;
+      // (the status: the name clear of the ring and two lines of read-back, as statusAt places them — more on wider pages)
+      const FOOT = Math.max(64, 78 * pw / 520 + 15) + (this.btnH || 70) + pw * (0.035 + 0.14 * 0.9) + 8;
       // the whole drawing circle stays inside the page's border (margin m, plus room for the vine's leaves)
       const m = pw * 0.035;
       const size = Math.max(160, Math.min(pw - 2 * (m + 9), vh - 10 - pad * 2 - HEAD - FOOT));
@@ -1088,6 +1096,16 @@ const Grim = {
     this.L = L;
     document.getElementById('pagebtns')?.classList.remove('tight'); // (tried afresh at each size)
     this.placeButtons();
+  },
+  // where the spell's name and read-back sit (sy + 2 is the name's baseline): under the circle, the name's tall
+  // script capitals (about 0.8 of its size) kept clear of the ring, which on the spread is drawn 4% outside the box
+  statusAt() {
+    const L = this.L, A = L.area, SD = L.side, P = SD || L.right, s = SD ? Math.min(0.9, P.w / 380) : Math.min(P.w, P.h) / 520;
+    if (SD) return { SD, P, s, sy: SD.y + 134 };
+    const ring = A.cy + A.half * (L.single ? 0.99 : 1.04) + 4;
+    const sy = Math.max(A.y + A.size + (L.single ? 26 : 22 * s), ring + 6 * s + 0.8 * (30 * s + 4) - 2);
+    // (end: below the read-back's second line, with a little air before the buttons)
+    return { SD, P, s, sy, end: sy + 22 * s + 4 + (15 * s + 3) + 11 * s };
   },
   // the HTML page buttons under the drawing area
   placeButtons() {
@@ -1104,7 +1122,11 @@ const Grim = {
       pb.style.left = L.right.x + 'px'; pb.style.width = L.right.w + 'px';
       // room for the name and two lines of the read-back, the big Inscribe kept above the bottom border
       const P = L.right, B = this.borderSize(P), h = pb.style.display === 'flex' ? pb.offsetHeight : 0;
-      pb.style.top = Math.min(L.area.y + L.area.size + P.h * 0.1, P.y + P.h - B.m - B.vh - 8 - h) + 'px';
+      if (h && Math.abs(h - (this.spreadBtnH || 90)) > 2 && (this._relaid = (this._relaid || 0) + 1) < 4) {
+        this.spreadBtnH = h; this.layout(); this.bookDirty = true; this.inkDirty = true; this._relaid = 0;
+        return;
+      }
+      pb.style.top = Math.min(Math.max(L.area.y + L.area.size + P.h * 0.1, this.statusAt().end), P.y + P.h - B.m - B.vh - 8 - h) + 'px';
       return;
     }
     // upright: inside the knotwork border, the last row clear of the bottom corner bosses
@@ -1143,8 +1165,7 @@ const Grim = {
       return { x: x0 - 12, y: y0 - 12, w: x1 - x0 + 24, h: y1 - y0 + 24 };
     }
     if (name === 'status') {
-      const SD = L.side, P = SD || L.right, s = SD ? Math.min(0.9, P.w / 380) : Math.min(P.w, P.h) / 520;
-      const sy = SD ? SD.y + 134 : A.y + A.size + (L.single ? 26 : 22 * s);
+      const { P, s, sy } = this.statusAt();
       const w = P.w * 0.8;
       return { x: P.x + (P.w - w) / 2, y: sy - 30 * s - 4, w, h: 30 * s + 44 * s + 8 };
     }
@@ -1526,7 +1547,8 @@ const Grim = {
     // (a gold medallion needs a taller row than a drawn ring, or the medallions stack into one another)
     const rows = twoCol ? Math.ceil(known.length / 2) : known.length, rowH0 = twoCol ? (MD ? 40 : 32) * s : FR;
     const k = clamp(avail / (rows * rowH0 + US), 0.72, 1); // and smaller still if even that will not fit
-    const rowH = rowH0 * k, colW = twoCol ? w / 2 : w;
+    const rowH = rowH0 * k, colW = twoCol ? w / 2 : w, rowsTop = y;
+    let textR = x0; // (how far the codex's writing reaches: the room beside it may take the map)
     known.forEach((id, n) => {
       const S = SIGILS[id], col = twoCol ? n % 2 : 0, row = twoCol ? Math.floor(n / 2) : n;
       // (in its medallion the sigil is drawn smaller, so the gold rim fits the row)
@@ -1545,11 +1567,14 @@ const Grim = {
       g.fillText(S.name, tx, nameY);
       const nw = g.measureText(S.name).width;
       g.fillStyle = red; g.font = `${Math.round(10 * s * k)}px Cinzel, serif`;
-      g.fillText(S.en.toUpperCase(), tx + Math.max(nw + 10 * s, twoCol ? 0 : 96 * s * k), nameY - 2 * s);
+      const ex = tx + Math.max(nw + 10 * s, twoCol ? 0 : 96 * s * k);
+      g.fillText(S.en.toUpperCase(), ex, nameY - 2 * s);
+      textR = Math.max(textR, ex + g.measureText(S.en.toUpperCase()).width);
       if (!twoCol) {
         g.fillStyle = ink; g.font = `italic ${Math.round(12 * s * k)}px "IM Fell English", serif`;
-        const ringOnly = lv.centers && !lv.centers.includes(id);
-        g.fillText((ringOnly ? 'Ring only, this lesson. ' : '') + S.desc, tx, ry + 36 * s * k);
+        const ringOnly = lv.centers && !lv.centers.includes(id), d = (ringOnly ? 'Ring only, this lesson. ' : '') + S.desc;
+        g.fillText(d, tx, ry + 36 * s * k);
+        textR = Math.max(textR, tx + g.measureText(d).width);
       }
       this.codexRects.push({ id, x: rx, y: ry, w: colW, h: rowH });
     });
@@ -1564,9 +1589,11 @@ const Grim = {
       });
       g.fillStyle = ink; g.font = `italic ${Math.round(12 * s * k)}px "IM Fell English", serif`; g.textAlign = 'left';
       g.fillText('not yet learned', x0 + unknown.length * (r * 2 + 10 * s) + 10 * s, cy + 4 * s);
+      textR = Math.max(textR, x0 + unknown.length * (r * 2 + 10 * s) + 10 * s + g.measureText('not yet learned').width);
       g.globalAlpha = 1;
       y += US * k;
     }
+    const B = this.borderSize(P), rowsEnd = y;
     // signs explanation with tiny diagram
     y += 8 * s;
     const dx = x0 + 22 * s, dy = y + 22 * s, dr = 14 * s;
@@ -1585,9 +1612,19 @@ const Grim = {
     }
     const end = wrapText(g, signNotes(lv), dx + dr * 2.4, y + 10 * s, w - dr * 2.6 - 12 * s, 15 * s);
     this.codexInfo = { k, twoCol, rowH, notesEnd: end, pageEnd: P.y + P.h - Math.min(P.w, P.h) * 0.035 }; // for checking the layout
-    if (TRI) {
+    const foot = P.y + P.h - B.m - B.vh - 10 * s, free = foot - end - 6 * s;
+    // on the spread the map of the land lies on this page (the drawing page kept free): beside the sigils if the
+    // writing leaves room there, else at the foot of the page — wherever it is drawn the larger
+    this.mapAt = null;
+    if (!this.L.single && World.W) {
+      const right = Math.min(x0 + w + P.w * 0.05, P.x + P.w - B.m - B.vh - 10 * s);
+      const beside = twoCol ? null : { x0: textR + 14 * s, x1: right, y0: rowsTop - 4 * s, y1: rowsEnd + 2 * s };
+      const atFoot = { x0: x0, x1: x0 + w, y0: end + 4 * s, y1: foot };
+      const fb = beside && this.mapFit(beside, false, s), ff = this.mapFit(atFoot, true, s);
+      this.mapAt = fb && (!ff || fb.tw >= ff.tw * 0.85) ? fb : ff;
+    }
+    if (TRI && !(this.mapAt && this.mapAt.foot)) {
       // a spiral tailpiece in the room left at the foot of the page, if there is room for one
-      const B = this.borderSize(P), foot = P.y + P.h - B.m - B.vh - 10 * s, free = foot - end - 6 * s;
       if (free > 70 * s) {
         const ts = Math.min(free * 0.8, w * 0.36), th = ts * TRI.naturalHeight / TRI.naturalWidth;
         g.drawImage(TRI, P.x + (P.w - ts) / 2, end + 6 * s + (free - th) / 2, ts, th);
@@ -1640,14 +1677,7 @@ const Grim = {
     g.setLineDash([3, 6]); g.beginPath(); g.arc(A.cx, A.cy, A.half * fr, 0, TAU); g.stroke(); g.setLineDash([]);
     }
     g.restore();
-    if (!this.L.single) {
-      const P = this.L.right, s = Math.min(P.w, P.h) / 520;
-      g.fillStyle = '#2a1830'; g.textAlign = 'center';
-      const pv = !!gart('knot'); // the painted knotwork border runs lower, so the heading sits a touch smaller and lower
-      g.font = `${Math.round((pv ? 31 : 34) * s)}px "Pinyon Script", cursive`;
-      if (pv) { g.textAlign = 'left'; g.fillText('Draft thy Seal', P.x + Math.min(P.w, P.h) * 0.035 + this.borderSize(P).bs * 0.9 + 8 * s, P.y + P.h * 0.085 + 3 * s); }
-      else g.fillText('Draft thy Seal', P.x + P.w / 2, P.y + P.h * 0.085);
-    }
+    // (no heading on the drawing page: it is all the circle's — user's call, v154)
   },
   renderInk() {
     const g = this.inkLayer.getContext('2d'), dpr = this.dpr;
@@ -1773,9 +1803,8 @@ const Grim = {
     }
     g.restore();
     // status
-    const SD = this.L.side, P = SD || this.L.right, s = SD ? Math.min(0.9, P.w / 380) : Math.min(P.w, P.h) / 520;
+    const { SD, P, s, sy } = this.statusAt();
     g.textAlign = 'center'; g.fillStyle = this.statusCol;
-    const sy = SD ? SD.y + 134 : A.y + A.size + (this.L.single ? 26 : 22 * s);
     if (valid) {
       const S = SIGILS[sp.sigil];
       g.font = `${Math.round(30 * s + 4)}px "Pinyon Script", cursive`;
@@ -1927,38 +1956,27 @@ const Grim = {
       if (c.feat === 'brazier') { g.fillStyle = c.lit ? '#e0701a' : '#4a3020'; g.beginPath(); g.arc(px, py + th, tw * 0.3, 0, TAU); g.fill(); }
     }
   },
+  // the largest the map of the land (in its panel, caption inside) will draw within a rect of the lesson page,
+  // centred there: { tw (a tile's half-width), x, y, w, h (the panel), foot } — null if it would be too small to read
+  mapFit(R, foot, s) {
+    const W = World.W, H = World.H, d = 15 * s, pad = d * 0.9;
+    let hi = 0, lo = 0; for (const c of World.cells) if (!c.void) { hi = Math.max(hi, c.h); lo = Math.min(lo, c.h); }
+    const fixW = 4 + 2 * pad, fixH = 2 * pad + 16 * s + 8, perW = W + H + 2, perH = (W + H) / 2 + 1 + 0.45 * (hi - lo + 2);
+    const tw = Math.min(8.5 * s * Math.min(1, 12 / Math.max(W, H)), (R.x1 - R.x0 - fixW) / perW, (R.y1 - R.y0 - fixH) / perH);
+    if (!(tw >= 2.6 * s)) return null;
+    const w = fixW + perW * tw, h = fixH + perH * tw;
+    return { tw, w, h, x: (R.x0 + R.x1 - w) / 2, y: (R.y0 + R.y1 - h) / 2, foot, hi, d, pad };
+  },
   drawMiniMap(g, t) {
-    if (!World.W || this.L.single) return;
-    const P = this.L.right, s = Math.min(P.w, P.h) / 520;
+    // (on the spread only, on the lesson page — placed by mapFit when that page was drawn — the drawing page kept free)
+    const MA = this.mapAt;
+    if (!World.W || this.L.single || !MA) return;
+    const P = this.L.left, s = Math.min(P.w, P.h) / 520;
     const FR = gart('frame') && gart('page') && typeof TEX_IMAGES !== 'undefined' ? GART.frame : null;
-    let size = (FR ? 6.4 : 7) * s * Math.min(1, 11 / Math.max(World.W, World.H)), tw = size, th = size * 0.5;
-    let ox, oy, fr = null;
-    if (FR) {
-      // in its knotwork panel at the top of the page, below the border and left of the corner's boss; the land
-      // shrinks until the panel keeps clear of the drawing circle and of the heading
-      const B = this.borderSize(P), d = 15 * s, pad = d * 0.9, A = this.L.area, gr = A.half * GUIDE_R, W = World.W, H = World.H;
-      let hi = 0, lo = 0; for (const c of World.cells) if (!c.void) { hi = Math.max(hi, c.h); lo = Math.min(lo, c.h); }
-      const right = P.x + P.w - B.m - B.bs * 0.9 - 6, fy = P.y + B.m + B.vh + 6;
-      g.font = `${Math.round(31 * s)}px "Pinyon Script", cursive`;
-      const head = P.x + Math.min(P.w, P.h) * 0.035 + B.bs * 0.9 + 8 * s + g.measureText('Draft thy Seal').width + 10 * s;
-      for (let k = 0; k < 14; k++) {
-        th = tw * 0.5;
-        ox = right - pad - (W + 1) * tw - 2; oy = fy + pad + 16 * s + (hi + 1) * th * 0.9 + 2;
-        const fx = ox - H * tw - tw - 2 - pad, fb = fy + pad + 16 * s + (W + H) * th + th * 2 + (hi - lo + 2) * th * 0.9 + 8 + pad;
-        // (it may cross the circle's rim, but never a slot or the seal's guide)
-        const off = (x, y) => Math.hypot(clamp(x, fx, right) - x, clamp(y, fy, fb) - y);
-        let ok = fx >= head && off(A.cx, A.cy) >= gr * 1.15;
-        for (let j = 0; ok && j < 8; j++) ok = off(A.cx + Math.cos(j * TAU / 8) * gr * SLOT_R, A.cy + Math.sin(j * TAU / 8) * gr * SLOT_R) >= gr * SLOT_SIZE + 8;
-        if (ok) break;
-        tw *= 0.92;
-      }
-      size = tw;
-      fr = { right, fy, d, pad };
-    } else {
-      // (moved in, if need be, so its right edge stays inside the page's border)
-      ox = Math.min(P.x + P.w - 78 * s - (World.W - World.H) * size * 0.5, P.x + P.w - Math.min(P.w, P.h) * 0.09 - (World.W + 1) * size);
-      oy = P.y + P.h * 0.13;
-    }
+    const W = World.W, size = MA.tw, tw = size, th = tw * 0.5, { d, pad } = MA;
+    const right = MA.x + MA.w, fy = MA.y;
+    const ox = right - pad - (W + 1) * tw - 2, oy = fy + pad + 16 * s + (MA.hi + 1) * th * 0.9 + 2;
+    const fr = FR ? { right, fy, d, pad } : null;
     g.save();
     if (gart('page') && typeof TEX_IMAGES !== 'undefined') {
       let key = `${World.W},${World.H},${ox.toFixed(1)},${oy.toFixed(1)},${size.toFixed(2)},${this.dpr},${Object.keys(TEX_IMAGES).length}|`;
@@ -1988,7 +2006,7 @@ const Grim = {
       g.fillStyle = '#d99a20'; g.beginPath(); g.arc(px, py, size * 0.4 + Math.sin(t * 4) * 0.6, 0, TAU); g.fill();
     }
     g.fillStyle = '#4a2e1a'; g.font = `italic ${Math.round(11 * s)}px "IM Fell English", serif`; g.textAlign = 'center';
-    if (fr) g.fillText('the land as it lies', fr.lx, fr.fy + fr.pad + 10 * s); else g.fillText('the land as it lies', ox, oy - 8 * s);
+    g.fillText('the land as it lies', fr ? fr.lx : MA.x + MA.w / 2, fy + pad + 10 * s);
     g.restore();
   },
 };
