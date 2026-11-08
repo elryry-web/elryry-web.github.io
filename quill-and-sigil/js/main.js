@@ -822,15 +822,20 @@ const Game = {
   openNotes() {
     if (this.state !== 'draw' || !this.level) return;
     const L = this.level, ringOnly = id => L.centers && !L.centers.includes(id);
+    // the painted look dresses the leaf as the codex page (the old look ◐ keeps the plain sheet)
+    const illum = !(typeof CLASSIC !== 'undefined' && CLASSIC.on) && !!GART.page;
+    $('#notes').classList.toggle('illum', illum);
     $('#nNum').textContent = `Lesson ${L.roman}`;
-    $('#nTitle').textContent = L.name;
-    $('#nText').textContent = L.lesson;
+    $('#nTitle span').textContent = L.name; $('#nTitle span').style.fontSize = '';
+    const nt = $('#nText'); nt.textContent = illum ? L.lesson.slice(1) : L.lesson;
+    if (illum) { const c = document.createElement('span'), i = document.createElement('i'); c.className = 'cap'; i.textContent = L.lesson[0]; c.append(i); nt.prepend(c); }
     const box = $('#nSigils'); box.innerHTML = '';
     for (const id of SIGIL_ORDER) {
       const S = SIGILS[id], known = L.sigils.includes(id);
       const b = document.createElement('button');
       b.className = 'nsig' + (known ? '' : ' off') + (Grim.ghost === id ? ' on' : '');
-      b.innerHTML = `<img src="${glyphIcon(id)}" alt="" style="background:${known ? S.color : 'transparent'}"><div><b>${S.name}</b><em>${S.en}</em>` +
+      const im = `<img src="${glyphIcon(id)}" alt="" style="background:${known ? S.color : 'transparent'}">`;
+      b.innerHTML = (illum ? `<span class="rd">${im}</span>` : im) + `<div><b>${S.name}</b><em>${S.en}</em>` +
         `<span>${known ? (ringOnly(id) ? 'Ring only, this lesson. ' : '') + S.desc : 'Not yet learned.'}</span></div>`;
       if (known) b.onclick = () => { Grim.ghost = Grim.ghost === id ? null : id; Sfx.play('tick'); this.closeNotes(); };
       else b.disabled = true;
@@ -838,8 +843,23 @@ const Game = {
     }
     $('#nSigns').textContent = signNotes(L);
     renderHint($('#nHint'), $('#nHintB'), L, this.hint || 0);
-    $('#notes .sheet').scrollTop = 0;
+    $('#notes .sheet').scrollTop = 0; $('#notes .nin').scrollTop = 0;
     $('#notes').classList.add('show'); Sfx.play('page');
+    if (illum) this.fitNotes();
+  },
+  // the leaf's painted page and border, drawn to its size (again whenever it changes: a hint shown, the phone turned),
+  // and the lesson's name fitted to the cartouche's cream panel (the middle 60% of it)
+  fitNotes() {
+    const sh = $('#notes .sheet'), t = $('#nTitle'), sp = $('#nTitle span');
+    if (!this._notesRO && window.ResizeObserver) {
+      this._notesRO = new ResizeObserver(() => { if ($('#notes').classList.contains('illum')) this.fitNotes(); });
+      this._notesRO.observe(sh);
+    }
+    const room = t.clientWidth * 0.6; let fs = Math.min(22, t.clientHeight * 0.36);
+    sp.style.fontSize = fs + 'px';
+    if (sp.offsetWidth > room) { fs = Math.max(9, fs * room / sp.offsetWidth); sp.style.fontSize = fs + 'px'; }
+    const e = Grim.notesBackdrop($('#nBg'), $('#nFr'));
+    if (e) { sh.style.setProperty('--nb', Math.round(e + 12) + 'px'); sh.style.setProperty('--nc', Math.round(e + 1) + 'px'); }
   },
   closeNotes() { if (this.notesOpen()) { $('#notes').classList.remove('show'); Sfx.play('page'); } },
   notesOpen() { return $('#notes').classList.contains('show'); },

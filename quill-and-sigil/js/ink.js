@@ -1426,7 +1426,24 @@ const Grim = {
   // (sizes in borderSize, so the page's contents can keep clear of it)
   borderSize(P) {
     const mn = Math.min(P.w, P.h);
-    return { m: mn * 0.035, vh: Math.max(9, mn * 0.03), bs: mn * (this.L.side ? 0.12 : 0.14) };
+    return { m: mn * 0.035, vh: Math.max(9, mn * 0.03), bs: mn * (this.L && this.L.side ? 0.12 : 0.14) };
+  },
+  // the Notes leaf (phones) as a page of this book: the parchment on bg, the knotwork border and bosses on fr (which
+  // lies over the writing). Returns the border's inner edge, so the writing can keep inside it; 0 without the art.
+  notesBackdrop(bg, fr) {
+    const w = bg.offsetWidth, h = bg.offsetHeight, pim = gart('page'); if (!w || !h || !pim) return 0;
+    const dpr = Math.min(window.devicePixelRatio || 1, 3), P = { x: 0, y: 0, w, h };
+    for (const c of [bg, fr]) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); c.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0); }
+    const g = bg.getContext('2d');
+    drawCover(g, pim, 0, 0, w, h);
+    const vg = g.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.3, w / 2, h / 2, Math.max(w, h) * 0.75);
+    vg.addColorStop(0, 'rgba(255,248,225,0.12)'); vg.addColorStop(1, 'rgba(120,75,30,0.24)');
+    g.fillStyle = vg; g.fillRect(0, 0, w, h);
+    const cg = g.createRadialGradient(w * 0.2, h * 0.12, 0, w * 0.2, h * 0.12, Math.max(w, h) * 1.05);
+    cg.addColorStop(0, 'rgba(255,214,140,0.16)'); cg.addColorStop(0.55, 'rgba(255,190,110,0.04)'); cg.addColorStop(1, 'rgba(70,35,10,0.14)');
+    g.fillStyle = cg; g.fillRect(0, 0, w, h);
+    const keep = this.dpr; this.dpr = dpr; this.pageBorderArt(fr.getContext('2d'), P); this.dpr = keep;
+    const { m, vh } = this.borderSize(P); return m + vh;
   },
   pageBorderArt(g, P) {
     const ink = '#4a2e1a', dpr = this.dpr, { m, vh, bs } = this.borderSize(P);

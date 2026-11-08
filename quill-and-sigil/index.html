@@ -292,6 +292,46 @@
   #nSigns { font-style: italic; font-size: 15px; line-height: 1.45; text-align: left; margin-bottom: 12px; }
   #nHint { display: none; font-size: 15px; padding: 10px 14px; border: 1px dashed rgba(90,60,40,.5); background: rgba(255,255,255,.25); text-align: left; margin-bottom: 12px; font-style: italic; }
   #nHint.show { display: block; }
+  .nsub { font-style: italic; font-size: 13px; color: #6a4a30; margin: -2px 0 4px; }
+  #nBg, #nFr, .ntail { display: none; }
+  #nTitle span { display: inline-block; }
+  /* the painted look (v156): the Notes leaf is the codex page of the illuminated grimoire. The page, its knotwork band
+     and the corner bosses are painted on #nBg by Grim.notesBackdrop (the same pageBorderArt as the book); the writing
+     scrolls inside the border; the name in the cartouche, the drop cap in its lapis frame, the sigils in roundels. */
+  #notes.illum .sheet { overflow: hidden; padding: 0; background: #e9d6a8; box-shadow: 0 20px 60px rgba(0,0,0,.7); border-radius: 2px; }
+  #notes.illum #nBg, #notes.illum #nFr { display: block; position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
+  #notes.illum #nFr { z-index: 2; } /* the border above the writing, so lines scroll in under the knotwork */
+  #notes.illum .nin { position: relative; max-height: 94vh; overflow: auto; padding: var(--nb, 34px) calc(var(--nb, 34px) + 2px); overscroll-behavior: contain;
+    clip-path: inset(var(--nc, 22px) 0); scrollbar-width: none; }
+  #notes.illum .nin::-webkit-scrollbar { display: none; }
+  #notes.illum .div { display: none; }
+  #notes.illum .num { font-size: 12px; margin-top: 6px; }
+  #notes.illum h3 { width: 88%; aspect-ratio: 1100 / 239; margin: 6px auto 12px; display: flex; align-items: center; justify-content: center;
+    background: url(art/grim-band.png?v=1) center / 100% 100% no-repeat; font-size: 22px; color: #5a1c14; white-space: nowrap; line-height: 1; }
+  #notes.illum #nText::first-letter { all: unset; }
+  #notes.illum .cap { float: left; position: relative; isolation: isolate; width: 50px; height: 50px; margin: 9px 18px 4px 9px;
+    display: flex; align-items: center; justify-content: center; }
+  #notes.illum .cap::before { content: ''; position: absolute; z-index: -1; left: -19.3%; top: -19.3%; width: 137.9%; height: 137.9%;
+    background: url(art/grim-capframe.png?v=1) center / 100% 100% no-repeat; }
+  #notes.illum .cap i { font: normal 700 33px/1 'Cinzel Decorative', serif; padding-top: 3px;
+    background: linear-gradient(#f7e29a, #d2a24a 42%, #9c6a22 58%, #dcb45c); -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 1px 0 rgba(66,36,12,.9)) drop-shadow(0 0 1px rgba(66,36,12,.9)); }
+  #notes.illum .nhead { border-top: none; padding-top: 4px; display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+  #notes.illum .nhead::before, #notes.illum .nhead::after { content: ''; flex: 1; min-width: 20px; height: 10px;
+    background: url(art/grim-knot.png?v=1) left center / auto 100% repeat-x; }
+  #notes.illum .nhead::before { -webkit-mask-image: linear-gradient(90deg, transparent, #000 18px); mask-image: linear-gradient(90deg, transparent, #000 18px); }
+  #notes.illum .nhead::after { -webkit-mask-image: linear-gradient(270deg, transparent, #000 18px); mask-image: linear-gradient(270deg, transparent, #000 18px); }
+  #notes.illum .nsig { border-bottom-color: rgba(90,60,40,.18); padding: 4px 4px; }
+  #notes.illum .nsig .rd { flex: none; width: 52px; height: 52px; display: flex; align-items: center; justify-content: center;
+    background: url(art/grim-roundel.png?v=1) center / 100% 100% no-repeat; }
+  #notes.illum .nsig img { width: 31px; height: 31px; }
+  #notes.illum .ntail { display: block; height: 44px; margin: 4px 0 10px; background: url(art/grim-triskele.png?v=1) center / contain no-repeat; opacity: .9; }
+  /* the page's buttons as the book's knotwork plaques, Back the gilded one */
+  #notes.illum .row .btn { border: solid transparent; border-width: 10px 11px; border-radius: 0; color: #2e1f14;
+    border-image: url(art/grim-btn.png?v=1) 58 62 fill / 10px 11px stretch; background: none;
+    box-shadow: none; filter: drop-shadow(0 2px 3px rgba(0,0,0,.35)); padding: 3px 8px; font-size: 14px; }
+  #notes.illum .row .btn.primary { border-image-source: url(art/grim-btn-gold.png?v=1); color: #3a1a0c; }
+  #notes.illum .row .btn::before, #notes.illum .row .btn::after { display: none; }
 
   /* ---------- desktop phone preview ---------- */
   #title #bPhone { position: absolute; right: 16px; bottom: 14px; font-size: 12px; padding: 7px 12px; }
@@ -441,18 +481,24 @@
 
 <div id="notes">
   <div class="sheet">
-    <div class="num" id="nNum">Lesson I</div>
-    <h3 id="nTitle">First Breath</h3>
-    <div class="div"></div>
-    <p id="nText"></p>
-    <div class="nhead">Sigils of this folio · tap one to trace it</div>
-    <div id="nSigils"></div>
-    <div class="nhead">Signs &amp; barbs</div>
-    <div id="nSigns"></div>
-    <div id="nHint"></div>
-    <div class="row">
-      <button class="btn ghost light" id="nHintB">A Nudge</button>
-      <button class="btn primary" id="nBack">↩ Back to the page</button>
+    <canvas id="nBg"></canvas>
+    <canvas id="nFr"></canvas>
+    <div class="nin">
+      <div class="num" id="nNum">Lesson I</div>
+      <h3 id="nTitle"><span>First Breath</span></h3>
+      <div class="div"></div>
+      <p id="nText"></p>
+      <div class="nhead"><span>Sigils of this folio</span></div>
+      <div class="nsub">tap one to trace it</div>
+      <div id="nSigils"></div>
+      <div class="nhead"><span>Signs &amp; barbs</span></div>
+      <div id="nSigns"></div>
+      <div id="nHint"></div>
+      <div class="ntail"></div>
+      <div class="row">
+        <button class="btn ghost light" id="nHintB">A Nudge</button>
+        <button class="btn primary" id="nBack">↩ Back to the page</button>
+      </div>
     </div>
   </div>
 </div>
@@ -558,9 +604,9 @@
   </div>
 </div>
 
-<script src="js/ink.js?v=155"></script>
-<script src="js/world.js?v=155"></script>
-<script src="js/tips.js?v=155"></script>
-<script src="js/main.js?v=155"></script>
+<script src="js/ink.js?v=156"></script>
+<script src="js/world.js?v=156"></script>
+<script src="js/tips.js?v=156"></script>
+<script src="js/main.js?v=156"></script>
 </body>
 </html>
