@@ -137,7 +137,8 @@ const TEMPLATES = [];
     add('tide', p, false, 'small');
   }
   // Frost — pentagram
-  add('frost', glyphLines('star')[0].slice(0, 5), true, 'small');
+  // (a pentagram repeats every 72°, so ±43° covers any tilt)
+  add('frost', glyphLines('star')[0].slice(0, 5), true, 'mid');
   // Luna — closed crescent & open C, both facings
   const moon = glyphLines('moon')[0];
   add('luna', moon, true, 'mid'); add('luna', mx(moon), true, 'mid');
@@ -258,8 +259,13 @@ function spiralEye(raw) {
 }
 function recognize(raw) {
   if (raw.length < 4 || pathLen(raw) < 0.05) return null;
+  // a star: a closed stroke with five sharp points. (It winds twice round its middle like a spiral does, so it
+  // must be told apart first; hand stars often missed the template, or read as Ventus.)
+  // (a star winds about twice and its radius doesn't grow; a tight spiral's eye can show five sharp spots too)
+  const tr = trimLoop(raw), sp0 = spiralTest(raw);
+  const starry = sp0.turns < 2.5 && sp0.corr < 0.75 && endGap(tr) < 0.45 && maxTurn(tr) > 1.6 && cornerCount(tr) === 5;
   // a loop that goes on curling inward is a spiral, not a closed shape with a hook: keep its curl
-  const sp0 = spiralTest(raw), curled = sp0.turns > 1.3 && spiralEye(raw);
+  const curled = !starry && sp0.turns > 1.3 && spiralEye(raw);
   if (!curled) raw = trimLoop(raw);
   const open = prepOpen(raw), closed = prepClosed(raw);
   const V = { open: [open, open.slice().reverse()], closed: [closed, closed.slice().reverse()] };
@@ -276,7 +282,8 @@ function recognize(raw) {
     }
   }
   const sp = spiralTest(raw);
-  if (sp.turns > 1.25 && (sp.corr > 0.75 || curled)) best.gale = Math.min(best.gale, 0.04 + Math.max(0, 0.9 - Math.max(sp.corr, 0.75)) * 0.2);
+  if (starry) { best.frost = Math.min(best.frost, 0.05 + Math.max(0, best.frost - 0.05) * 0.3); best.gale += 0.06; }
+  else if (sp.turns > 1.25 && (sp.corr > 0.75 || curled)) best.gale = Math.min(best.gale, 0.04 + Math.max(0, 0.9 - Math.max(sp.corr, 0.75)) * 0.2);
   // corners: a square must have them; circles and crescents must not
   const sharp = maxTurn(raw);
   if (sharp < 0.85) {
@@ -465,7 +472,8 @@ function strokeGeom(st) {
   const L = pathLen(st), chord = Math.hypot(st[0].x - st[st.length - 1].x, st[0].y - st[st.length - 1].y);
   return { cx: cx / st.length, cy: cy / st.length, size: Math.max(x1 - x0, y1 - y0), straight: chord / (L || 1) };
 }
-const SLOT_R = 1.45, SLOT_SIZE = 0.27, GUIDE_R = 0.52; // GUIDE_R: the dotted seal guide on the page (in page half-widths)
+const SLOT_R = 1.45, GUIDE_R = 0.52;
+let SLOT_SIZE = 0.27; // (the slots' guide circles: bigger on one-page layouts, set in layout()) // GUIDE_R: the dotted seal guide on the page (in page half-widths)
 function slotOf(dx, dy) { return ((Math.round(Math.atan2(dy, dx) / (TAU / 8)) % 8) + 8) % 8; }
 function signOf(st, ds, S) {
   let ni = 0, fi = 0;
@@ -1103,7 +1111,10 @@ const Grim = {
     // a phone held sideways: one wide page, the drawing circle on the left, everything else in a column beside it
     const side = vh < 560 && vw > vh * 1.25;
     const single = side || vw < 900 || vh > vw * 0.95;
-    const L = { single, side: null };
+    // (the ring round the drawing circle, in half-widths: snug on one page, and snugger upright, where the width
+    // is all there is — so the circle, and its slots drawn larger, get what the ring gives up)
+    const L = { single, side: null, fr: side ? 0.99 : single ? 0.97 : 1.04 };
+    SLOT_SIZE = single ? 0.32 : 0.27;
     if (side) {
       // the height is all a sideways phone has: the book runs nearly edge to edge and the circle fills the page's height
       const bh = vh - 8, bw = Math.min(vw - 16, bh * 2.6);
@@ -1138,14 +1149,14 @@ const Grim = {
       // upright: the circle takes nearly the page's full width (the width is what limits it) and the book grows
       // as tall as it needs — header, circle, then the status, the buttons (as tall as they measured) and the
       // bottom border with its corner bosses
-      const HEAD = 140, pad = 6;
-      const bw = Math.min(vw - 10, 640), pw = bw - pad * 2;
+      const HEAD = 134, pad = 4;
+      const bw = Math.min(vw - 4, 640), pw = bw - pad * 2;
       // (the status: the name clear of the ring and two lines of read-back, as statusAt places them — more on wider pages)
       const FOOT = Math.max(64, 78 * pw / 520 + 15) + (this.btnH || 70) + pw * (0.035 + 0.14 * 0.9) + 8;
       // the whole drawing circle stays inside the page's border (margin m, plus room for the vine's leaves)
       const m = pw * 0.035;
-      const size = Math.max(160, Math.min(pw - 2 * (m + 9), vh - 10 - pad * 2 - HEAD - FOOT));
-      const bh = Math.min(vh - 10, HEAD + size + FOOT + pad * 2);
+      const size = Math.max(160, Math.min((pw - 2 * (m + 9)) * 0.99 / L.fr, vh - 4 - pad * 2 - HEAD - FOOT));
+      const bh = Math.min(vh - 4, HEAD + size + FOOT + pad * 2);
       L.bx = (vw - bw) / 2; L.by = (vh - bh) / 2; L.bw = bw; L.bh = bh;
       L.right = { x: L.bx + pad, y: L.by + pad, w: pw, h: bh - pad * 2 };
       L.left = null;
@@ -1162,7 +1173,7 @@ const Grim = {
   statusAt() {
     const L = this.L, A = L.area, SD = L.side, P = SD || L.right, s = SD ? Math.min(0.9, P.w / 380) : Math.min(P.w, P.h) / 520;
     if (SD) return { SD, P, s, sy: SD.y + 134 };
-    const ring = A.cy + A.half * (L.single ? 0.99 : 1.04) + 4;
+    const ring = A.cy + A.half * L.fr + 4;
     const sy = Math.max(A.y + A.size + (L.single ? 26 : 22 * s), ring + 6 * s + 0.8 * (30 * s + 4) - 2);
     // (end: below the read-back's second line, with a little air before the buttons)
     return { SD, P, s, sy, end: sy + 22 * s + 4 + (15 * s + 3) + 11 * s };
@@ -1772,7 +1783,7 @@ const Grim = {
   drawingFrame(g) {
     const A = this.L.area, ink = '#4a2e1a';
     // on one-page layouts the circle is drawn snug so it fits within the page border
-    const fr = this.L.single ? 0.99 : 1.04;
+    const fr = this.L.fr;
     g.save();
     g.fillStyle = 'rgba(255,250,232,0.18)';
     g.beginPath(); g.arc(A.cx, A.cy, A.half * fr, 0, TAU); g.fill();
