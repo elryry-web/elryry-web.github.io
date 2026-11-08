@@ -105,7 +105,7 @@ const Sfx = {
 };
 
 /* ---------------- Lessons ---------------- */
-const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV', 'XV', 'XVI', 'XVII', 'XVIII', 'XIX', 'XX', 'XXI', 'XXII', 'XXIII', 'XXIV', 'XXV', 'XXVI', 'XXVII', 'XXVIII', 'XXIX', 'XXX'];
+const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV', 'XV', 'XVI', 'XVII', 'XVIII', 'XIX', 'XX', 'XXI', 'XXII', 'XXIII', 'XXIV', 'XXV', 'XXVI', 'XXVII', 'XXVIII', 'XXIX', 'XXX', 'XXXI', 'XXXII', 'XXXIII', 'XXXIV', 'XXXV'];
 const LEVELS = [
   {
     name: 'First Breath', sigils: ['gale'], par: 1, opens: 'The First Folio',
@@ -412,6 +412,82 @@ const LEVELS = [
     t: ['    ****        ', '    ****        ', '   1****1       ', ' 001****1000    ', '0001****100001  ', '0000****0~~~~000', '0001****100001  ', ' 001****1000    ', '   1****1       ', '    ****        ', '    ****        '],
     o: ['................', '................', '................', '................', '................', '.BOI.........DGB', '................', '................', '................', '................', '................'],
     flows: [{ x0: 4, x1: 7, y0: 0, y1: 10, dx: 0, dy: 1, s: 12 }, { x0: 9, x1: 12, y0: 5, y1: 5, dx: 1, dy: 0, s: 5 }],
+    folioEnd: { title: 'The Fourth Folio is Complete', text: 'The leat runs on to the mill. The master sets the fourth folio aside and opens a fifth, where small sigils ride on stone and water.' },
+  },
+  /* ---------- The Fifth Folio: sigils upon the placing rings ---------- */
+  // Each lesson here says which ring-sigils each centre may carry (ringOf): Ventus carries nothing, so no glide, ferry or
+  // heavy orb, and each lesson keeps to the one pairing it teaches.
+  // A chasm six tiles wide (x 4–9) between two plateaus at height 2; orb (1,3), font (12,3). Seal 1: Petra cast on the
+  // last tile of ground (3.5,3.5), its sign toward the font, Luna and Ventus on its ring: the slabs rise out over the void
+  // and hang there (6s with one Luna, 2s more per Luna). Seal 2: Ventus on the orb toward the font, two barbs, before the
+  // slabs drop. Wins 9/9 with no barb and 2+ Ventus, one barb and 2+ Ventus, two barbs and 1+ Ventus, at any Luna count.
+  // Fails 0/9: shorter bridges (no barb with 0–1 Ventus, one barb with 0–1, two barbs with none: the arm stops short of the
+  // far side); a one-barb gust over the bridge; the bridge cast on the void (it starts a tile out); opposite signs; a
+  // plain gust of any strength; a plain Petra line without Luna (it falls into the void).
+  {
+    name: 'The Hanging Stones', sigils: ['gale', 'stone', 'luna'], centers: ['gale', 'stone'], ringOf: { gale: [], stone: ['luna', 'gale'] },
+    par: 2, ink: 2, combos: true, opens: 'The Fifth Folio',
+    lesson: 'The fifth folio, where the small sigils ride on stone and water. A chasm too wide for any gust lies between the orb and the font. An arm of Petra cast out over empty air falls away, but Luna on Petra’s ring makes the stone hang where it rises, for a while. Ventus on Petra’s ring stretches the arm farther. In this folio each sigil takes only certain sigils on its ring.',
+    hint: 'Petra in the centre, cast on the last tile of ground before the chasm, its sign toward the font (lower right) crossed by two barbs. On its ring a small Luna and a small Ventus, in any slots. Then, while the stones still hang, Ventus on the orb toward the font, crossed by two barbs.',
+    t: [' 222      2222 ', '2222      22222', '2222      22222', '2222      22222', '2222      22222', '2222      22222', ' 222      2222 '],
+    o: ['...............', '...............', '...............', '.O..........G..', '...............', '...............', '...............'],
+  },
+  // The orb sits in a sunken pool (3×3 at -1) on an upper isle; the font lies on a lower-left isle across four rows of void.
+  // One seal: Unda on the orb, its sign toward the font (lower left), two or three Luna on its ring: the pool fills, the
+  // bubble lifts the orb out (3s and 2s more per Luna) and drifts it the way of the sign onto the font (6/6, any barbs).
+  // Fails: one Luna (the bubble bursts over the void, 0/6); any gust (cannot leave the pool); Unda alone or with the outer
+  // circle (still water); Unda + one Luna. Ventus on Unda's ring with Luna gave shortcuts, so Unda takes only Luna here.
+  {
+    name: 'The Moon Pool', sigils: ['gale', 'tide', 'luna'], centers: ['gale', 'tide'], ringOf: { gale: [], tide: ['luna'] },
+    par: 1, ink: 1, combos: true,
+    lesson: 'The orb rests in a sunken pool, too deep for any wind to lift it out, and the font lies on an isle across the empty air. Luna on the ring of Unda blows a bubble: the water lifts what floats in it up into the air, and the bubble drifts the way of Unda’s sign. Each Luna keeps it aloft a little longer.',
+    hint: 'Unda on the orb, its sign toward the font (lower left), with two small Luna on its ring. The bubble lifts the orb out of the pool and drifts it over the gap to the font. With one Luna it bursts too soon.',
+    t: [' 00000 ', '0000000', '00___00', '00___00', '00___00', '0000000', ' 00000 ', '       ', '       ', '       ', '       ', ' 00000 ', '0000000', '0000000', '0000000', ' 00000 '],
+    o: ['.......', '.......', '.......', '...O...', '.......', '.......', '.......', '.......', '.......', '.......', '.......', '.......', '.......', '...G...', '.......', '.......'],
+  },
+  // A trench one tile wide and four long (x 5–8, row 2, floor -1) runs between two walls (height 2) across the only way
+  // to the font; the orb (2,2) cannot climb out of it once in. Seal 1: Unda cast in the trench with Gelu on its ring and a
+  // sign crossed by one or two barbs (any direction), or the outer circle: the water freezes as it pours, a slick floor at
+  // -0.25 to 0. Seal 2: Ventus on the orb toward the font, two barbs: it glides over the glass to the font (one barb
+  // sometimes). Fails: plain gust (stuck in the trench); Unda without Gelu (the orb floats and stops in still water);
+  // the gust first; an unbarbed pour (ice at -0.75 or -0.5, too low to climb out of).
+  {
+    name: 'The Glass Floor', sigils: ['gale', 'tide', 'frost'], centers: ['gale', 'tide'], ringOf: { gale: [], tide: ['frost'] },
+    par: 2, ink: 2, combos: true,
+    lesson: 'A narrow trench lies across the only way to the font, between two walls. An orb that rolls into it cannot climb out. Gelu on the ring of Unda freezes the water as it pours, leaving a floor of ice, level and slick, at whatever height the water reached.',
+    hint: 'First Unda cast in the trench, with a small Gelu on its ring and a sign crossed by a barb or two (any direction): the trench fills and freezes nearly to the brim. Then Ventus on the orb toward the font (lower right), crossed by two barbs.',
+    t: [' 0000      00000  ', '000002222000000000', '00000____000000000', '000002222000000000', ' 0000      00000  '],
+    o: ['..................', '..................', '..O............G..', '..................', '..................'],
+  },
+  // A small isle with the orb (2,1), eight rows of void, then a broad low isle (-1) with the font (2,18). Seal 1: Petra cast
+  // on the first void tile (2.5,4.5), its sign toward the font (lower left), Gelu and Ventus on its ring: an ice bridge.
+  // Seal 2 (after ~1.5s, once it has risen): Ventus on the orb toward the font, two barbs. Wins 4/4 with one barb and two
+  // Ventus, no barb and two Ventus, two barbs and one Ventus. A stone bridge of the same reach fails 0/4: the orb slows on
+  // it and stops at row 12–14.7. An ice bridge with no barb and one Ventus is too short. An overshooting bridge only raises
+  // the low isle's tiles to 0.
+  {
+    name: 'The Glass Bridge', sigils: ['gale', 'stone', 'frost'], centers: ['gale', 'stone'], ringOf: { gale: [], stone: ['frost', 'gale'] },
+    par: 2, ink: 2, combos: true,
+    lesson: 'A bridge of stone could reach the far isle, but the way is long, and the orb slows on stone and stops before it arrives. Gelu on the ring of Petra raises the stone as ice, slick underfoot: on it the orb keeps its speed far beyond where it would stop on stone.',
+    hint: 'Petra cast on the first empty tile past the orb’s isle, its sign toward the font (lower left) crossed by one barb, with a small Gelu and two small Ventus on its ring. When the bridge has risen, Ventus on the orb toward the font, crossed by two barbs.',
+    t: [' 000 ', '00000', '00000', '00000', '     ', '     ', '     ', '     ', '     ', '     ', '     ', '     ', ' ___ ', '_____', '_____', '_____', '_____', '_____', '_____', ' ___ '],
+    o: ['.....', '..O..', '.....', '.....', '.....', '.....', '.....', '.....', '.....', '.....', '.....', '.....', '.....', '.....', '.....', '.....', '.....', '.....', '..G..', '.....'],
+  },
+  // The orb (1,2) faces a deep trench (x 5–7, floor -2, between walls of height 2), a short bank (x 8–9), a chasm of eight
+  // tiles (x 10–17) and a low isle (-1) with the font (21,2). Three seals, the first two in either order: Unda with the
+  // outer circle (any sign) and Gelu on its ring, cast in the trench (a glass floor near the brim); Petra with Gelu and
+  // 1–3 Ventus on its ring cast at 10.5 or 11.5, its sign toward the font (an ice bridge); then Ventus on the orb toward the
+  // font, two barbs (one barb with the longer bridges). 6/6 either way round. Fails: Unda without the outer circle (the orb
+  // stops in the trench, x 7.7); water without Gelu (8.2); a stone bridge (stops at 16.8); one ice bridge over both the
+  // trench and the chasm (7.7: Petra lifts the -2 floor only to -1).
+  {
+    name: 'The Glass Road', sigils: ['gale', 'stone', 'tide', 'frost'], centers: ['gale', 'stone', 'tide'], ringOf: { gale: [], stone: ['frost', 'gale'], tide: ['frost'] },
+    par: 3, ink: 3, combos: true,
+    lesson: 'The last page of the fifth folio. A deep trench, then a wide chasm, then the font on a low isle. Stone cannot fill the trench, and stone is too slow to cross the chasm. Each wants its own glass.',
+    hint: 'Unda in the trench with a second, larger circle around the seal and a small Gelu on its ring: a glass floor. Petra on the first empty tile past the trench’s far bank, its sign toward the font (lower right) crossed by one barb, with a small Gelu and two small Ventus on its ring: a glass bridge. Then Ventus on the orb toward the font, crossed by two barbs.',
+    t: [' 0000              ____ ', '0000022200        ______', '00000===00        ______', '0000022200        ______', ' 0000              ____ '],
+    o: ['........................', '........................', '.O...................G..', '........................', '........................'],
+    folioEnd: { title: 'The Fifth Folio is Complete', text: 'Glass over the trench, glass over the void, and the light is home. The master sets the fifth folio aside.' },
   },
 ];
 LEVELS.forEach((l, i) => l.roman = ROMAN[i]);
@@ -447,6 +523,11 @@ const NUDGES = {
   'The Timber Run': 'No wind carries the crates that far, but moving water will. Where does the race end, and what would lie there?',
   'The Icebound Font': 'Fire would melt the wall, and the frozen race under the orb with it. Something heavy breaks ice without melting it.',
   'The Thaw': 'The fire must cross the race to reach both braziers, and a thawed race carries everything over the falls. Cross while it is still frozen.',
+  'The Hanging Stones': 'Stone cast out over empty air falls away. Something on its ring could hold it where it rises, long enough to cross.',
+  'The Moon Pool': 'No wind lifts the orb out of its pool, but water would. What could carry the water’s float on across the gap?',
+  'The Glass Floor': 'Once in the trench, the orb never climbs out. Fill the trench, and make what fills it hold still.',
+  'The Glass Bridge': 'A long enough bridge is not enough: the orb slows on stone and stops before it arrives. What would keep it from slowing?',
+  'The Glass Road': 'Petra cannot raise the deep trench far enough, but water can fill it. Two kinds of glass, then one gust.',
 };
 LEVELS.forEach(l => l.nudge = NUDGES[l.name] || '');
 /* the hint, in two steps: a nudge, then the master's hint. Shown the same in the lesson card and the Notes leaf. */
@@ -468,7 +549,7 @@ const TITLE_LEVEL = {
 
 /* ---------------- Progress ---------------- */
 const Save = {
-  data: { unlocked: 1, stars: {}, v: 6 },
+  data: { unlocked: 1, stars: {}, v: 7 },
   load() {
     try {
       const s = JSON.parse(localStorage.getItem('quillsigil.v1'));
@@ -501,6 +582,11 @@ const Save = {
       if (s.v === 5) {
         if (s.stars[24]) s.unlocked = Math.max(s.unlocked, 26);
         s.v = 6; this.data = s; this.save();
+      }
+      // v155 added the fifth folio after The Thaw (index 29): a save that had beaten it was capped at 30 lessons
+      if (s.v === 6) {
+        if (s.stars[29]) s.unlocked = Math.max(s.unlocked, 31);
+        s.v = 7; this.data = s; this.save();
       }
       this.data = s;
     } catch (e) { }

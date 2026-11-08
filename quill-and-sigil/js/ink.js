@@ -478,7 +478,7 @@ function signOf(st, ds, S) {
 /* the active lesson's rules: which sigils may sit at the centre, which upon the ring */
 function lessonRules() {
   const L = typeof Game !== 'undefined' && Game.level; if (!L) return null;
-  return { centers: L.centers || L.sigils, sats: L.sats || L.sigils, combos: !!L.combos };
+  return { centers: L.centers || L.sigils, sats: L.sats || L.sigils, combos: !!L.combos, ringOf: L.ringOf || null };
 }
 const REL_NAME = { now: 'at once', along: 'along the way', arrive: 'on arrival' };
 // the small circles' colours in the second folio: when a ring-sigil there would act
@@ -525,6 +525,9 @@ function buildSpell(draft, rules) {
   for (const s of A.sats) {
     if (!s.ok) return { err: 'A ring-sigil is unclear. Redraw it inside its slot.' };
     if (rules && !rules.sats.includes(s.id)) return { err: `${SIGILS[s.id].name} cannot be set upon the ring in this lesson.` };
+    // a lesson may say which ring-sigils each centre may carry (v155, the fifth folio)
+    const allow = rules && rules.ringOf && rules.ringOf[id];
+    if (allow && !allow.includes(s.id)) return { err: allow.length ? `${SIGILS[s.id].name} cannot ride the ring of ${SIGILS[id].name} in this lesson.` : `${SIGILS[id].name} carries nothing upon its ring in this lesson: signs alone.` };
   }
   // each of the eight positions holds one mark: a sign or a ring-sigil
   for (const s of A.sats) if (A.signs.some(g => g.pos === s.slot)) return { err: 'Each place on the ring holds one mark: a sign or a ring-sigil, not both.' };
@@ -720,13 +723,22 @@ function describeSpell(sp, short = false) {
     if (isFerry(sp) && s.rel === 'now' && (s.id === 'luna' || s.id === 'stone')) continue;
     if (short && sp.sigil === 'luna' && s.id === 'gale' && sp.dir) continue; // already said: "Ventus bears it …"
     if (reach && s.id === 'gale') continue; // already said: "every arm … farther"
-    const what = !gust ? '' : s.id === 'stone' ? (s.rel === 'arrive' ? ': stone rises under it where it comes to rest' : ': turns it to stone')
+    const what = !gust ? (short ? '' : placedWhat(sp, s)) : s.id === 'stone' ? (s.rel === 'arrive' ? ': stone rises under it where it comes to rest' : ': turns it to stone')
       : s.rel === 'arrive' ? ': where it comes to rest' : '';
     t += ` · + ${SIGILS[s.id].name}${s.n > 1 ? ' ×' + s.n : ''} ${REL_NAME[s.rel]}${what}`;
   }
   return t;
 }
 
+/* what a ring-sigil does to a placed spell (the fifth folio's pairings), for the aim preview */
+function placedWhat(sp, s) {
+  const lunas = (sp.sats || []).filter(x => x.id === 'luna').reduce((a, x) => a + x.n, 0);
+  if (sp.sigil === 'stone' && s.id === 'luna') return `: the stone floats where it rises, ${6 + 2 * lunas}s`;
+  if (sp.sigil === 'stone' && s.id === 'frost') return ': raised as ice, slick underfoot';
+  if (sp.sigil === 'tide' && s.id === 'frost') return ': the water freezes as it pours';
+  if (sp.sigil === 'tide' && s.id === 'luna') return `: a bubble lifts what the water holds, ${3 + 2 * s.n}s${sp.dir ? ' · drifting ' + worldDirArrow(sp.dir) : ''}`;
+  return '';
+}
 function shortSpell(sp) {
   let t = SIGILS[sp.sigil].name;
   if ((sp.sigil === 'stone' || sp.sigil === 'flame' || sp.sigil === 'frost' || sp.sigil === 'tide') && sp.arms && sp.arms.length) { const P = petraShape(sp.arms, sp.amp, placeReach(sp)); t += P.kind === 'block' ? ` ${P.W}×${P.H}` : P.kind === 'diamond' ? ` ◇${P.cells.length}` : P.kind === 'field' ? ` ▱${P.cells.length}` : ' ' + sp.arms.map(a => worldDirArrow(a)).join('') + P.len; }
