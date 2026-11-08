@@ -1593,10 +1593,12 @@ const Grim = {
         if (sat && sat.ok) {
           g.globalAlpha = 0.55; drawGlyph(g, sat.id, px, py, sr * 0.75, hexA(SIGILS[sat.id].color, 0.9), 4); drawGlyph(g, sat.id, px, py, sr * 0.75, hexA(gold, 0.9), 1); g.globalAlpha = 1;
         }
-        // its time, written beneath: for every coloured circle, and for any ring-sigil
+        // its time, written on the circle's outer side (above the upper three, beneath the rest, so it never
+        // lies on the seal's rune ring): for every coloured circle, and for any ring-sigil
         if ((coloured && !signHere) || (sat && sat.ok)) {
           g.fillStyle = hexA(coloured ? col : '#5a3a1a', sat ? 0.95 : 0.75); g.font = `italic ${Math.max(9, Math.round(r * 0.075))}px "IM Fell English", serif`; g.textAlign = 'center';
-          g.fillText(REL_NAME[rel || 'now'], px, py + sr + Math.max(10, r * 0.09));
+          const up = Math.sin(a) < -0.5;
+          g.fillText(REL_NAME[rel || 'now'], px, up ? py - sr - Math.max(5, r * 0.035) : py + sr + Math.max(10, r * 0.09));
         }
       }
     }
