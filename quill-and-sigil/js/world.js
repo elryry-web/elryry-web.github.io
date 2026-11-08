@@ -152,7 +152,7 @@ const TOUCH = [[0, 0], [0.55, 0], [-0.55, 0], [0, 0.55], [0, -0.55]];
 function imbueTick(b, dt) {
   const sp = Math.hypot(b.vx, b.vy);
   for (const id in b.imb) {
-    const e = b.imb[id]; e.t -= dt; e.age += dt;
+    const e = b.imb[id]; e.age += dt; // (e.t: the tiles it has left to carry the element, spent in stepBody as it moves)
     if (e.t <= 0 || (e.untilStop && e.age > 0.4 && sp < 0.5 && b.lev <= 0)) { delete b.imb[id]; continue; }
     if (id === 'flame') {
       for (const [dx, dy] of TOUCH) { const c = cellAt(b.x + dx, b.y + dy); if (c && !c.void && Math.abs(surfaceTop(c) + featH(c) * 0.5 - b.z) < 1.7) ignite(c, true); }
@@ -180,7 +180,10 @@ function arrivalCheck(b, dt) {
   const sp = Math.hypot(b.vx, b.vy);
   // (a sailing slab floats the whole way: it arrives when it stops, run ashore or its float spent)
   const sails = b.kind === 'slab' && b.drift;
-  if (!(b.captured || (b.arriveT > 0.3 && sp < 0.6 && b.lev <= 0) || (sails && b.arriveT > 0.6 && sp < 0.35) || (b.arriveT > 0.15 && b.offEdge) || b.arriveT > 7)) return;
+  // a float left alone hangs for good, so a still, floating body has arrived too, unless wind is carrying it; and a body
+  // that never comes to rest arrives once it has travelled 40 tiles (b.arriveD, counted in stepBody), never on a clock
+  const borne = b.drift && b.lev > 0;
+  if (!(b.captured || (b.arriveT > 0.3 && sp < 0.6 && !borne) || ((sails || borne) && b.arriveT > 0.6 && sp < 0.35) || (b.arriveT > 0.15 && b.offEdge) || (b.arriveD || 0) > 40)) return;
   const list = b.arrive; b.arrive = null;
   for (const a of list) arriveEffect(b, a.id, a.n, a.dir);
 }
@@ -190,7 +193,7 @@ function arriveEffect(b, id, n, dir = null) {
   Sfx.play(id, {});
   switch (id) {
     case 'gale': if (!b.captured) { const dv = (3 + 3 * n) / Math.pow(effMass(b), 0.7), dx = dir ? dir.x : b.ldx || 0, dy = dir ? dir.y : b.ldy || 0; b.vx += dx * dv; b.vy += dy * dv; b.vz += 1.2; } break;
-    case 'luna': if (!b.captured) { b.lev = 3 + 2 * n; b.drift = null; b.vz += 2.5; } break;
+    case 'luna': if (!b.captured) { b.lev = 1e6; b.levRange = RING_TILES * n; b.levAge = 0; b.levUntilStop = false; b.drift = null; b.vz += 2.5; } break;
     case 'flame': for (const c of cellsNear(x, y, 1.3 + 0.3 * n)) { ignite(c, true); for (let i = 0; i < 5; i++) flameP(c.x + Math.random(), c.y + Math.random(), surfaceTop(c) + 0.2, 1.4); } break;
     case 'frost': for (const c of cellsNear(x, y, 1.4 + 0.3 * n)) freezeCell(c); for (let i = 0; i < 30; i++) emit({ x: x + (Math.random() - .5) * 3, y: y + (Math.random() - .5) * 3, z: z + Math.random(), vz: -0.4, life: 1.6, size: 3, color: '#ffffff', kind: 'flake', vr: 3 }); break;
     case 'tide': { const cs = cellsNear(x, y, 1.2 + 0.3 * n); floodAt(cs, null, 0); cs.forEach(douseCell); splash(x, y, z, 20); break; }
@@ -281,8 +284,12 @@ function stepBody(b, dt) {
   const ny = b.y + b.vy * dt;
   if (stuck || !blockedAt(b, b.x, ny)) b.y = ny;
   else { if (Math.abs(b.vy) > 1.5) Sfx.play('bump', Math.min(1, Math.abs(b.vy) / 8)); b.vy = -b.vy * 0.22; }
+  const moved = Math.hypot(b.x - x0, b.y - y0);
+  if (b.arrive) b.arriveD = (b.arriveD || 0) + moved;
+  // what rides on a body (fire, frost, water, stone) is spent by the tiles it carries them, not by the seconds
+  if (b.imb) for (const id in b.imb) b.imb[id].t -= moved;
   if (b.levRange != null && b.lev > 0) {
-    b.levRange -= Math.hypot(b.x - x0, b.y - y0);
+    b.levRange -= moved;
     // carried its full distance: Luna lets go and it settles where it is (no coasting on to somewhere the float never reached)
     if (b.levRange <= 0) { b.lev = 0; b.levRange = null; b.vx *= 0.15; b.vy *= 0.15; b.drift = null; }
   }
@@ -665,12 +672,12 @@ function applySpell(sp, tx, ty, tz) {
 function bodiesOn(cells) { const set = new Set(cells); return World.bodies.filter(b => b.alive && !b.captured && set.has(cellAt(b.x, b.y))); }
 function infuseBody(b, s, sp) {
   if (b.captured) return;
-  const T = 3 + 2 * s.n, col = SIGILS[s.id].color;
+  const T = (s.id === 'luna' ? RIDE_TILES : RING_TILES) * s.n, col = SIGILS[s.id].color; // tiles, not seconds
   for (let i = 0; i < 18; i++) { const a = Math.random() * TAU; emit({ x: b.x + Math.cos(a) * 0.4, y: b.y + Math.sin(a) * 0.4, z: b.z + 0.3, vx: -Math.cos(a), vy: -Math.sin(a), vz: 1, drag: 2, life: 0.8, size: 4, color: col, kind: 'glow' }); }
   if (s.rel === 'arrive') {
     // on Luna, a sigil ahead of the sign waits for the landing; it keeps Luna's sign (its way) and barbs (its strength)
     const luna = sp.sigil === 'luna' && sp.dir;
-    b.arrive = (b.arrive || []).concat([{ id: s.id, n: luna ? Math.max(s.n, sp.s) : s.n, dir: luna ? sp.dir : null }]); b.arriveT = 0; return;
+    b.arrive = (b.arrive || []).concat([{ id: s.id, n: luna ? Math.max(s.n, sp.s) : s.n, dir: luna ? sp.dir : null }]); b.arriveT = 0; b.arriveD = 0; return;
   }
   const until = s.rel === 'along';
   switch (s.id) {
@@ -680,7 +687,7 @@ function infuseBody(b, s, sp) {
       const dx = sp.dir ? sp.dir.x : b.vx, dy = sp.dir ? sp.dir.y : b.vy, L = Math.hypot(dx, dy) || 1, dv = 2.5 * s.n / Math.pow(effMass(b), 0.7);
       b.vx += dx / L * dv; b.vy += dy / L * dv; break;
     }
-    case 'luna': b.lev = Math.max(b.lev, T); b.levAge = 0; b.levUntilStop = until; if (sp.sigil !== 'luna') b.drift = null; b.vz += 2; break;
+    case 'luna': b.levRange = Math.max(b.lev > 0 && b.levRange != null ? b.levRange : 0, T); b.lev = 1e6; b.levAge = 0; b.levUntilStop = until; if (sp.sigil !== 'luna') b.drift = null; b.vz += 2; break;
     default:
       b.imb = b.imb || {}; b.imb[s.id] = { t: T, n: s.n, untilStop: until, age: 0 };
       if (s.id === 'stone') { Sfx.play('bump', 1); dust(b.x, b.y, b.z, 8); cam.shake = Math.max(cam.shake, 0.12); }
@@ -697,7 +704,7 @@ function infuseCells(s, cells, sp, tx, ty, tz, out) {
       break;
     case 'luna': // e.g. Unda + Luna: a bubble that lifts whatever it holds
       for (const b of bodiesOn(cells)) {
-        b.lev = Math.max(b.lev, 3 + 2 * n); b.levAge = 0; b.levUntilStop = false; b.vz += 2;
+        b.lev = 1e6; b.levRange = BUBBLE_TILES * n; b.levAge = 0; b.levUntilStop = false; b.vz += 2; // the bubble drifts BUBBLE_TILES per Luna
         b.drift = sp.dir ? { x: sp.dir.x * (0.8 + 0.5 * n), y: sp.dir.y * (0.8 + 0.5 * n) } : null;
         for (let i = 0; i < 12; i++) emit({ x: b.x, y: b.y, z: b.z + 0.3, vx: (Math.random() - .5) * 2, vy: (Math.random() - .5) * 2, vz: 1 + Math.random(), drag: 2, life: 1.2, size: 6, color: '#cfe8ff', kind: 'glow' });
       }
@@ -727,12 +734,12 @@ function infuseCells(s, cells, sp, tx, ty, tz, out) {
   }
 }
 /* a floating stone slab on one tile (drift: how it sails, or null to hang in place) */
-function raiseSlab(x, y, tz, T, drift) {
+function raiseSlab(x, y, tz, tiles, drift) { // tiles: how far it sails before it settles (null: it hangs for good)
   const c = cellI(x, y);
   if (!c || (c.feat && c.feat !== 'font')) return;
   const z = c.void ? tz : surfaceTop(c);
   const b = makeBody('slab', x + 0.5, y + 0.5, z);
-  Object.assign(b, { lev: T, levAge: 0, hover: z, drift });
+  Object.assign(b, { lev: 1e6, levRange: tiles, levAge: 0, hover: z, drift });
   World.bodies.push(b);
   return b;
   for (let i = 0; i < 14; i++) emit({ x: x + Math.random(), y: y + Math.random(), z: z - 0.4, vx: 0, vy: 0, vz: 1 + Math.random() * 2, life: 1.2, size: 4, color: i % 2 ? '#cdb0ff' : '#c8bca8', kind: 'glow' });
@@ -741,17 +748,17 @@ function raiseSlab(x, y, tz, T, drift) {
    (2s more per Luna) and fell, and a player who looked away came back to find the bridge sunk a level below the land,
    with nothing to say time had anything to do with it. (1e6, not Infinity: rewind snapshots are JSON) */
 function spawnSlabs(sp, tx, ty, tz, n) {
-  for (const [x, y] of spellCells(sp, tx, ty)) raiseSlab(x, y, tz, 1e6, null);
+  for (const [x, y] of spellCells(sp, tx, ty)) raiseSlab(x, y, tz, null, null);
   ring(tx, ty, tz, '#cdb0ff', 1.1); cam.shake = Math.max(cam.shake, 0.15);
 }
 /* Luna + Petra on the ring: a floating slab beneath the target, riders and all — and with Ventus on the ring too, it sails the way of the sign */
 function spawnFerry(sp, tx, ty, tz, n, gale = 0, luna = 0) {
-  // it floats 6s, +2s for each Petra and each extra Luna; the wind's barbs set how fast it sails
-  const T = 6 + 2 * n + 2 * Math.max(0, luna - 1), v = sp.dir && gale ? (0.8 + 0.6 * sp.s) * (1 + 0.4 * (gale - 1)) : 0, drift = v ? { x: sp.dir.x * v, y: sp.dir.y * v } : null;
+  // it sails ferryTiles() tiles (more for each Petra, each extra Luna and each barb; ink.js) and settles; with no wind it hangs for good
+  const v = sp.dir ? ferrySpeed(sp.s, gale) : 0, drift = v ? { x: sp.dir.x * v, y: sp.dir.y * v } : null, range = drift ? ferryTiles(sp.s, n, gale, luna) : null;
   const ix = Math.floor(tx), iy = Math.floor(ty);
   const tiles = sp.amp ? [-1, 0, 1].flatMap(a => [-1, 0, 1].map(b => [ix + a, iy + b])) : [[ix, iy]];
   const slabs = [];
-  for (const [x, y] of tiles) if (x >= 0 && y >= 0 && x < World.W && y < World.H) { const b = raiseSlab(x, y, tz, T, drift && { ...drift }); if (b) slabs.push(b); }
+  for (const [x, y] of tiles) if (x >= 0 && y >= 0 && x < World.W && y < World.H) { const b = raiseSlab(x, y, tz, range, drift && { ...drift }); if (b) slabs.push(b); }
   ring(tx, ty, tz, '#cdb0ff', sp.amp ? 1.8 : 1.1); cam.shake = Math.max(cam.shake, 0.15);
   return slabs;
 }

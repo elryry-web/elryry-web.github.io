@@ -189,7 +189,7 @@ const LEVELS = [
   },
   {
     name: 'The Broad Water', sigils: ['gale', 'frost'], par: 2, ring: true,
-    lesson: 'Around Luna the second circle made the float last longer; around other seals it spreads the spell wider: a broader gust, a path of frost three tiles wide, a wall three stones thick. It adds breadth, not strength. An unadorned Gelu stills a single tile, or three by three with the ring, and this river is broader still.',
+    lesson: 'Around Luna the second circle made the float carry farther; around other seals it spreads the spell wider: a broader gust, a path of frost three tiles wide, a wall three stones thick. It adds breadth, not strength. An unadorned Gelu stills a single tile, or three by three with the ring, and this river is broader still.',
     hint: 'Gelu cast in the middle of the river with two opposite signs across it (lower right and upper left), each crossed by one barb, and a second, larger circle around the whole seal: a path of ice from bank to bank, three wide. Then Ventus with a twice-barbed sign.',
     t: ['0000~~~~~0000', '0000~~~~~0000', '0000~~~~~0000', '0000~~~~~0000', '0000~~~~~0000'],
     o: ['.............', '.............', '.O.........G.', '.............', '.............'],
@@ -221,7 +221,7 @@ const LEVELS = [
   },
   {
     name: 'The Ferry', sigils: ['gale', 'stone', 'luna'], centers: ['gale'], sats: ['stone', 'luna'], par: 1, ink: 1, combos: true,
-    lesson: 'Ventus with Luna and Petra both on its ring, behind the sign where they act at once, raises a slab of floating stone beneath what you touch, and the wind sails it the way of your sign, rider and all. A slab sails on at an even pace where a floating orb soon slows in the air. In this lesson Petra and Luna can only go on the ring.',
+    lesson: 'Ventus with Luna and Petra both on its ring, behind the sign where they act at once, raises a slab of floating stone beneath what you touch, and the wind sails it the way of your sign, rider and all. A slab sails on at an even pace for a set distance, where a floating orb soon slows in the air. In this lesson Petra and Luna can only go on the ring.',
     hint: 'Ventus in the centre, cast right on the orb, its sign toward the far island crossed by two barbs. On the ring, in two of the red circles behind the sign: a small Luna and a small Petra.',
     t: ['000             000', '000             0000', '000             0000', '000             0000', '000             000 '],
     o: ['...................', '...................', '.O...............G.', '...................', '...................'],
@@ -244,8 +244,8 @@ const LEVELS = [
   },
   // Skyward's land again, solved by one compound seal. The hollow's rim throws back a plain Ventus gust, so Luna must
   // lift first (Luna in the centre, Ventus on its ring); the font is 12 tiles off (outer circle); the brazier on the near
-  // bank opens the gate, so Ignis must burn along the way (on arrival is too late). Fire on the orb lasts 5s: a gentle
-  // wind's flame dies before the brazier, one or two barbs arrive in time. Simulated at 15 cast offsets each.
+  // bank opens the gate, so Ignis must burn along the way (on arrival is too late). Fire on the orb lasts 10 tiles (since
+  // v161 a distance, not 5s), so even an unbarbed sign now carries it to the brazier. Simulated at 15 cast offsets each.
   // Since v138 Luna behind a Ventus sign lifts before the gust blows (LIFT_BEAT), so Ventus in the centre with two barbs,
   // Luna behind and Ignis beside also wins (9/9); one barb falls short. A shut gate can no longer be floated over.
   {
@@ -344,7 +344,7 @@ const LEVELS = [
   // at the level of the channel bed. Intended: Ventus toward the font with two barbs and a small Petra behind the sign. The
   // heavy orb sinks, the current cannot move it, and it rolls along the bed into the font (9/9; also 9/9 at ±0.45 offsets,
   // with the outer circle, with Petra beside the sign, or with three Petra). The water still brakes a heavy orb: with one
-  // barb it stops 0.7 tiles short on the bed, floats up once the stone wears off (5s), and is swept away (0/9).
+  // barb it stops 0.7 tiles short on the bed and stays there, heavy (0/9; stone at rest never wears off since v161).
   // Fail 0/9 at every barb count: plain gust (swept 2+ tiles downstream into the wall, then over the fall); gust toward the
   // upper right (aimed upstream, never gets across); gust toward the lower left; Petra on arrival (n 1–3: it raises the
   // first channel tile as the orb leaves the bank, and the orb still floats over the other two).
@@ -397,8 +397,9 @@ const LEVELS = [
   },
   // The orb (2,5) is cut off from the font (14,5) by an ice block, a frozen race four wide (current 12, south over the
   // falls), a dam (8,5) and an open leat (current 5 east) ending at a shut gate; braziers at both ends of the row.
-  // Seal 1: Ventus toward the font with Petra behind the sign: the heavy orb smashes the ice block, crosses the frozen race
-  // and waits at the gate (x 11.8; 9/9 at 0–3 barbs). Seal 2: Ignis on the dam, two opposite two-barbed signs along the row
+  // Seal 1: Ventus toward the font with Petra beside the sign (along the way): the heavy orb smashes the ice block, crosses
+  // the frozen race and waits at the gate (x 11.8), light again once it stops. Since v161 Petra behind the sign keeps the
+  // orb heavy as it waits (stone wears off by distance, not time), so the leat cannot carry it: 0/4. Seal 2: Ignis on the dam, two opposite two-barbed signs along the row
   // and two Ventus on its ring (7 tiles each way): both braziers light, the race thaws behind the orb and the leat carries it
   // through the opening gate (9/9, cast 1.5–5s after seal 1). Fire first fails 0/4 at every barb for every gust tried
   // (plain, amp, Ventus ×3 at any timing, heavy at once or beside, Petra on arrival): the thawed race sweeps it over the
@@ -408,7 +409,7 @@ const LEVELS = [
   {
     name: 'The Thaw', sigils: ['gale', 'stone', 'flame'], par: 2, ink: 2, combos: true,
     lesson: 'The last page of the fourth folio. A millrace lies frozen between the meadow and the mill, and the mill leat runs to a shut gate. Fire thaws ice, and a thawed race sweeps anything over the falls. An orb that reaches a shut gate only waits there. Mind the order of your seals.',
-    hint: 'First, Ventus on the orb toward the font (lower right), with a small Petra in a red slot behind the sign. The heavy orb breaks the ice block, crosses the frozen race and waits in the leat at the gate. Then Ignis on the dam between the race and the leat, with two signs of two barbs each, toward the lower right and the upper left, and two small Ventus on its ring. Each arm reaches seven tiles, to both braziers. The fire thaws the race behind the orb and the leat carries it through the opening gate.',
+    hint: 'First, Ventus on the orb toward the font (lower right), with a small Petra in a blue slot beside the sign. The heavy orb breaks the ice block, crosses the frozen race and waits in the leat at the gate, its stone worn off once it comes to rest. Then Ignis on the dam between the race and the leat, with two signs of two barbs each, toward the lower right and the upper left, and two small Ventus on its ring. Each arm reaches seven tiles, to both braziers. The fire thaws the race behind the orb and the leat carries it through the opening gate.',
     t: ['    ****        ', '    ****        ', '   1****1       ', ' 001****1000    ', '0001****100001  ', '0000****0~~~~000', '0001****100001  ', ' 001****1000    ', '   1****1       ', '    ****        ', '    ****        '],
     o: ['................', '................', '................', '................', '................', '.BOI.........DGB', '................', '................', '................', '................', '................'],
     flows: [{ x0: 4, x1: 7, y0: 0, y1: 10, dx: 0, dy: 1, s: 12 }, { x0: 9, x1: 12, y0: 5, y1: 5, dx: 1, dy: 0, s: 5 }],
@@ -434,19 +435,21 @@ const LEVELS = [
   },
   // The orb sits in a sunken pool (3×3 at -1) on an upper isle; the font lies on a lower-left isle across four rows of void.
   // One seal: Unda on the orb, its sign toward the font (lower left), two or three Luna on its ring: the pool fills, the
-  // bubble lifts the orb out (3s and 2s more per Luna) and drifts it the way of the sign onto the font (6/6, any barbs).
-  // Fails: one Luna (the bubble bursts over the void, 0/6); any gust (cannot leave the pool); Unda alone or with the outer
+  // bubble lifts the orb out and drifts it 6 tiles per Luna the way of the sign onto the font (6/6, any barbs).
+  // Fails: one Luna (the bubble falls short over the void, 0/6); any gust (cannot leave the pool); Unda alone or with the outer
   // circle (still water); Unda + one Luna. Ventus on Unda's ring with Luna gave shortcuts, so Unda takes only Luna here.
   {
     name: 'The Moon Pool', sigils: ['gale', 'tide', 'luna'], centers: ['gale', 'tide'], ringOf: { gale: [], tide: ['luna'] },
     par: 1, ink: 1, combos: true,
-    lesson: 'The orb rests in a sunken pool, too deep for any wind to lift it out, and the font lies on an isle across the empty air. Luna on the ring of Unda blows a bubble: the water lifts what floats in it up into the air, and the bubble drifts the way of Unda’s sign. Each Luna keeps it aloft a little longer.',
-    hint: 'Unda on the orb, its sign toward the font (lower left), with two small Luna on its ring. The bubble lifts the orb out of the pool and drifts it over the gap to the font. With one Luna it bursts too soon.',
+    lesson: 'The orb rests in a sunken pool, too deep for any wind to lift it out, and the font lies on an isle across the empty air. Luna on the ring of Unda blows a bubble: the water lifts what floats in it up into the air, and the bubble drifts the way of Unda’s sign. Each Luna carries it six tiles farther.',
+    hint: 'Unda on the orb, its sign toward the font (lower left), with two small Luna on its ring. The bubble lifts the orb out of the pool and drifts it over the gap to the font. With one Luna it falls short.',
     t: [' 00000 ', '0000000', '00___00', '00___00', '00___00', '0000000', ' 00000 ', '       ', '       ', '       ', '       ', ' 00000 ', '0000000', '0000000', '0000000', ' 00000 '],
     o: ['.......', '.......', '.......', '...O...', '.......', '.......', '.......', '.......', '.......', '.......', '.......', '.......', '.......', '...G...', '.......', '.......'],
   },
-  // A trench one tile wide and four long (x 5–8, row 2, floor -1) runs between two walls (height 2) across the only way
-  // to the font; the orb (2,2) cannot climb out of it once in. Seal 1: Unda cast in the trench with Gelu on its ring and a
+  // A trench one tile wide and four long (x 5–8, row 2, floor -1) cut across the only way to the font, in a neck of land
+  // three rows wide; the orb (2,2) cannot climb out of it once in. (The walls beside it went in v161: they only hid the
+  // cut. No pair of gusts, nor Unda on the orb then a gust, gets round it on the flat sides; Unda + Gelu cast on the orb
+  // with a two-barbed sign toward the font also fills the trench, the same idea.) Seal 1: Unda cast in the trench with Gelu on its ring and a
   // sign crossed by one or two barbs (any direction), or the outer circle: the water freezes as it pours, a slick floor at
   // -0.25 to 0. Seal 2: Ventus on the orb toward the font, two barbs: it glides over the glass to the font (one barb
   // sometimes). Fails: plain gust (stuck in the trench); Unda without Gelu (the orb floats and stops in still water);
@@ -454,9 +457,9 @@ const LEVELS = [
   {
     name: 'The Glass Floor', sigils: ['gale', 'tide', 'frost'], centers: ['gale', 'tide'], ringOf: { gale: [], tide: ['frost'] },
     par: 2, ink: 2, combos: true,
-    lesson: 'A narrow trench lies across the only way to the font, between two walls. An orb that rolls into it cannot climb out. Gelu on the ring of Unda freezes the water as it pours, leaving a floor of ice, level and slick, at whatever height the water reached.',
+    lesson: 'A narrow trench cuts across the only way to the font. An orb that rolls into it cannot climb out. Gelu on the ring of Unda freezes the water as it pours, leaving a floor of ice, level and slick, at whatever height the water reached.',
     hint: 'First Unda cast in the trench, with a small Gelu on its ring and a sign crossed by a barb or two (any direction): the trench fills and freezes nearly to the brim. Then Ventus on the orb toward the font (lower right), crossed by two barbs.',
-    t: [' 0000      00000  ', '000002222000000000', '00000____000000000', '000002222000000000', ' 0000      00000  '],
+    t: [' 0000      00000  ', '000000000000000000', '00000____000000000', '000000000000000000', ' 0000      00000  '],
     o: ['..................', '..................', '..O............G..', '..................', '..................'],
   },
   // A small isle with the orb (2,1), eight rows of void, then a broad low isle (-1) with the font (2,18). Seal 1: Petra cast

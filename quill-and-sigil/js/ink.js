@@ -670,6 +670,20 @@ function placeReach(sp) {
   const placing = sp.sigil === 'stone' || sp.sigil === 'flame' || sp.sigil === 'frost' || (sp.sigil === 'tide' && !tideCurrent(sp));
   return placing ? 2 * (sp.sats || []).filter(s => s.id === 'gale').reduce((a, s) => a + s.n, 0) : 0;
 }
+// No spell lasts a length of time (a hard rule since v161): what floats or carries an element does so for a distance in
+// tiles, and keeps it for as long as it is left alone. world.js reads these; the aim bar says them.
+const RING_TILES = 10;   // Ignis, Gelu, Unda or Petra riding on what a gust moves (and Luna on arrival), per sigil
+const RIDE_TILES = 20;   // Luna riding a gust: the air stops a glide well before this (about 15 tiles at most), then it hangs
+const BUBBLE_TILES = 6;  // Unda + Luna: how far the bubble drifts, per Luna
+// the ferry's slab sails as far as it used to in (6 + 2 per Petra + 2 per extra Luna) seconds, gathering speed from rest
+// (0.55s lost): about 10 / 15 / 19 tiles for no barb / one / two, so The Ferry's one barb still lands short of the font
+function ferrySpeed(s, gale) { return gale ? (0.8 + 0.6 * s) * (1 + 0.4 * (gale - 1)) : 0; }
+function ferryTiles(s, petra, gale, luna) { return Math.round((6 + 2 * petra + 2 * Math.max(0, luna - 1) - 0.55) * ferrySpeed(s, gale)); }
+function ferryOf(sp) { // the counts applySpell passes to spawnFerry
+  const sum = f => (sp.sats || []).filter(f).reduce((a, s) => a + s.n, 0);
+  if (sp.sigil === 'luna') return ferryTiles(sp.s, sum(s => s.id === 'stone'), sum(s => s.id === 'gale'), 0);
+  return ferryTiles(sp.s, sum(s => s.id === 'stone' && s.rel === 'now'), 1, sum(s => s.id === 'luna' && s.rel === 'now'));
+}
 // Ventus with Luna and Petra both on its ring at once: the ferry (applySpell in world.js)
 function isFerry(sp) { const now = id => (sp.sats || []).some(s => s.id === id && s.rel === 'now'); return sp.sigil === 'gale' && !!sp.dir && now('luna') && now('stone'); }
 // short: the aim bar's compact form (on a phone the full read-back would fill a third of the screen); the grimoire keeps it whole
@@ -708,7 +722,7 @@ function describeSpell(sp, short = false) {
     else if (sp.dir && late) t += short ? ` · blown ${force} ${worldDirArrow(sp.dir)} on landing` : ` · when it lands, Ventus blows it ${force} ${worldDirArrow(sp.dir)}`;
     else if (sp.dir && !ring.length && !short) t += ' · its sign aims only what rides on Luna’s ring';
   }
-  else if (isFerry(sp)) t += short ? ` · a ferry sails ${force} ${worldDirArrow(sp.dir)}` : ` · a ferry: a floating slab sails ${force} ${worldDirArrow(sp.dir)}, rider and all`;
+  else if (isFerry(sp)) t += short ? ` · a ferry sails ${ferryOf(sp)} tiles ${worldDirArrow(sp.dir)}` : ` · a ferry: a floating slab sails ${ferryOf(sp)} tiles ${worldDirArrow(sp.dir)}, rider and all`;
   else if (sp.dir) t += ` · ${force} ${{ gale: 'gust', tide: 'current' }[sp.sigil] || 'push'} ${worldDirArrow(sp.dir)}`;
   else if (sp.radial) t += ` · ${force}, balanced (outward)`;
   if (sp.amp && !line && sp.sigil !== 'stone' && sp.sigil !== 'luna') t += ' · widened';
@@ -723,8 +737,11 @@ function describeSpell(sp, short = false) {
     if (isFerry(sp) && s.rel === 'now' && (s.id === 'luna' || s.id === 'stone')) continue;
     if (short && sp.sigil === 'luna' && s.id === 'gale' && sp.dir) continue; // already said: "Ventus bears it …"
     if (reach && s.id === 'gale') continue; // already said: "every arm … farther"
-    const what = !gust ? (short ? '' : placedWhat(sp, s)) : s.id === 'stone' ? (s.rel === 'arrive' ? ': stone rises under it where it comes to rest' : ': turns it to stone')
-      : s.rel === 'arrive' ? ': where it comes to rest' : '';
+    // (and how far what rides on the orb lasts: a distance, never a time)
+    const far = ` for ${s.rel === 'along' ? 'up to ' : ''}${(s.id === 'luna' ? RIDE_TILES : RING_TILES) * s.n} tiles`;
+    const what = !gust ? (short ? '' : placedWhat(sp, s)) : s.id === 'stone' ? (s.rel === 'arrive' ? ': stone rises under it where it comes to rest' : ': turns it to stone' + far)
+      : s.rel === 'arrive' ? (s.id === 'luna' ? `: where it comes to rest it floats ${RING_TILES * s.n} tiles` : ': where it comes to rest')
+      : s.id === 'luna' ? ': floats it' + far : s.id === 'gale' ? '' : ': it carries the element' + far;
     t += ` · + ${SIGILS[s.id].name}${s.n > 1 ? ' ×' + s.n : ''} ${REL_NAME[s.rel]}${what}`;
   }
   return t;
@@ -735,7 +752,7 @@ function placedWhat(sp, s) {
   if (sp.sigil === 'stone' && s.id === 'luna') return ': the stone hangs where it rises';
   if (sp.sigil === 'stone' && s.id === 'frost') return ': raised as ice, slick underfoot';
   if (sp.sigil === 'tide' && s.id === 'frost') return ': the water freezes as it pours';
-  if (sp.sigil === 'tide' && s.id === 'luna') return `: a bubble lifts what the water holds, ${3 + 2 * s.n}s${sp.dir ? ' · drifting ' + worldDirArrow(sp.dir) : ''}`;
+  if (sp.sigil === 'tide' && s.id === 'luna') return `: a bubble lifts what the water holds${sp.dir ? ' and drifts ' + BUBBLE_TILES * s.n + ' tiles ' + worldDirArrow(sp.dir) : ''}`;
   return '';
 }
 function shortSpell(sp) {
@@ -2079,7 +2096,8 @@ const Grim = {
       if (fr) {
         // the panel, its caption inside it with the land
         const { d, pad, fy } = fr, fx = Math.min(M.x - pad, MA.x), fw = fr.right - fx, fh = M.y + M.h + pad - fy;
-        g.fillStyle = 'rgba(255,248,226,0.35)'; g.fillRect(fx + d * 0.5, fy + d * 0.5, fw - d, fh - d);
+        // solid parchment, so a corner boss the panel sits over never shows through it (the user: all beige inside)
+        g.fillStyle = '#f3e6c6'; g.fillRect(fx + d * 0.5, fy + d * 0.5, fw - d, fh - d);
         nineSlice(g, FR, fx, fy, fw, fh, 96, d);
         fr.lx = fx + fw / 2;
       }
