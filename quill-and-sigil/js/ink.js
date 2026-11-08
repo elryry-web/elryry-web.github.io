@@ -245,9 +245,22 @@ function trimLoop(raw) {
   if (best > 0.12 * size || best > d0 - 0.04 * size || (bi === 0 && bj === n - 1)) return raw;
   return raw.slice(bi, bj + 1);
 }
+/* a spiral has its eye in the middle: one end near the centre of the shape, the other out on its rim.
+   (A hand spiral is often a round loop with a short curl inside, so its radius barely grows until the end.) */
+function spiralEye(raw) {
+  const rs = resample(raw, 64);
+  let cx = 0, cy = 0, x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+  for (const p of rs) { cx += p.x; cy += p.y; x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y); }
+  cx /= 64; cy /= 64;
+  const size = Math.max(x1 - x0, y1 - y0) || 1, a = raw[0], b = raw[raw.length - 1];
+  const d0 = Math.hypot(a.x - cx, a.y - cy) / size, d1 = Math.hypot(b.x - cx, b.y - cy) / size;
+  return Math.min(d0, d1) < 0.3 && Math.max(d0, d1) > 0.36;
+}
 function recognize(raw) {
   if (raw.length < 4 || pathLen(raw) < 0.05) return null;
-  raw = trimLoop(raw);
+  // a loop that goes on curling inward is a spiral, not a closed shape with a hook: keep its curl
+  const sp0 = spiralTest(raw), curled = sp0.turns > 1.3 && spiralEye(raw);
+  if (!curled) raw = trimLoop(raw);
   const open = prepOpen(raw), closed = prepClosed(raw);
   const V = { open: [open, open.slice().reverse()], closed: [closed, closed.slice().reverse()] };
   const best = {};
@@ -263,7 +276,7 @@ function recognize(raw) {
     }
   }
   const sp = spiralTest(raw);
-  if (sp.turns > 1.25 && sp.corr > 0.75) best.gale = Math.min(best.gale, 0.04 + Math.max(0, 0.9 - sp.corr) * 0.2);
+  if (sp.turns > 1.25 && (sp.corr > 0.75 || curled)) best.gale = Math.min(best.gale, 0.04 + Math.max(0, 0.9 - Math.max(sp.corr, 0.75)) * 0.2);
   // corners: a square must have them; circles and crescents must not
   const sharp = maxTurn(raw);
   if (sharp < 0.85) {
@@ -376,8 +389,8 @@ class Draft {
     const slotRec = {};
     for (const k in A.slotStrokes) {
       const idx = A.slotStrokes[k], rec = recognize(idx.flatMap(ptsOf));
-      // (a closed shape is never an arrow)
-      if ((!rec || !rec.ok) && idx.length === 1 && endGap(ptsOf(idx[0])) > 0.3) {
+      // (a closed shape is never an arrow, nor is a loop or curl: an arrow runs fairly straight)
+      if ((!rec || !rec.ok) && idx.length === 1 && endGap(ptsOf(idx[0])) > 0.3 && strokeGeom(ptsOf(idx[0])).straight > 0.6) {
         const sg = signOf(ptsOf(idx[0]), dsOf(ptsOf(idx[0])), S);
         if (sg) { A.roles[idx[0]] = 'sign'; A.signs.push({ ...sg, i: idx[0] }); delete A.slotStrokes[k]; continue; }
       }
@@ -1152,6 +1165,7 @@ const Grim = {
     if (sp.err) {
       this.status = sp.err; this.statusCol = '#8a2a1a';
       if (!A.sigil.ok && A.sigil.id) this.status += `  (Closest: ${SIGILS[A.sigil.id].name}?)`;
+      else { const u = A.sats.find(s => !s.ok && s.id); if (A.sigil.ok && u) this.status += `  (Closest: ${SIGILS[u.id].name}?)`; }
       return;
     }
     this.status = describeSpell(sp);
