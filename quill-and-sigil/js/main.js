@@ -524,7 +524,7 @@ const Game = {
     for (const c of World.cells) if (c.feat === 'brazier') c.lit = true;
     const f = World.fonts[0], b = makeBody('orb', f.x + 0.5, f.y + 0.5, 1);
     b.captured = { x: f.x, y: f.y, h: f.h }; World.bodies.push(b);
-    fitCamera(innerWidth, innerHeight);
+    VIEW.z = 1; fitCamera(innerWidth, innerHeight);
     $('#hud').classList.remove('show');
     this.showScreen('title');
     $('#bContinue').style.display = Save.data.unlocked > 1 ? '' : 'none';
@@ -551,7 +551,7 @@ const Game = {
     Grim.draft.clear(); Grim.ghost = null; Grim.bookDirty = true; Grim.inkDirty = true;
     parts.length = 0;
     loadWorld(this.level);
-    fitCamera(innerWidth, innerHeight);
+    VIEW.z = 1; fitCamera(innerWidth, innerHeight);
     $('#lnum').textContent = `Lesson ${this.level.roman}`;
     $('#ltitle').textContent = this.level.name;
     $('#par').textContent = this.level.par;
@@ -970,28 +970,61 @@ const mouseAim = e => e.pointerType === 'mouse' && !FORCE_TOUCH;
 
 // Mouse: the preview follows the pointer and a click casts.
 // Finger: touch and drag to place the preview; it stays where you lift, and the Cast button in the aim bar sends it.
+// Two fingers on the land pinch to zoom it and drag to move it; the wheel zooms it under a mouse. A pinch never aims:
+// the preview goes back to where it was before the fingers came down.
+const FING = new Map(), PINCH = { on: false, used: false, d: 0, mx: 0, my: 0, aim: null };
+function pinchSpan() { const [a, b] = [...FING.values()]; return [Math.hypot(a.x - b.x, a.y - b.y) || 1, (a.x + b.x) / 2, (a.y + b.y) / 2]; }
 wc.addEventListener('pointermove', e => {
+  if (FING.has(e.pointerId)) FING.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (PINCH.on && FING.size >= 2) {
+    const [d, mx, my] = pinchSpan();
+    zoomView(d / PINCH.d, PINCH.mx, PINCH.my, mx - PINCH.mx, my - PINCH.my);
+    PINCH.d = d; PINCH.mx = mx; PINCH.my = my;
+    return;
+  }
+  if (PINCH.used) return;
   if (Game.state !== 'aim') return;
   if (mouseAim(e) || Game.aimDown) { Game.aim = pick(e.clientX, e.clientY); Game.aimReady(); }
 });
 wc.addEventListener('pointerdown', e => {
   Sfx.init();
+  if (e.pointerType === 'touch') {
+    if (!FING.size) { PINCH.used = false; PINCH.aim = Game.aim; }
+    FING.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (FING.size >= 2) {
+      if (!PINCH.on && Game.state === 'aim') { Game.aim = PINCH.aim; Game.aimDown = false; Game.aimReady(); }
+      PINCH.on = PINCH.used = true; [PINCH.d, PINCH.mx, PINCH.my] = pinchSpan();
+      return;
+    }
+  }
   if (Game.state === 'aim') {
     if (e.button === 2) { Game.backToPage(); return; }
     try { wc.setPointerCapture(e.pointerId); } catch (err) { }
     Game.aim = pick(e.clientX, e.clientY); Game.aimDown = true; Game.aimReady();
-  } else if (Game.state === 'play' && e.button === 0) {
-    Game.toast(isTouch() ? 'Open the grimoire to draft a spell.' : 'Open the grimoire (Space) to draft a spell.');
+  } else if (Game.state === 'play' && e.button === 0 && !isTouch()) {
+    Game.toast('Open the grimoire (Space) to draft a spell.');
   }
 });
+function fingerUp(e) {
+  FING.delete(e.pointerId);
+  if (FING.size < 2) PINCH.on = false;
+  // a lone tap on the land while nothing is being aimed (a pinch is not a tap)
+  if (!FING.size && !PINCH.used && e.type === 'pointerup' && Game.state === 'play' && isTouch()) Game.toast('Open the grimoire to draft a spell. Pinch to zoom the land.');
+}
 wc.addEventListener('pointerup', e => {
-  if (Game.state === 'aim' && Game.aimDown && e.button !== 2) {
+  if (e.pointerType === 'touch') fingerUp(e);
+  if (Game.state === 'aim' && Game.aimDown && e.button !== 2 && !PINCH.used) {
     Game.aim = pick(e.clientX, e.clientY); Game.aimReady();
     if (mouseAim(e)) Game.cast();
   }
   Game.aimDown = false;
 });
-wc.addEventListener('pointercancel', () => { Game.aimDown = false; });
+wc.addEventListener('pointercancel', e => { if (e.pointerType === 'touch') fingerUp(e); Game.aimDown = false; });
+wc.addEventListener('wheel', e => {
+  if (Game.state !== 'play' && Game.state !== 'aim') return;
+  e.preventDefault();
+  zoomView(Math.exp(-clamp(e.deltaY, -120, 120) * 0.0015), e.clientX, e.clientY);
+}, { passive: false });
 // which kind of hand is holding the quill: hides keyboard hints and switches the aiming style
 function setTouch(on) { document.body.classList.toggle('touch', on || FORCE_TOUCH); }
 setTouch(matchMedia('(hover: none) and (pointer: coarse)').matches);

@@ -1401,19 +1401,49 @@ function fitCamera(vw, vh, pads, grow) {
   const side = vw < 520 ? 36 : 60;
   const s = clamp(Math.min((vw - side) / (maxX - minX), (vh - topPad - botPad) / (maxY - minY)), 0.25, 1.9);
   const ox = vw / 2 - (minX + maxX) / 2 * s, oy = topPad + (vh - topPad - botPad) / 2 - (minY + maxY) / 2 * s;
-  if (!grow) { cam.s = s; cam.ox = ox; cam.oy = oy; return; }
+  cam.mid = [vw / 2, topPad + (vh - topPad - botPad) / 2];
+  if (!grow) { cam.b = { s, ox, oy }; applyView(); return; }
   // during play the view only ever widens, gently, when land has risen beyond it
-  const C = cam.goal || cam, out = C.ox + minX * C.s < side * 0.25 || C.ox + maxX * C.s > vw - side * 0.25
+  const C = cam.goal || cam.b, out = C.ox + minX * C.s < side * 0.25 || C.ox + maxX * C.s > vw - side * 0.25
     || C.oy + minY * C.s < topPad * 0.5 || C.oy + maxY * C.s > vh - botPad * 0.4;
   if (out && s < C.s + 1e-3) cam.goal = { s, ox, oy };
 }
 function easeCamera() {
   if (cam.fit && frameNo % 20 === 0) fitCamera(cam.fit[0], cam.fit[1], cam.fit[2], true);
-  const G = cam.goal; if (!G) return;
+  const G = cam.goal, B = cam.b; if (!G || !B) return;
   const k = 0.07;
-  cam.s += (G.s - cam.s) * k; cam.ox += (G.ox - cam.ox) * k; cam.oy += (G.oy - cam.oy) * k;
-  if (Math.abs(G.s - cam.s) < 1e-4 && Math.abs(G.ox - cam.ox) < 0.3 && Math.abs(G.oy - cam.oy) < 0.3) { cam.s = G.s; cam.ox = G.ox; cam.oy = G.oy; cam.goal = null; }
+  B.s += (G.s - B.s) * k; B.ox += (G.ox - B.ox) * k; B.oy += (G.oy - B.oy) * k;
+  if (Math.abs(G.s - B.s) < 1e-4 && Math.abs(G.ox - B.ox) < 0.3 && Math.abs(G.oy - B.oy) < 0.3) { B.s = G.s; B.ox = G.ox; B.oy = G.oy; cam.goal = null; }
+  applyView();
 }
+/* The player's own zoom over the fitted view (a pinch on a phone, the wheel with a mouse). cam.b is the view that fits
+   the land; VIEW.z scales it about the middle of the play area and VIEW.px/py shift it in screen pixels. cam.s/ox/oy,
+   which everything draws by, are the two together. */
+const VIEW = { z: 1, px: 0, py: 0 };
+const VIEW_MAXS = 2.2; // the closest the view comes, as a scale
+function applyView() {
+  const B = cam.b; if (!B) return;
+  const zmax = Math.max(1, VIEW_MAXS / B.s);
+  VIEW.z = clamp(VIEW.z, 1, zmax);
+  if (VIEW.z < 1.001) { VIEW.z = 1; VIEW.px = VIEW.py = 0; }
+  const [cx, cy] = cam.mid || [0, 0], z = VIEW.z;
+  // keep some land under the middle of the screen, so the land can't be pushed out of sight
+  if (z > 1 && World.W) {
+    const [minX, maxX, minY, maxY] = landBox();
+    const bx = cx + (B.ox - cx) * z, by = cy + (B.oy - cy) * z, s = B.s * z;
+    VIEW.px = clamp(VIEW.px, cx - bx - maxX * s, cx - bx - minX * s);
+    VIEW.py = clamp(VIEW.py, cy - by - maxY * s, cy - by - minY * s);
+  }
+  cam.s = B.s * z; cam.ox = cx + (B.ox - cx) * z + VIEW.px; cam.oy = cy + (B.oy - cy) * z + VIEW.py;
+}
+// zoom by f about the screen point (mx, my), then shift by (dx, dy)
+function zoomView(f, mx, my, dx = 0, dy = 0) {
+  const B = cam.b; if (!B) return;
+  const [cx, cy] = cam.mid || [0, 0], z0 = VIEW.z, z1 = clamp(z0 * f, 1, Math.max(1, VIEW_MAXS / B.s)), g = z1 / z0;
+  VIEW.px = mx - cx - (mx - cx - VIEW.px) * g + dx; VIEW.py = my - cy - (my - cy - VIEW.py) * g + dy; VIEW.z = z1;
+  applyView();
+}
+function resetView() { VIEW.z = 1; VIEW.px = VIEW.py = 0; applyView(); }
 
 function growQuad(q, px) {
   const cx = (q[0][0] + q[1][0] + q[2][0] + q[3][0]) / 4, cy = (q[0][1] + q[1][1] + q[2][1] + q[3][1]) / 4;
