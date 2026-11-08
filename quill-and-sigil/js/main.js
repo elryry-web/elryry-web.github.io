@@ -838,7 +838,7 @@ const Game = {
       list.appendChild(item);
       const s = document.createElement('button');
       s.className = 'slot' + (ok ? '' : ' off'); s.style.setProperty('--c', inf.color || '#e8c27a');
-      s.title = ok ? `${inf.label}: cast at once (${i + 1})` : `${inf.label}: not yet learned in this lesson`;
+      s.title = ok ? `${inf.label}: cast at once (${i + 1})` : `${inf.label}: not used in this lesson`;
       s.innerHTML = `<img src="${inf.img}" alt=""><span class="k">${i + 1}</span>`;
       s.onclick = e => { Sfx.init(); this.quick(i); e.currentTarget.blur(); };
       bar.appendChild(s);
@@ -862,7 +862,7 @@ const Game = {
       b.className = 'nsig' + (known ? '' : ' off') + (Grim.ghost === id ? ' on' : '');
       const im = `<img src="${glyphIcon(id)}" alt="" style="background:${known ? S.color : 'transparent'}">`;
       b.innerHTML = (illum ? `<span class="rd">${im}</span>` : im) + `<div><b>${S.name}</b><em>${S.en}</em>` +
-        `<span>${known ? (ringOnly(id) ? 'Ring only, this lesson. ' : '') + S.desc : 'Not yet learned.'}</span></div>`;
+        `<span>${known ? (ringOnly(id) ? 'Ring only, this lesson. ' : '') + S.desc : LEVELS.slice(0, LEVELS.indexOf(L)).some(l => l.sigils.includes(id)) ? 'Unused this lesson.' : 'Not yet learned.'}</span></div>`;
       if (known) b.onclick = () => { Grim.ghost = Grim.ghost === id ? null : id; Sfx.play('tick'); this.closeNotes(); };
       else b.disabled = true;
       box.appendChild(b);

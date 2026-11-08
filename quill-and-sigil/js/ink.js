@@ -1663,14 +1663,23 @@ const Grim = {
     if (unknown.length) {
       g.globalAlpha = 0.32;
       const r = 10 * s * k, cy = y + US * k / 2;
-      unknown.forEach((id, n) => {
-        const cx = x0 + r + 4 + n * (r * 2 + 10 * s);
-        g.strokeStyle = ink; g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, r, 0, TAU); g.stroke();
-        drawGlyph(g, id, cx, cy, r * 0.8, ink, 1.2);
-      });
+      // a sigil some earlier lesson taught is only unused here, not unlearned (the user: "not yet learned" was wrong for those)
+      const at = typeof LEVELS === 'undefined' ? -1 : LEVELS.indexOf(lv);
+      const taught = id => at > 0 && LEVELS.slice(0, at).some(l => l.sigils.includes(id));
+      const groups = [[unknown.filter(taught), 'unused this lesson'], [unknown.filter(id => !taught(id)), 'not yet learned']].filter(q => q[0].length);
       g.fillStyle = ink; g.font = `italic ${Math.round(12 * s * k)}px "IM Fell English", serif`; g.textAlign = 'left';
-      g.fillText('not yet learned', x0 + unknown.length * (r * 2 + 10 * s) + 10 * s, cy + 4 * s);
-      textR = Math.max(textR, x0 + unknown.length * (r * 2 + 10 * s) + 10 * s + g.measureText('not yet learned').width);
+      let gx = x0;
+      for (const [ids, label] of groups) {
+        ids.forEach((id, n) => {
+          const cx = gx + r + 4 + n * (r * 2 + 10 * s);
+          g.strokeStyle = ink; g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, r, 0, TAU); g.stroke();
+          drawGlyph(g, id, cx, cy, r * 0.8, ink, 1.2);
+        });
+        const lx = gx + ids.length * (r * 2 + 10 * s) + 10 * s;
+        g.fillText(label, lx, cy + 4 * s);
+        gx = lx + g.measureText(label).width + 22 * s;
+        textR = Math.max(textR, gx - 22 * s);
+      }
       g.globalAlpha = 1;
       y += US * k;
     }
