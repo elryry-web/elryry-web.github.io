@@ -144,7 +144,7 @@
   #lessonGrid .fhead { grid-column: 1 / -1; font-family: 'Cinzel Decorative', serif; font-weight: 700; font-size: 20px; color: var(--gold);
     text-align: center; text-shadow: 0 2px 8px #000; margin: 14px 0 -2px; }
   #lessonGrid .fhead:first-child { margin-top: 0; }
-  .ls i, #winStars i { display: inline-block; width: 16px; height: 16px; border-radius: 50%; background: rgba(90,60,40,.25); border: 1px solid rgba(90,60,40,.4); }
+  .ls i { display: inline-block; width: 16px; height: 16px; border-radius: 50%; background: rgba(90,60,40,.25); border: 1px solid rgba(90,60,40,.4); }
   .ls i.on { background: radial-gradient(circle at 35% 35%, #e05a48, #8e1f18); border-color: #5a120e; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
 
   .card { background: rgba(8,5,18,.55); }
@@ -173,14 +173,36 @@
   #noteHint .master::before, #nHint .master::before { content: 'The master’s hint: '; font-family: Cinzel, serif; font-size: .75em; letter-spacing: .08em; color: #8e2f22; font-style: normal; }
   .sheet .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
   .sheet .keys { margin-top: 14px; font-size: 13px; color: #6a4a30; font-style: italic; }
-  #winStars { display: flex; justify-content: center; gap: 14px; margin: 10px 0 16px; }
-  #winStars i { width: 44px; height: 44px; position: relative; }
-  #winStars i.on { background: radial-gradient(circle at 35% 35%, #e86a50, #a0241a 60%, #6a120c); border-color: #4a0e08;
-    box-shadow: 0 3px 8px rgba(0,0,0,.4), inset 0 0 0 4px rgba(0,0,0,.12); animation: stamp .45s cubic-bezier(.3,1.6,.5,1) both; }
-  #winStars i.on::after { content: '✦'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: rgba(255,210,170,.75); font-size: 20px; }
   #winText::first-letter { all: unset; }
   #winText { text-align: center !important; }
-  @keyframes stamp { from { transform: scale(2.2) rotate(-25deg); opacity: 0; } to { transform: none; opacity: 1; } }
+  /* ---------- the lesson leaf (v146): the lesson's words beside the land, never over it ---------- */
+  #note.leaf { position: fixed; z-index: 12; left: 50%; bottom: calc(104px + env(safe-area-inset-bottom)); transform: translate(-50%, 10px);
+    width: min(520px, calc(100vw - 32px)); max-height: 36vh; overflow: auto; padding: 14px 40px 10px 18px; color: #2e1f14; text-align: left;
+    background: radial-gradient(ellipse at 50% 35%, #fbf2da, #e7d3a6 70%, #d4b880); border-radius: 4px;
+    box-shadow: inset 0 0 30px rgba(120,80,30,.4), inset 0 0 0 1px #8a6a3a, 0 10px 30px rgba(0,0,0,.55);
+    opacity: 0; pointer-events: none; transition: opacity .35s, transform .35s; }
+  #note.leaf.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+  #note p { font-size: 16px; line-height: 1.42; font-style: italic; margin: 0 0 8px; }
+  #note .chips { justify-content: flex-start; margin: 4px 0 6px; gap: 6px; }
+  #note .chip img { width: 22px; height: 22px; }
+  #note #noteHint { font-size: 15px; padding: 8px 10px; margin: 4px 0 8px; }
+  #note .row { justify-content: flex-start; }
+  #note .row .btn { font-size: 12px; padding: 6px 12px; color: #6a3a1a; border-color: rgba(90,60,40,.5); background: rgba(255,255,255,.2); }
+  #note .keys { margin-top: 6px; font-size: 12px; text-align: left; }
+  #note .leafx { position: absolute; right: 6px; top: 6px; width: 30px; height: 30px; border: none; background: none; color: #6a4a30;
+    font-size: 22px; line-height: 1; cursor: pointer; pointer-events: auto; }
+  #note .leafx:hover { color: #8e2f22; }
+  /* wide screens: a column at the left, under the lesson's name, where the land is not */
+  @media (min-width: 900px) and (min-height: 501px) {
+    #note.leaf { left: 22px; bottom: auto; top: 150px; width: 330px; max-height: calc(100vh - 290px); transform: translateX(-10px); }
+    #note.leaf.show { transform: none; }
+  }
+  /* a phone on its side: a narrow column at the left */
+  @media (max-height: 500px) and (orientation: landscape) {
+    #note.leaf { left: calc(10px + env(safe-area-inset-left)); bottom: auto; top: 84px; width: min(300px, 36vw); max-height: calc(100vh - 150px); transform: translateX(-10px); padding: 10px 34px 8px 12px; }
+    #note.leaf.show { transform: none; }
+    #note p { font-size: 14px; line-height: 1.35; }
+  }
   /* ---------- satchel ---------- */
   #castrow { display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; max-width: 96vw; }
   #hotbar { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; transition: opacity .3s; }
@@ -230,13 +252,11 @@
   .touch-only { display: none; }
   body.touch .touch-only { display: revert; }
   body.touch .aimbtns.touch-only { display: flex; }
-  body:not(.touch) #tools #bFull { display: none; }
+  body:not(.touch) #bFull { display: none; }
 
   /* ---------- the Notes leaf: the grimoire's left page, for one-page (phone) layouts ---------- */
   #pagebtns #pNotes { display: none; }
   #pagebtns.single #pNotes { display: inline-block; }
-  #pNotes.beckon { animation: beckon 1.8s ease-in-out infinite; }
-  @keyframes beckon { 50% { box-shadow: 0 0 0 2px #ffe7a8, 0 0 22px rgba(255,215,130,.95); } }
   #notes { position: fixed; inset: 0; z-index: 24; display: flex; align-items: center; justify-content: center; background: rgba(8,5,18,.35);
     opacity: 0; pointer-events: none; transition: opacity .25s; perspective: 1400px; }
   #notes.show { opacity: 1; pointer-events: auto; }
@@ -341,7 +361,6 @@
     #title .foot { display: none; }
     .card .sheet, #satchel .sheet { padding: 18px 24px 16px; max-height: 94vh; }
     .sheet h3 { font-size: 24px; } .sheet .div { height: 24px; } .sheet p { font-size: 15px; line-height: 1.4; }
-    #winStars i { width: 34px; height: 34px; }
     #levels { padding: 2vh 0; } #levels .orn { height: 30px; margin-bottom: 6px; }
   }
 
@@ -361,10 +380,8 @@
   #tip[data-side=above] .tiparrow { top: 100% !important; box-shadow: 1px 1px 0 #8a6a3a; }
   #tip[data-side=right] .tiparrow { left: 0 !important; box-shadow: -1px 1px 0 #8a6a3a; }
   #tip[data-side=left] .tiparrow { left: 100% !important; box-shadow: 1px -1px 0 #8a6a3a; }
-  #tipring { position: fixed; z-index: 26; pointer-events: none; border: 2px solid #ffe2a0; opacity: 0; transition: opacity .3s;
-    box-shadow: 0 0 14px rgba(255,214,130,.85), inset 0 0 10px rgba(255,214,130,.5); }
-  #tipring.show { opacity: 1; animation: tippulse 1.6s ease-in-out infinite; }
-  @keyframes tippulse { 50% { box-shadow: 0 0 26px rgba(255,214,130,1), inset 0 0 16px rgba(255,214,130,.7); border-color: #fff4d6; } }
+  #tipring { position: fixed; z-index: 26; pointer-events: none; border: 1.5px dashed rgba(255,226,160,.85); opacity: 0; transition: opacity .3s; }
+  #tipring.show { opacity: 1; }
   @media (max-height: 500px) and (orientation: landscape) { #tip .tiptext { font-size: 14px; } #tip { padding: 9px 12px 8px; } }
 </style>
 </head>
@@ -387,11 +404,9 @@
     <button class="btn ghost" id="bHintHud" title="A hint (H)">✦ <span>Hint</span></button>
     <button class="btn ghost" id="bLessons" title="The folio of lessons">☰ <span>Folio</span></button>
     <button class="btn ghost" id="bSound" title="Sound on/off">♪</button>
-    <button class="btn ghost" id="bLook" title="Old look / painted look (G)">◐</button>
-    <button class="btn ghost touch-only" id="bFull" title="Full screen">⛶</button>
   </div>
   <div id="bottom">
-    <div id="inkline">Seals cast <b id="casts">0</b> &nbsp;·&nbsp; the master's mark <b id="par">1</b> <span id="inkwell"></span></div>
+    <div id="inkline"><span id="inkwell"></span></div>
     <div id="castrow">
       <button class="btn primary" id="bGrimoire"><span class="q">✒</span> Open the Grimoire <kbd>Space</kbd></button>
       <div id="hotbar"></div>
@@ -506,23 +521,16 @@
   <h2>The Folio</h2>
   <div class="orn"></div>
   <div id="lessonGrid"></div>
-  <div style="margin-top:20px"><button class="btn ghost" id="bBackTitle">← Back</button> <button class="btn ghost" id="bTipsAgain" title="Show every tip again, as if for the first time">↺ Show the tips again</button> <button class="btn ghost" id="bLessonsT" style="display:none">.</button></div>
+  <div style="margin-top:20px"><button class="btn ghost" id="bBackTitle">← Back</button> <button class="btn ghost" id="bTipsAgain" title="Show every tip again, as if for the first time">↺ Show the tips again</button> <button class="btn ghost" id="bLook" title="Old look / painted look (G)">◐ Old look</button> <button class="btn ghost touch-only" id="bFull">⛶ Full screen</button> <button class="btn ghost" id="bLessonsT" style="display:none">.</button></div>
 </div>
 
-<div id="note" class="card">
-  <div class="sheet">
-    <div class="num" id="noteNum">Lesson I</div>
-    <h3 id="noteTitle">First Breath</h3>
-    <div class="div"></div>
-    <p id="noteText"></p>
-    <div class="chips" id="noteSigils"></div>
-    <div id="noteHint"></div>
-    <div class="row">
-      <button class="btn ghost" id="bHint" style="color:#6a3a1a;border-color:rgba(90,60,40,.5);background:rgba(255,255,255,.2)">A Nudge</button>
-      <button class="btn primary" id="bStart">Take up the Quill</button>
-    </div>
-    <div class="keys mouse-only">Space opens the grimoire · Enter inscribes · K keeps a spell · 1–9 casts a kept spell · H a hint · Z rewinds · R restarts</div>
-  </div>
+<div id="note" class="leaf">
+  <button class="leafx" id="bStart" title="Put the lesson away (Esc)">×</button>
+  <p id="noteText"></p>
+  <div class="chips" id="noteSigils"></div>
+  <div id="noteHint"></div>
+  <div class="row"><button class="btn ghost" id="bHint">The Master’s Hint</button></div>
+  <div class="keys mouse-only" id="noteKeys">Space opens the grimoire · Enter inscribes · K keeps a spell · 1–9 casts a kept spell · H a hint · Z rewinds · R restarts</div>
 </div>
 
 <div id="win" class="card">
@@ -530,7 +538,6 @@
     <div class="num">well written</div>
     <h3 id="winTitle">Lesson Complete</h3>
     <div class="div"></div>
-    <div id="winStars"></div>
     <p id="winText"></p>
     <div class="row">
       <button class="btn ghost" id="bReplay" style="color:#6a3a1a;border-color:rgba(90,60,40,.5);background:rgba(255,255,255,.2)">Replay</button>
@@ -540,9 +547,9 @@
   </div>
 </div>
 
-<script src="js/ink.js?v=145"></script>
-<script src="js/world.js?v=145"></script>
-<script src="js/tips.js?v=145"></script>
-<script src="js/main.js?v=145"></script>
+<script src="js/ink.js?v=146"></script>
+<script src="js/world.js?v=146"></script>
+<script src="js/tips.js?v=146"></script>
+<script src="js/main.js?v=146"></script>
 </body>
 </html>

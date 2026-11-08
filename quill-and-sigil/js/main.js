@@ -516,6 +516,7 @@ const Game = {
 
   showScreen(id) {
     for (const el of document.querySelectorAll('.screen,.card')) el.classList.toggle('show', el.id === id);
+    if (id) this.closeNote();
     this.coverAt = id === 'win' || id === 'note' || id === 'levels' ? performance.now() : 0;
   },
   title() {
@@ -537,57 +538,66 @@ const Game = {
       if (L.opens) { const h = document.createElement('div'); h.className = 'fhead'; h.textContent = L.opens; box.appendChild(h); }
       const el = document.createElement('button');
       el.className = 'lcard' + (locked ? ' locked' : '');
-      el.innerHTML = `<div class="lr">${L.roman}</div><div class="ln">${locked ? '· sealed ·' : L.name}</div><div class="ls">${[0, 1, 2].map(k => `<i class="${k < st ? 'on' : ''}"></i>`).join('')}</div>`;
+      el.innerHTML = `<div class="lr">${L.roman}</div><div class="ln">${locked ? '· sealed ·' : L.name}</div><div class="ls">${st ? '<i class="on" title="Solved"></i>' : ''}</div>`;
       if (!locked) el.onclick = () => { Sfx.init(); this.start(i); };
       box.appendChild(el);
     });
     $('#hud').classList.remove('show');
     this.showScreen('levels');
   },
-  start(i) {
+  start(i, quiet) {
     // Restarting (or replaying) the same lesson keeps the last drawing for Recall.
     if (i !== this.idx) { Grim.lastStrokes = null; this.hint = 0; } // (the hint already shown stays shown on a restart)
+    this.tapped = false;
     this.idx = i; this.level = LEVELS[i]; this.casts = 0; this.history = []; this.winT = 0; this.held = null;
     Grim.draft.clear(); Grim.ghost = null; Grim.bookDirty = true; Grim.inkDirty = true;
     parts.length = 0;
     loadWorld(this.level);
+    $('#note').classList.remove('show');
     VIEW.z = 1; fitCamera(innerWidth, innerHeight);
     $('#lnum').textContent = `Lesson ${this.level.roman}`;
     $('#ltitle').textContent = this.level.name;
-    $('#par').textContent = this.level.par;
     this.updateCasts();
     $('#hud').classList.add('show');
     this.state = 'play';
     this.renderSatchel();
-    this.note();
+    this.showScreen(null);
+    if (!quiet) this.note(true);
   },
-  note() {
+  note(now) {
     const L = this.level;
-    $('#noteNum').textContent = `Lesson ${L.roman}`;
-    $('#noteTitle').textContent = L.name;
     $('#noteText').textContent = L.lesson;
-    renderHint($('#noteHint'), $('#bHint'), L, this.hint || 0);
+    this.leafHint();
+    $('#noteKeys').style.display = this.idx === 0 ? '' : 'none';
     const ringOnly = id => L.centers && !L.centers.includes(id);
     $('#noteSigils').innerHTML = L.sigils.map(id => `<span class="chip" style="--c:${SIGILS[id].color}"><img src="${glyphIcon(id)}" alt="">${SIGILS[id].name}${ringOnly(id) ? ' <small>(ring only)</small>' : ''}</span>`).join('') + (L.ink ? `<span class="chip ink">ink for ${L.ink} seal${L.ink > 1 ? 's' : ''}</span>` : '');
-    this.showScreen('note'); this.state = 'note';
+    $('#note').scrollTop = 0;
+    $('#note').classList.add('show');
+    fitLand(!now);
   },
-  closeNote() { this.showScreen(null); this.state = 'play'; },
+  closeNote() { if (!this.noteOpen()) return; $('#note').classList.remove('show'); fitLand(true); },
+  noteOpen() { return $('#note').classList.contains('show'); },
+  // the leaf offers the hint only once it has been asked for (the HUD's Hint button or H)
+  leafHint() {
+    renderHint($('#noteHint'), $('#bHint'), this.level, this.hint || 0);
+    if (!this.hint) $('#bHint').style.display = 'none';
+  },
   // one step further into the hint: a nudge first, then the master's hint
   moreHint() {
     const L = this.level; if (!L) return;
     this.hint = Math.min(2, (this.hint || 0) + 1); Sfx.play('page');
-    renderHint($('#noteHint'), $('#bHint'), L, this.hint); renderHint($('#nHint'), $('#nHintB'), L, this.hint);
+    this.leafHint(); renderHint($('#nHint'), $('#nHintB'), L, this.hint);
+    if (this.noteOpen()) { fitLand(true); $('#note').scrollTop = $('#noteHint').offsetTop - 10; }
   },
   // the HUD's Hint button: the lesson card, open at the nudge (or as far as the hint has gone)
   openHint() { if (this.state !== 'play') return; this.note(); if (!this.hint) this.moreHint(); },
-  reset() { if (!this.level) return; Sfx.play('rewind'); this.start(this.idx); this.closeNote(); },
+  reset() { if (!this.level) return; Sfx.play('rewind'); this.start(this.idx, true); },
   rewind() {
     if (!this.history.length || this.state === 'won') { this.toast('Nothing to rewind.'); return; }
     restore(this.history.pop()); this.casts = Math.max(0, this.casts - 1); this.updateCasts();
     parts.length = 0; Sfx.play('rewind'); this.toast('The page turns back.');
   },
   updateCasts() {
-    $('#casts').textContent = this.casts;
     const L = this.level, w = $('#inkwell');
     if (L && L.ink) { w.style.display = ''; w.innerHTML = 'ink ' + Array.from({ length: L.ink }, (_, k) => `<i class="${k < L.ink - this.casts ? 'on' : ''}"></i>`).join(''); }
     else w.style.display = 'none';
@@ -599,7 +609,7 @@ const Game = {
   },
   openGrimoire() {
     if (this.state !== 'play' || this.dry()) return;
-    Sfx.init();
+    Sfx.init(); this.closeNote();
     this.state = 'draw'; Grim.show();
     $('#bGrimoire').classList.add('hidden');
   },
@@ -666,7 +676,7 @@ const Game = {
   win() {
     this.state = 'won';
     if (Grim.open) Grim.hide();
-    $('#aimbar').classList.remove('show');
+    $('#aimbar').classList.remove('show'); this.closeNote();
     Sfx.play('win');
     const f = World.fonts[0];
     for (let i = 0; i < 160; i++) {
@@ -684,10 +694,7 @@ const Game = {
       // the last lesson of each folio says so; the very last closes the book
       const end = L.folioEnd || (last && { title: 'The Folio is Complete', text: 'Your seals have carried the light across the sky. The master closes the folio.' });
       $('#winTitle').textContent = end ? end.title : 'Lesson Complete';
-      $('#winText').textContent = end
-        ? `${end.text} (${this.casts} seal${this.casts === 1 ? '' : 's'} cast; the master's mark is ${par}.)`
-        : `${L.name} — ${this.casts} seal${this.casts === 1 ? '' : 's'} cast. The master's mark is ${par}.`;
-      $('#winStars').innerHTML = [0, 1, 2].map(k => `<i class="${k < stars ? 'on' : ''}" style="animation-delay:${0.3 + k * 0.25}s"></i>`).join('');
+      $('#winText').textContent = end ? end.text : L.name;
       $('#bNext').style.display = last ? 'none' : '';
       this.showScreen('win');
     }, 1300);
@@ -711,7 +718,7 @@ const Game = {
       list.appendChild(item);
       const s = document.createElement('button');
       s.className = 'slot' + (ok ? '' : ' off'); s.style.setProperty('--c', inf.color || '#e8c27a');
-      s.title = ok ? `${inf.label} — cast at once (${i + 1})` : `${inf.label} — not yet learned in this lesson`;
+      s.title = ok ? `${inf.label}: cast at once (${i + 1})` : `${inf.label}: not yet learned in this lesson`;
       s.innerHTML = `<img src="${inf.img}" alt=""><span class="k">${i + 1}</span>`;
       s.onclick = e => { Sfx.init(); this.quick(i); e.currentTarget.blur(); };
       bar.appendChild(s);
@@ -739,8 +746,6 @@ const Game = {
     renderHint($('#nHint'), $('#nHintB'), L, this.hint || 0);
     $('#notes .sheet').scrollTop = 0;
     $('#notes').classList.add('show'); Sfx.play('page');
-    $('#pNotes').classList.remove('beckon');
-    try { localStorage.setItem('quillsigil.notesSeen', '1'); } catch (e) { }
   },
   closeNotes() { if (this.notesOpen()) { $('#notes').classList.remove('show'); Sfx.play('page'); } },
   notesOpen() { return $('#notes').classList.contains('show'); },
@@ -953,9 +958,19 @@ function resize() {
   skc.width = Math.round(innerWidth * SKYP.dpr); skc.height = Math.round(innerHeight * SKYP.dpr);
   wc.width = Math.round(innerWidth * DPR); wc.height = Math.round(innerHeight * DPR);
   Grim.resize();
-  fitCamera(innerWidth, innerHeight);
+  fitLand();
 }
 window.addEventListener('resize', resize);
+// the land's frame. While the lesson leaf is out the land is fitted into the room beside it: above it on a phone held
+// upright, to its right on wide screens and sideways phones (eased there and back when the leaf comes and goes)
+function fitLand(ease) {
+  const leaf = $('#note'), open = leaf.classList.contains('show');
+  const top = leaf.offsetTop, under = top > innerHeight * 0.4; // (offset*: the leaf's place without its slide-in)
+  const pads = !open ? undefined : under ? [null, innerHeight - top + 12] : [null, null, leaf.offsetLeft + leaf.offsetWidth + 8];
+  const from = ease && cam.b && { ...cam.b };
+  fitCamera(innerWidth, innerHeight, pads);
+  if (from && cam.b) { cam.goal = { ...cam.b }; Object.assign(cam.b, from); applyView(); }
+}
 // coming back to the page (or the browser restoring a lost canvas): every kept drawing is made afresh, in case the
 // browser wiped them while the page was away
 function refreshAll() { try { refreshCanvases(); } catch (e) { console.warn(e); } Grim.bookDirty = true; Grim.inkDirty = true; }
@@ -1001,15 +1016,15 @@ wc.addEventListener('pointerdown', e => {
     if (e.button === 2) { Game.backToPage(); return; }
     try { wc.setPointerCapture(e.pointerId); } catch (err) { }
     Game.aim = pick(e.clientX, e.clientY); Game.aimDown = true; Game.aimReady();
-  } else if (Game.state === 'play' && e.button === 0 && !isTouch()) {
-    Game.toast('Open the grimoire (Space) to draft a spell.');
+  } else if (Game.state === 'play' && e.button === 0 && !isTouch() && !Game.tapped) {
+    Game.tapped = true; Game.toast('Open the grimoire (Space) to draft a spell.');
   }
 });
 function fingerUp(e) {
   FING.delete(e.pointerId);
   if (FING.size < 2) PINCH.on = false;
   // a lone tap on the land while nothing is being aimed (a pinch is not a tap)
-  if (!FING.size && !PINCH.used && e.type === 'pointerup' && Game.state === 'play' && isTouch()) Game.toast('Open the grimoire to draft a spell. Pinch to zoom the land.');
+  if (!FING.size && !PINCH.used && e.type === 'pointerup' && Game.state === 'play' && isTouch() && !Game.tapped) { Game.tapped = true; Game.toast('Open the grimoire to draft a spell. Pinch to zoom the land.'); }
 }
 wc.addEventListener('pointerup', e => {
   if (e.pointerType === 'touch') fingerUp(e);
@@ -1033,7 +1048,7 @@ wc.addEventListener('contextmenu', e => e.preventDefault());
 
 window.addEventListener('keydown', e => {
   const k = e.key;
-  if (Game.state === 'note' && (k === 'Enter' || k === ' ' || k === 'Escape')) { e.preventDefault(); Game.closeNote(); return; }
+  if (Game.state === 'play' && Game.noteOpen() && k === 'Escape') { e.preventDefault(); Game.closeNote(); return; }
   const digit = /^[1-9]$/.test(k) ? +k - 1 : -1;
   if (Game.state === 'draw' && Game.notesOpen()) {
     if (k === 'Escape') { e.preventDefault(); Game.closeNotes(); }
@@ -1073,7 +1088,7 @@ bind('#bGrimoire', () => Game.openGrimoire());
 bind('#bRewind', () => Game.rewind());
 bind('#bReset', () => Game.reset());
 bind('#bTipsAgain', e => { Tips.reset(); Sfx.play('tick'); e.currentTarget.textContent = '✓ The tips will show again'; });
-bind('#bNote', () => { if (Game.state === 'play') Game.note(); });
+bind('#bNote', () => { if (Game.state === 'play') Game.noteOpen() ? Game.closeNote() : Game.note(); });
 bind('#bLessons', () => { if (Grim.open) Grim.hide(); Game.lessons(); });
 bind('#bSound', () => { Sfx.setMuted(!Sfx.muted); $('#bSound').classList.toggle('off', Sfx.muted); });
 // the look before the paintings and the painted look, side by side in time (button, G, or ?classic in the address)
@@ -1088,7 +1103,7 @@ bind('#bStart', () => Game.closeNote());
 bind('#bHint', () => Game.moreHint());
 bind('#bHintHud', () => Game.openHint());
 bind('#bNext', () => Game.next());
-bind('#bReplay', () => { Game.start(Game.idx); Game.closeNote(); });
+bind('#bReplay', () => Game.start(Game.idx, true));
 bind('#bWinMenu', () => Game.lessons());
 bind('#pInscribe', () => Grim.inscribe());
 bind('#pUndo', () => Grim.undo());
@@ -1104,7 +1119,6 @@ bind('#pNotes', () => Game.openNotes());
 bind('#nBack', () => Game.closeNotes());
 bind('#nHintB', () => Game.moreHint());
 $('#notes').addEventListener('pointerdown', e => { if (e.target.id === 'notes') Game.closeNotes(); });
-try { if (!localStorage.getItem('quillsigil.notesSeen')) $('#pNotes').classList.add('beckon'); } catch (e) { }
 bind('#aCast', () => Game.cast());
 bind('#aBack', () => Game.backToPage());
 
@@ -1196,7 +1210,7 @@ if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { Gr
 ['700 30px "Cinzel Decorative"', '30px "Pinyon Script"', 'italic 16px "IM Fell English"', '600 12px Cinzel'].forEach(f => { try { document.fonts.load(f).then(() => { Grim.bookDirty = true; }); } catch (e) { } });
 
 let lastT = performance.now(), acc = 0;
-const WORLD_PAUSED = new Set(['menu', 'note', 'draw', 'aim']);
+const WORLD_PAUSED = new Set(['menu', 'draw', 'aim']);
 const FIXED = 1 / 120;
 function loop(now) {
   if (!PV.isOpen) tick(now); else lastT = now; // the phone preview covers this game: let it rest

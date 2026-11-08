@@ -369,7 +369,7 @@ function updateCells(dt) {
   }
   // gate check
   if (!World.gateOpen && World.braziers.length && World.braziers.every(b => b.lit) && World.cells.some(c => c.feat === 'gate')) {
-    World.gateOpen = true; Sfx.play('gate'); Game.toast('Every brazier burns — the rune gate yields.');
+    World.gateOpen = true; Sfx.play('gate'); Game.toast('Every brazier burns, and the rune gate sinks.');
     cam.shake = 0.5;
   }
   // burning bodies
@@ -607,10 +607,10 @@ function floodAt(cells, dir, s, vol = cells.length) {
   const { s0, region, rim, spill, want, lvl } = P;
   if (P.ok) {
     for (const c of region) { c.water = lvl; c.ice = false; c.frost = 0; if (dir) c.flow = { x: dir.x, y: dir.y, s: 1.2 + 0.9 * s }; splash(c.x + 0.5, c.y + 0.5, lvl, 10); }
-    if (want > rim + 0.3) Game.toast('The hollow brims over — the extra water spills away.');
+    if (want > rim + 0.3) Game.toast('The hollow brims over. The extra water spills away.');
     return region;
   }
-  if (spill && s0.h < 0) Game.toast('The water spills away — that hollow cannot hold it.');
+  if (spill && s0.h < 0) Game.toast('The water spills away: that hollow cannot hold it.');
   return [];
 }
 
@@ -1396,15 +1396,15 @@ function fitCamera(vw, vh, pads, grow) {
   const [minX, maxX, minY, maxY] = landBox();
   // short screens (a phone held sideways) keep the HUD tight to the edges; narrow ones stack it above the land
   const short = vh < 500 && vw > vh;
-  const topPad = pads ? pads[0] : short ? 58 : vw < 520 ? 185 : vw < 700 ? 150 : 120;
-  const botPad = pads ? pads[1] : short ? 70 : 110;
-  const side = vw < 520 ? 36 : 60;
-  const s = clamp(Math.min((vw - side) / (maxX - minX), (vh - topPad - botPad) / (maxY - minY)), 0.25, 1.9);
-  const ox = vw / 2 - (minX + maxX) / 2 * s, oy = topPad + (vh - topPad - botPad) / 2 - (minY + maxY) / 2 * s;
-  cam.mid = [vw / 2, topPad + (vh - topPad - botPad) / 2];
+  const topPad = pads && pads[0] != null ? pads[0] : short ? 58 : vw < 520 ? 185 : vw < 700 ? 150 : 120;
+  const botPad = pads && pads[1] != null ? pads[1] : short ? 70 : 110;
+  const side = vw < 520 ? 36 : 60, left = pads && pads[2] || 0; // left: room kept clear at the left (the lesson leaf on wide screens)
+  const s = clamp(Math.min((vw - left - side) / (maxX - minX), (vh - topPad - botPad) / (maxY - minY)), 0.25, 1.9);
+  const cx = left + (vw - left) / 2, ox = cx - (minX + maxX) / 2 * s, oy = topPad + (vh - topPad - botPad) / 2 - (minY + maxY) / 2 * s;
+  cam.mid = [cx, topPad + (vh - topPad - botPad) / 2];
   if (!grow) { cam.b = { s, ox, oy }; applyView(); return; }
   // during play the view only ever widens, gently, when land has risen beyond it
-  const C = cam.goal || cam.b, out = C.ox + minX * C.s < side * 0.25 || C.ox + maxX * C.s > vw - side * 0.25
+  const C = cam.goal || cam.b, out = C.ox + minX * C.s < left + side * 0.25 || C.ox + maxX * C.s > vw - side * 0.25
     || C.oy + minY * C.s < topPad * 0.5 || C.oy + maxY * C.s > vh - botPad * 0.4;
   if (out && s < C.s + 1e-3) cam.goal = { s, ox, oy };
 }

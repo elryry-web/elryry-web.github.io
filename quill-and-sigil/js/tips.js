@@ -1,5 +1,5 @@
 /* =====================================================================
-   Tips — small parchment notes that point at one thing at a time (First Breath only, since v141).
+   Tips: small parchment notes that point at one thing at a time (First Breath only, since v141; three of them since v146).
    Each tip has: when() — may it show now; at() — the screen rect it points at;
    done() — finished by doing what it asks (else it has a "Got it" button).
    A tip is remembered once finished (localStorage quillsigil.tips); one whose moment passes
@@ -13,16 +13,9 @@ const Tips = (() => {
   const store = () => { try { localStorage.setItem(KEY, JSON.stringify([...seen])); localStorage.setItem(OFF, off ? '1' : ''); } catch (e) { } };
 
   /* ---------- what the tips can point at ---------- */
-  const elRect = sel => {
-    const el = document.querySelector(sel); if (!el) return null;
-    const r = el.getBoundingClientRect();
-    if (!r.width || !r.height || getComputedStyle(el).visibility === 'hidden' || +getComputedStyle(el).opacity === 0) return null;
-    return { x: r.left, y: r.top, w: r.width, h: r.height };
-  };
   const worldRect = (x, y, z, rad = 26) => { const [px, py] = proj(x, y, z); return { x: px - rad, y: py - rad, w: rad * 2, h: rad * 2, round: true }; };
   const orb = () => World.bodies.find(b => b.kind === 'orb' && b.alive);
   const orbRect = () => { const b = orb(); return b && worldRect(b.x, b.y, b.z + (b.hgt || 0.5) * 0.5, 30 * cam.s + 8); };
-  const cellRect = c => c && worldRect(c.x + 0.5, c.y + 0.5, (c.h || 0) + 0.4, 30 * cam.s + 8);
   const font = () => World.fonts[0];
   // the small circle whose sign points the wind from the orb toward the font
   const slotToFont = () => {
@@ -34,40 +27,26 @@ const Tips = (() => {
   };
 
   /* ---------- when ---------- */
-  // Only the first lesson has tips: a walk through drawing and casting one spell. Everything later is taught by the
-  // lesson notes, and the Hint button (a nudge, then the master's hint) helps on demand.
+  // Only the first lesson has tips, and only at the three steps the page can't show by itself: the seal, which way the
+  // sign points, and where to cast. The lesson leaf teaches the rest, and the Hint button helps on demand.
   const first = () => !!(Game.level && Game.level.name === 'First Breath');
-  const play = () => first() && Game.state === 'play' && !document.querySelector('.screen.show,.card.show');
   const page = () => first() && Game.state === 'draw' && Grim.open && !Game.notesOpen() && !Game.satchelOpen();
   const D = () => Grim.draft.a;
-  const spell = () => { const a = D(); return a.seal && a.sigil && a.sigil.ok && !buildSpell(Grim.draft, lessonRules()).err; };
   const touch = () => isTouch();
 
   /* ---------- the tips, in the order they may appear ---------- */
   const T = [
-    { id: 'orb', when: () => play() && !Game.casts, at: orbRect,
-      text: 'This is the orb, a mote of light fallen from its font.' },
-    { id: 'font', when: () => play() && !Game.casts, at: () => cellRect(font()),
-      text: 'And this is the font. Bring the orb home to it to finish the lesson.' },
-    { id: 'grimoire', when: () => play() && !Game.casts, at: () => elRect('#bGrimoire'),
-      text: () => 'Spells are drawn, not chosen. Open the grimoire to write one' + (touch() ? '.' : ' (or press Space).'),
-      done: () => Game.state === 'draw' },
     { id: 'page.seal', when: () => page() && !D().seal, at: () => Grim.anchor('guide'),
-      text: () => D().loneSigil ? 'Now the seal: one closed circle around your sigil, drawn roughly on the dotted ring.' : 'Begin with the seal: one closed circle, drawn roughly on the dotted ring. (The sigil may come first or after.)',
-      done: () => !!D().seal },
-    { id: 'page.sigil', when: () => page() && D().seal && !(D().sigil && D().sigil.ok), at: () => Grim.anchor('centre'),
       enter: () => { if (!Grim.ghost) { Grim.ghost = 'gale'; Grim.inkDirty = true; } },
-      text: 'Inside the seal, draw the sigil. Ventus is a spiral: follow its faint trace.',
-      done: () => !!(D().sigil && D().sigil.ok) },
+      text: () => D().loneSigil ? 'Now the seal: one closed circle around your sigil, roughly on the dotted ring.'
+        : 'Draw one closed circle roughly on the dotted ring, then trace the faint spiral inside it.',
+      done: () => !!D().seal },
     { id: 'page.sign', when: () => page() && D().sigil && D().sigil.ok && D().sigil.id === 'gale' && !D().signs.length, at: () => Grim.anchor('slot:' + slotToFont()),
-      text: 'Now the sign: one stroke from the ring outward, through one of the small circles. The wind blows that way, so point it toward the font.',
+      text: 'Now one stroke from the ring outward, through a small circle. The wind blows that way, so point it toward the font.',
       done: () => D().signs.length > 0 },
-    { id: 'page.inscribe', when: () => page() && spell(), at: () => elRect('#pInscribe'),
-      text: () => 'The line under the seal reads your spell back to you. Inscribe takes it up, ready to cast' + (touch() ? '.' : ' (or press Enter).'),
-      done: () => Game.state === 'aim' },
     { id: 'aim', when: () => first() && Game.state === 'aim' && Game.held && Game.held.sigil === 'gale', at: orbRect,
-      text: () => touch() ? 'Now choose where it falls. The wind takes what lies inside its circle: drag onto the orb, then press Cast here.'
-        : 'Now choose where it falls. The wind takes what lies inside its circle, so click right on the orb.',
+      text: () => touch() ? 'The wind takes what lies inside its circle: drag onto the orb, then press Cast.'
+        : 'The wind takes what lies inside its circle, so click right on the orb.',
       done: () => Game.state !== 'aim' },
   ];
 
