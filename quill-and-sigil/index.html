@@ -169,6 +169,8 @@
   #noteHint { display: none; font-size: 16px; padding: 10px 14px; border: 1px dashed rgba(90,60,40,.5); background: rgba(255,255,255,.25); text-align: left; margin-bottom: 14px; }
   #noteHint.show { display: block; }
   #noteHint::first-letter { all: unset; }
+  #noteHint .master, #nHint .master { margin-top: 8px; padding-top: 8px; border-top: 1px dashed rgba(90,60,40,.4); }
+  #noteHint .master::before, #nHint .master::before { content: 'The master’s hint: '; font-family: Cinzel, serif; font-size: .75em; letter-spacing: .08em; color: #8e2f22; font-style: normal; }
   .sheet .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
   .sheet .keys { margin-top: 14px; font-size: 13px; color: #6a4a30; font-style: italic; }
   #winStars { display: flex; justify-content: center; gap: 14px; margin: 10px 0 16px; }
@@ -382,6 +384,7 @@
     <button class="btn ghost" id="bRewind" title="Undo the last cast (Z)">⟲ <span>Rewind</span></button>
     <button class="btn ghost" id="bReset" title="Restart the lesson (R)">↻ <span>Restart</span></button>
     <button class="btn ghost" id="bNote" title="Re-read the lesson">✉ <span>Lesson</span></button>
+    <button class="btn ghost" id="bHintHud" title="A hint (H)">✦ <span>Hint</span></button>
     <button class="btn ghost" id="bLessons" title="The folio of lessons">☰ <span>Folio</span></button>
     <button class="btn ghost" id="bSound" title="Sound on/off">♪</button>
     <button class="btn ghost" id="bLook" title="Old look / painted look (G)">◐</button>
@@ -422,7 +425,7 @@
     <div id="nSigns"></div>
     <div id="nHint"></div>
     <div class="row">
-      <button class="btn ghost light" id="nHintB">The Master's Hint</button>
+      <button class="btn ghost light" id="nHintB">A Nudge</button>
       <button class="btn primary" id="nBack">↩ Back to the page</button>
     </div>
   </div>
@@ -515,10 +518,10 @@
     <div class="chips" id="noteSigils"></div>
     <div id="noteHint"></div>
     <div class="row">
-      <button class="btn ghost" id="bHint" style="color:#6a3a1a;border-color:rgba(90,60,40,.5);background:rgba(255,255,255,.2)">The Master's Hint</button>
+      <button class="btn ghost" id="bHint" style="color:#6a3a1a;border-color:rgba(90,60,40,.5);background:rgba(255,255,255,.2)">A Nudge</button>
       <button class="btn primary" id="bStart">Take up the Quill</button>
     </div>
-    <div class="keys mouse-only">Space opens the grimoire · Enter inscribes · K keeps a spell · 1–9 casts a kept spell · Z rewinds · R restarts</div>
+    <div class="keys mouse-only">Space opens the grimoire · Enter inscribes · K keeps a spell · 1–9 casts a kept spell · H a hint · Z rewinds · R restarts</div>
   </div>
 </div>
 
@@ -537,9 +540,9 @@
   </div>
 </div>
 
-<script src="js/ink.js?v=140"></script>
-<script src="js/world.js?v=140"></script>
-<script src="js/tips.js?v=140"></script>
-<script src="js/main.js?v=140"></script>
+<script src="js/ink.js?v=141"></script>
+<script src="js/world.js?v=141"></script>
+<script src="js/tips.js?v=141"></script>
+<script src="js/main.js?v=141"></script>
 </body>
 </html>

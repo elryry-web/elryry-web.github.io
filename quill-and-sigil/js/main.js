@@ -323,6 +323,45 @@ const LEVELS = [
   },
 ];
 LEVELS.forEach((l, i) => l.roman = ROMAN[i]);
+// The Hint button's first step: a nudge toward the idea, short of the answer (the master's hint, `hint`, is the second step)
+const NUDGES = {
+  'First Breath': 'The wind blows the way your sign points. Which way does the font lie from the orb?',
+  'The Long Meadow': 'If the orb stops short, the wind was too gentle. A short stroke across the sign makes it firmer.',
+  'The Rift': 'A firm gust only rolls the orb into the crack. It must leap: give the sign all the strength it can bear.',
+  'From the Abyss': 'Nothing rolls across empty air, so give the orb ground first. On Petra a sign is an arm of stone: which way must it reach, and from where?',
+  'Thornwall': 'You need not burn the whole hedge yourself. Fire travels along whatever will burn.',
+  'Keystone': 'The trench must be filled before the orb can cross it. What here is heavy enough to fill it, and what must the fire not touch?',
+  'The Sunken Orb': 'No wind lifts the orb out of that hollow. Fill the hollow and the orb rises with the water: count how many tiles it needs.',
+  'The Rushing Stream': 'The stream carries off whatever falls in. Make it something the orb can roll across.',
+  'Featherfall': 'Lift first, then push. A floating orb waits in the air for your next gust.',
+  'Featherfall II': 'The island lies beyond what an unadorned float can carry. Something drawn around the whole seal carries it farther.',
+  'The Rune Gate': 'The gate wants both braziers, and the ice is in the way. One fire, set in the right place, can do several things at once.',
+  'The Broad Water': 'One tile of ice will not span this river. The second circle makes a spell broader; barbs make each arm longer.',
+  'Skyward': 'One step at a time, in the order the land asks: out of the hollow, past the hedge, over the stream, then up to the gate.',
+  'Torchbearer': 'Let the orb carry the fire to what it touches. What sits on Ventus’s ring travels with the orb.',
+  'Rime Road': 'Water lies across the way and you have one seal. What if the orb froze the water as it rolled?',
+  'The Ferry': 'A floating orb soon slows in the air, but a slab of stone sails on at an even pace. Raise one beneath the orb.',
+  'The Lantern': 'Fire lit too soon melts the ice road. Where on the ring does a sigil wait until the orb arrives?',
+  'Confluence': 'The orb must float over thorn and water, then kindle the brazier once it is there. Two ring-sigils, each with its own timing.',
+  'Skyward Redux': 'The orb must rise out of its hollow before anything carries it, and the brazier is passed on the way, not at the end. Mind how far the font lies.',
+  'The Bead Chain': 'The beads touch only at their corners. A sign straight across the page runs corner to corner, for stone as well as wind.',
+  'The Crescent Lagoon': 'Freeze the water as the orb goes, and kindle the fire only once it has come: two ring-sigils, two timings.',
+  'The Broken Causeway': 'No wind leaps the gap that late. What if the missing stone rose beneath the orb just as the ground ran out?',
+  'The Eye': 'Light both braziers first: a shut gate stops even a floating orb. One line of fire can reach them both, if something makes it longer.',
+  'The Stair of Isles': 'A Luna float rises when the ground rises. But the font is farther than an unadorned float can carry.',
+  'The Compass Rose': 'Fire first: the gates must be open before the orb arrives. Then mind the missing bead on the orb’s arm.',
+};
+LEVELS.forEach(l => l.nudge = NUDGES[l.name] || '');
+/* the hint, in two steps: a nudge, then the master's hint. Shown the same in the lesson card and the Notes leaf. */
+function renderHint(box, btn, L, step) {
+  if (!L.nudge && !L.hint) { box.classList.remove('show'); btn.style.display = 'none'; return; }
+  if (step <= 0) { box.classList.remove('show'); box.textContent = ''; btn.textContent = L.nudge ? 'A Nudge' : 'The Master’s Hint'; btn.style.display = ''; return; }
+  box.innerHTML = '';
+  if (L.nudge) { const n = document.createElement('div'); n.className = 'nudge'; n.textContent = L.nudge; box.append(n); }
+  if (step >= 2 || !L.nudge) { const h = document.createElement('div'); h.className = 'master'; h.textContent = L.hint; box.append(h); }
+  box.classList.add('show');
+  btn.textContent = 'The Master’s Hint'; btn.style.display = step >= 2 || !L.nudge ? 'none' : '';
+}
 const TITLE_LEVEL = {
   name: 'Title', sigils: [], par: 0, lesson: '', hint: '',
   t: ['  00000  ', ' 0011000 ', '001210~~0', '00110~~00', ' 000~~00 ', '  000~0  '],
@@ -405,7 +444,7 @@ const Game = {
   },
   start(i) {
     // Restarting (or replaying) the same lesson keeps the last drawing for Recall.
-    if (i !== this.idx) Grim.lastStrokes = null;
+    if (i !== this.idx) { Grim.lastStrokes = null; this.hint = 0; } // (the hint already shown stays shown on a restart)
     this.idx = i; this.level = LEVELS[i]; this.casts = 0; this.history = []; this.winT = 0; this.held = null;
     Grim.draft.clear(); Grim.ghost = null; Grim.bookDirty = true; Grim.inkDirty = true;
     parts.length = 0;
@@ -425,12 +464,20 @@ const Game = {
     $('#noteNum').textContent = `Lesson ${L.roman}`;
     $('#noteTitle').textContent = L.name;
     $('#noteText').textContent = L.lesson;
-    $('#noteHint').textContent = L.hint; $('#noteHint').classList.remove('show'); $('#bHint').style.display = '';
+    renderHint($('#noteHint'), $('#bHint'), L, this.hint || 0);
     const ringOnly = id => L.centers && !L.centers.includes(id);
     $('#noteSigils').innerHTML = L.sigils.map(id => `<span class="chip" style="--c:${SIGILS[id].color}"><img src="${glyphIcon(id)}" alt="">${SIGILS[id].name}${ringOnly(id) ? ' <small>(ring only)</small>' : ''}</span>`).join('') + (L.ink ? `<span class="chip ink">ink for ${L.ink} seal${L.ink > 1 ? 's' : ''}</span>` : '');
     this.showScreen('note'); this.state = 'note';
   },
   closeNote() { this.showScreen(null); this.state = 'play'; },
+  // one step further into the hint: a nudge first, then the master's hint
+  moreHint() {
+    const L = this.level; if (!L) return;
+    this.hint = Math.min(2, (this.hint || 0) + 1); Sfx.play('page');
+    renderHint($('#noteHint'), $('#bHint'), L, this.hint); renderHint($('#nHint'), $('#nHintB'), L, this.hint);
+  },
+  // the HUD's Hint button: the lesson card, open at the nudge (or as far as the hint has gone)
+  openHint() { if (this.state !== 'play') return; this.note(); if (!this.hint) this.moreHint(); },
   reset() { if (!this.level) return; Sfx.play('rewind'); this.start(this.idx); this.closeNote(); },
   rewind() {
     if (!this.history.length || this.state === 'won') { this.toast('Nothing to rewind.'); return; }
@@ -587,7 +634,7 @@ const Game = {
       box.appendChild(b);
     }
     $('#nSigns').textContent = signNotes(L);
-    $('#nHint').textContent = L.hint; $('#nHint').classList.remove('show'); $('#nHintB').style.display = '';
+    renderHint($('#nHint'), $('#nHintB'), L, this.hint || 0);
     $('#notes .sheet').scrollTop = 0;
     $('#notes').classList.add('show'); Sfx.play('page');
     $('#pNotes').classList.remove('beckon');
@@ -869,6 +916,7 @@ window.addEventListener('keydown', e => {
     else if (k === 'z' || k === 'Z') Game.rewind();
     else if (k === 'r' || k === 'R') Game.reset();
     else if (k === 'g' || k === 'G') toggleLook();
+    else if (k === 'h' || k === 'H') Game.openHint();
   } else if (Game.state === 'draw') {
     if (k === 'Enter') { e.preventDefault(); Grim.inscribe(); }
     else if (k === 'Escape' || k === 'Tab') { e.preventDefault(); Game.closeGrimoire(); }
@@ -902,7 +950,8 @@ function toggleLook(quiet) {
 bind('#bLook', () => toggleLook());
 if (/[?&]classic(=|&|$)/.test(location.search)) toggleLook(true);
 bind('#bStart', () => Game.closeNote());
-bind('#bHint', () => { $('#noteHint').classList.add('show'); $('#bHint').style.display = 'none'; });
+bind('#bHint', () => Game.moreHint());
+bind('#bHintHud', () => Game.openHint());
 bind('#bNext', () => Game.next());
 bind('#bReplay', () => { Game.start(Game.idx); Game.closeNote(); });
 bind('#bWinMenu', () => Game.lessons());
@@ -918,7 +967,7 @@ bind('#sClose', () => Game.closeSatchel());
 $('#satchel').addEventListener('pointerdown', e => { if (e.target.id === 'satchel') Game.closeSatchel(); });
 bind('#pNotes', () => Game.openNotes());
 bind('#nBack', () => Game.closeNotes());
-bind('#nHintB', () => { $('#nHint').classList.add('show'); $('#nHintB').style.display = 'none'; });
+bind('#nHintB', () => Game.moreHint());
 $('#notes').addEventListener('pointerdown', e => { if (e.target.id === 'notes') Game.closeNotes(); });
 try { if (!localStorage.getItem('quillsigil.notesSeen')) $('#pNotes').classList.add('beckon'); } catch (e) { }
 bind('#aCast', () => Game.cast());
