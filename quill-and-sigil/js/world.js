@@ -2749,7 +2749,7 @@ function drawCell(g, c, t, part) {
     }
   }
   // decorations
-  if (!c.feat && c.water == null && c.h >= 0 && c.h < 1 && !c.ash) {
+  if (!c.feat && c.water == null && c.h >= 0 && c.h < 1 && !c.ash && !c.icy) { // no grass on Petra + Gelu's ice blocks
     for (const k of d.tufts) {
       const p = proj(x + k.u, y + k.v, z);
       if (k.k === 'tuft') {

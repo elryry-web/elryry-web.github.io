@@ -476,7 +476,8 @@ const LEVELS = [
     t: [' 000 ', '00000', '00000', '00000', '     ', '     ', '     ', '     ', '     ', '     ', '     ', '     ', ' ___ ', '_____', '_____', '_____', '_____', '_____', '_____', ' ___ '],
     o: ['.....', '..O..', '.....', '.....', '.....', '.....', '.....', '.....', '.....', '.....', '.....', '.....', '.....', '.....', '.....', '.....', '.....', '.....', '..G..', '.....'],
   },
-  // The orb (1,2) faces a deep trench (x 5–7, floor -2, between walls of height 2), a short bank (x 8–9), a chasm of eight
+  // The orb (1,2) faces a deep trench (x 5–7, floor -2, cut across flat ground: the walls beside it went in v162, as they
+  // only hid it; no gusts, alone or with an ice bridge on any row, get round it), a short bank (x 8–9), a chasm of eight
   // tiles (x 10–17) and a low isle (-1) with the font (21,2). Three seals, the first two in either order: Unda with the
   // outer circle (any sign) and Gelu on its ring, cast in the trench (a glass floor near the brim); Petra with Gelu and
   // 1–3 Ventus on its ring cast at 10.5 or 11.5, its sign toward the font (an ice bridge); then Ventus on the orb toward the
@@ -488,7 +489,7 @@ const LEVELS = [
     par: 3, ink: 3, combos: true,
     lesson: 'The last page of the fifth folio. A deep trench, then a wide chasm, then the font on a low isle. Stone cannot fill the trench, and stone is too slow to cross the chasm. Each wants its own glass.',
     hint: 'Unda in the trench with a second, larger circle around the seal and a small Gelu on its ring: a glass floor. Petra on the first empty tile past the trench’s far bank, its sign toward the font (lower right) crossed by one barb, with a small Gelu and two small Ventus on its ring: a glass bridge. Then Ventus on the orb toward the font, crossed by two barbs.',
-    t: [' 0000              ____ ', '0000022200        ______', '00000===00        ______', '0000022200        ______', ' 0000              ____ '],
+    t: [' 0000              ____ ', '0000000000        ______', '00000===00        ______', '0000000000        ______', ' 0000              ____ '],
     o: ['........................', '........................', '.O...................G..', '........................', '........................'],
     folioEnd: { title: 'The Fifth Folio is Complete', text: 'Glass over the trench, glass over the void, and the light is home. The master sets the fifth folio aside.' },
   },
