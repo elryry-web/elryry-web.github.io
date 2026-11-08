@@ -168,7 +168,9 @@ function imbueTick(b, dt) {
       for (const [dx, dy] of TOUCH) douseCell(cellAt(b.x + dx, b.y + dy));
       if (Math.random() < dt * 20) emit({ x: b.x, y: b.y, z: b.z + b.hgt, vx: (Math.random() - .5), vy: (Math.random() - .5), vz: 1, grav: 8, life: 0.6, size: 2, color: '#9fd6ff', kind: 'drop' });
     } else if (id === 'stone') {
-      if (Math.random() < dt * 8) emit({ x: b.x, y: b.y, z: b.z + 0.1, vx: (Math.random() - .5), vy: (Math.random() - .5), vz: 0.5, grav: 6, life: 0.6, size: 2, color: '#8a7a68', kind: 'chunk' });
+      // a stone orb grinds along: grit kicked up behind it, more the faster it rolls, and dust while it is quick
+      if (Math.random() < dt * (6 + 5 * sp)) emit({ x: b.x, y: b.y, z: b.z + 0.1, vx: (Math.random() - .5) - b.vx * 0.15, vy: (Math.random() - .5) - b.vy * 0.15, vz: 0.5 + Math.random(), grav: 6, life: 0.6, size: 2 + Math.random() * 1.5, color: '#8a7a68', kind: 'chunk' });
+      if (sp > 1.5 && b.lev <= 0 && Math.random() < dt * 6) dust(b.x, b.y, b.z, 2);
     }
   }
   if (!Object.keys(b.imb).length) b.imb = null;
@@ -679,7 +681,9 @@ function infuseBody(b, s, sp) {
       b.vx += dx / L * dv; b.vy += dy / L * dv; break;
     }
     case 'luna': b.lev = Math.max(b.lev, T); b.levAge = 0; b.levUntilStop = until; if (sp.sigil !== 'luna') b.drift = null; b.vz += 2; break;
-    default: b.imb = b.imb || {}; b.imb[s.id] = { t: T, n: s.n, untilStop: until, age: 0 };
+    default:
+      b.imb = b.imb || {}; b.imb[s.id] = { t: T, n: s.n, untilStop: until, age: 0 };
+      if (s.id === 'stone') { Sfx.play('bump', 1); dust(b.x, b.y, b.z, 8); cam.shake = Math.max(cam.shake, 0.12); }
   }
 }
 function infuseCells(s, cells, sp, tx, ty, tz, out) {
@@ -1518,7 +1522,8 @@ function gatherLights(t) {
     else if (c.burn) L.push({ x: c.x + .5, y: c.y + .5, z: c.h + 0.4, col: '#ff7a36', r: 1.9, a: 0.4 + 0.05 * Math.sin(t * 13 + c.y * 5) });
     if (c.feat === 'font') S.push({ x: c.x + .5, y: c.y + .5, z: c.h + 0.2, col: '#78e6ff', r: 2.0, a: 0.4, still: true });
   }
-  for (const b of World.bodies) if (b.alive && b.kind === 'orb') L.push({ x: b.x, y: b.y, z: b.z + b.r, col: '#ffc45e', r: 2.2, a: b.captured ? 0.6 : 0.42 });
+  // (an orb turned to stone casts less light: see stoneOrbSprite)
+  for (const b of World.bodies) if (b.alive && b.kind === 'orb') L.push({ x: b.x, y: b.y, z: b.z + b.r, col: '#ffc45e', r: 2.2, a: (b.captured ? 0.6 : 0.42) * (1 - 0.7 * (b.stoneK || 0)) });
   L.sort((p, q) => q.a - p.a);
   LIGHTS_STILL = S; LIGHTS_MOVING = L.slice(0, 6);
   LIGHTS = [...S, ...LIGHTS_MOVING];
@@ -3653,7 +3658,8 @@ function drawBody(g, b, t) {
     const [cx, cy] = proj(b.x, b.y, b.z + b.hgt * 0.5);
     g.save(); g.globalCompositeOperation = 'lighter';
     let k = 0;
-    for (const id of [...Object.keys(b.imb || {}), ...(b.arrive || []).map(a => a.id)]) {
+    // (an orb turned to stone shows it on the orb itself, not as an aura)
+    for (const id of [...Object.keys(b.imb || {}).filter(id => !(id === 'stone' && b.kind === 'orb')), ...(b.arrive || []).map(a => a.id)]) {
       const r = (34 + 6 * Math.sin(t * 6 + k)) * s; g.globalAlpha = 0.5;
       g.drawImage(glowSprite(SIGILS[id].color), cx - r, cy - r, r * 2, r * 2);
       const a = t * 3 + k * 2.1; g.globalAlpha = 0.9; g.fillStyle = SIGILS[id].color;
@@ -3675,10 +3681,12 @@ function drawBody(g, b, t) {
   if (b.kind === 'orb') {
     const [cx, cy] = proj(b.x, b.y, b.z + b.r);
     const r = b.r * TW * 0.78 * s;
+    // turned to stone by Petra: the shell eases in over the light while it lasts, and out again when it ends
+    const stoneK = b.stoneK = (b.stoneK || 0) + ((b.imb && b.imb.stone ? 1 : 0) - (b.stoneK || 0)) * 0.25;
     // a tight halo here; its glow on the ground is drawn in the light pass, once the land is down (drawn here, the
     // tiles in front would cut it off square)
     g.save(); g.globalCompositeOperation = 'lighter';
-    g.globalAlpha = 0.55 + (b.captured ? 0.35 : 0); g.drawImage(glowSprite('#ffc860'), cx - r * 1.8, cy - r * 1.8, r * 3.6, r * 3.6); g.restore();
+    g.globalAlpha = (0.55 + (b.captured ? 0.35 : 0)) * (1 - 0.65 * stoneK); g.drawImage(glowSprite('#ffc860'), cx - r * 1.8, cy - r * 1.8, r * 3.6, r * 3.6); g.restore();
     const gr = g.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.05, cx, cy, r);
     gr.addColorStop(0, '#fffbea'); gr.addColorStop(0.35, '#ffd77a'); gr.addColorStop(0.8, '#d4862c'); gr.addColorStop(1, '#8a4a1a');
     g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, r, 0, TAU); g.fill();
@@ -3697,6 +3705,13 @@ function drawBody(g, b, t) {
     g.restore();
     g.strokeStyle = 'rgba(255,240,200,0.6)'; g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, r, Math.PI * 1.1, Math.PI * 1.6); g.stroke();
     g.fillStyle = 'rgba(255,255,255,0.9)'; g.beginPath(); g.ellipse(cx - r * 0.38, cy - r * 0.45, r * 0.16, r * 0.1, -0.6, 0, TAU); g.fill();
+    if (stoneK > 0.02) {
+      g.save(); g.globalAlpha = Math.min(1, stoneK); g.translate(cx, cy); g.rotate(b.spin * 0.5);
+      g.drawImage(stoneOrbSprite(), -r * 1.04, -r * 1.04, r * 2.08, r * 2.08); g.restore();
+      // the light inside breathing through the cracks
+      g.save(); g.globalCompositeOperation = 'lighter'; g.globalAlpha = stoneK * (0.18 + 0.12 * Math.sin(t * 5));
+      g.drawImage(glowSprite('#ffc860'), cx - r * 0.9, cy - r * 0.9, r * 1.8, r * 1.8); g.restore();
+    }
   } else {
     const r = b.r, burnt = b.burn ? clamp(b.burn, 0, 1) : 0;
     if (texOK) {
@@ -3713,6 +3728,42 @@ function drawBody(g, b, t) {
     let p = proj(b.x + r, b.y - r, b.z), q = proj(b.x + r, b.y + r, b.z + b.hgt); g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); g.stroke();
     p = proj(b.x - r, b.y + r, b.z); q = proj(b.x + r, b.y + r, b.z + b.hgt); g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); g.stroke();
   }
+}
+
+/* The orb turned to stone (Petra at once or along the way on a moving spell): a ball of the land's own stone texture,
+   shaded round and lit from the upper left, with the orb's gold light showing through its cracks. Painted once at
+   128px (again when the stone texture arrives) and turned with the orb's roll. */
+let _stoneOrb = null;
+function stoneOrbSprite() {
+  const im = TEX_IMAGES.stone || null;
+  if (_stoneOrb && _stoneOrb.im === im) return _stoneOrb.c;
+  const N = 128, R = N / 2, c = document.createElement('canvas'); c.width = c.height = N;
+  const g = c.getContext('2d'), rnd = mulberry(4242);
+  g.save(); g.beginPath(); g.arc(R, R, R - 1, 0, TAU); g.clip();
+  if (im) g.drawImage(im, 0, 0, im.naturalWidth * 0.45, im.naturalHeight * 0.45, 0, 0, N, N);
+  else { g.fillStyle = '#9a947e'; g.fillRect(0, 0, N, N); }
+  g.globalCompositeOperation = 'multiply'; g.fillStyle = '#a89e84'; g.fillRect(0, 0, N, N);
+  g.globalCompositeOperation = 'source-over';
+  const sh = g.createRadialGradient(R * 0.62, R * 0.58, R * 0.08, R, R, R);
+  sh.addColorStop(0, 'rgba(255,248,230,0.32)'); sh.addColorStop(0.45, 'rgba(0,0,0,0)'); sh.addColorStop(1, 'rgba(18,12,6,0.85)');
+  g.fillStyle = sh; g.fillRect(0, 0, N, N);
+  // cracks from near the middle outward: a dark edge, a soft gold glow, and a bright core
+  const cracks = [];
+  for (let k = 0; k < 4; k++) {
+    let a = k * TAU / 4 + rnd() * 1.2, x = R + Math.cos(a) * R * 0.12, y = R + Math.sin(a) * R * 0.12;
+    const pts = [[x, y]];
+    for (let i = 0; i < 5; i++) { a += (rnd() - 0.5) * 1.1; const L = R * (0.12 + rnd() * 0.1); x += Math.cos(a) * L; y += Math.sin(a) * L; pts.push([x, y]); }
+    cracks.push(pts);
+  }
+  g.lineJoin = g.lineCap = 'round';
+  for (const [w, col] of [[5, 'rgba(25,16,8,0.7)'], [7, 'rgba(255,170,60,0.35)'], [2.2, 'rgba(255,230,150,1)']]) {
+    g.strokeStyle = col; g.lineWidth = w;
+    for (const p of cracks) { g.beginPath(); g.moveTo(p[0][0], p[0][1]); for (const q of p.slice(1)) g.lineTo(q[0], q[1]); g.stroke(); }
+  }
+  g.restore();
+  g.strokeStyle = 'rgba(40,28,16,0.65)'; g.lineWidth = 2; g.beginPath(); g.arc(R, R, R - 1.5, 0, TAU); g.stroke();
+  _stoneOrb = { c, im };
+  return c;
 }
 
 /* Spell seal projected onto the ground */

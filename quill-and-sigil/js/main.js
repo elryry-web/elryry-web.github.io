@@ -354,7 +354,7 @@ const LEVELS = [
   // current (9/9 even with one barb), and Luna would float over, so neither is in this lesson's sigils (no ferry either).
   {
     name: 'The Mill Wall', sigils: ['gale', 'stone'], sats: ['stone'], par: 1, ink: 1, combos: true,
-    lesson: 'A millrace runs between the meadow and the mill: a channel of fast water that sweeps anything floating down and over the edge. The font sits in a gap in the far wall, down at the level of the channel bed. An orb that carries Petra is heavy as stone. It sinks instead of floating, and the current cannot take it, though the water still slows it as it rolls along the bed.',
+    lesson: 'A millrace runs between the meadow and the mill: a channel of fast water that sweeps anything floating down and over the edge. The font sits in a gap in the far wall, down at the level of the channel bed. Petra on the ring of a gust turns the orb to stone. A stone orb sinks instead of floating, and the current cannot take it, though the water still slows it as it rolls along the bed.',
     hint: 'Ventus in the centre, cast on the orb, its sign toward the font (lower right) crossed by two barbs. On the ring, in a red circle behind the sign: a small Petra. The heavy orb sinks and rolls straight across the bed into the font; with fewer barbs the water stops it short.',
     t: ['  000~~~11 ', ' 0000~~~111', '00000~~~111', '00000~~~111', '00000~~~_11', '00000~~~111', '00000~~~111', ' 0000~~~111', '  000~~~11 ', '     ~~~   ', '     ~~~   '],
     o: ['...........', '...........', '...........', '...........', '...O....G..', '...........', '...........', '...........', '...........', '...........', '...........'],
@@ -389,7 +389,7 @@ const LEVELS = [
   // The ice blocks stand on the rock. (An ice block on frozen water ('*') blocks from the ice's top; since v144 it is drawn there too.)
   {
     name: 'The Icebound Font', sigils: ['gale', 'stone', 'flame'], par: 1, ink: 1, combos: true,
-    lesson: 'The millrace has frozen hard, and its font stands on a rock in the middle, walled in by blocks of ice. Fire melts ice, and not only the ice you aim it at: the frozen race thaws too. A heavy orb smashes the ice in its way.',
+    lesson: 'The millrace has frozen hard, and its font stands on a rock in the middle, walled in by blocks of ice. Fire melts ice, and not only the ice you aim it at: the frozen race thaws too. Petra on the ring of a gust turns the orb to stone, and a stone orb smashes the ice in its way.',
     hint: 'Ventus on the orb with a sign toward the font (lower right), crossed by one barb, and a small Petra in a slot opposite the sign (red: at once). The heavy orb rolls over the frozen race and smashes through the ice around the font.',
     t: ['  00000000   ', ' 000******0  ', '0000******00 ', '0000**000*000', '0000**000*000', '0000**000*000', ' 000******00 ', '  00******0  ', '   0******   ', '    ******   '],
     o: ['.............', '.............', '.............', '......III....', '.O....IGI....', '......III....', '.............', '.............', '.............', '.............'],

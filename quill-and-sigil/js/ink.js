@@ -18,7 +18,7 @@ const SIGN_NOTES = {
   plain: 'A sign is a stroke drawn outward through one of the eight small circles: it points the spell as the world lies. A short barb across it adds strength, two at most. Unadorned, stone, fire, ice and water set one tile; each sign is its own arm: opposite signs make one line through your mark; signs at right angles fill the ground between.',
   // added to the plain notes only once Featherfall II has taught the outer circle (ringTaught)
   ring: ' A second ring around the seal widens the spell; around Luna, it doubles how far the float carries.',
-  combos: 'A sign points the spell as the world lies; each barb across it adds strength. On Luna, the sign and barbs aim and strengthen only what rides on its ring. Each place on the ring holds one mark. A small sigil in a slot infuses the spell: behind the sign (red) it acts at once; beside it (blue), along the way; ahead of it (green), on arrival.',
+  combos: 'A sign points the spell as the world lies; each barb across it adds strength. On Luna, the sign and barbs aim and strengthen only what rides on its ring. Each place on the ring holds one mark. A small sigil in a slot infuses the spell: behind the sign (red) it acts at once; beside it (blue), along the way; ahead of it (green), on arrival, once what the spell moves comes to rest. On the ring of a gust, Petra turns what the wind moves to stone. On the ring of fire, stone, ice or water, each Ventus carries every arm two tiles farther.',
 };
 // has the outer circle been taught yet? (Featherfall II teaches it; before that nothing mentions or shows it)
 function ringTaught(L = Game.level) {
@@ -709,10 +709,20 @@ function describeSpell(sp, short = false) {
   else if (sp.dir) t += ` · ${force} ${{ gale: 'gust', tide: 'current' }[sp.sigil] || 'push'} ${worldDirArrow(sp.dir)}`;
   else if (sp.radial) t += ` · ${force}, balanced (outward)`;
   if (sp.amp && !line && sp.sigil !== 'stone' && sp.sigil !== 'luna') t += ' · widened';
+  // Ventus on the ring of a placed spell (stone, fire, ice, still water) carries every arm farther, whatever its slot:
+  // say how far, not when
+  const reach = placeReach(sp);
+  if (reach) t += ` · + Ventus${reach > 2 ? ' ×' + reach / 2 : ''}: every arm ${reach} tiles farther`;
+  // on a gust, say what the ring-sigils whose effect is easy to miss will do: Petra at once or along the way turns what
+  // the wind moves to stone; anything on arrival waits until it comes to rest (a bounce is not an arrival)
+  const gust = sp.sigil === 'gale' && !isFerry(sp) && !short;
   for (const s of sp.sats || []) {
     if (isFerry(sp) && s.rel === 'now' && (s.id === 'luna' || s.id === 'stone')) continue;
     if (short && sp.sigil === 'luna' && s.id === 'gale' && sp.dir) continue; // already said: "Ventus bears it …"
-    t += ` · + ${SIGILS[s.id].name}${s.n > 1 ? ' ×' + s.n : ''} ${REL_NAME[s.rel]}`;
+    if (reach && s.id === 'gale') continue; // already said: "every arm … farther"
+    const what = !gust ? '' : s.id === 'stone' ? (s.rel === 'arrive' ? ': stone rises under it where it comes to rest' : ': turns it to stone')
+      : s.rel === 'arrive' ? ': where it comes to rest' : '';
+    t += ` · + ${SIGILS[s.id].name}${s.n > 1 ? ' ×' + s.n : ''} ${REL_NAME[s.rel]}${what}`;
   }
   return t;
 }
@@ -910,7 +920,7 @@ function textOnCircle(g, text, cx, cy, r, a0, size) {
 /* Parchment texture (cached) */
 let _parch = null;
 // (let go when the page comes back from the background, in case the browser wiped it)
-document.addEventListener('visibilitychange', () => { if (!document.hidden) _parch = null; });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { _parch = null; Grim._mmKey = null; } });
 function parchment() {
   if (_parch) return _parch;
   const c = document.createElement('canvas'); c.width = c.height = 512;
@@ -934,6 +944,53 @@ function parchment() {
     g.lineWidth = 0.6 + R(); g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke();
   }
   _parch = c; return c;
+}
+
+/* The painted grimoire (art/grim-*, cut from paintings): each piece takes over from its drawn version as it loads,
+   and the old look (◐) keeps the drawn book */
+const GART = {};
+for (const f of ['page.jpg', 'leather.jpg', 'corner.png', 'head.png', 'rim.png', 'medal.png', 'initial.png', 'cap.png', 'ribbon.png', 'vine.png']) {
+  const k = f.split('.')[0], im = new Image();
+  im.onload = () => { GART[k] = im; Grim.bookDirty = true; };
+  im.src = `art/grim-${f}?v=1`;
+}
+function gart(k) { return typeof CLASSIC !== 'undefined' && CLASSIC.on ? null : GART[k] || null; }
+// an image with its corner at (x, y), turned outwards by fx/fy = ±1 (for the four corners of a page)
+function drawFlip(g, im, x, y, w, h, fx, fy) { g.save(); g.translate(x, y); g.scale(fx, fy); g.drawImage(im, 0, 0, w, h); g.restore(); }
+// an image cropped to fill a box without stretching
+function drawCover(g, im, x, y, w, h, flip) {
+  const iw = im.naturalWidth, ih = im.naturalHeight, k = Math.max(w / iw, h / ih), sw = w / k, sh = h / k;
+  g.save(); g.translate(x + (flip ? w : 0), y); if (flip) g.scale(-1, 1);
+  g.drawImage(im, (iw - sw) / 2, (ih - sh) / 2, sw, sh, 0, 0, w, h); g.restore();
+}
+// the painted vine laid along a line from (x0, y0) to (x1, y1), its stem on the line, fading out at both ends
+function vineRun(g, x0, y0, x1, y1, h, dpr) {
+  const V = GART.vine, len = Math.hypot(x1 - x0, y1 - y0); if (!V || len < h) return;
+  const c = document.createElement('canvas'); c.width = Math.ceil(len * dpr); c.height = Math.ceil(h * dpr);
+  const q = c.getContext('2d'); q.scale(dpr, dpr);
+  const tw = V.naturalWidth * h / V.naturalHeight, n = Math.ceil(len / tw) + 1, sx = (len - n * tw) / 2;
+  for (let i = 0; i < n; i++) q.drawImage(V, sx + i * tw - 0.5 * i, 0, tw, h);
+  q.globalCompositeOperation = 'destination-in';
+  const f = Math.min(0.3, h * 1.4 / len), gr = q.createLinearGradient(0, 0, len, 0);
+  gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(f, '#000'); gr.addColorStop(1 - f, '#000'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+  q.fillStyle = gr; q.fillRect(0, 0, len, h);
+  g.save(); g.translate(x0, y0); g.rotate(Math.atan2(y1 - y0, x1 - x0)); g.drawImage(c, 0, -h / 2, len, h); g.restore();
+}
+// gilded lettering: a dark edge, a gold body lit from above
+function goldText(g, text, x, y, size) {
+  const gr = g.createLinearGradient(0, y - size * 0.78, 0, y + size * 0.05);
+  gr.addColorStop(0, '#f7e29a'); gr.addColorStop(0.42, '#d2a24a'); gr.addColorStop(0.58, '#9c6a22'); gr.addColorStop(1, '#dcb45c');
+  g.save(); g.lineJoin = 'round';
+  g.shadowColor = 'rgba(70,40,10,0.35)'; g.shadowOffsetY = Math.max(1, size * 0.04); g.shadowBlur = size * 0.06;
+  g.strokeStyle = 'rgba(66,36,12,0.9)'; g.lineWidth = Math.max(1.2, size * 0.075); g.strokeText(text, x, y);
+  g.shadowColor = 'transparent'; g.fillStyle = gr; g.fillText(text, x, y);
+  g.restore();
+}
+// a sigil in its gold medallion
+function medalGlyph(g, id, cx, cy, r, lw) {
+  const M = GART.medal, R = (r + 2) / 0.66; // (its cream centre is two thirds of it)
+  g.drawImage(M, cx - R, cy - R, R * 2, R * 2);
+  drawGlyph(g, id, cx, cy, r * 0.8, '#2a1830', lw);
 }
 
 /* =====================================================================
@@ -1213,39 +1270,116 @@ const Grim = {
     const cvx = L.bx - 14, cvy = L.by - 12, cw = L.bw + 28, ch = L.bh + 24;
     // its shadow: soft layers spreading out below it (a canvas blur this size is very slow on phones)
     for (let k = 8; k >= 1; k--) { g.fillStyle = `rgba(0,0,0,${0.075})`; roundRect(g, cvx - k * 3, cvy + 16 - k * 2.5, cw + k * 6, ch + k * 5, 14 + k * 3); g.fill(); }
-    const lg = g.createLinearGradient(cvx, cvy, cvx, cvy + ch);
-    lg.addColorStop(0, '#4a2232'); lg.addColorStop(1, '#2a1020');
-    g.fillStyle = lg; roundRect(g, cvx, cvy, cw, ch, 14); g.fill();
+    const lea = gart('leather'), art = !!gart('page');
+    this._classic = typeof CLASSIC !== 'undefined' && CLASSIC.on;
+    document.getElementById('pagebtns')?.classList.toggle('plaques', !this._classic); // the painted brass plaques (CSS) follow the look
+    if (lea) {
+      // the painted plum leather, darker towards the foot
+      roundRect(g, cvx, cvy, cw, ch, 14); g.clip();
+      const p = g.createPattern(lea, 'repeat'), k = clamp(L.bh / 1300, 0.3, 0.75);
+      if (p.setTransform && typeof DOMMatrix !== 'undefined') p.setTransform(new DOMMatrix().translate(cvx, cvy).scale(k));
+      g.fillStyle = p; g.fillRect(cvx, cvy, cw, ch);
+      const sg = g.createLinearGradient(0, cvy, 0, cvy + ch);
+      sg.addColorStop(0, 'rgba(90,40,60,0.05)'); sg.addColorStop(1, 'rgba(20,5,14,0.5)');
+      g.fillStyle = sg; g.fillRect(cvx, cvy, cw, ch);
+    } else {
+      const lg = g.createLinearGradient(cvx, cvy, cvx, cvy + ch);
+      lg.addColorStop(0, '#4a2232'); lg.addColorStop(1, '#2a1020');
+      g.fillStyle = lg; roundRect(g, cvx, cvy, cw, ch, 14); g.fill();
+    }
     g.restore();
     g.strokeStyle = 'rgba(232,194,122,0.55)'; g.lineWidth = 1.5; roundRect(g, cvx + 6, cvy + 6, cw - 12, ch - 12, 10); g.stroke();
     g.strokeStyle = 'rgba(232,194,122,0.25)'; g.lineWidth = 1; roundRect(g, cvx + 10, cvy + 10, cw - 20, ch - 20, 8); g.stroke();
-    // page stack edges
-    for (let i = 3; i > 0; i--) {
+    // brass caps on the cover's corners (the pages lie over their inner part)
+    const cap = gart('cap');
+    if (cap) {
+      const h = clamp(L.bh * 0.075, 26, 60), w = h * cap.naturalWidth / cap.naturalHeight;
+      drawFlip(g, cap, cvx - 2, cvy - 2, w, h, 1, 1); drawFlip(g, cap, cvx + cw + 2, cvy - 2, w, h, -1, 1);
+      drawFlip(g, cap, cvx - 2, cvy + ch + 2, w, h, 1, -1); drawFlip(g, cap, cvx + cw + 2, cvy + ch + 2, w, h, -1, -1);
+    }
+    // page stack edges (a thicker block of leaves in the painted book)
+    const leaves = art ? 6 : 3;
+    for (let i = leaves; i > 0; i--) {
       g.fillStyle = i % 2 ? '#d9c597' : '#e8d6ab';
       g.fillRect(L.bx - i * 1.5 + 2, L.by + i * 1.6, L.bw + i * 3 - 4, L.bh - i * 1.2);
+      if (art) { g.fillStyle = 'rgba(110,80,40,0.25)'; g.fillRect(L.bx - i * 1.5 + 2, L.by + L.bh + i * 0.4 - 1, L.bw + i * 3 - 4, 0.6); }
     }
     const pages = L.single ? [L.right] : [L.left, L.right];
-    const pat = g.createPattern(parchment(), 'repeat');
+    const pim = gart('page'), pat = pim ? null : g.createPattern(parchment(), 'repeat');
     for (const P of pages) {
       g.save();
-      g.fillStyle = pat; g.fillRect(P.x, P.y, P.w, P.h);
+      if (pim) drawCover(g, pim, P.x, P.y, P.w, P.h, P === L.left);
+      else { g.fillStyle = pat; g.fillRect(P.x, P.y, P.w, P.h); }
       // vignette
       const vg = g.createRadialGradient(P.x + P.w / 2, P.y + P.h / 2, Math.min(P.w, P.h) * 0.3, P.x + P.w / 2, P.y + P.h / 2, Math.max(P.w, P.h) * 0.75);
-      vg.addColorStop(0, 'rgba(255,248,225,0.12)'); vg.addColorStop(1, 'rgba(120,75,30,0.38)');
+      vg.addColorStop(0, 'rgba(255,248,225,0.12)'); vg.addColorStop(1, `rgba(120,75,30,${pim ? 0.24 : 0.38})`);
       g.fillStyle = vg; g.fillRect(P.x, P.y, P.w, P.h);
+      if (pim) {
+        // candlelight from the upper left, warm on the pages
+        const lx = L.bx + L.bw * 0.22, ly = L.by + L.bh * 0.15, cg = g.createRadialGradient(lx, ly, 0, lx, ly, Math.max(L.bw, L.bh) * 1.05);
+        cg.addColorStop(0, 'rgba(255,214,140,0.16)'); cg.addColorStop(0.55, 'rgba(255,190,110,0.04)'); cg.addColorStop(1, 'rgba(70,35,10,0.14)');
+        g.fillStyle = cg; g.fillRect(P.x, P.y, P.w, P.h);
+      }
       g.restore();
-      this.pageBorder(g, P);
+      if (pim) this.pageBorderArt(g, P); else this.pageBorder(g, P);
     }
     if (!L.single) {
-      const cx = L.bx + L.bw / 2;
-      const gg = g.createLinearGradient(cx - 40, 0, cx + 40, 0);
-      gg.addColorStop(0, 'rgba(60,35,15,0)'); gg.addColorStop(0.45, 'rgba(60,35,15,0.32)'); gg.addColorStop(0.5, 'rgba(40,20,8,0.5)');
-      gg.addColorStop(0.55, 'rgba(60,35,15,0.32)'); gg.addColorStop(1, 'rgba(60,35,15,0)');
-      g.fillStyle = gg; g.fillRect(cx - 40, L.by, 80, L.bh);
+      const cx = L.bx + L.bw / 2, gw = art ? L.bw * 0.07 : 40;
+      const gg = g.createLinearGradient(cx - gw, 0, cx + gw, 0);
+      if (art) {
+        // a deeper fold: the pages curving down into the spine
+        gg.addColorStop(0, 'rgba(60,35,15,0)'); gg.addColorStop(0.3, 'rgba(60,35,15,0.12)'); gg.addColorStop(0.46, 'rgba(50,26,10,0.42)');
+        gg.addColorStop(0.5, 'rgba(30,14,5,0.66)'); gg.addColorStop(0.54, 'rgba(50,26,10,0.42)'); gg.addColorStop(0.7, 'rgba(60,35,15,0.12)'); gg.addColorStop(1, 'rgba(60,35,15,0)');
+      } else {
+        gg.addColorStop(0, 'rgba(60,35,15,0)'); gg.addColorStop(0.45, 'rgba(60,35,15,0.32)'); gg.addColorStop(0.5, 'rgba(40,20,8,0.5)');
+        gg.addColorStop(0.55, 'rgba(60,35,15,0.32)'); gg.addColorStop(1, 'rgba(60,35,15,0)');
+      }
+      g.fillStyle = gg; g.fillRect(cx - gw, L.by, gw * 2, L.bh);
       this.codex(g, L.left);
     } else this.codexStrip(g, L.side || L.right);
     this.drawingFrame(g);
+    // the crimson ribbon marker, hanging out of the foot of the book
+    const rib = gart('ribbon');
+    if (rib && !L.side) {
+      const rw = clamp(L.bw * 0.022, 14, 24), k = rw / rib.naturalWidth, sy = rib.naturalHeight * 0.36;
+      // upright, the Open-the-Grimoire button sits just under the book, so only a short tail shows
+      const rh = Math.min(rib.naturalHeight * 0.42 * k, L.single ? 30 : 1e9), sh = rh / k;
+      const rx = L.single ? L.bx + L.bw * 0.78 : L.bx + L.bw * 0.56, ry = L.by + L.bh - 10;
+      g.save();
+      g.beginPath(); g.moveTo(rx, ry); g.lineTo(rx + rw, ry); g.lineTo(rx + rw, ry + rh); g.lineTo(rx + rw / 2, ry + rh - rw * 0.55); g.lineTo(rx, ry + rh); g.closePath(); g.clip();
+      g.shadowColor = 'rgba(0,0,0,0.4)'; g.shadowBlur = 4; g.shadowOffsetY = 2;
+      g.drawImage(rib, 0, sy, rib.naturalWidth, sh, rx, ry, rw, rh);
+      g.restore();
+    }
     this.bookDirty = false;
+  },
+  // the painted border: rules as before, the painted corners and headpieces, the painted vine between them
+  pageBorderArt(g, P) {
+    const ink = '#4a2e1a', gold = '#b8893e', red = '#8e2f22';
+    const mn = Math.min(P.w, P.h), m = mn * 0.035, dpr = this.dpr;
+    const x0 = P.x + m, y0 = P.y + m, x1 = P.x + P.w - m, y1 = P.y + P.h - m, cx = P.x + P.w / 2;
+    g.strokeStyle = hexA(ink, 0.8); g.lineWidth = 1.4; g.strokeRect(x0, y0, x1 - x0, y1 - y0);
+    g.strokeStyle = hexA(red, 0.7); g.lineWidth = 0.8; g.strokeRect(x0 + 5, y0 + 5, x1 - x0 - 10, y1 - y0 - 10);
+    g.strokeStyle = gold; g.lineWidth = 0.9; g.strokeRect(x0 - 3, y0 - 3, x1 - x0 + 6, y1 - y0 + 6);
+    const C = GART.corner, H = GART.head, side = !!this.L.side;
+    const ch = mn * (side ? 0.3 : 0.34), cw = C ? ch * C.naturalWidth / C.naturalHeight : 0;
+    const vh = Math.max(14, mn * 0.055);
+    const hw = H && !side ? mn * (this.L.single ? 0.4 : 0.56) : 0, hh = H ? hw * H.naturalHeight / H.naturalWidth : 0;
+    const ax = cw * 0.8, ay = ch * 0.82, gap = hw * 0.42;
+    if (hw) {
+      vineRun(g, x0 + ax, y0, cx - gap, y0, vh, dpr); vineRun(g, cx + gap, y0, x1 - ax, y0, vh, dpr);
+      vineRun(g, x1 - ax, y1, cx + gap, y1, vh, dpr); vineRun(g, cx - gap, y1, x0 + ax, y1, vh, dpr);
+    } else { vineRun(g, x0 + ax, y0, x1 - ax, y0, vh, dpr); vineRun(g, x1 - ax, y1, x0 + ax, y1, vh, dpr); }
+    vineRun(g, x0, y1 - ay, x0, y0 + ay, vh, dpr); vineRun(g, x1, y0 + ay, x1, y1 - ay, vh, dpr);
+    if (C) {
+      const ox = cw * 0.108, oy = ch * 0.097; // the rosette sits on the corner of the rules
+      drawFlip(g, C, x0 - ox, y0 - oy, cw, ch, 1, 1); drawFlip(g, C, x1 + ox, y0 - oy, cw, ch, -1, 1);
+      drawFlip(g, C, x0 - ox, y1 + oy, cw, ch, 1, -1); drawFlip(g, C, x1 + ox, y1 + oy, cw, ch, -1, -1);
+    }
+    if (hw) {
+      g.drawImage(H, cx - hw / 2, y0 - hh / 2, hw, hh);
+      drawFlip(g, H, cx - hw / 2, y1 + hh / 2, hw, hh, 1, -1);
+    }
   },
   pageBorder(g, P) {
     const ink = '#4a2e1a', gold = '#b8893e', red = '#8e2f22';
@@ -1275,37 +1409,51 @@ const Grim = {
     g.textAlign = 'center'; g.textBaseline = 'alphabetic';
     g.fillStyle = red; g.font = `${Math.round(13 * s)}px Cinzel, serif`;
     g.fillText(`LESSON ${lv.roman}`, P.x + P.w / 2, y); y += 34 * s;
-    g.fillStyle = ink; g.font = `700 ${Math.round(26 * s)}px "Cinzel Decorative", serif`;
-    g.fillText(lv.name, P.x + P.w / 2, y); y += 14 * s;
-    fleuron(g, P.x + P.w / 2, y + 6 * s, s * 0.8, ink, gold); y += 30 * s;
+    const H = gart('head'), IN = gart('initial'), MD = gart('medal');
+    g.font = `700 ${Math.round(26 * s)}px "Cinzel Decorative", serif`;
+    if (H) goldText(g, lv.name, P.x + P.w / 2, y, 26 * s);
+    else { g.fillStyle = ink; g.fillText(lv.name, P.x + P.w / 2, y); }
+    y += 14 * s;
+    if (H) { const hw = w * 0.62, hh = hw * H.naturalHeight / H.naturalWidth; g.drawImage(H, P.x + (P.w - hw) / 2, y + 8 * s - hh / 2, hw, hh); y += 34 * s; }
+    else { fleuron(g, P.x + P.w / 2, y + 6 * s, s * 0.8, ink, gold); y += 30 * s; }
     // master's note with illuminated initial
     g.textAlign = 'left';
-    const capS = 46 * s;
+    const capS = (IN ? 52 : 46) * s, capGap = (IN ? 13 : 8) * s;
     const first = lv.lesson[0], rest = lv.lesson.slice(1);
     g.save();
-    g.fillStyle = '#f3dfa8'; g.strokeStyle = gold; g.lineWidth = 1.5;
-    g.fillRect(x0, y, capS, capS); g.strokeRect(x0, y, capS, capS);
-    g.strokeStyle = red; g.lineWidth = 0.8; g.strokeRect(x0 + 3, y + 3, capS - 6, capS - 6);
-    g.strokeStyle = 'rgba(46,107,62,0.8)'; g.lineWidth = 1;
-    g.beginPath(); curl(g, x0 + capS * 0.22, y + capS * 0.78, capS * 0.14, 1.2, 0, 1); g.stroke();
-    g.beginPath(); curl(g, x0 + capS * 0.8, y + capS * 0.22, capS * 0.12, 1.2, Math.PI, 1); g.stroke();
-    g.fillStyle = red; g.font = `700 ${Math.round(capS * 0.78)}px "Cinzel Decorative", serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.fillText(first, x0 + capS / 2, y + capS * 0.54);
+    if (IN) {
+      // the painted ultramarine panel in its gold frame (the frame is 83% of the painting), a gilded capital on it
+      const D = capS / 0.83;
+      g.drawImage(IN, x0 - D * 0.1, y - D * 0.1, D, D);
+      g.font = `700 ${Math.round(capS * 0.7)}px "Cinzel Decorative", serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+      goldText(g, first, x0 + capS / 2, y + capS * 0.53, capS * 0.7);
+    } else {
+      g.fillStyle = '#f3dfa8'; g.strokeStyle = gold; g.lineWidth = 1.5;
+      g.fillRect(x0, y, capS, capS); g.strokeRect(x0, y, capS, capS);
+      g.strokeStyle = red; g.lineWidth = 0.8; g.strokeRect(x0 + 3, y + 3, capS - 6, capS - 6);
+      g.strokeStyle = 'rgba(46,107,62,0.8)'; g.lineWidth = 1;
+      g.beginPath(); curl(g, x0 + capS * 0.22, y + capS * 0.78, capS * 0.14, 1.2, 0, 1); g.stroke();
+      g.beginPath(); curl(g, x0 + capS * 0.8, y + capS * 0.22, capS * 0.12, 1.2, Math.PI, 1); g.stroke();
+      g.fillStyle = red; g.font = `700 ${Math.round(capS * 0.78)}px "Cinzel Decorative", serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText(first, x0 + capS / 2, y + capS * 0.54);
+    }
     g.restore();
     g.fillStyle = ink; g.font = `italic ${Math.round(14.5 * s)}px "IM Fell English", Georgia, serif`; g.textBaseline = 'alphabetic';
     const lh = 19 * s;
     // first lines flow beside the initial
-    const words = rest.split(' '); let line = '', ly = y + lh * 0.95, lx = x0 + capS + 8 * s, lw = w - capS - 8 * s, lines = 0;
+    // the painted panel hangs a little lower than the drawn one, so three lines sit beside it
+    const nIn = IN ? 3 : 2, capBot = IN ? capS / 0.83 * 0.9 : capS;
+    const words = rest.split(' '); let line = '', ly = y + lh * 0.95, lx = x0 + capS + capGap, lw = w - capS - capGap, lines = 0;
     let i = 0;
     for (; i < words.length; i++) {
       const t = line ? line + ' ' + words[i] : words[i];
-      const maxW = lines < 2 ? lw : w;
+      const maxW = lines < nIn ? lw : w;
       if (g.measureText(t).width > maxW && line) {
-        g.fillText(line, lines < 2 ? lx : x0, ly); ly += lh; lines++; line = words[i];
+        g.fillText(line, lines < nIn ? lx : x0, ly); ly += lh; lines++; line = words[i];
       } else line = t;
     }
-    if (line) { g.fillText(line, lines < 2 ? lx : x0, ly); ly += lh; }
-    y = Math.max(ly, y + capS + lh) + 10 * s;
+    if (line) { g.fillText(line, lines < nIn ? lx : x0, ly); ly += lh; }
+    y = Math.max(ly, y + capBot + lh) + 10 * s;
     // sigil codex
     g.strokeStyle = 'rgba(74,46,26,0.5)'; g.lineWidth = 0.8;
     g.beginPath(); g.moveTo(x0, y); g.lineTo(x0 + w, y); g.stroke();
@@ -1330,11 +1478,15 @@ const Grim = {
     const rowH = rowH0 * k, colW = twoCol ? w / 2 : w;
     known.forEach((id, n) => {
       const S = SIGILS[id], col = twoCol ? n % 2 : 0, row = twoCol ? Math.floor(n / 2) : n;
-      const rx = x0 + col * colW, ry = y + row * rowH, r = 15 * s * k, cx = rx + r + 4, cy = ry + rowH / 2;
-      g.strokeStyle = ink; g.lineWidth = 1.1; g.beginPath(); g.arc(cx, cy, r, 0, TAU); g.stroke();
-      g.strokeStyle = gold; g.lineWidth = 0.6; g.beginPath(); g.arc(cx, cy, r + 3, 0, TAU); g.stroke();
-      drawGlyph(g, id, cx, cy, r * 0.82, '#2a1830', 1.6);
-      const tx = cx + r + 12 * s;
+      // (in its medallion the sigil is drawn smaller, so the gold rim fits the row)
+      const rx = x0 + col * colW, ry = y + row * rowH, r = (MD ? 12.5 : 15) * s * k, cx = rx + (MD ? r * 1.5 + 3 : r + 4), cy = ry + rowH / 2;
+      if (MD) medalGlyph(g, id, cx, cy, r, 1.6);
+      else {
+        g.strokeStyle = ink; g.lineWidth = 1.1; g.beginPath(); g.arc(cx, cy, r, 0, TAU); g.stroke();
+        g.strokeStyle = gold; g.lineWidth = 0.6; g.beginPath(); g.arc(cx, cy, r + 3, 0, TAU); g.stroke();
+        drawGlyph(g, id, cx, cy, r * 0.82, '#2a1830', 1.6);
+      }
+      const tx = cx + r + (MD ? 16 : 12) * s;
       g.textAlign = 'left'; g.fillStyle = '#2a1830'; g.font = `${Math.round(22 * s * k)}px "Pinyon Script", cursive`;
       const nameY = twoCol ? cy + 6 * s * k : ry + 19 * s * k;
       g.fillText(S.name, tx, nameY);
@@ -1386,17 +1538,19 @@ const Grim = {
     const s = Math.min(1, P.w / 520), ink = '#3a2414', red = '#8e2f22';
     // upright, the name sits below the page's top vine and its centre ornament
     const side = !!this.L.side, top = side ? P.y + 32 : P.y + 54;
+    const MD = gart('medal');
     g.textAlign = 'center'; g.fillStyle = ink;
     g.font = `700 ${Math.round(20 * s + 4)}px "Cinzel Decorative", serif`;
-    g.fillText(lv.name, P.x + P.w / 2, top);
+    if (MD) goldText(g, lv.name, P.x + P.w / 2, top, 20 * s + 4);
+    else g.fillText(lv.name, P.x + P.w / 2, top);
     this.codexRects = [];
     const ids = lv.sigils, cw = Math.min(70, (P.w - 20) / ids.length);
     const x0 = P.x + P.w / 2 - cw * ids.length / 2;
     ids.forEach((id, k) => {
-      const cx = x0 + cw * (k + 0.5), cy = top + (side ? 30 : 36), r = Math.min(16, cw * 0.36);
-      g.strokeStyle = ink; g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, r, 0, TAU); g.stroke();
-      drawGlyph(g, id, cx, cy, r * 0.8, '#2a1830', 1.4);
-      g.fillStyle = red; g.font = `${cw < 54 ? 8 : 10}px Cinzel, serif`; g.fillText(SIGILS[id].name.toUpperCase(), cx, cy + r + 12);
+      const cx = x0 + cw * (k + 0.5), cy = top + (side ? 30 : 36), r = Math.min(MD ? 13 : 16, cw * (MD ? 0.29 : 0.36));
+      if (MD) medalGlyph(g, id, cx, cy, r, 1.4);
+      else { g.strokeStyle = ink; g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, r, 0, TAU); g.stroke(); drawGlyph(g, id, cx, cy, r * 0.8, '#2a1830', 1.4); }
+      g.fillStyle = red; g.font = `${cw < 54 ? 8 : 10}px Cinzel, serif`; g.fillText(SIGILS[id].name.toUpperCase(), cx, cy + (MD ? (r + 2) / 0.66 + 9 : r + 12)); // clear of the medal's gold rim
       this.codexRects.push({ id, x: cx - cw / 2, y: cy - r, w: cw, h: r * 2 + 16 });
     });
   },
@@ -1407,6 +1561,13 @@ const Grim = {
     g.save();
     g.fillStyle = 'rgba(255,250,232,0.18)';
     g.beginPath(); g.arc(A.cx, A.cy, A.half * fr, 0, TAU); g.fill();
+    const rim = gart('rim');
+    if (rim) {
+      // the painted astrolabe rim (its inner edge is 0.68 of it): straddling the circle's edge on the spread, inside it on one page
+      const R = A.half * (this.L.single ? 1.0 : 1.12);
+      g.globalAlpha = 0.8; g.drawImage(rim, A.cx - R, A.cy - R, R * 2, R * 2);
+      g.restore();
+    } else {
     g.strokeStyle = 'rgba(74,46,26,0.18)'; g.lineWidth = 1;
     for (let k = 0; k < 8; k++) {
       const a = k * TAU / 8;
@@ -1415,11 +1576,13 @@ const Grim = {
     }
     g.setLineDash([3, 6]); g.beginPath(); g.arc(A.cx, A.cy, A.half * fr, 0, TAU); g.stroke(); g.setLineDash([]);
     g.restore();
+    }
     if (!this.L.single) {
       const P = this.L.right, s = Math.min(P.w, P.h) / 520;
       g.fillStyle = '#2a1830'; g.textAlign = 'center';
-      g.font = `${Math.round(34 * s)}px "Pinyon Script", cursive`;
-      g.fillText('Draft thy Seal', P.x + P.w / 2, P.y + P.h * 0.085);
+      const pv = !!gart('vine'); // the painted vine border runs lower, so the heading sits a touch smaller and lower
+      g.font = `${Math.round((pv ? 31 : 34) * s)}px "Pinyon Script", cursive`;
+      g.fillText('Draft thy Seal', P.x + P.w / 2, P.y + P.h * 0.085 + (pv ? 3 * s : 0));
     }
   },
   renderInk() {
@@ -1474,6 +1637,7 @@ const Grim = {
       this.closing = false; this.cv.style.display = 'none';
       return;
     }
+    if (typeof CLASSIC !== 'undefined' && CLASSIC.on !== this._classic) this.bookDirty = true; // the look was switched (◐)
     if (this.bookDirty) this.renderBook();
     if (this.inkDirty) this.renderInk();
     const g = this.g, dpr = this.dpr, e = ease(this.anim), A = this.L.area;
@@ -1486,6 +1650,7 @@ const Grim = {
     g.globalAlpha = e;
     g.translate(sx, (1 - e) * 80);
     g.drawImage(this.book, 0, 0, innerWidth, innerHeight);
+    if (this.open && this.anim < 1) this.pageTurn(g, e);
     this.drawMiniMap(g, t);
     const D = this.draft.a;
     // guide circle
@@ -1636,6 +1801,64 @@ const Grim = {
     }
     g.restore();
   },
+  // as the book opens, the last leaf turns over onto the left page (on one page, it turns away to the left)
+  pageTurn(g, e) {
+    const pim = gart('page'); if (!pim) return;
+    const L = this.L, P = L.right, a = ease(clamp(this.anim * 1.15, 0, 1));
+    let hx, wd;
+    if (L.single) { hx = P.x; wd = P.w * Math.cos(a * Math.PI / 2); }
+    else { hx = L.bx + L.bw / 2; wd = P.w * Math.cos(a * Math.PI); }
+    if (Math.abs(wd) < 1) return;
+    const x = wd > 0 ? hx : hx + wd, w = Math.abs(wd);
+    g.save();
+    // its shadow on the page beneath, then the leaf itself, darkening as it stands up edge-on
+    g.fillStyle = `rgba(40,20,5,${0.18 * (1 - w / P.w)})`; g.fillRect(x - 6, P.y + 4, w + 12, P.h);
+    drawCover(g, pim, x, P.y, w, P.h, wd < 0);
+    const sh = g.createLinearGradient(hx, 0, hx + wd, 0);
+    sh.addColorStop(0, 'rgba(50,25,8,0.45)'); sh.addColorStop(0.25, 'rgba(50,25,8,0.12)'); sh.addColorStop(1, `rgba(40,20,5,${0.35 * (1 - w / P.w)})`);
+    g.fillStyle = sh; g.fillRect(x, P.y, w, P.h);
+    g.strokeStyle = 'rgba(120,85,40,0.5)'; g.lineWidth = 1; g.strokeRect(x + 0.5, P.y + 0.5, w - 1, P.h - 1);
+    g.restore();
+  },
+  // the land, from the painted textures, cached until something on it changes
+  renderMiniMap(ox, oy, tw, th) {
+    const W = World.W, Hh = World.H, cells = World.cells, dpr = this.dpr;
+    let lo = 0, hi = 0; for (const c of cells) if (!c.void) { lo = Math.min(lo, c.h); hi = Math.max(hi, c.h); }
+    const bx = ox - Hh * tw - tw - 2, by = oy - (hi + 1) * th * 0.9 - 2;
+    const bw = (W + Hh) * tw + tw * 2 + 4, bh = (W + Hh) * th + th * 2 + (hi - lo + 2) * th * 0.9 + 8;
+    const M = this._mm || (this._mm = { c: document.createElement('canvas') });
+    M.c.width = Math.ceil(bw * dpr); M.c.height = Math.ceil(bh * dpr); M.x = bx; M.y = by; M.w = bw; M.h = bh;
+    const g = M.c.getContext('2d'); g.scale(dpr, dpr); g.translate(-bx, -by);
+    const pats = {};
+    const pat = k => {
+      if (k in pats) return pats[k];
+      const im = TEX_IMAGES[k]; if (!im) return pats[k] = null;
+      const p = g.createPattern(im, 'repeat');
+      if (p.setTransform && typeof DOMMatrix !== 'undefined') p.setTransform(new DOMMatrix().scale(2 * tw * TEX_ART[k].span / im.naturalWidth));
+      return pats[k] = p;
+    };
+    const top = (px, py) => { g.beginPath(); g.moveTo(px, py); g.lineTo(px + tw, py + th); g.lineTo(px, py + th * 2); g.lineTo(px - tw, py + th); g.closePath(); };
+    for (let y = 0; y < Hh; y++) for (let x = 0; x < W; x++) {
+      const c = cells[y * W + x]; if (c.void) continue;
+      const px = ox + (x - y) * tw, py = oy + (x + y) * th - c.h * th * 0.9, d = (c.h - lo) * th * 0.9 + th * 0.6;
+      const water = c.water != null, base = water ? (c.ice ? '#b8d8e0' : '#7ea7c4') : c.feat === 'bramble' ? '#6a7050' : c.h > 0 ? '#bfae90' : '#8f9a5e';
+      const tex = water ? (c.ice ? 'ice' : 'water') : c.h > 0 ? 'stone' : 'grass';
+      // the two faces below the top, shaded
+      for (const R of [0, 1]) {
+        g.beginPath();
+        if (R) { g.moveTo(px, py + th * 2); g.lineTo(px + tw, py + th); g.lineTo(px + tw, py + th + d); g.lineTo(px, py + th * 2 + d); }
+        else { g.moveTo(px - tw, py + th); g.lineTo(px, py + th * 2); g.lineTo(px, py + th * 2 + d); g.lineTo(px - tw, py + th + d); }
+        g.closePath(); g.fillStyle = water ? '#5a7a90' : '#8a7454'; g.fill();
+        g.fillStyle = `rgba(30,18,8,${R ? 0.42 : 0.24})`; g.fill();
+      }
+      top(px, py); g.fillStyle = base; g.fill();
+      const p = pat(tex); if (p) { g.globalAlpha = 0.7; g.fillStyle = p; g.fill(); g.globalAlpha = 1; }
+      if (c.feat === 'bramble') { g.fillStyle = 'rgba(50,60,30,0.45)'; g.fill(); }
+      g.strokeStyle = 'rgba(255,240,205,0.22)'; g.lineWidth = 0.6; g.stroke();
+      if (c.feat === 'font') { g.fillStyle = '#2a8a9a'; g.beginPath(); g.arc(px, py + th, tw * 0.35, 0, TAU); g.fill(); }
+      if (c.feat === 'brazier') { g.fillStyle = c.lit ? '#e0701a' : '#4a3020'; g.beginPath(); g.arc(px, py + th, tw * 0.3, 0, TAU); g.fill(); }
+    }
+  },
   drawMiniMap(g, t) {
     if (!World.W || this.L.single) return;
     const P = this.L.right, s = Math.min(P.w, P.h) / 520;
@@ -1643,7 +1866,14 @@ const Grim = {
     const ox = P.x + P.w - 78 * s - (World.W - World.H) * size * 0.5, oy = P.y + P.h * 0.13;
     const tw = size, th = size * 0.5;
     g.save();
-    for (let y = 0; y < World.H; y++) for (let x = 0; x < World.W; x++) {
+    if (gart('page') && typeof TEX_IMAGES !== 'undefined') {
+      let key = `${World.W},${World.H},${ox.toFixed(1)},${oy.toFixed(1)},${size.toFixed(2)},${this.dpr},${Object.keys(TEX_IMAGES).length}|`;
+      for (const c of World.cells) key += c.void ? 'v' : `${c.h},${c.water != null ? 1 : 0}${c.ice ? 1 : 0}${c.feat || ''}${c.lit ? 1 : 0};`;
+      if (this._mmKey !== key) { this._mmKey = key; this.renderMiniMap(ox, oy, tw, th); }
+      const M = this._mm;
+      g.save(); g.shadowColor = 'rgba(60,30,10,0.35)'; g.shadowBlur = 6; g.shadowOffsetY = 3;
+      g.drawImage(M.c, M.x, M.y, M.w, M.h); g.restore();
+    } else for (let y = 0; y < World.H; y++) for (let x = 0; x < World.W; x++) {
       const c = World.cells[y * World.W + x]; if (c.void) continue;
       const px = ox + (x - y) * tw, py = oy + (x + y) * th - c.h * th * 0.9;
       g.fillStyle = c.water != null ? (c.ice ? '#b8d8e0' : '#7ea7c4') : c.feat === 'bramble' ? '#6a7050' : c.h > 0 ? '#bfae90' : '#a99a6e';
