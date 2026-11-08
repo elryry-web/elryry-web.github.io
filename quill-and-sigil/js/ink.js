@@ -482,7 +482,8 @@ function lessonRules() {
 }
 const REL_NAME = { now: 'at once', along: 'along the way', arrive: 'on arrival' };
 // the small circles' colours in the second folio: when a ring-sigil there would act
-const REL_COL = { now: '#b3392a', along: '#2d6fb3', arrive: '#2f8a4c' };
+// (softened in v142: muted inks that sit on the parchment rather than over it)
+const REL_COL = { now: '#b0614f', along: '#5a80a8', arrive: '#5d8a63' };
 
 /* Convert a page-space direction into a world direction (inverse isometric), snapped to 8 ways */
 const DIR8 = [];
@@ -502,6 +503,14 @@ function worldDirArrow(d) {
   return ARROWS[((Math.round(a / (TAU / 8)) % 8) + 8) % 8];
 }
 
+/* the slots whose ring-sigils go beyond three of one kind in a spell: the ones drawn last are ignored (v143) */
+const RING_MAX = 3;
+function ringExtras(A) {
+  const out = new Set(), seen = {};
+  const drawn = A.sats.filter(s => s.ok && s.id).sort((a, b) => Math.min(...a.idx) - Math.min(...b.idx));
+  for (const s of drawn) { seen[s.id] = (seen[s.id] || 0) + 1; if (seen[s.id] > RING_MAX) out.add(s.slot); }
+  return out;
+}
 function buildSpell(draft, rules) {
   const A = draft.a;
   if (Array.isArray(rules)) rules = { centers: rules, sats: rules };
@@ -533,8 +542,11 @@ function buildSpell(draft, rules) {
     else radial = true;
   }
   // ring-sigils: behind the signs act at once, beside them along the way, ahead of them on arrival
+  // a ring holds three of one sigil at most, counted over the whole spell (whatever their timing); later ones are ignored
+  const extra = ringExtras(A);
   const groups = {};
   for (const s of A.sats) {
+    if (extra.has(s.slot)) continue;
     let rel = 'now';
     if (dir) {
       const c = Math.cos(s.slot * TAU / 8 - Math.atan2(sy, sx));
@@ -542,7 +554,7 @@ function buildSpell(draft, rules) {
     }
     const k = s.id + ':' + rel;
     groups[k] = groups[k] || { id: s.id, rel, n: 0, order: s.slot };
-    groups[k].n = Math.min(3, groups[k].n + 1);
+    groups[k].n++;
   }
   const sats = Object.values(groups);
   // Petra reads each sign as its own arm of stone (no averaging): lines, lines through the mark, rectangles
@@ -1044,7 +1056,9 @@ const Grim = {
   slotRel(k) {
     const D = this.draft.a; let sx = 0, sy = 0;
     for (const s of D.signs) { sx += Math.cos(s.pos * TAU / 8); sy += Math.sin(s.pos * TAU / 8); }
-    if (!D.signs.length || Math.hypot(sx, sy) < 0.5 * D.signs.length) return null;
+    if (!D.signs.length) return null;
+    // signs that balance out (opposite arms) give the spell no single way: every ring-sigil then acts at once, as buildSpell has it
+    if (Math.hypot(sx, sy) < 0.5 * D.signs.length) return 'now';
     const c = Math.cos(k * TAU / 8 - Math.atan2(sy, sx)); // the same rule buildSpell uses
     return c > 0.38 ? 'arrive' : c < -0.38 ? 'now' : 'along';
   },
@@ -1169,7 +1183,8 @@ const Grim = {
       return;
     }
     this.status = describeSpell(sp);
-    if (A.notes.includes('dupSign')) this.status += ' · one sign to a place; the extra is ignored';
+    if (ringExtras(A).size) this.status += ` · a ring holds ${['', 'one', 'two', 'three'][RING_MAX]} of one sigil; the rest is ignored`;
+    else if (A.notes.includes('dupSign')) this.status += ' · one sign to a place; the extra is ignored';
     else if (A.notes.includes('tooManyBarbs')) this.status += ' · a sign bears but two barbs';
     else if (A.roles.includes('stray')) this.status += ' · stray marks are ignored';
     this.statusCol = '#2b2040';
@@ -1593,26 +1608,29 @@ const Grim = {
     // always drawn: in the first folio they are plain gold marks for the eight places a sign may go;
     // from the second folio (ring-sigils), once a sign gives the spell a way, each takes the colour of when a sigil there would act
     {
-      const ringSigils = !!(Game.level && Game.level.combos);
+      const ringSigils = !!(Game.level && Game.level.combos), extra = ringExtras(D);
       for (let k = 0; k < 8; k++) {
         const a = k * TAU / 8, px = cx + Math.cos(a) * r * SLOT_R, py = cy + Math.sin(a) * r * SLOT_R, sr = r * SLOT_SIZE;
         const sat = D.sats.find(s => s.slot === k), signHere = D.signs.some(s => s.pos === k);
         const rel = this.slotRel(k), coloured = ringSigils && rel;
         const col = coloured ? REL_COL[rel] : gold;
-        if (coloured && !signHere) { g.fillStyle = hexA(col, sat ? 0.1 : 0.14); g.beginPath(); g.arc(px, py, sr, 0, TAU); g.fill(); }
+        if (coloured && !signHere) { g.fillStyle = hexA(col, sat ? 0.05 : 0.08); g.beginPath(); g.arc(px, py, sr, 0, TAU); g.fill(); }
         g.setLineDash(coloured ? [] : [3, 4]);
-        g.strokeStyle = hexA(sat && !sat.ok ? '#a02a1a' : col, coloured ? (signHere ? 0.35 : 0.85) : (sat ? 0.75 : 0.55));
-        g.lineWidth = coloured ? 1.8 : 1.4;
+        g.strokeStyle = hexA(sat && !sat.ok ? '#a02a1a' : col, coloured ? (signHere ? 0.25 : 0.6) : (sat ? 0.75 : 0.55));
+        g.lineWidth = coloured ? 1.4 : 1.4;
         g.beginPath(); g.arc(px, py, sr, 0, TAU); g.stroke(); g.setLineDash([]);
-        if (sat && sat.ok) {
+        // (a ring-sigil past the third of its kind is ignored: no glow, and the circle says so)
+        const ignored = extra.has(k);
+        if (sat && sat.ok && !ignored) {
           g.globalAlpha = 0.55; drawGlyph(g, sat.id, px, py, sr * 0.75, hexA(SIGILS[sat.id].color, 0.9), 4); drawGlyph(g, sat.id, px, py, sr * 0.75, hexA(gold, 0.9), 1); g.globalAlpha = 1;
         }
+        if (ignored) { g.fillStyle = 'rgba(120,105,90,0.22)'; g.beginPath(); g.arc(px, py, sr, 0, TAU); g.fill(); }
         // its time, written on the circle's outer side (above the upper three, beneath the rest, so it never
         // lies on the seal's rune ring): for every coloured circle, and for any ring-sigil
         if ((coloured && !signHere) || (sat && sat.ok)) {
-          g.fillStyle = hexA(coloured ? col : '#5a3a1a', sat ? 0.95 : 0.75); g.font = `italic ${Math.max(9, Math.round(r * 0.075))}px "IM Fell English", serif`; g.textAlign = 'center';
+          g.fillStyle = ignored ? 'rgba(110,95,80,0.85)' : hexA(coloured ? col : '#5a3a1a', sat ? 0.95 : 0.75); g.font = `italic ${Math.max(9, Math.round(r * 0.075))}px "IM Fell English", serif`; g.textAlign = 'center';
           const up = Math.sin(a) < -0.5;
-          g.fillText(REL_NAME[rel || 'now'], px, up ? py - sr - Math.max(5, r * 0.035) : py + sr + Math.max(10, r * 0.09));
+          g.fillText(ignored ? 'ignored' : REL_NAME[rel || 'now'], px, up ? py - sr - Math.max(5, r * 0.035) : py + sr + Math.max(10, r * 0.09));
         }
       }
     }
