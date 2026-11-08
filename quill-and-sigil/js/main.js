@@ -622,6 +622,16 @@ const Game = {
   },
   resumeAt() { return Math.max(0, Math.min(LEVELS.length, Save.data.unlocked || 1) - 1); },
   lessons() {
+    // the button at the head of the folio goes back to the lesson you were on: one left mid-play carries on where it
+    // stood, one just won goes on to the next, and from the title page it is the furthest lesson open
+    const from = this.state;
+    if (from !== 'menu') {
+      this.resumeMid = !!this.level && from !== 'won'; // (the title page has no lesson loaded)
+      this.resumeTo = this.resumeMid ? this.idx : from === 'won' ? Math.min(LEVELS.length - 1, this.idx + 1) : this.resumeAt();
+    }
+    const L0 = LEVELS[this.resumeTo];
+    $('#bResume').textContent = `${this.resumeMid ? '↩ Back to' : 'On to'} Lesson ${L0.roman}: ${L0.name}`;
+    $('#aimbar').classList.remove('show'); this.held = null; // a seal being aimed is put down
     this.state = 'menu';
     const box = $('#lessonGrid'); box.innerHTML = '';
     LEVELS.forEach((L, i) => {
@@ -635,6 +645,13 @@ const Game = {
     });
     $('#hud').classList.remove('show');
     this.showScreen('levels');
+  },
+  resumeLesson() {
+    if (!(this.resumeMid && this.level && this.idx === this.resumeTo)) { this.start(this.resumeTo); return; }
+    // left mid-play: the page is as it was (its seals cast, its rewinds kept); only the HUD comes back
+    this.state = 'play';
+    $('#bGrimoire').classList.remove('hidden'); $('#hud').classList.add('show');
+    this.showScreen(null);
   },
   start(i) {
     // a restart can come while the grimoire is open or a spell is being aimed (the R key, the button, a lost orb)
@@ -1215,6 +1232,7 @@ bind('#bBegin', () => Game.start(Game.resumeAt()));
 bind('#bContinue', () => Game.lessons());
 bind('#bLessonsT', () => Game.lessons());
 bind('#bBackTitle', () => Game.title());
+bind('#bResume', () => Game.resumeLesson());
 bind('#bGrimoire', () => Game.openGrimoire());
 bind('#bRewind', () => Game.rewind());
 bind('#bReset', () => Game.reset());
