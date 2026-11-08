@@ -1500,7 +1500,10 @@ const Grim = {
       let fs = Math.min(22 * s, bh * 0.3);
       g.font = `700 ${Math.round(fs)}px "Cinzel Decorative", serif`;
       const tw = g.measureText(lv.name).width; if (tw > bw * 0.5) { fs *= bw * 0.5 / tw; g.font = `700 ${Math.round(fs)}px "Cinzel Decorative", serif`; }
-      g.fillStyle = '#5a1c14'; g.textBaseline = 'middle'; g.fillText(lv.name, P.x + P.w / 2, by + bh * 0.5); g.textBaseline = 'alphabetic';
+      // centred on the letters' own ink, not the font's em box (Cinzel's 'middle' sits the capitals high on the panel)
+      g.fillStyle = '#5a1c14'; g.textBaseline = 'middle';
+      const nm = g.measureText(lv.name), lift = (nm.actualBoundingBoxAscent - nm.actualBoundingBoxDescent) / 2 || 0;
+      g.fillText(lv.name, P.x + P.w / 2, by + bh * 0.5 + lift); g.textBaseline = 'alphabetic';
       y = by + bh + 16 * s;
     } else {
       y += 34 * s;

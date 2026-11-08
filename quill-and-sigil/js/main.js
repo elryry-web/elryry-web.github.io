@@ -614,8 +614,13 @@ const Game = {
     VIEW.z = 1; fitCamera(innerWidth, innerHeight);
     $('#hud').classList.remove('show');
     this.showScreen('title');
+    // with lessons won, the big button carries on from the furthest one open (a phone that reloads the page, as
+    // Safari does when it runs short of memory or has put the tab away, lands here and would otherwise start at I)
+    const at = this.resumeAt();
+    $('#bBegin').textContent = at > 0 ? `Continue: Lesson ${LEVELS[at].roman}` : 'Begin the Lessons';
     $('#bContinue').style.display = Save.data.unlocked > 1 ? '' : 'none';
   },
+  resumeAt() { return Math.max(0, Math.min(LEVELS.length, Save.data.unlocked || 1) - 1); },
   lessons() {
     this.state = 'menu';
     const box = $('#lessonGrid'); box.innerHTML = '';
@@ -858,7 +863,14 @@ const Game = {
     const room = t.clientWidth * 0.5; let fs = Math.min(22, t.clientHeight * 0.36);
     sp.style.fontSize = fs + 'px';
     if (sp.offsetWidth > room) { fs = Math.max(9, fs * room / sp.offsetWidth); sp.style.fontSize = fs + 'px'; }
-    const e = Grim.notesBackdrop($('#nBg'), $('#nFr'));
+    // the line box centres the font's em box, and Cinzel's capitals sit high in it: the name is moved down by the
+    // difference, so its ink is centred on the panel
+    const mg = this._mg || (this._mg = document.createElement('canvas').getContext('2d')), cs = getComputedStyle(sp);
+    mg.font = `${cs.fontWeight} ${fs}px ${cs.fontFamily}`;
+    const m = mg.measureText(sp.textContent), base = (fs - m.fontBoundingBoxAscent - m.fontBoundingBoxDescent) / 2 + m.fontBoundingBoxAscent;
+    const drop = fs / 2 - (base - (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2);
+    sp.style.transform = isFinite(drop) ? `translateY(${drop.toFixed(2)}px)` : '';
+    const e =Grim.notesBackdrop($('#nBg'), $('#nFr'));
     if (e) {
       sh.style.setProperty('--nb', Math.round(e + 12) + 'px');
       sh.style.setProperty('--nk', Math.round(Math.max(Grim.notesBoss || 0, e + 1)) + 'px');
@@ -1199,7 +1211,7 @@ window.addEventListener('keydown', e => {
 });
 
 function bind(id, fn) { $(id).addEventListener('click', e => { Sfx.init(); fn(e); e.currentTarget.blur(); }); }
-bind('#bBegin', () => { Game.start(Math.min(Save.data.unlocked - 1, 0)); });
+bind('#bBegin', () => Game.start(Game.resumeAt()));
 bind('#bContinue', () => Game.lessons());
 bind('#bLessonsT', () => Game.lessons());
 bind('#bBackTitle', () => Game.title());
