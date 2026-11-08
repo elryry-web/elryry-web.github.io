@@ -1026,6 +1026,10 @@ const Grim = {
     cv.addEventListener('pointerup', e => this.up(e));
     cv.addEventListener('pointercancel', e => this.up(e));
     cv.addEventListener('contextmenu', e => e.preventDefault());
+    // the page buttons are measured, not assumed: a phone's text-size setting or the satchel's count can make them
+    // run wider and taller than planned, and the upright page then makes room for them
+    const pb = document.getElementById('pagebtns');
+    if (pb && window.ResizeObserver) new ResizeObserver(() => this.placeButtons()).observe(pb);
     this.resize();
   },
   resize() {
@@ -1065,9 +1069,11 @@ const Grim = {
       L.area = { x: P.x + (P.w - size) / 2, y: P.y + P.h * 0.13, size };
     } else {
       // upright: the circle takes nearly the page's full width (the width is what limits it) and the book grows
-      // as tall as it needs — header 120, circle, then status and two rows of buttons below
-      const HEAD = 140, FOOT = 175, pad = 6;
+      // as tall as it needs — header, circle, then the status, the buttons (as tall as they measured) and the
+      // bottom border with its corner bosses
+      const HEAD = 140, pad = 6;
       const bw = Math.min(vw - 10, 640), pw = bw - pad * 2;
+      const FOOT = 64 + (this.btnH || 70) + pw * (0.035 + 0.14 * 0.9) + 8;
       // the whole drawing circle stays inside the page's border (margin m, plus room for the vine's leaves)
       const m = pw * 0.035;
       const size = Math.max(160, Math.min(pw - 2 * (m + 9), vh - 10 - pad * 2 - HEAD - FOOT));
@@ -1080,19 +1086,41 @@ const Grim = {
     }
     L.area.cx = L.area.x + L.area.size / 2; L.area.cy = L.area.y + L.area.size / 2; L.area.half = L.area.size / 2;
     this.L = L;
-    // position HTML buttons under the drawing area
-    const pb = document.getElementById('pagebtns');
-    if (pb) {
-      pb.classList.toggle('single', single);
-      if (L.side) {
-        pb.style.left = L.side.x + 'px'; pb.style.width = L.side.w + 'px';
-        pb.style.top = 'auto'; pb.style.bottom = (vh - (L.side.y + L.side.h)) + 'px';
-      } else {
-        pb.style.left = (L.right.x) + 'px'; pb.style.width = L.right.w + 'px';
-        pb.style.bottom = 'auto';
-        pb.style.top = (L.area.y + L.area.size + (single ? 70 : L.right.h * 0.1)) + 'px'; // room for the name and two lines of the read-back
+    document.getElementById('pagebtns')?.classList.remove('tight'); // (tried afresh at each size)
+    this.placeButtons();
+  },
+  // the HTML page buttons under the drawing area
+  placeButtons() {
+    const pb = document.getElementById('pagebtns'), L = this.L; if (!pb || !L) return;
+    const vh = innerHeight;
+    pb.classList.toggle('single', L.single);
+    if (L.side) {
+      pb.style.left = L.side.x + 'px'; pb.style.width = L.side.w + 'px';
+      pb.style.top = 'auto'; pb.style.bottom = (vh - (L.side.y + L.side.h)) + 'px';
+      return;
+    }
+    pb.style.bottom = 'auto';
+    if (!L.single) {
+      pb.style.left = L.right.x + 'px'; pb.style.width = L.right.w + 'px';
+      // room for the name and two lines of the read-back, the big Inscribe kept above the bottom border
+      const P = L.right, B = this.borderSize(P), h = pb.style.display === 'flex' ? pb.offsetHeight : 0;
+      pb.style.top = Math.min(L.area.y + L.area.size + P.h * 0.1, P.y + P.h - B.m - B.vh - 8 - h) + 'px';
+      return;
+    }
+    // upright: inside the knotwork border, the last row clear of the bottom corner bosses
+    const P = L.right, B = this.borderSize(P), inset = B.m + B.vh + 4;
+    pb.style.left = (P.x + inset) + 'px'; pb.style.width = (P.w - inset * 2) + 'px';
+    if (pb.style.display === 'flex') {
+      // three rows (large text, or the satchel's count) tighten the plaques; then the page makes room for what is left
+      const rows = () => new Set([...pb.children].filter(b => b.offsetParent).map(b => b.offsetTop)).size;
+      if (rows() > 2) pb.classList.add('tight');
+      const h = pb.offsetHeight;
+      if (h && Math.abs(h - (this.btnH || 70)) > 2 && (this._relaid = (this._relaid || 0) + 1) < 4) {
+        this.btnH = h; this.layout(); this.bookDirty = true; this.inkDirty = true; this._relaid = 0;
+        return;
       }
     }
+    pb.style.top = (P.y + P.h - B.m - B.bs * 0.9 - 4 - (this.btnH || 70)) + 'px';
   },
   /* screen rects of things on the page, for the tips (js/tips.js): 'guide', 'centre', 'slot:k', 'sign', 'status',
      'codex:id', 'area' (the whole drawing circle with its eight places) */
@@ -1312,7 +1340,15 @@ const Grim = {
     }
     // page stack edges (a thicker block of leaves in the painted book)
     const leaves = art ? 6 : 3;
-    for (let i = leaves; i > 0; i--) {
+    if (art) {
+      // only a sliver of each leaf shows at the pages' edges: no flat paper band round the vellum
+      const P0 = L.left || L.right, ex = P0.x, ey = L.right.y, ew = L.right.x + L.right.w - ex, eh = L.right.h;
+      for (let i = leaves; i > 0; i--) {
+        g.fillStyle = i % 2 ? '#cbb282' : '#dcc596';
+        g.fillRect(ex - i, ey + i * 0.5, ew + i * 2, eh + i * 0.5);
+        g.fillStyle = 'rgba(110,80,40,0.3)'; g.fillRect(ex - i, ey + eh + i - 0.6, ew + i * 2, 0.6);
+      }
+    } else for (let i = leaves; i > 0; i--) {
       g.fillStyle = i % 2 ? '#d9c597' : '#e8d6ab';
       g.fillRect(L.bx - i * 1.5 + 2, L.by + i * 1.6, L.bw + i * 3 - 4, L.bh - i * 1.2);
       if (art) { g.fillStyle = 'rgba(110,80,40,0.25)'; g.fillRect(L.bx - i * 1.5 + 2, L.by + L.bh + i * 0.4 - 1, L.bw + i * 3 - 4, 0.6); }
@@ -1689,11 +1725,10 @@ const Grim = {
       // the eight places around the seal, waiting for signs (and, later, ring-sigils)
       g.setLineDash([3, 4]); g.lineDashOffset = 0; g.strokeStyle = 'rgba(201,150,62,0.5)'; g.lineWidth = 1.4;
       const r = A.half * GUIDE_R;
-      const RD = gart('roundel');
+      // plain dashed rings: the drawing circle is kept free of ornament (user's call, v153)
       for (let k = 0; k < 8; k++) {
         const a = k * TAU / 8, px = A.cx + Math.cos(a) * r * SLOT_R, py = A.cy + Math.sin(a) * r * SLOT_R;
-        if (RD) { g.globalAlpha = e * 0.85; roundelAt(g, px, py, r * SLOT_SIZE * 0.81); g.globalAlpha = e; }
-        else { g.beginPath(); g.arc(px, py, r * SLOT_SIZE, 0, TAU); g.stroke(); }
+        g.beginPath(); g.arc(px, py, r * SLOT_SIZE, 0, TAU); g.stroke();
       }
       g.restore();
     }
@@ -1768,10 +1803,8 @@ const Grim = {
     const A = this.L.area, S = D.seal;
     const cx = A.cx + S.cx * A.half, cy = A.cy + S.cy * A.half, r = S.r * A.half;
     const col = sp && !sp.err ? sp.color : '#c9963e';
-    const gold = '#c9963e', RD = gart('roundel');
+    const gold = '#c9963e';
     g.save();
-    // the eight places a sign may go, each in a knotwork roundel (beneath the gilding, so nothing of the seal is hidden)
-    if (RD) { const ga = g.globalAlpha; g.globalAlpha = ga * 0.85; for (let k = 0; k < 8; k++) { const a = k * TAU / 8; roundelAt(g, cx + Math.cos(a) * r * SLOT_R, cy + Math.sin(a) * r * SLOT_R, r * SLOT_SIZE * 0.81); } g.globalAlpha = ga; }
     g.strokeStyle = hexA(gold, 0.55); g.lineWidth = 1;
     g.beginPath(); g.arc(cx, cy, r * 1.0, 0, TAU); g.stroke();
     g.beginPath(); g.arc(cx, cy, r * 1.16, 0, TAU); g.stroke();
@@ -1815,12 +1848,10 @@ const Grim = {
         const rel = this.slotRel(k), coloured = ringSigils && rel;
         const col = coloured ? REL_COL[rel] : gold;
         if (coloured && !signHere) { g.fillStyle = hexA(col, sat ? 0.05 : 0.08); g.beginPath(); g.arc(px, py, sr, 0, TAU); g.fill(); }
-        if (!RD || coloured || (sat && !sat.ok)) {
-          g.setLineDash(coloured ? [] : [3, 4]);
-          g.strokeStyle = hexA(sat && !sat.ok ? '#a02a1a' : col, coloured ? (signHere ? 0.25 : 0.6) : (sat ? 0.75 : 0.55));
-          g.lineWidth = 1.4;
-          g.beginPath(); g.arc(px, py, RD ? sr * 0.81 : sr, 0, TAU); g.stroke(); g.setLineDash([]);
-        }
+        g.setLineDash(coloured ? [] : [3, 4]);
+        g.strokeStyle = hexA(sat && !sat.ok ? '#a02a1a' : col, coloured ? (signHere ? 0.25 : 0.6) : (sat ? 0.75 : 0.55));
+        g.lineWidth = 1.4;
+        g.beginPath(); g.arc(px, py, sr, 0, TAU); g.stroke(); g.setLineDash([]);
         // (a ring-sigil past the third of its kind is ignored: no glow, and the circle says so)
         const ignored = extra.has(k);
         if (sat && sat.ok && !ignored) {
@@ -1832,8 +1863,7 @@ const Grim = {
         if ((coloured && !signHere) || (sat && sat.ok)) {
           g.fillStyle = ignored ? 'rgba(110,95,80,0.85)' : hexA(coloured ? col : '#5a3a1a', sat ? 0.95 : 0.75); g.font = `italic ${Math.max(9, Math.round(r * 0.075))}px "IM Fell English", serif`; g.textAlign = 'center';
           const up = Math.sin(a) < -0.5;
-          const so = RD ? sr * 1.35 : sr; // (outside the roundel's knotwork)
-          g.fillText(ignored ? 'ignored' : REL_NAME[rel || 'now'], px, up ? py - so - Math.max(5, r * 0.035) : py + so + Math.max(10, r * 0.09));
+          g.fillText(ignored ? 'ignored' : REL_NAME[rel || 'now'], px, up ? py - sr - Math.max(5, r * 0.035) : py + sr + Math.max(10, r * 0.09));
         }
       }
     }
@@ -1901,14 +1931,28 @@ const Grim = {
     if (!World.W || this.L.single) return;
     const P = this.L.right, s = Math.min(P.w, P.h) / 520;
     const FR = gart('frame') && gart('page') && typeof TEX_IMAGES !== 'undefined' ? GART.frame : null;
-    const size = (FR ? 6.4 : 7) * s * Math.min(1, 11 / Math.max(World.W, World.H)), tw = size, th = size * 0.5;
+    let size = (FR ? 6.4 : 7) * s * Math.min(1, 11 / Math.max(World.W, World.H)), tw = size, th = size * 0.5;
     let ox, oy, fr = null;
     if (FR) {
-      // in its knotwork panel at the top of the page, below the border and left of the corner's boss
-      const B = this.borderSize(P), d = 15 * s, pad = d * 0.9;
-      let hi = 0; for (const c of World.cells) if (!c.void) hi = Math.max(hi, c.h);
+      // in its knotwork panel at the top of the page, below the border and left of the corner's boss; the land
+      // shrinks until the panel keeps clear of the drawing circle and of the heading
+      const B = this.borderSize(P), d = 15 * s, pad = d * 0.9, A = this.L.area, gr = A.half * GUIDE_R, W = World.W, H = World.H;
+      let hi = 0, lo = 0; for (const c of World.cells) if (!c.void) { hi = Math.max(hi, c.h); lo = Math.min(lo, c.h); }
       const right = P.x + P.w - B.m - B.bs * 0.9 - 6, fy = P.y + B.m + B.vh + 6;
-      ox = right - pad - (World.W + 1) * tw - 2; oy = fy + pad + 16 * s + (hi + 1) * th * 0.9 + 2;
+      g.font = `${Math.round(31 * s)}px "Pinyon Script", cursive`;
+      const head = P.x + Math.min(P.w, P.h) * 0.035 + B.bs * 0.9 + 8 * s + g.measureText('Draft thy Seal').width + 10 * s;
+      for (let k = 0; k < 14; k++) {
+        th = tw * 0.5;
+        ox = right - pad - (W + 1) * tw - 2; oy = fy + pad + 16 * s + (hi + 1) * th * 0.9 + 2;
+        const fx = ox - H * tw - tw - 2 - pad, fb = fy + pad + 16 * s + (W + H) * th + th * 2 + (hi - lo + 2) * th * 0.9 + 8 + pad;
+        // (it may cross the circle's rim, but never a slot or the seal's guide)
+        const off = (x, y) => Math.hypot(clamp(x, fx, right) - x, clamp(y, fy, fb) - y);
+        let ok = fx >= head && off(A.cx, A.cy) >= gr * 1.15;
+        for (let j = 0; ok && j < 8; j++) ok = off(A.cx + Math.cos(j * TAU / 8) * gr * SLOT_R, A.cy + Math.sin(j * TAU / 8) * gr * SLOT_R) >= gr * SLOT_SIZE + 8;
+        if (ok) break;
+        tw *= 0.92;
+      }
+      size = tw;
       fr = { right, fy, d, pad };
     } else {
       // (moved in, if need be, so its right edge stays inside the page's border)
