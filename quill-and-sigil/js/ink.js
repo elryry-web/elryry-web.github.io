@@ -947,9 +947,12 @@ function parchment() {
 }
 
 /* The painted grimoire (art/grim-*, cut from paintings): each piece takes over from its drawn version as it loads,
-   and the old look (◐) keeps the drawn book */
+   and the old look (◐) keeps the drawn book. (v152: an illuminated manuscript: every piece in one family of red,
+   green and gold Insular knotwork, each thing on the page in its own frame: knot border, corner bosses, a title
+   cartouche, a framed map, roundels round the sigils and the seal's eight places, a lapis drop cap, a triskele
+   tailpiece. The v150 vine, rosettes, rim, ribbon, medals and plaques stay in art/ but are no longer loaded.) */
 const GART = {};
-for (const f of ['page.jpg', 'leather.jpg', 'corner.png', 'head.png', 'rim.png', 'medal.png', 'initial.png', 'cap.png', 'ribbon.png', 'vine.png']) {
+for (const f of ['page.jpg', 'leather.jpg', 'cap.png', 'knot.png', 'boss.png', 'band.png', 'frame.png', 'roundel.png', 'capframe.png', 'triskele.png']) {
   const k = f.split('.')[0], im = new Image();
   im.onload = () => { GART[k] = im; Grim.bookDirty = true; };
   im.src = `art/grim-${f}?v=1`;
@@ -963,15 +966,26 @@ function drawCover(g, im, x, y, w, h, flip) {
   g.save(); g.translate(x + (flip ? w : 0), y); if (flip) g.scale(-1, 1);
   g.drawImage(im, (iw - sw) / 2, (ih - sh) / 2, sw, sh, 0, 0, w, h); g.restore();
 }
-// the painted vine laid along a line from (x0, y0) to (x1, y1), its stem on the line, fading out at both ends
+// a painted frame stretched to a box, its corners kept square (b: the corner's size in the painting, d: on the page)
+function nineSlice(g, im, x, y, w, h, b, d) {
+  const iw = im.naturalWidth, ih = im.naturalHeight; d = Math.min(d, w / 2, h / 2);
+  const sx = [0, b, iw - b, iw], sy = [0, b, ih - b, ih], dx = [x, x + d, x + w - d, x + w], dy = [y, y + d, y + h - d, y + h];
+  for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
+    if (i === 1 && j === 1) continue;
+    g.drawImage(im, sx[i], sy[j], sx[i + 1] - sx[i], sy[j + 1] - sy[j], dx[i], dy[j], dx[i + 1] - dx[i], dy[j + 1] - dy[j]);
+  }
+}
+// the painted roundel round a circle of radius r (its open middle is 60% of it)
+function roundelAt(g, cx, cy, r) { const R = r / 0.6; g.drawImage(GART.roundel, cx - R, cy - R, R * 2, R * 2); return R; }
+// the painted knotwork laid along a line from (x0, y0) to (x1, y1), centred on it, fading out briefly at both ends
 function vineRun(g, x0, y0, x1, y1, h, dpr) {
-  const V = GART.vine, len = Math.hypot(x1 - x0, y1 - y0); if (!V || len < h) return;
+  const V = GART.knot, len = Math.hypot(x1 - x0, y1 - y0); if (!V || len < h) return;
   const c = document.createElement('canvas'); c.width = Math.ceil(len * dpr); c.height = Math.ceil(h * dpr);
   const q = c.getContext('2d'); q.scale(dpr, dpr);
   const tw = V.naturalWidth * h / V.naturalHeight, n = Math.ceil(len / tw) + 1, sx = (len - n * tw) / 2;
   for (let i = 0; i < n; i++) q.drawImage(V, sx + i * tw - 0.5 * i, 0, tw, h);
   q.globalCompositeOperation = 'destination-in';
-  const f = Math.min(0.3, h * 1.4 / len), gr = q.createLinearGradient(0, 0, len, 0);
+  const f = Math.min(0.12, h * 0.8 / len), gr = q.createLinearGradient(0, 0, len, 0);
   gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(f, '#000'); gr.addColorStop(1 - f, '#000'); gr.addColorStop(1, 'rgba(0,0,0,0)');
   q.fillStyle = gr; q.fillRect(0, 0, len, h);
   g.save(); g.translate(x0, y0); g.rotate(Math.atan2(y1 - y0, x1 - x0)); g.drawImage(c, 0, -h / 2, len, h); g.restore();
@@ -986,11 +1000,10 @@ function goldText(g, text, x, y, size) {
   g.shadowColor = 'transparent'; g.fillStyle = gr; g.fillText(text, x, y);
   g.restore();
 }
-// a sigil in its gold medallion
+// a sigil in its knotwork roundel (whose outer edge is (r + 3) / 0.6)
 function medalGlyph(g, id, cx, cy, r, lw) {
-  const M = GART.medal, R = (r + 2) / 0.66; // (its cream centre is two thirds of it)
-  g.drawImage(M, cx - R, cy - R, R * 2, R * 2);
-  drawGlyph(g, id, cx, cy, r * 0.8, '#2a1830', lw);
+  roundelAt(g, cx, cy, r + 3);
+  drawGlyph(g, id, cx, cy, r * 0.82, '#2a1830', lw);
 }
 
 /* =====================================================================
@@ -1338,48 +1351,31 @@ const Grim = {
       this.codex(g, L.left);
     } else this.codexStrip(g, L.side || L.right);
     this.drawingFrame(g);
-    // the crimson ribbon marker, hanging out of the foot of the book
-    const rib = gart('ribbon');
-    if (rib && !L.side) {
-      const rw = clamp(L.bw * 0.022, 14, 24), k = rw / rib.naturalWidth, sy = rib.naturalHeight * 0.36;
-      // upright, the Open-the-Grimoire button sits just under the book, so only a short tail shows
-      const rh = Math.min(rib.naturalHeight * 0.42 * k, L.single ? 30 : 1e9), sh = rh / k;
-      const rx = L.single ? L.bx + L.bw * 0.78 : L.bx + L.bw * 0.56, ry = L.by + L.bh - 10;
-      g.save();
-      g.beginPath(); g.moveTo(rx, ry); g.lineTo(rx + rw, ry); g.lineTo(rx + rw, ry + rh); g.lineTo(rx + rw / 2, ry + rh - rw * 0.55); g.lineTo(rx, ry + rh); g.closePath(); g.clip();
-      g.shadowColor = 'rgba(0,0,0,0.4)'; g.shadowBlur = 4; g.shadowOffsetY = 2;
-      g.drawImage(rib, 0, sy, rib.naturalWidth, sh, rx, ry, rw, rh);
-      g.restore();
-    }
     this.bookDirty = false;
   },
-  // the painted border: rules as before, the painted corners and headpieces, the painted vine between them
+  // the illuminated border: a band of knotwork between two inked rules, a round knotwork boss on each corner
+  // (sizes in borderSize, so the page's contents can keep clear of it)
+  borderSize(P) {
+    const mn = Math.min(P.w, P.h);
+    return { m: mn * 0.035, vh: Math.max(9, mn * 0.03), bs: mn * (this.L.side ? 0.12 : 0.14) };
+  },
   pageBorderArt(g, P) {
-    const ink = '#4a2e1a', gold = '#b8893e', red = '#8e2f22';
-    const mn = Math.min(P.w, P.h), m = mn * 0.035, dpr = this.dpr;
-    const x0 = P.x + m, y0 = P.y + m, x1 = P.x + P.w - m, y1 = P.y + P.h - m, cx = P.x + P.w / 2;
-    g.strokeStyle = hexA(ink, 0.8); g.lineWidth = 1.4; g.strokeRect(x0, y0, x1 - x0, y1 - y0);
-    g.strokeStyle = hexA(red, 0.7); g.lineWidth = 0.8; g.strokeRect(x0 + 5, y0 + 5, x1 - x0 - 10, y1 - y0 - 10);
-    g.strokeStyle = gold; g.lineWidth = 0.9; g.strokeRect(x0 - 3, y0 - 3, x1 - x0 + 6, y1 - y0 + 6);
-    const C = GART.corner, H = GART.head, side = !!this.L.side;
-    const ch = mn * (side ? 0.3 : 0.34), cw = C ? ch * C.naturalWidth / C.naturalHeight : 0;
-    const vh = Math.max(14, mn * 0.055);
-    const hw = H && !side ? mn * (this.L.single ? 0.4 : 0.56) : 0, hh = H ? hw * H.naturalHeight / H.naturalWidth : 0;
-    const ax = cw * 0.8, ay = ch * 0.82, gap = hw * 0.42;
-    if (hw) {
-      vineRun(g, x0 + ax, y0, cx - gap, y0, vh, dpr); vineRun(g, cx + gap, y0, x1 - ax, y0, vh, dpr);
-      vineRun(g, x1 - ax, y1, cx + gap, y1, vh, dpr); vineRun(g, cx - gap, y1, x0 + ax, y1, vh, dpr);
-    } else { vineRun(g, x0 + ax, y0, x1 - ax, y0, vh, dpr); vineRun(g, x1 - ax, y1, x0 + ax, y1, vh, dpr); }
-    vineRun(g, x0, y1 - ay, x0, y0 + ay, vh, dpr); vineRun(g, x1, y0 + ay, x1, y1 - ay, vh, dpr);
-    if (C) {
-      const ox = cw * 0.108, oy = ch * 0.097; // the rosette sits on the corner of the rules
-      drawFlip(g, C, x0 - ox, y0 - oy, cw, ch, 1, 1); drawFlip(g, C, x1 + ox, y0 - oy, cw, ch, -1, 1);
-      drawFlip(g, C, x0 - ox, y1 + oy, cw, ch, 1, -1); drawFlip(g, C, x1 + ox, y1 + oy, cw, ch, -1, -1);
+    const ink = '#4a2e1a', dpr = this.dpr, { m, vh, bs } = this.borderSize(P);
+    const x0 = P.x + m, y0 = P.y + m, x1 = P.x + P.w - m, y1 = P.y + P.h - m, c = vh / 2;
+    g.save();
+    if (GART.knot) {
+      vineRun(g, x0 + bs * 0.7, y0 + c, x1 - bs * 0.7, y0 + c, vh, dpr); vineRun(g, x1 - bs * 0.7, y1 - c, x0 + bs * 0.7, y1 - c, vh, dpr);
+      vineRun(g, x0 + c, y1 - bs * 0.7, x0 + c, y0 + bs * 0.7, vh, dpr); vineRun(g, x1 - c, y0 + bs * 0.7, x1 - c, y1 - bs * 0.7, vh, dpr);
     }
-    if (hw) {
-      g.drawImage(H, cx - hw / 2, y0 - hh / 2, hw, hh);
-      drawFlip(g, H, cx - hw / 2, y1 + hh / 2, hw, hh, 1, -1);
+    g.strokeStyle = hexA(ink, 0.65); g.lineWidth = 1; g.strokeRect(x0 - 1.5, y0 - 1.5, x1 - x0 + 3, y1 - y0 + 3);
+    g.strokeStyle = hexA(ink, 0.45); g.strokeRect(x0 + vh + 1.5, y0 + vh + 1.5, x1 - x0 - vh * 2 - 3, y1 - y0 - vh * 2 - 3);
+    const B = GART.boss;
+    if (B) {
+      const o = bs * 0.1; // the boss stands a little out over the corner of the rules
+      drawFlip(g, B, x0 - o, y0 - o, bs, bs, 1, 1); drawFlip(g, B, x1 + o, y0 - o, bs, bs, -1, 1);
+      drawFlip(g, B, x0 - o, y1 + o, bs, bs, 1, -1); drawFlip(g, B, x1 + o, y1 + o, bs, bs, -1, -1);
     }
+    g.restore();
   },
   pageBorder(g, P) {
     const ink = '#4a2e1a', gold = '#b8893e', red = '#8e2f22';
@@ -1408,25 +1404,34 @@ const Grim = {
     let y = P.y + P.h * 0.1;
     g.textAlign = 'center'; g.textBaseline = 'alphabetic';
     g.fillStyle = red; g.font = `${Math.round(13 * s)}px Cinzel, serif`;
-    g.fillText(`LESSON ${lv.roman}`, P.x + P.w / 2, y); y += 34 * s;
-    const H = gart('head'), IN = gart('initial'), MD = gart('medal');
-    g.font = `700 ${Math.round(26 * s)}px "Cinzel Decorative", serif`;
-    if (H) goldText(g, lv.name, P.x + P.w / 2, y, 26 * s);
-    else { g.fillStyle = ink; g.fillText(lv.name, P.x + P.w / 2, y); }
-    y += 14 * s;
-    if (H) { const hw = w * 0.62, hh = hw * H.naturalHeight / H.naturalWidth; g.drawImage(H, P.x + (P.w - hw) / 2, y + 8 * s - hh / 2, hw, hh); y += 34 * s; }
-    else { fleuron(g, P.x + P.w / 2, y + 6 * s, s * 0.8, ink, gold); y += 30 * s; }
+    g.fillText(`LESSON ${lv.roman}`, P.x + P.w / 2, y);
+    const BAND = gart('band'), IN = gart('capframe'), MD = gart('roundel'), TRI = gart('triskele');
+    if (BAND) {
+      // the lesson's name on the cream panel of a knotwork cartouche (smaller type for a long name)
+      const bw = w * 0.84, bh = bw * BAND.naturalHeight / BAND.naturalWidth, by = y + 8 * s;
+      g.drawImage(BAND, P.x + (P.w - bw) / 2, by, bw, bh);
+      let fs = Math.min(22 * s, bh * 0.3);
+      g.font = `700 ${Math.round(fs)}px "Cinzel Decorative", serif`;
+      const tw = g.measureText(lv.name).width; if (tw > bw * 0.54) { fs *= bw * 0.54 / tw; g.font = `700 ${Math.round(fs)}px "Cinzel Decorative", serif`; }
+      g.fillStyle = '#5a1c14'; g.textBaseline = 'middle'; g.fillText(lv.name, P.x + P.w / 2, by + bh * 0.5); g.textBaseline = 'alphabetic';
+      y = by + bh + 16 * s;
+    } else {
+      y += 34 * s;
+      g.font = `700 ${Math.round(26 * s)}px "Cinzel Decorative", serif`;
+      g.fillStyle = ink; g.fillText(lv.name, P.x + P.w / 2, y);
+      y += 14 * s; fleuron(g, P.x + P.w / 2, y + 6 * s, s * 0.8, ink, gold); y += 30 * s;
+    }
     // master's note with illuminated initial
     g.textAlign = 'left';
-    const capS = (IN ? 52 : 46) * s, capGap = (IN ? 13 : 8) * s;
+    const capS = (IN ? 58 : 46) * s, capGap = IN ? capS * 0.19 + 9 * s : 8 * s; // (the painted frame stands out 19% past the blue)
     const first = lv.lesson[0], rest = lv.lesson.slice(1);
     g.save();
     if (IN) {
-      // the painted ultramarine panel in its gold frame (the frame is 83% of the painting), a gilded capital on it
-      const D = capS / 0.83;
-      g.drawImage(IN, x0 - D * 0.1, y - D * 0.1, D, D);
-      g.font = `700 ${Math.round(capS * 0.7)}px "Cinzel Decorative", serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
-      goldText(g, first, x0 + capS / 2, y + capS * 0.53, capS * 0.7);
+      // the lapis field in its knotwork frame (the blue is the middle 72.5% of the painting), a gilded capital on it
+      const D = capS / 0.725;
+      g.drawImage(IN, x0 - D * 0.14, y - D * 0.14, D, D);
+      g.font = `700 ${Math.round(capS * 0.66)}px "Cinzel Decorative", serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+      goldText(g, first, x0 + capS / 2, y + capS * 0.53, capS * 0.66);
     } else {
       g.fillStyle = '#f3dfa8'; g.strokeStyle = gold; g.lineWidth = 1.5;
       g.fillRect(x0, y, capS, capS); g.strokeRect(x0, y, capS, capS);
@@ -1442,7 +1447,7 @@ const Grim = {
     const lh = 19 * s;
     // first lines flow beside the initial
     // the painted panel hangs a little lower than the drawn one, so three lines sit beside it
-    const nIn = IN ? 3 : 2, capBot = IN ? capS / 0.83 * 0.9 : capS;
+    const nIn = IN ? 4 : 2, capBot = IN ? capS / 0.725 * 0.86 - 4 * s : capS;
     const words = rest.split(' '); let line = '', ly = y + lh * 0.95, lx = x0 + capS + capGap, lw = w - capS - capGap, lines = 0;
     let i = 0;
     for (; i < words.length; i++) {
@@ -1455,11 +1460,20 @@ const Grim = {
     if (line) { g.fillText(line, lines < nIn ? lx : x0, ly); ly += lh; }
     y = Math.max(ly, y + capBot + lh) + 10 * s;
     // sigil codex
-    g.strokeStyle = 'rgba(74,46,26,0.5)'; g.lineWidth = 0.8;
-    g.beginPath(); g.moveTo(x0, y); g.lineTo(x0 + w, y); g.stroke();
-    y += 18 * s;
     g.fillStyle = red; g.font = `${Math.round(11.5 * s)}px Cinzel, serif`; g.textAlign = 'center';
-    g.fillText('SIGILS OF THIS FOLIO  ·  tap one to trace it', P.x + P.w / 2, y); y += 12 * s;
+    const head = 'SIGILS OF THIS FOLIO  ·  tap one to trace it';
+    if (gart('knot')) {
+      // its heading between two short bands of knotwork
+      const hy = y + 8 * s, tw = g.measureText(head).width, kh = 10 * s, gap = 10 * s;
+      vineRun(g, x0, hy, P.x + P.w / 2 - tw / 2 - gap, hy, kh, this.dpr); vineRun(g, x0 + w, hy, P.x + P.w / 2 + tw / 2 + gap, hy, kh, this.dpr);
+      g.textBaseline = 'middle'; g.fillText(head, P.x + P.w / 2, hy + 1); g.textBaseline = 'alphabetic';
+      y = hy + 14 * s;
+    } else {
+      g.strokeStyle = 'rgba(74,46,26,0.5)'; g.lineWidth = 0.8;
+      g.beginPath(); g.moveTo(x0, y); g.lineTo(x0 + w, y); g.stroke();
+      y += 18 * s;
+      g.fillText(head, P.x + P.w / 2, y); y += 12 * s;
+    }
     this.codexRects = [];
     // the room left above the signs note at the foot of the page (measured, not guessed)
     const notesText = signNotes(lv), dr0 = 14 * s;
@@ -1473,20 +1487,23 @@ const Grim = {
     const known = SIGIL_ORDER.filter(id => lv.sigils.includes(id)), unknown = SIGIL_ORDER.filter(id => !lv.sigils.includes(id));
     const FR = 44 * s, US = unknown.length ? 30 * s : 0;
     const twoCol = known.length * FR + US > avail; // a crowded page: two columns, names only
-    const rows = twoCol ? Math.ceil(known.length / 2) : known.length, rowH0 = twoCol ? 32 * s : FR;
+    // (a gold medallion needs a taller row than a drawn ring, or the medallions stack into one another)
+    const rows = twoCol ? Math.ceil(known.length / 2) : known.length, rowH0 = twoCol ? (MD ? 40 : 32) * s : FR;
     const k = clamp(avail / (rows * rowH0 + US), 0.72, 1); // and smaller still if even that will not fit
     const rowH = rowH0 * k, colW = twoCol ? w / 2 : w;
     known.forEach((id, n) => {
       const S = SIGILS[id], col = twoCol ? n % 2 : 0, row = twoCol ? Math.floor(n / 2) : n;
       // (in its medallion the sigil is drawn smaller, so the gold rim fits the row)
-      const rx = x0 + col * colW, ry = y + row * rowH, r = (MD ? 12.5 : 15) * s * k, cx = rx + (MD ? r * 1.5 + 3 : r + 4), cy = ry + rowH / 2;
+      // (a roundel's outer edge is (r + 3) / 0.6: kept to 84% of the row, so neighbours never touch)
+      const r = MD ? Math.min(12.5 * s * k, rowH * 0.42 * 0.6 - 3) : 15 * s * k;
+      const rx = x0 + col * colW, ry = y + row * rowH, cx = rx + (MD ? (r + 3) / 0.6 + 2 : r + 4), cy = ry + rowH / 2;
       if (MD) medalGlyph(g, id, cx, cy, r, 1.6);
       else {
         g.strokeStyle = ink; g.lineWidth = 1.1; g.beginPath(); g.arc(cx, cy, r, 0, TAU); g.stroke();
         g.strokeStyle = gold; g.lineWidth = 0.6; g.beginPath(); g.arc(cx, cy, r + 3, 0, TAU); g.stroke();
         drawGlyph(g, id, cx, cy, r * 0.82, '#2a1830', 1.6);
       }
-      const tx = cx + r + (MD ? 16 : 12) * s;
+      const tx = cx + (MD ? (r + 3) / 0.6 + 8 * s : r + 12 * s);
       g.textAlign = 'left'; g.fillStyle = '#2a1830'; g.font = `${Math.round(22 * s * k)}px "Pinyon Script", cursive`;
       const nameY = twoCol ? cy + 6 * s * k : ry + 19 * s * k;
       g.fillText(S.name, tx, nameY);
@@ -1532,25 +1549,35 @@ const Grim = {
     }
     const end = wrapText(g, signNotes(lv), dx + dr * 2.4, y + 10 * s, w - dr * 2.6 - 12 * s, 15 * s);
     this.codexInfo = { k, twoCol, rowH, notesEnd: end, pageEnd: P.y + P.h - Math.min(P.w, P.h) * 0.035 }; // for checking the layout
+    if (TRI) {
+      // a spiral tailpiece in the room left at the foot of the page, if there is room for one
+      const B = this.borderSize(P), foot = P.y + P.h - B.m - B.vh - 10 * s, free = foot - end - 6 * s;
+      if (free > 70 * s) {
+        const ts = Math.min(free * 0.8, w * 0.36), th = ts * TRI.naturalHeight / TRI.naturalWidth;
+        g.drawImage(TRI, P.x + (P.w - ts) / 2, end + 6 * s + (free - th) / 2, ts, th);
+      }
+    }
   },
   codexStrip(g, P) {
     const lv = Game.level; if (!lv) return;
     const s = Math.min(1, P.w / 520), ink = '#3a2414', red = '#8e2f22';
     // upright, the name sits below the page's top vine and its centre ornament
     const side = !!this.L.side, top = side ? P.y + 32 : P.y + 54;
-    const MD = gart('medal');
+    const MD = gart('roundel');
     g.textAlign = 'center'; g.fillStyle = ink;
     g.font = `700 ${Math.round(20 * s + 4)}px "Cinzel Decorative", serif`;
     if (MD) goldText(g, lv.name, P.x + P.w / 2, top, 20 * s + 4);
     else g.fillText(lv.name, P.x + P.w / 2, top);
     this.codexRects = [];
-    const ids = lv.sigils, cw = Math.min(70, (P.w - 20) / ids.length);
+    // the row keeps inside the knotwork border (its first and last names were clipped by it)
+    const B = this.borderSize(P), inner = MD ? P.w - 2 * (B.m + B.vh) - 14 : P.w - 20;
+    const ids = lv.sigils, cw = Math.min(70, inner / ids.length);
     const x0 = P.x + P.w / 2 - cw * ids.length / 2;
     ids.forEach((id, k) => {
-      const cx = x0 + cw * (k + 0.5), cy = top + (side ? 30 : 36), r = Math.min(MD ? 13 : 16, cw * (MD ? 0.29 : 0.36));
+      const cx = x0 + cw * (k + 0.5), cy = top + (side ? 30 : 36), r = MD ? Math.min(11, cw * 0.27 - 3) : Math.min(16, cw * 0.36);
       if (MD) medalGlyph(g, id, cx, cy, r, 1.4);
       else { g.strokeStyle = ink; g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, r, 0, TAU); g.stroke(); drawGlyph(g, id, cx, cy, r * 0.8, '#2a1830', 1.4); }
-      g.fillStyle = red; g.font = `${cw < 54 ? 8 : 10}px Cinzel, serif`; g.fillText(SIGILS[id].name.toUpperCase(), cx, cy + (MD ? (r + 2) / 0.66 + 9 : r + 12)); // clear of the medal's gold rim
+      g.fillStyle = red; g.font = `${cw < 54 ? 8 : 10}px Cinzel, serif`; g.fillText(SIGILS[id].name.toUpperCase(), cx, cy + (MD ? (r + 3) / 0.6 + 9 : r + 12)); // clear of the roundel's knotwork
       this.codexRects.push({ id, x: cx - cw / 2, y: cy - r, w: cw, h: r * 2 + 16 });
     });
   },
@@ -1561,12 +1588,12 @@ const Grim = {
     g.save();
     g.fillStyle = 'rgba(255,250,232,0.18)';
     g.beginPath(); g.arc(A.cx, A.cy, A.half * fr, 0, TAU); g.fill();
-    const rim = gart('rim');
-    if (rim) {
-      // the painted astrolabe rim (its inner edge is 0.68 of it): straddling the circle's edge on the spread, inside it on one page
-      const R = A.half * (this.L.single ? 1.0 : 1.12);
-      g.globalAlpha = 0.8; g.drawImage(rim, A.cx - R, A.cy - R, R * 2, R * 2);
-      g.restore();
+    if (gart('knot')) {
+      // ruled like the page: an inked hairline, a gold band, a red hairline
+      const R = A.half * fr;
+      g.strokeStyle = 'rgba(74,46,26,0.5)'; g.lineWidth = 1; g.beginPath(); g.arc(A.cx, A.cy, R - 3.5, 0, TAU); g.stroke();
+      g.strokeStyle = 'rgba(184,137,62,0.75)'; g.lineWidth = 2.5; g.beginPath(); g.arc(A.cx, A.cy, R, 0, TAU); g.stroke();
+      g.strokeStyle = 'rgba(142,47,34,0.5)'; g.lineWidth = 0.8; g.beginPath(); g.arc(A.cx, A.cy, R + 3.5, 0, TAU); g.stroke();
     } else {
     g.strokeStyle = 'rgba(74,46,26,0.18)'; g.lineWidth = 1;
     for (let k = 0; k < 8; k++) {
@@ -1575,14 +1602,15 @@ const Grim = {
       g.lineTo(A.cx + Math.cos(a) * A.half * (fr + 0.01), A.cy + Math.sin(a) * A.half * (fr + 0.01)); g.stroke();
     }
     g.setLineDash([3, 6]); g.beginPath(); g.arc(A.cx, A.cy, A.half * fr, 0, TAU); g.stroke(); g.setLineDash([]);
-    g.restore();
     }
+    g.restore();
     if (!this.L.single) {
       const P = this.L.right, s = Math.min(P.w, P.h) / 520;
       g.fillStyle = '#2a1830'; g.textAlign = 'center';
-      const pv = !!gart('vine'); // the painted vine border runs lower, so the heading sits a touch smaller and lower
+      const pv = !!gart('knot'); // the painted knotwork border runs lower, so the heading sits a touch smaller and lower
       g.font = `${Math.round((pv ? 31 : 34) * s)}px "Pinyon Script", cursive`;
-      g.fillText('Draft thy Seal', P.x + P.w / 2, P.y + P.h * 0.085 + (pv ? 3 * s : 0));
+      if (pv) { g.textAlign = 'left'; g.fillText('Draft thy Seal', P.x + Math.min(P.w, P.h) * 0.035 + this.borderSize(P).bs * 0.9 + 8 * s, P.y + P.h * 0.085 + 3 * s); }
+      else g.fillText('Draft thy Seal', P.x + P.w / 2, P.y + P.h * 0.085);
     }
   },
   renderInk() {
@@ -1661,7 +1689,12 @@ const Grim = {
       // the eight places around the seal, waiting for signs (and, later, ring-sigils)
       g.setLineDash([3, 4]); g.lineDashOffset = 0; g.strokeStyle = 'rgba(201,150,62,0.5)'; g.lineWidth = 1.4;
       const r = A.half * GUIDE_R;
-      for (let k = 0; k < 8; k++) { const a = k * TAU / 8; g.beginPath(); g.arc(A.cx + Math.cos(a) * r * SLOT_R, A.cy + Math.sin(a) * r * SLOT_R, r * SLOT_SIZE, 0, TAU); g.stroke(); }
+      const RD = gart('roundel');
+      for (let k = 0; k < 8; k++) {
+        const a = k * TAU / 8, px = A.cx + Math.cos(a) * r * SLOT_R, py = A.cy + Math.sin(a) * r * SLOT_R;
+        if (RD) { g.globalAlpha = e * 0.85; roundelAt(g, px, py, r * SLOT_SIZE * 0.81); g.globalAlpha = e; }
+        else { g.beginPath(); g.arc(px, py, r * SLOT_SIZE, 0, TAU); g.stroke(); }
+      }
       g.restore();
     }
     // ghost trace
@@ -1735,8 +1768,10 @@ const Grim = {
     const A = this.L.area, S = D.seal;
     const cx = A.cx + S.cx * A.half, cy = A.cy + S.cy * A.half, r = S.r * A.half;
     const col = sp && !sp.err ? sp.color : '#c9963e';
-    const gold = '#c9963e';
+    const gold = '#c9963e', RD = gart('roundel');
     g.save();
+    // the eight places a sign may go, each in a knotwork roundel (beneath the gilding, so nothing of the seal is hidden)
+    if (RD) { const ga = g.globalAlpha; g.globalAlpha = ga * 0.85; for (let k = 0; k < 8; k++) { const a = k * TAU / 8; roundelAt(g, cx + Math.cos(a) * r * SLOT_R, cy + Math.sin(a) * r * SLOT_R, r * SLOT_SIZE * 0.81); } g.globalAlpha = ga; }
     g.strokeStyle = hexA(gold, 0.55); g.lineWidth = 1;
     g.beginPath(); g.arc(cx, cy, r * 1.0, 0, TAU); g.stroke();
     g.beginPath(); g.arc(cx, cy, r * 1.16, 0, TAU); g.stroke();
@@ -1780,10 +1815,12 @@ const Grim = {
         const rel = this.slotRel(k), coloured = ringSigils && rel;
         const col = coloured ? REL_COL[rel] : gold;
         if (coloured && !signHere) { g.fillStyle = hexA(col, sat ? 0.05 : 0.08); g.beginPath(); g.arc(px, py, sr, 0, TAU); g.fill(); }
-        g.setLineDash(coloured ? [] : [3, 4]);
-        g.strokeStyle = hexA(sat && !sat.ok ? '#a02a1a' : col, coloured ? (signHere ? 0.25 : 0.6) : (sat ? 0.75 : 0.55));
-        g.lineWidth = coloured ? 1.4 : 1.4;
-        g.beginPath(); g.arc(px, py, sr, 0, TAU); g.stroke(); g.setLineDash([]);
+        if (!RD || coloured || (sat && !sat.ok)) {
+          g.setLineDash(coloured ? [] : [3, 4]);
+          g.strokeStyle = hexA(sat && !sat.ok ? '#a02a1a' : col, coloured ? (signHere ? 0.25 : 0.6) : (sat ? 0.75 : 0.55));
+          g.lineWidth = 1.4;
+          g.beginPath(); g.arc(px, py, RD ? sr * 0.81 : sr, 0, TAU); g.stroke(); g.setLineDash([]);
+        }
         // (a ring-sigil past the third of its kind is ignored: no glow, and the circle says so)
         const ignored = extra.has(k);
         if (sat && sat.ok && !ignored) {
@@ -1795,7 +1832,8 @@ const Grim = {
         if ((coloured && !signHere) || (sat && sat.ok)) {
           g.fillStyle = ignored ? 'rgba(110,95,80,0.85)' : hexA(coloured ? col : '#5a3a1a', sat ? 0.95 : 0.75); g.font = `italic ${Math.max(9, Math.round(r * 0.075))}px "IM Fell English", serif`; g.textAlign = 'center';
           const up = Math.sin(a) < -0.5;
-          g.fillText(ignored ? 'ignored' : REL_NAME[rel || 'now'], px, up ? py - sr - Math.max(5, r * 0.035) : py + sr + Math.max(10, r * 0.09));
+          const so = RD ? sr * 1.35 : sr; // (outside the roundel's knotwork)
+          g.fillText(ignored ? 'ignored' : REL_NAME[rel || 'now'], px, up ? py - so - Math.max(5, r * 0.035) : py + so + Math.max(10, r * 0.09));
         }
       }
     }
@@ -1862,15 +1900,34 @@ const Grim = {
   drawMiniMap(g, t) {
     if (!World.W || this.L.single) return;
     const P = this.L.right, s = Math.min(P.w, P.h) / 520;
-    const size = 7 * s * Math.min(1, 11 / Math.max(World.W, World.H));
-    const ox = P.x + P.w - 78 * s - (World.W - World.H) * size * 0.5, oy = P.y + P.h * 0.13;
-    const tw = size, th = size * 0.5;
+    const FR = gart('frame') && gart('page') && typeof TEX_IMAGES !== 'undefined' ? GART.frame : null;
+    const size = (FR ? 6.4 : 7) * s * Math.min(1, 11 / Math.max(World.W, World.H)), tw = size, th = size * 0.5;
+    let ox, oy, fr = null;
+    if (FR) {
+      // in its knotwork panel at the top of the page, below the border and left of the corner's boss
+      const B = this.borderSize(P), d = 15 * s, pad = d * 0.9;
+      let hi = 0; for (const c of World.cells) if (!c.void) hi = Math.max(hi, c.h);
+      const right = P.x + P.w - B.m - B.bs * 0.9 - 6, fy = P.y + B.m + B.vh + 6;
+      ox = right - pad - (World.W + 1) * tw - 2; oy = fy + pad + 16 * s + (hi + 1) * th * 0.9 + 2;
+      fr = { right, fy, d, pad };
+    } else {
+      // (moved in, if need be, so its right edge stays inside the page's border)
+      ox = Math.min(P.x + P.w - 78 * s - (World.W - World.H) * size * 0.5, P.x + P.w - Math.min(P.w, P.h) * 0.09 - (World.W + 1) * size);
+      oy = P.y + P.h * 0.13;
+    }
     g.save();
     if (gart('page') && typeof TEX_IMAGES !== 'undefined') {
       let key = `${World.W},${World.H},${ox.toFixed(1)},${oy.toFixed(1)},${size.toFixed(2)},${this.dpr},${Object.keys(TEX_IMAGES).length}|`;
       for (const c of World.cells) key += c.void ? 'v' : `${c.h},${c.water != null ? 1 : 0}${c.ice ? 1 : 0}${c.feat || ''}${c.lit ? 1 : 0};`;
       if (this._mmKey !== key) { this._mmKey = key; this.renderMiniMap(ox, oy, tw, th); }
       const M = this._mm;
+      if (fr) {
+        // the panel, its caption inside it with the land
+        const { d, pad, fy } = fr, fx = M.x - pad, fw = fr.right - fx, fh = M.y + M.h + pad - fy;
+        g.fillStyle = 'rgba(255,248,226,0.35)'; g.fillRect(fx + d * 0.5, fy + d * 0.5, fw - d, fh - d);
+        nineSlice(g, FR, fx, fy, fw, fh, 96, d);
+        fr.lx = fx + fw / 2;
+      }
       g.save(); g.shadowColor = 'rgba(60,30,10,0.35)'; g.shadowBlur = 6; g.shadowOffsetY = 3;
       g.drawImage(M.c, M.x, M.y, M.w, M.h); g.restore();
     } else for (let y = 0; y < World.H; y++) for (let x = 0; x < World.W; x++) {
@@ -1887,7 +1944,7 @@ const Grim = {
       g.fillStyle = '#d99a20'; g.beginPath(); g.arc(px, py, size * 0.4 + Math.sin(t * 4) * 0.6, 0, TAU); g.fill();
     }
     g.fillStyle = '#4a2e1a'; g.font = `italic ${Math.round(11 * s)}px "IM Fell English", serif`; g.textAlign = 'center';
-    g.fillText('the land as it lies', ox, oy - 8 * s);
+    if (fr) g.fillText('the land as it lies', fr.lx, fr.fy + fr.pad + 10 * s); else g.fillText('the land as it lies', ox, oy - 8 * s);
     g.restore();
   },
 };
