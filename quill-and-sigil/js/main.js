@@ -545,7 +545,7 @@ const Game = {
     $('#hud').classList.remove('show');
     this.showScreen('levels');
   },
-  start(i, quiet) {
+  start(i) {
     // Restarting (or replaying) the same lesson keeps the last drawing for Recall.
     if (i !== this.idx) { Grim.lastStrokes = null; this.hint = 0; } // (the hint already shown stays shown on a restart)
     this.tapped = false;
@@ -563,9 +563,8 @@ const Game = {
     this.state = 'play';
     this.renderSatchel();
     this.showScreen(null);
-    if (!quiet) this.note(true);
   },
-  note(now) {
+  note() {
     const L = this.level;
     $('#noteText').textContent = L.lesson;
     this.leafHint();
@@ -574,7 +573,7 @@ const Game = {
     $('#noteSigils').innerHTML = L.sigils.map(id => `<span class="chip" style="--c:${SIGILS[id].color}"><img src="${glyphIcon(id)}" alt="">${SIGILS[id].name}${ringOnly(id) ? ' <small>(ring only)</small>' : ''}</span>`).join('') + (L.ink ? `<span class="chip ink">ink for ${L.ink} seal${L.ink > 1 ? 's' : ''}</span>` : '');
     $('#note').scrollTop = 0;
     $('#note').classList.add('show');
-    fitLand(!now);
+    fitLand(true);
   },
   closeNote() { if (!this.noteOpen()) return; $('#note').classList.remove('show'); fitLand(true); },
   noteOpen() { return $('#note').classList.contains('show'); },
@@ -592,7 +591,7 @@ const Game = {
   },
   // the HUD's Hint button: the lesson card, open at the nudge (or as far as the hint has gone)
   openHint() { if (this.state !== 'play') return; this.note(); if (!this.hint) this.moreHint(); },
-  reset() { if (!this.level) return; Sfx.play('rewind'); this.start(this.idx, true); },
+  reset() { if (!this.level) return; Sfx.play('rewind'); this.start(this.idx); },
   rewind() {
     if (!this.history.length || this.state === 'won') { this.toast('Nothing to rewind.'); return; }
     restore(this.history.pop()); this.casts = Math.max(0, this.casts - 1); this.updateCasts();
@@ -968,6 +967,8 @@ window.addEventListener('resize', resize);
 // upright, to its right on wide screens and sideways phones (eased there and back when the leaf comes and goes)
 function fitLand(ease) {
   const leaf = $('#note'), open = leaf.classList.contains('show');
+  // under the land, the leaf stands just above the grimoire button and the kept-spell slots, however tall they wrap
+  leaf.style.setProperty('--above', innerHeight - $('#bottom').getBoundingClientRect().top + 10 + 'px');
   const top = leaf.offsetTop, under = top > innerHeight * 0.4; // (offset*: the leaf's place without its slide-in)
   const pads = !open ? undefined : under ? [null, innerHeight - top + 12] : [null, null, leaf.offsetLeft + leaf.offsetWidth + 8];
   const from = ease && cam.b && { ...cam.b };
@@ -1106,7 +1107,7 @@ bind('#bStart', () => Game.closeNote());
 bind('#bHint', () => Game.moreHint());
 bind('#bHintHud', () => Game.openHint());
 bind('#bNext', () => Game.next());
-bind('#bReplay', () => Game.start(Game.idx, true));
+bind('#bReplay', () => Game.start(Game.idx));
 bind('#bWinMenu', () => Game.lessons());
 bind('#pInscribe', () => Grim.inscribe());
 bind('#pUndo', () => Grim.undo());
