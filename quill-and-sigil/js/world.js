@@ -2738,7 +2738,7 @@ function drawCell(g, c, t, part) {
 }
 // what moves on a tile: its water, and whatever stands on it
 function drawCellTop(g, c, d, t) {
-  const x = c.x, y = c.y, z = c.h, s = cam.s;
+  const x = c.x, y = c.y, z = floorTop(c), s = cam.s; // an ice block on frozen water stands on the ice, as it blocks
   if (texOK && !isPool(c)) landShoreWater(g, c, t);
   // water / ice
   if (c.water != null && c.water > c.h) { if (WATER_PART === 'live') waterLive(g, c, t); else drawWater(g, c, d, t); }

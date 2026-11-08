@@ -320,6 +320,98 @@ const LEVELS = [
     hint: 'First the fire: Ignis on the font with two-barbed signs toward both braziers (lower right and upper left) and two small Ventus on its ring, so each arm reaches seven tiles. Then Ventus on the orb with a sign straight down the page (6 o’clock), crossed by two barbs, and a small Petra just beside it on its forward side (green): stone fills the missing bead as the orb rolls over the gap.',
     t: ['0      0      0', ' 0     0     0 ', '  0    0    0  ', '   0   0   0   ', '    0  0  0    ', '      0000     ', '     00000     ', '000000000000000', '     00000     ', '     00000     ', '    0  0  0    ', '   0   0   0   ', '  0    0    0  ', ' 0     0     0 ', '0      0      0'],
     o: ['O..............', '...............', '...............', '...............', '...............', '...............', '.......D.......', 'B.....DGD.....B', '.......D.......', '...............', '...............', '...............', '...............', '...............', '...............'],
+    folioEnd: { title: 'The Third Folio is Complete', text: 'The light rests at the heart of the rose. The master sets the third folio aside and opens a fourth, where water runs and ice moves.' },
+  },
+  /* ---------- The Fourth Folio: water and ice in motion ---------- */
+  // A dry millrace, its floor rimed, 12 tiles long; the orb lies at its head and the font on the bank just past its end.
+  // One seal: Unda with the outer circle and a two-barbed sign down the race (a run 3 wide, 4 long: 12 tiles of water, the
+  // race exactly brimful), Ventus anywhere on its ring (any timing, 1-3 of them): the whole race flows at 3.9 tiles/s and
+  // floats the orb out onto the font in about 3s. Less water fails: outer circle + one barb leaves the level at -0.25, so the
+  // orb is carried the whole way but sticks under the far lip; no outer circle = 4 tiles of water, far too low. A plain gust
+  // cannot climb out of the race. Ventus with Unda behind the sign floats the orb, but still water stops it 4 tiles on
+  // (x 6.5); a second push from Ventus ahead (green) gets it to x 12.4 at best (font at 14.5). The rime makes a dry gust
+  // slam into the far end and bounce back, so Unda + Ventus on arrival flood the race and then push the orb the wrong way
+  // (without the rime, one barb + Unda ahead + three Ventus ahead won). All 672 Ventus-centre seals with Unda/Ventus on the
+  // ring fail. Unda without Ventus is still water; right-angle signs make a slanting current that pushes the orb out over the side bank.
+  {
+    name: 'The Millrace', sigils: ['gale', 'tide'], par: 1, ink: 1, combos: true, opens: 'The Fourth Folio',
+    lesson: 'The fourth folio, and the water moves. A millrace runs dry from the orb to the font, its floor white with rime, too deep to roll out of and too long for any gust. Unda alone pours still water, and a gust soon dies in it. With Ventus on its ring the water flows the way of its sign through the whole channel it fills, and carries whatever floats there. The orb can float out at the far end only if the race is full to the brim.',
+    hint: 'Unda in the centre, cast on the orb, with a second, larger circle around the seal: the race is twelve tiles long and wants twelve tiles of water. Its sign down the race toward the font (lower right), crossed by two barbs: a run three wide and four long. A small Ventus in any slot of the ring makes it flow.',
+    t: [' 000       0000 ', '0000000000000000', '00____________00', '0000000000000000', ' 000       0000 '],
+    o: ['................', '................', '..OfffffffffffG.', '................', '................'],
+  },
+  // A fast millrace (current 10, three tiles wide) between the meadow and the mill wall; the font sits in a gap in the wall
+  // at the level of the channel bed. Intended: Ventus toward the font with two barbs and a small Petra behind the sign. The
+  // heavy orb sinks, the current cannot move it, and it rolls along the bed into the font (9/9; also 9/9 at ±0.45 offsets,
+  // with the outer circle, with Petra beside the sign, or with three Petra). The water still brakes a heavy orb: with one
+  // barb it stops 0.7 tiles short on the bed, floats up once the stone wears off (5s), and is swept away (0/9).
+  // Fail 0/9 at every barb count: plain gust (swept 2+ tiles downstream into the wall, then over the fall); gust toward the
+  // upper right (aimed upstream, never gets across); gust toward the lower left; Petra on arrival (n 1–3: it raises the
+  // first channel tile as the orb leaves the bank, and the orb still floats over the other two).
+  // A sign-less or opposite-signed gust cast beside the orb can aim at any angle: at current 8 it won within 0.15 tile at
+  // ~26° upstream; at current 10 no angle or distance wins. Ventus on its own ring adds speed along that angle and won at
+  // 10–20° upstream even at current 10, so the ring takes only Petra. Gelu at once (the Rime Road ice road) crosses any
+  // current (9/9 even with one barb), and Luna would float over, so neither is in this lesson's sigils (no ferry either).
+  {
+    name: 'The Mill Wall', sigils: ['gale', 'stone'], sats: ['stone'], par: 1, ink: 1, combos: true,
+    lesson: 'A millrace runs between the meadow and the mill: a channel of fast water that sweeps anything floating down and over the edge. The font sits in a gap in the far wall, down at the level of the channel bed. An orb that carries Petra is heavy as stone. It sinks instead of floating, and the current cannot take it, though the water still slows it as it rolls along the bed.',
+    hint: 'Ventus in the centre, cast on the orb, its sign toward the font (lower right) crossed by two barbs. On the ring, in a red circle behind the sign: a small Petra. The heavy orb sinks and rolls straight across the bed into the font; with fewer barbs the water stops it short.',
+    t: ['  000~~~11 ', ' 0000~~~111', '00000~~~111', '00000~~~111', '00000~~~_11', '00000~~~111', '00000~~~111', ' 0000~~~111', '  000~~~11 ', '     ~~~   ', '     ~~~   '],
+    o: ['...........', '...........', '...........', '...........', '...O....G..', '...........', '...........', '...........', '...........', '...........', '...........'],
+    flows: [{ x0: 5, x1: 7, y0: 0, y1: 10, dx: 0, dy: 1, s: 10 }],
+  },
+  // A dry millpond (5×4, floor -1) drains into a race two tiles wide that runs down and cuts the road. A raised sill
+  // closes the race's foot. Two crates sit side by side in the pond, in line with the race. Seal 1: Unda with one sign
+  // down the race and Ventus on its ring. The water fills the whole floor (34 tiles, so a 2-tile shape gives a level of
+  // -0.94) and flows. The crates are carried 9 tiles and stop together against the sill, a two-tile bridge at
+  // crate-top -0.14. Seal 2: Ventus with two barbs on the orb. 9/9 at nine offsets, whether Unda is cast on the pond or
+  // the race, has 0/1/2 barbs, the outer circle, or Ventus in any slot. The crates take ~4.6s with a plain sign; a gust
+  // cast 4s after the current is in time. Fails: one-barb gust 0/9 (rolls 8.4 tiles, font is 10). Plain two-barb gust
+  // 0/9: the 2-tile race cannot be leapt. Gusting the crates: amp + two barbs moves them 4 tiles, and with 3 Ventus on
+  // arrival 4.8 (9.2 needed). Ventus + Unda behind the sign + 2 Ventus beside it, cast on the crates, moves them 3.3.
+  // Brimming the race with a 25-tile Unda (still or flowing) only reaches -0.26; the orb floats at -0.39 and cannot
+  // climb out. A diagonal current jams the crates on the pond corner. A current toward the font leaves them in the pond.
+  // No Petra, Luna or Gelu here (Petra on the race, or a Luna float, would cross it).
+  {
+    name: 'The Timber Run', sigils: ['gale', 'tide'], par: 2, ink: 2, combos: true,
+    lesson: 'A dry millpond, and a race cut from it down across the road, two tiles wide: too broad for any gust to leap. Two crates of timber wait in the pond, too far off for the wind to shove them all that way. Timber floats, and flowing water carries what floats until the race ends.',
+    hint: 'Unda cast on the dry pond (or anywhere in the race) with one sign toward the lower left (7:30), down the race, and a small Ventus in any slot of its ring: the water flows and carries both crates to the foot of the race, side by side. When they rest against the sill, Ventus on the orb with a sign toward the font (lower right), crossed by two barbs.',
+    t: ['     0000000  ', '     0_____0  ', '     0_____0  ', '     0_____0  ', '     0_____0  ', '     000__00  ', '       0__0   ', '       0__0   ', '       0__0   ', '       0__0   ', '00000000__0000', '00000000__0000', '        11    '],
+    o: ['..............', '..............', '........CC....', '..............', '..............', '..............', '..............', '..............', '..............', '..............', '..............', '..O.........G.', '..............'],
+  },
+  // A frozen millrace, the font on a rock islet in it, ringed by eight ice blocks. One seal: Ventus toward the font
+  // (lower right) with Petra at once: the heavy orb crosses the ice and smashes the wall (no barb, 1 or 2 barbs: each 9/9).
+  // Petra beside the sign also wins 9/9. Checked, all 0/9 at 0–2 barbs: plain gust (bounces off the wall); Ignis at once,
+  // along or on arrival (the burning orb thaws the race and the current carries it over the falls); Petra on arrival;
+  // Ignis or Petra on arrival plus Ventus on arrival; three Ventus on the ring; Petra at once plus Ignis along (the heavy
+  // orb sinks in the thawed race); Ignis or Petra placed east from the orb with 1–3 Ventus on the ring.
+  // Two seals (Ignis on the islet, then a gust) win, but ink is 1. No Luna here, so no float or ferry.
+  // The ice blocks stand on the rock. (An ice block on frozen water ('*') blocks from the ice's top; since v144 it is drawn there too.)
+  {
+    name: 'The Icebound Font', sigils: ['gale', 'stone', 'flame'], par: 1, ink: 1, combos: true,
+    lesson: 'The millrace has frozen hard, and its font stands on a rock in the middle, walled in by blocks of ice. Fire melts ice, and not only the ice you aim it at: the frozen race thaws too. A heavy orb smashes the ice in its way.',
+    hint: 'Ventus on the orb with a sign toward the font (lower right), crossed by one barb, and a small Petra in a slot opposite the sign (red: at once). The heavy orb rolls over the frozen race and smashes through the ice around the font.',
+    t: ['  00000000   ', ' 000******0  ', '0000******00 ', '0000**000*000', '0000**000*000', '0000**000*000', ' 000******00 ', '  00******0  ', '   0******   ', '    ******   '],
+    o: ['.............', '.............', '.............', '......III....', '.O....IGI....', '......III....', '.............', '.............', '.............', '.............'],
+    flows: [{ x0: 4, x1: 9, y0: 1, y1: 9, dx: 0, dy: 1, s: 2.5 }],
+  },
+  // The orb (2,5) is cut off from the font (14,5) by an ice block, a frozen race four wide (current 12, south over the
+  // falls), a dam (8,5) and an open leat (current 5 east) ending at a shut gate; braziers at both ends of the row.
+  // Seal 1: Ventus toward the font with Petra behind the sign: the heavy orb smashes the ice block, crosses the frozen race
+  // and waits at the gate (x 11.8; 9/9 at 0–3 barbs). Seal 2: Ignis on the dam, two opposite two-barbed signs along the row
+  // and two Ventus on its ring (7 tiles each way): both braziers light, the race thaws behind the orb and the leat carries it
+  // through the opening gate (9/9, cast 1.5–5s after seal 1). Fire first fails 0/4 at every barb for every gust tried
+  // (plain, amp, Ventus ×3 at any timing, heavy at once or beside, Petra on arrival): the thawed race sweeps it over the
+  // falls, or the heavy orb sinks in its bed. A burning orb first goes over the falls; a plain gust bounces off the ice
+  // block. Luna, Gelu and Unda are left out: fire then a Luna glide or ferry, fire then Ventus + Gelu (refreezes the race),
+  // and fire then an Unda current all win. The dam keeps a heavy orb from rolling along the race bed into the leat.
+  {
+    name: 'The Thaw', sigils: ['gale', 'stone', 'flame'], par: 2, ink: 2, combos: true,
+    lesson: 'The last page of the fourth folio. A millrace lies frozen between the meadow and the mill, and the mill leat runs to a shut gate. Fire thaws ice, and a thawed race sweeps anything over the falls. An orb that reaches a shut gate only waits there. Mind the order of your seals.',
+    hint: 'First, Ventus on the orb toward the font (lower right), with a small Petra in a red slot behind the sign. The heavy orb breaks the ice block, crosses the frozen race and waits in the leat at the gate. Then Ignis on the dam between the race and the leat, with two signs of two barbs each, toward the lower right and the upper left, and two small Ventus on its ring. Each arm reaches seven tiles, to both braziers. The fire thaws the race behind the orb and the leat carries it through the opening gate.',
+    t: ['    ****        ', '    ****        ', '   1****1       ', ' 001****1000    ', '0001****100001  ', '0000****0~~~~000', '0001****100001  ', ' 001****1000    ', '   1****1       ', '    ****        ', '    ****        '],
+    o: ['................', '................', '................', '................', '................', '.BOI.........DGB', '................', '................', '................', '................', '................'],
+    flows: [{ x0: 4, x1: 7, y0: 0, y1: 10, dx: 0, dy: 1, s: 12 }, { x0: 9, x1: 12, y0: 5, y1: 5, dx: 1, dy: 0, s: 5 }],
   },
 ];
 LEVELS.forEach((l, i) => l.roman = ROMAN[i]);
@@ -350,6 +442,11 @@ const NUDGES = {
   'The Eye': 'Light both braziers first: a shut gate stops even a floating orb. One line of fire can reach them both, if something makes it longer.',
   'The Stair of Isles': 'A Luna float rises when the ground rises. But the font is farther than an unadorned float can carry.',
   'The Compass Rose': 'Fire first: the gates must be open before the orb arrives. Then mind the missing bead on the orb’s arm.',
+  'The Millrace': 'Still water only lifts the orb, and a gust soon dies in it. Make the water itself move, and pour enough to fill the race to the brim: count its tiles.',
+  'The Mill Wall': 'Whatever floats here is swept away, and no angle of wind beats the current. What would the orb need to be for the water to leave it where it is?',
+  'The Timber Run': 'No wind carries the crates that far, but moving water will. Where does the race end, and what would lie there?',
+  'The Icebound Font': 'Fire would melt the wall, and the frozen race under the orb with it. Something heavy breaks ice without melting it.',
+  'The Thaw': 'The fire must cross the race to reach both braziers, and a thawed race carries everything over the falls. Cross while it is still frozen.',
 };
 LEVELS.forEach(l => l.nudge = NUDGES[l.name] || '');
 /* the hint, in two steps: a nudge, then the master's hint. Shown the same in the lesson card and the Notes leaf. */
@@ -371,7 +468,7 @@ const TITLE_LEVEL = {
 
 /* ---------------- Progress ---------------- */
 const Save = {
-  data: { unlocked: 1, stars: {}, v: 5 },
+  data: { unlocked: 1, stars: {}, v: 6 },
   load() {
     try {
       const s = JSON.parse(localStorage.getItem('quillsigil.v1'));
@@ -399,6 +496,11 @@ const Save = {
       if (s.v === 4) {
         if (s.stars[18]) s.unlocked = Math.max(s.unlocked, 20);
         s.v = 5; this.data = s; this.save();
+      }
+      // v144 added the fourth folio after The Compass Rose (index 24): a save that had beaten it was capped at 25 lessons
+      if (s.v === 5) {
+        if (s.stars[24]) s.unlocked = Math.max(s.unlocked, 26);
+        s.v = 6; this.data = s; this.save();
       }
       this.data = s;
     } catch (e) { }
