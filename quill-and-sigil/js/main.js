@@ -546,6 +546,10 @@ const Game = {
     this.showScreen('levels');
   },
   start(i) {
+    // a restart can come while the grimoire is open or a spell is being aimed (the R key, the button, a lost orb)
+    if (Grim.open) Grim.hide();
+    this.closeSatchel(); this.closeNotes();
+    $('#aimbar').classList.remove('show'); $('#bGrimoire').classList.remove('hidden');
     // Restarting (or replaying) the same lesson keeps the last drawing for Recall.
     if (i !== this.idx) { Grim.lastStrokes = null; this.hint = 0; } // (the hint already shown stays shown on a restart)
     this.tapped = false;
@@ -592,6 +596,8 @@ const Game = {
   // the HUD's Hint button: the lesson card, open at the nudge (or as far as the hint has gone)
   openHint() { if (this.state !== 'play') return; this.note(); if (!this.hint) this.moreHint(); },
   reset() { if (!this.level) return; Sfx.play('rewind'); this.start(this.idx); },
+  // the orb fell in a lesson with a measured inkwell: begin again, ink and all (the toast already said so)
+  lostRestart() { if (this.level && this.state !== 'won') this.start(this.idx); },
   rewind() {
     if (!this.history.length || this.state === 'won') { this.toast('Nothing to rewind.'); return; }
     restore(this.history.pop()); this.casts = Math.max(0, this.casts - 1); this.updateCasts();

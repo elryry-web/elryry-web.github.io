@@ -301,7 +301,12 @@ function stepBody(b, dt) {
   }
   if (b.z < -7) {
     b.alive = false;
-    if (b.kind === 'orb') { World.respawns.push({ b, t: 0.9 }); Game.toast('The orb is lost to the abyss… it re-forms where it began.'); Sfx.play('lost'); }
+    if (b.kind === 'orb') {
+      // with a measured inkwell the spent ink can't bring the orb home again, so the whole lesson begins again
+      const again = !!(World.level && World.level.ink);
+      World.respawns.push({ b, t: 0.9, again });
+      Game.toast(again ? 'The orb is lost to the abyss. The lesson begins again.' : 'The orb is lost to the abyss. It re-forms where it began.'); Sfx.play('lost');
+    }
   }
 }
 function collideBodies() {
@@ -399,6 +404,7 @@ function worldStep(dt) {
     const r = World.respawns[i]; r.t -= dt;
     if (r.t <= 0) {
       World.respawns.splice(i, 1);
+      if (r.again && Game.lostRestart) { Game.lostRestart(); return; } // (the level simulations in Node have no Game.lostRestart)
       const b = r.b; Object.assign(b, { x: b.home.x, y: b.home.y, z: b.home.z + 1.2, vx: 0, vy: 0, vz: 0, alive: true, lev: 0, drift: null, captured: false });
       for (let k = 0; k < 40; k++) { const a = Math.random() * TAU, rr = 0.8 + Math.random(); emit({ x: b.x + Math.cos(a) * rr, y: b.y + Math.sin(a) * rr, z: b.z + Math.random(), vx: -Math.cos(a) * rr * 2, vy: -Math.sin(a) * rr * 2, life: 0.5, size: 4, color: '#ffd27a', kind: 'glow' }); }
       Sfx.play('reform');
