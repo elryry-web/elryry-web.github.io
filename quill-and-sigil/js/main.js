@@ -242,10 +242,12 @@ const LEVELS = [
     o: ['.........#......', '.........#....B.', '.O.......#....G.', '.........#......', '.........#......'],
     flows: [{ x0: 4, x1: 8, y0: 0, y1: 4, dx: 0, dy: 1, s: 3 }],
   },
-  // Skyward's land again, solved by one compound seal. The hollow's rim throws back any Ventus-centred gust, so Luna must
+  // Skyward's land again, solved by one compound seal. The hollow's rim throws back a plain Ventus gust, so Luna must
   // lift first (Luna in the centre, Ventus on its ring); the font is 12 tiles off (outer circle); the brazier on the near
   // bank opens the gate, so Ignis must burn along the way (on arrival is too late). Fire on the orb lasts 5s: a gentle
   // wind's flame dies before the brazier, one or two barbs arrive in time. Simulated at 15 cast offsets each.
+  // Since v138 Luna behind a Ventus sign lifts before the gust blows (LIFT_BEAT), so Ventus in the centre with two barbs,
+  // Luna behind and Ignis beside also wins (9/9); one barb falls short. A shut gate can no longer be floated over.
   {
     name: 'Skyward Redux', sigils: ['gale', 'stone', 'flame', 'tide', 'frost', 'luna'], par: 1, ink: 2, combos: true,
     folioEnd: { title: 'The Second Folio is Complete', text: 'The same land, in a single seal. The master sets the second folio aside and opens a third, whose lands take stranger shapes.' },
@@ -299,7 +301,8 @@ const LEVELS = [
   },
   // Isles one step higher each, two tiles of air between them, the font 12 tiles off. Only Luna in the centre with the outer
   // circle and Ventus on its ring wins: the float rides 1.3 above the ground and climbs each step. A bare float runs out,
-  // the Ventus + Luna glide falls short, and the ferry's slab cannot climb.
+  // the Ventus + Luna glide falls short, and the ferry's slab cannot climb. (Since v138 the Ventus + Luna glide with two
+  // barbs also wins: Luna behind the sign lifts before the gust, where the gust used to slam the orb into the first step.)
   {
     name: 'The Stair of Isles', sigils: ['gale', 'stone', 'luna'], par: 1, ink: 1, combos: true,
     lesson: 'Isles climb into the sky like steps, each a stone higher than the last, too far apart to roll and too high to leap. What Luna lifts floats a little above whatever lies beneath it, and rises when the ground rises. A slab of stone keeps to its own level.',

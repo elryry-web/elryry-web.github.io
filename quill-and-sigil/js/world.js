@@ -114,6 +114,8 @@ function blockedAt(b, nx, ny) {
   const rr = b.r * 0.82;
   for (let i = 0; i < 4; i++) {
     const c = cellAt(nx + (i & 1 ? rr : -rr), ny + (i & 2 ? rr : -rr));
+    // a shut rune gate's ward reaches the sky: nothing floats over it (a Luna float rides only 1.3 above the ground)
+    if (c && c.feat === 'gate' && !World.gateOpen && cellAt(b.x, b.y) !== c) return c;
     if (solidTop(c) > b.z + STEP) { if (b.imb && breakThrough(b, c)) continue; return c; }
   }
   return null;
@@ -613,6 +615,7 @@ function floodAt(cells, dir, s, vol = cells.length) {
 }
 
 /* ---------- compound seals: the centre acts first, then each ring-sigil in turn ---------- */
+const LIFT_BEAT = 0.35; // how long a gust waits for the Luna or Unda behind its sign to lift what it holds
 function applySpell(sp, tx, ty, tz) {
   const inf = (sp.sats || []).slice().sort((a, b) => a.order - b.order);
   const cnt = id => inf.filter(s => s.id === id).reduce((a, s) => a + s.n, 0);
@@ -629,6 +632,20 @@ function applySpell(sp, tx, ty, tz) {
   if (sp.sigil === 'gale' && sp.dir && now('stone') && now('luna'))
     return ferryRest(spawnFerry(sp, tx, ty, tz, now('stone'), 1, now('luna')), s => s.rel === 'now' && (s.id === 'stone' || s.id === 'luna'));
   if ((sp.sigil === 'flame' || sp.sigil === 'frost') && cnt('luna')) return spawnWisps(sp, tx, ty, tz, cnt('luna'));
+  // "at once" means at once: on Ventus, a Luna or Unda behind the sign lifts first (Luna raises what the wind holds,
+  // Unda pours where it is cast and floats it), and the gust waits a breath for it to rise before it blows
+  const lifts = sp.sigil === 'gale' ? inf.filter(s => s.rel === 'now' && (s.id === 'luna' || s.id === 'tide')) : [];
+  if (lifts.length) {
+    const held = bodiesInRadius(tx, ty, spellRadius(sp)).filter(b => !b.captured);
+    for (const s of lifts) {
+      if (s.id === 'luna') { for (const b of held) infuseBody(b, s, sp); continue; }
+      const cs = spellCells(sp, tx, ty).map(([x, y]) => cellI(x, y)).filter(c => c && !c.void);
+      floodAt(cs, null, 0); cs.forEach(douseCell);
+      for (const c of cs) splash(c.x + 0.5, c.y + 0.5, surfaceTop(c), 3);
+    }
+    World.pending.push({ t: LIFT_BEAT, fn: () => applySpell({ ...sp, sats: inf.filter(s => !lifts.includes(s)) }, tx, ty, tz) });
+    return;
+  }
   const out = { bodies: [], cells: [], prev: new Map() };
   baseSpell(sp, tx, ty, tz, out);
   const cells = [...new Set([...spellCells(sp, tx, ty).map(([x, y]) => cellI(x, y)), ...out.cells])].filter(Boolean);
