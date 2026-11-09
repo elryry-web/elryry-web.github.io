@@ -1411,8 +1411,8 @@ const Grim = {
   },
   layout() {
     const vw = innerWidth, vh = innerHeight;
-    // a phone held sideways: the book open at two pages, the drawing circle on the left one, everything else in a
-    // column on the right one
+    // a phone held sideways: the book open at two pages, the drawing circle on the right one (where the desktop
+    // spread has it), everything else in a column on the left one
     const side = vh < 560 && vw > vh * 1.25;
     const single = side || vw < 900 || vh > vw * 0.95;
     // (the ring round the drawing circle, in half-widths: snug on one page, and snugger upright, where the width
@@ -1421,18 +1421,20 @@ const Grim = {
     SLOT_SIZE = single ? 0.32 : 0.27;
     if (side) {
       // the height is all a sideways phone has: the book runs nearly edge to edge (leaving the painted cover room at
-      // the sides), the left page just wide enough for the circle, which fills its height inside the knotwork border
-      // (the frame's rules a few pixels clear of it); the right page takes the rest, up to half as wide again as tall
+      // the sides), the right page just wide enough for the circle, which fills its height inside the knotwork border
+      // (the frame's rules a few pixels clear of it); the left page takes the rest, up to half as wide again as tall
+      // (v169: the pages swapped, so the circle stands on the right as on the desktop spread)
       const bh = vh - 8, pad = 5, ph = bh - pad * 2;
       const B = { m: ph * 0.035, vh: Math.max(9, ph * 0.03) }; // (as borderSize gives for both pages: neither is narrower than tall)
       const half = (ph / 2 - B.m - B.vh - 6) / L.fr, lw = Math.ceil(2 * half * L.fr + 2 * (B.m + B.vh) + 24);
       const bw = Math.min(vw - 2 * Math.round(vh * 0.055), lw + pad * 2 + ph * 1.5);
       L.bx = (vw - bw) / 2; L.by = 4; L.bw = bw; L.bh = bh;
-      L.left = { x: L.bx + pad, y: L.by + pad, w: lw, h: ph };
-      L.right = { x: L.left.x + lw, y: L.by + pad, w: bw - pad * 2 - lw, h: ph };
-      L.area = { x: L.left.x + lw / 2 - half, y: L.left.y + ph / 2 - half, size: half * 2 };
-      // the column inside the right page's border (its bottom, where the buttons stand, just above the knotwork)
-      const P = L.right, inset = B.m + B.vh + 8;
+      const cw = bw - pad * 2 - lw;
+      L.left = { x: L.bx + pad, y: L.by + pad, w: cw, h: ph };
+      L.right = { x: L.left.x + cw, y: L.by + pad, w: lw, h: ph };
+      L.area = { x: L.right.x + lw / 2 - half, y: L.right.y + ph / 2 - half, size: half * 2 };
+      // the column inside the left page's border (its bottom, where the buttons stand, just above the knotwork)
+      const P = L.left, inset = B.m + B.vh + 8;
       L.side = { x: P.x + inset, y: P.y + 14, w: P.w - inset * 2, h: P.h - 14 - (B.m + B.vh + 4) };
     } else if (!single) {
       const bw = Math.min(vw - 40, (vh - 30) * 1.52, 1500), bh = bw / 1.52;
@@ -1505,7 +1507,7 @@ const Grim = {
     const pb = document.getElementById('pagebtns'), L = this.L; if (!pb || !L) return;
     this.headUnder();
     pb.classList.toggle('single', L.single);
-    // (a phone held sideways sets them out as upright, at the foot of its right-hand page)
+    // (a phone held sideways sets them out as upright, at the foot of its left-hand page, the column's)
     pb.classList.toggle('upright', L.single);
     this.fitButtons();
     pb.style.bottom = 'auto';
@@ -1523,7 +1525,8 @@ const Grim = {
     // upright: inside the knotwork border, always two rows (CSS: Notes, Undo, Blot, Recall and a ✕ for Close
     // across the page; Keep, Satchel and Inscribe between the bottom corner bosses, just above the vine), the
     // first row clear of the bosses' tops; the labels shrink to fit (large system text) rather than wrap to a third row
-    const P = L.right, B = this.borderSize(P), inset = B.m + B.vh + 4;
+    // (sideways, on the left page: the column's, the circle having the right one)
+    const P = L.side ? L.left : L.right, B = this.borderSize(P), inset = B.m + B.vh + 4;
     pb.style.left = (P.x + inset) + 'px'; pb.style.width = (P.w - inset * 2) + 'px';
     pb.style.setProperty('--bx', Math.max(0, B.m + B.bs * 0.9 + 4 - inset) + 'px');
     pb.style.rowGap = Math.max(4, B.bs * 0.9 - B.vh - 42) / 2 + 'px'; // (halved: the row break is an empty line of its own)
@@ -2220,10 +2223,10 @@ const Grim = {
     g.drawImage(this.book, 0, 0, innerWidth, innerHeight);
     if (this.open && this.anim < 1) this.pageTurn(g, e);
     this.drawMiniMap(g, t);
-    // sideways, everything of the circle's (a large seal's rune ring and places, the ink) stays inside the left
+    // sideways, everything of the circle's (a large seal's rune ring and places, the ink) stays inside the right
     // page's knotwork border
-    const clip = this.L.side && this.L.left;
-    if (clip) { const Q = this.L.left, b = this.borderSize(Q), k = b.m + b.vh; g.save(); g.beginPath(); g.rect(Q.x + k, Q.y + k, Q.w - k * 2, Q.h - k * 2); g.clip(); }
+    const clip = this.L.side && this.L.right;
+    if (clip) { const Q = this.L.right, b = this.borderSize(Q), k = b.m + b.vh; g.save(); g.beginPath(); g.rect(Q.x + k, Q.y + k, Q.w - k * 2, Q.h - k * 2); g.clip(); }
     const D = this.draft.a;
     // guide circle
     if (!D.seal) {

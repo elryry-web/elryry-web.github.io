@@ -18,7 +18,7 @@
 <style>
   :root {
     --ink: #2a1d3a; --gold: #e8c27a; --gold2: #b8893e; --parch: #f1e4c6; --night: #120d26;
-    --divider: none; --divider-gold: none;
+    --divider: none; --divider-gold: none; --divider-seal: none;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden; background: var(--night); color: #f3e7cc;
@@ -240,6 +240,33 @@
   .sheet .div { height: 40px; background: var(--divider) center/contain no-repeat; margin: 2px 0 8px; }
   .sheet p { font-size: 18px; line-height: 1.5; font-style: italic; margin: 0 0 14px; text-align: left; }
   .sheet p::first-letter { font-family: 'Cinzel Decorative', serif; font-style: normal; font-weight: 700; font-size: 2.6em; float: left; line-height: .9; margin: 4px 8px 0 0; color: #8e2f22; }
+  /* (v169) the Lesson Complete card's divider: its two lines either side of the lesson's own wax seal (the one its
+     folio entry shows: the same painting, tilt and size), which is pressed into the middle a moment after the card
+     appears. The divider is as tall as the seal from the start, so nothing moves when it lands; the card's little
+     shake at contact nudges top/left (no transform on the card: see LESSONS §11) */
+  #win .div { --stamp: 100px; position: relative; height: calc(var(--stamp) * .84); margin: 0 0 6px; background: none; }
+  #win .div::before { content: ''; position: absolute; left: 0; right: 0; top: calc(50% - 20px); height: 40px; background: var(--divider-seal) center / contain no-repeat; }
+  #win .stamp { position: absolute; left: 50%; top: 50%; width: var(--stamp); height: var(--stamp); margin: calc(var(--stamp) / -2) 0 0 calc(var(--stamp) / -2);
+    pointer-events: none; background: center / contain no-repeat;
+    transform: translateY(calc(var(--stamp) * -.04)) rotate(var(--tilt, -6deg)) scale(calc(var(--sz, 1) * .96));
+    filter: drop-shadow(0 2px 2px rgba(40,10,0,.45)); }
+  /* 300ms after the card shows, the seal comes down from a little above, larger and faint, presses in (a quick squash
+     just under its size, its shadow tightening) at 560ms, and settles by 720ms */
+  #win .stamp.go { animation: stampPress .42s linear .3s both; }
+  #win .sheet.thud { animation: cardThud .15s linear .56s; }
+  @keyframes stampPress {
+    0% { opacity: 0; transform: translateY(calc(var(--stamp) * -.36)) rotate(calc(var(--tilt, -6deg) + 5deg)) scale(calc(var(--sz, 1) * 1.42));
+      filter: drop-shadow(0 18px 10px rgba(40,10,0,.16)); animation-timing-function: ease-out; }
+    18% { opacity: .55; transform: translateY(calc(var(--stamp) * -.32)) rotate(calc(var(--tilt, -6deg) + 4.5deg)) scale(calc(var(--sz, 1) * 1.38));
+      filter: drop-shadow(0 16px 9px rgba(40,10,0,.18)); animation-timing-function: cubic-bezier(.55, 0, .9, .45); }
+    62% { opacity: 1; transform: translateY(calc(var(--stamp) * -.04)) rotate(var(--tilt, -6deg)) scale(calc(var(--sz, 1) * .89));
+      filter: drop-shadow(0 1px 1px rgba(40,10,0,.55)); animation-timing-function: ease-out; }
+    100% { opacity: 1; transform: translateY(calc(var(--stamp) * -.04)) rotate(var(--tilt, -6deg)) scale(calc(var(--sz, 1) * .96));
+      filter: drop-shadow(0 2px 2px rgba(40,10,0,.45)); }
+  }
+  @keyframes cardThud { 0% { top: 0; left: 0; } 30% { top: 2px; left: -1px; } 65% { top: -1px; left: 1px; } 100% { top: 0; left: 0; } }
+  @media (max-width: 520px) { #win .div { --stamp: 80px; } }
+  @media (prefers-reduced-motion: reduce) { #win .stamp.go, #win .sheet.thud { animation: none; } }
   .chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 6px 0 16px; }
   .chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 12px 3px 4px; border-radius: 20px; border: 1px solid rgba(90,60,40,.4);
     background: rgba(255,255,255,.35); font-family: 'Pinyon Script', cursive; font-size: 22px; color: #2a1830; }
@@ -498,6 +525,7 @@
     #title .foot { display: none; }
     .card .sheet, #satchel .sheet { padding: 18px 24px 16px; max-height: 94vh; }
     .sheet h3 { font-size: 24px; } .sheet .div { height: 24px; } .sheet p { font-size: 15px; line-height: 1.4; }
+    #win .div { --stamp: 80px; height: calc(var(--stamp) * .84); } #win .div::before { top: calc(50% - 12px); height: 24px; }
     #levels { padding: 2vh 0; } #levels .orn { height: 30px; margin-bottom: 6px; }
   }
 
@@ -682,7 +710,7 @@
   <div class="sheet">
     <div class="num">well written</div>
     <h3 id="winTitle">Lesson Complete</h3>
-    <div class="div"></div>
+    <div class="div"><i class="stamp" id="winSeal" aria-hidden="true"></i></div>
     <p id="winText"></p>
     <div class="row">
       <button class="btn ghost" id="bReplay" style="color:#6a3a1a;border-color:rgba(90,60,40,.5);background:rgba(255,255,255,.2)">Replay</button>
@@ -692,9 +720,9 @@
   </div>
 </div>
 
-<script src="js/ink.js?v=168"></script>
-<script src="js/world.js?v=168"></script>
-<script src="js/tips.js?v=168"></script>
-<script src="js/main.js?v=168"></script>
+<script src="js/ink.js?v=169"></script>
+<script src="js/world.js?v=169"></script>
+<script src="js/tips.js?v=169"></script>
+<script src="js/main.js?v=169"></script>
 </body>
 </html>

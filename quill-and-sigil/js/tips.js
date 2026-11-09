@@ -83,9 +83,9 @@ const Tips = (() => {
     ];
     // on the page, the note may also stand clear of the whole drawing circle, above or below it (upright phones)
     if (avoid) cands.push(['above', cx - bw / 2, avoid.y - gap - bh], ['below', cx - bw / 2, avoid.y + avoid.h + gap]);
-    // a phone on its side: the column beside the drawing circle
+    // a phone on its side: the column beside the drawing circle (v169: on the left page, so the note stands left of it)
     const SD = page() && Grim.L.side;
-    if (SD) cands.push(['right', SD.x + (SD.w - bw) / 2, SD.y + 4]);
+    if (SD) cands.push([SD.x < Grim.L.area.x ? 'left' : 'right', SD.x + (SD.w - bw) / 2, SD.y + 4]);
     const over = (ax, ay, aw, ah, b) => !b ? 0 : Math.max(0, Math.min(ax + aw, b.x + b.w) - Math.max(ax, b.x)) * Math.max(0, Math.min(ay + ah, b.y + b.h) - Math.max(ay, b.y));
     let best = null;
     for (const [side, x0, y0] of cands) {

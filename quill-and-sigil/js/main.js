@@ -907,6 +907,8 @@ const Game = {
     Save.data.unlocked = Math.max(Save.data.unlocked, Math.min(LEVELS.length, this.idx + 2));
     Save.save();
     const last = this.idx === LEVELS.length - 1, wonIdx = this.idx;
+    // (the lesson's wax seal, as its folio entry shows it, fetched now so it is ready when the card stamps it)
+    const seal = sealLook(wonIdx), sealSrc = `art/seal-${seal.n + 1}.png?v=2`; new Image().src = sealSrc;
     setTimeout(() => {
       if (this.state !== 'won' || this.idx !== wonIdx) return; // the player has already moved on
       // the last lesson of each folio says so; the very last closes the book
@@ -915,7 +917,15 @@ const Game = {
       const tally = `${this.casts} seal${this.casts === 1 ? '' : 's'} cast. The master's mark is ${par}.`;
       $('#winText').textContent = end ? `${end.text} ${tally}` : tally;
       $('#bNext').style.display = last ? 'none' : '';
+      // the seal pressed into the divider (CSS: #win .stamp.go, #win .sheet.thud), started afresh on every win, with a
+      // soft thud as it lands (560ms: the press's contact in stampPress)
+      const st = $('#winSeal'), sh = $('#win .sheet');
+      st.classList.remove('go'); sh.classList.remove('thud');
+      st.style.backgroundImage = `url(${sealSrc})`; st.style.setProperty('--tilt', seal.tilt + 'deg'); st.style.setProperty('--sz', seal.size);
+      void st.offsetWidth;
+      st.classList.add('go'); sh.classList.add('thud');
       this.showScreen('win');
+      setTimeout(() => { if (this.state === 'won' && this.idx === wonIdx) Sfx.play('bump', 0.7); }, 560);
     }, 1300);
   },
   next() { if (this.idx < LEVELS.length - 1) this.start(this.idx + 1); else this.lessons(); },
@@ -1715,6 +1725,14 @@ if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && windo
   g.strokeStyle = '#b8893e'; g.lineWidth = 0.6;
   g.beginPath(); g.moveTo(40, 34); g.lineTo(165, 34); g.moveTo(355, 34); g.lineTo(480, 34); g.stroke();
   document.documentElement.style.setProperty('--divider', `url(${c.toDataURL()})`);
+  // (the Lesson Complete card's: the same lines, a wider gap between them where its wax seal is pressed)
+  const c3 = document.createElement('canvas'); c3.width = 520; c3.height = 60;
+  const g3 = c3.getContext('2d');
+  g3.strokeStyle = '#4a2e1a'; g3.lineWidth = 1.2;
+  g3.beginPath(); g3.moveTo(20, 30); g3.lineTo(150, 30); g3.moveTo(370, 30); g3.lineTo(500, 30); g3.stroke();
+  g3.strokeStyle = '#b8893e'; g3.lineWidth = 0.6;
+  g3.beginPath(); g3.moveTo(40, 34); g3.lineTo(150, 34); g3.moveTo(370, 34); g3.lineTo(480, 34); g3.stroke();
+  document.documentElement.style.setProperty('--divider-seal', `url(${c3.toDataURL()})`);
   const c2 = document.createElement('canvas'); c2.width = 640; c2.height = 90;
   const g2 = c2.getContext('2d');
   fleuron(g2, 320, 45, 2.2, '#e8c27a', '#fff0c8');
