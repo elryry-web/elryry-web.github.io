@@ -97,6 +97,24 @@
   #pagebtns.tight { gap: 3px; } #pagebtns.tight .btn { letter-spacing: 0; padding-left: 0; padding-right: 0; font-size: 10px; }
   #pagebtns.tight .btn.primary { font-size: 11px; padding-left: 3px; padding-right: 3px; }
   #pagebtns.plaques .btn:hover { box-shadow: none; filter: drop-shadow(0 0 6px rgba(232,194,122,.8)) drop-shadow(0 2px 3px rgba(0,0,0,.45)); }
+  /* upright phones: always two rows, so the drawing circle keeps the page's width. Notes, Undo, Blot, Recall and a ✕ for
+     Close across the page; Keep, Satchel and Inscribe below, between the bottom corner bosses (--bx, set in placeButtons).
+     The plaques are a fixed thumb-sized 42px tall and the labels shrink to fit them (fitButtons) instead of wrapping. */
+  #pagebtns.upright { gap: 4px 4px; }
+  #pagebtns.upright::after { content: ''; flex: 0 0 100%; order: 1; }
+  #pagebtns.upright .btn, #pagebtns.upright .btn.primary { box-sizing: border-box; height: 42px; min-width: 0; flex: 1 1 0;
+    white-space: nowrap; overflow: hidden; padding: 0 2px; letter-spacing: .02em; font-size: 12px; line-height: 1; }
+  #pagebtns.upright .btn.primary { font-size: 13px; }
+  #pagebtns.upright #pNotes, #pagebtns.upright #pUndo { flex-grow: 1.1; }
+  #pagebtns.upright #pBlot { flex-grow: .8; }
+  #pagebtns.upright #pClose { flex: 0 0 42px; font-size: 0; }
+  #pagebtns.upright #pClose::before { content: '\2715'; font-size: 17px; }
+  #pagebtns.upright #pKeep, #pagebtns.upright #pSatchel, #pagebtns.upright #pInscribe { order: 2; }
+  #pagebtns.upright #pKeep { margin-left: var(--bx, 0px); }
+  #pagebtns.upright #pSatchel { flex-grow: 1.15; }
+  #pagebtns.upright #pInscribe { margin-right: var(--bx, 0px); flex-grow: 1.35; }
+  #pagebtns.upright #satCount:not(:empty)::before { content: none; }
+  #pagebtns.upright #satCount:not(:empty) { font-size: .8em; vertical-align: .45em; margin-left: 2px; }
 
   /* ---------- screens & cards ---------- */
   .screen, .card { position: fixed; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center;
@@ -639,9 +657,9 @@
   </div>
 </div>
 
-<script src="js/ink.js?v=165"></script>
-<script src="js/world.js?v=165"></script>
-<script src="js/tips.js?v=165"></script>
-<script src="js/main.js?v=165"></script>
+<script src="js/ink.js?v=166"></script>
+<script src="js/world.js?v=166"></script>
+<script src="js/tips.js?v=166"></script>
+<script src="js/main.js?v=166"></script>
 </body>
 </html>

@@ -943,6 +943,7 @@ const Game = {
     const list = $('#satList'), bar = $('#hotbar');
     list.innerHTML = ''; bar.innerHTML = '';
     $('#satCount').textContent = Satchel.list.length || '';
+    Grim.fitButtons(); // (the count can crowd the upright plaque's label)
     if (!Satchel.list.length) list.innerHTML = '<div class="empty">Your satchel is empty. Draft a spell on the page, then keep it here to cast again without redrawing.</div>';
     Satchel.list.forEach((e, i) => {
       const inf = Satchel.info(i), ok = !allowed || !Satchel.spell(i, allowed).err;
@@ -1548,7 +1549,7 @@ Satchel.load();
 Grim.init(document.getElementById('page'));
 resize();
 Game.title();
-if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { Grim.bookDirty = true; });
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { Grim.bookDirty = true; Grim.fitButtons(); });
 ['700 30px "Cinzel Decorative"', '30px "Pinyon Script"', 'italic 16px "IM Fell English"', '600 12px Cinzel', '700 30px Cinzel'].forEach(f => { try { document.fonts.load(f).then(() => { Grim.bookDirty = true; }); } catch (e) { } });
 
 let lastT = performance.now(), acc = 0;

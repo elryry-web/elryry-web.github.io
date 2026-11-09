@@ -1149,12 +1149,12 @@ const Grim = {
       L.area = { x: P.x + (P.w - size) / 2, y: top + Math.max(0, room - size) * 0.5, size };
     } else {
       // upright: the circle takes nearly the page's full width (the width is what limits it) and the book grows
-      // as tall as it needs — header, circle, then the status, the buttons (as tall as they measured) and the
-      // bottom border with its corner bosses
-      const HEAD = 134, pad = 4;
+      // as tall as it needs — header, circle, then the status, the buttons' two rows (as tall as they measured)
+      // and the bottom border: the last row sits between the bottom corner bosses, just above the vine
+      const HEAD = 128, pad = 4;
       const bw = Math.min(vw - 4, 640), pw = bw - pad * 2;
       // (the status: the name clear of the ring and two lines of read-back, as statusAt places them — more on wider pages)
-      const FOOT = Math.max(64, 78 * pw / 520 + 15) + (this.btnH || 70) + pw * (0.035 + 0.14 * 0.9) + 8;
+      const FOOT = Math.max(64, 78 * pw / 520 + 15) + (this.btnH || 88) + pw * 0.035 + Math.max(9, pw * 0.03) + 6;
       // the whole drawing circle stays inside the page's border (margin m, plus room for the vine's leaves)
       const m = pw * 0.035;
       const size = Math.max(160, Math.min((pw - 2 * (m + 9)) * 0.99 / L.fr, vh - 4 - pad * 2 - HEAD - FOOT));
@@ -1185,6 +1185,8 @@ const Grim = {
     const pb = document.getElementById('pagebtns'), L = this.L; if (!pb || !L) return;
     const vh = innerHeight;
     pb.classList.toggle('single', L.single);
+    pb.classList.toggle('upright', L.single && !L.side);
+    this.fitButtons();
     if (L.side) {
       pb.style.left = L.side.x + 'px'; pb.style.width = L.side.w + 'px';
       pb.style.top = 'auto'; pb.style.bottom = (vh - (L.side.y + L.side.h)) + 'px';
@@ -1202,20 +1204,35 @@ const Grim = {
       pb.style.top = Math.min(Math.max(L.area.y + L.area.size + P.h * 0.1, this.statusAt().end), P.y + P.h - B.m - B.vh - 8 - h) + 'px';
       return;
     }
-    // upright: inside the knotwork border, the last row clear of the bottom corner bosses
+    // upright: inside the knotwork border, always two rows (CSS: Notes, Undo, Blot, Recall and a ✕ for Close
+    // across the page; Keep, Satchel and Inscribe between the bottom corner bosses, just above the vine), the
+    // first row clear of the bosses' tops; the labels shrink to fit (large system text) rather than wrap to a third row
     const P = L.right, B = this.borderSize(P), inset = B.m + B.vh + 4;
     pb.style.left = (P.x + inset) + 'px'; pb.style.width = (P.w - inset * 2) + 'px';
+    pb.style.setProperty('--bx', Math.max(0, B.m + B.bs * 0.9 + 4 - inset) + 'px');
+    pb.style.rowGap = Math.max(4, B.bs * 0.9 - B.vh - 42) / 2 + 'px'; // (halved: the row break is an empty line of its own)
     if (pb.style.display === 'flex') {
-      // three rows (large text, or the satchel's count) tighten the plaques; then the page makes room for what is left
-      const rows = () => new Set([...pb.children].filter(b => b.offsetParent).map(b => b.offsetTop)).size;
-      if (rows() > 2) pb.classList.add('tight');
       const h = pb.offsetHeight;
-      if (h && Math.abs(h - (this.btnH || 70)) > 2 && (this._relaid = (this._relaid || 0) + 1) < 4) {
+      if (h && Math.abs(h - (this.btnH || 88)) > 2 && (this._relaid = (this._relaid || 0) + 1) < 4) {
         this.btnH = h; this.layout(); this.bookDirty = true; this.inkDirty = true; this._relaid = 0;
         return;
       }
     }
-    pb.style.top = (P.y + P.h - B.m - B.bs * 0.9 - 4 - (this.btnH || 70)) + 'px';
+    pb.style.top = (P.y + P.h - inset - (this.btnH || 88)) + 'px';
+  },
+  // upright, each page button's label shrinks until it fits its plaque (Firefox for Android scales text up with the
+  // system font size, which used to wrap the buttons to a third row and shrink the circle); elsewhere they keep the CSS size
+  fitButtons() {
+    const pb = document.getElementById('pagebtns'); if (!pb) return;
+    for (const b of pb.children) b.style.fontSize = '';
+    if (!pb.classList.contains('upright') || pb.style.display !== 'flex') return;
+    for (const b of pb.children) {
+      if (!b.offsetParent || b.id === 'pClose') continue;
+      for (let n = 0; n < 6 && b.scrollWidth > b.clientWidth + 0.5; n++) {
+        const fs = parseFloat(getComputedStyle(b).fontSize);
+        b.style.fontSize = Math.max(7, fs * b.clientWidth / b.scrollWidth * 0.97).toFixed(2) + 'px';
+      }
+    }
   },
   /* screen rects of things on the page, for the tips (js/tips.js): 'guide', 'centre', 'slot:k', 'sign', 'status',
      'codex:id', 'area' (the whole drawing circle with its eight places) */
