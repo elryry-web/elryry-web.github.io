@@ -1022,12 +1022,70 @@ function parchment() {
    cartouche, a framed map, roundels round the sigils and the seal's eight places, a lapis drop cap, a triskele
    tailpiece. The v150 vine, rosettes, rim, ribbon, medals and plaques stay in art/ but are no longer loaded.) */
 const GART = {};
-for (const f of ['page.jpg', 'leather.jpg', 'cap.png', 'knot.png', 'boss.png', 'title.png', 'frame.png', 'roundel.png', 'capframe.png', 'triskele.png']) {
+for (const f of ['page.jpg', 'knot.png', 'boss.png', 'title.png', 'frame.png', 'roundel.png', 'capframe.png', 'triskele.png']) {
   const k = f.split('.')[0], im = new Image();
   im.onload = () => { GART[k] = im; Grim.bookDirty = true; };
   im.src = `art/grim-${f}?v=1`;
 }
 function gart(k) { return typeof CLASSIC !== 'undefined' && CLASSIC.on ? null : GART[k] || null; }
+/* The book itself: the owner's painting of an open book, the one the folio of lessons shows, cut into slices
+   so its cover, gilt corners, block of leaves and fold keep their shape and only the plain parchment stretches (book:
+   the spread; page: the right-hand page alone, for one page). Measured in the pictures' own pixels: rx / ry, the
+   middles of each page's double ruled border (painted out once the picture loads: the knotwork is the page's one
+   border); spine, the fold; cx / cy, where the fixed slices end and the stretched ones begin; leaf, the plain
+   parchment inside the page's ruled border, untouched by the painting-out (the turning leaf, the Notes leaf). */
+const FOLIO_ART = {
+  book: { src: 'folio-book.jpg', w: 2000, h: 1116, spine: 999, rx: [213, 908.5, 1090.75, 1786.5], ry: [128.75, 983.5], cx: [243, 870, 1130, 1757], cy: [167, 944] },
+  page: { src: 'folio-page.jpg', w: 1000, h: 1051, spine: 58, rx: [144, 798.75], ry: [121, 926], cx: [175, 773], cy: [157, 890], leaf: [156, 134, 630, 780] },
+};
+const FOLIO = {};
+for (const k in FOLIO_ART) {
+  const im = new Image();
+  im.onload = () => { FOLIO[k] = folioClean(im, FOLIO_ART[k]); Grim.bookDirty = true; };
+  im.src = `art/${FOLIO_ART[k].src}?v=1`;
+}
+function folioArt(k) { return typeof CLASSIC !== 'undefined' && CLASSIC.on ? null : FOLIO[k] || null; }
+// a leaf of the painted book's parchment laid in a box (fill: stretched to it whole, edges and all; otherwise its
+// middle cropped to the box's shape), turned over by flip. False until the picture has loaded (and in the old look)
+function folioLeaf(g, x, y, w, h, flip, fill) {
+  const im = folioArt('page'); if (!im) return false;
+  let [sx, sy, sw, sh] = FOLIO_ART.page.leaf;
+  if (!fill) { const k = Math.max(w / sw, h / sh), cw = w / k, ch = h / k; sx += (sw - cw) / 2; sy += (sh - ch) / 2; sw = cw; sh = ch; }
+  g.save(); g.translate(x + (flip ? w : 0), y); if (flip) g.scale(-1, 1);
+  g.drawImage(im, sx, sy, sw, sh, 0, 0, w, h); g.restore();
+  return true;
+}
+// the picture with its ruled borders painted out: each rule (both its lines) covered by the parchment just inside it,
+// then each corner's little squares and quarter-rounds by a patch from further in
+function folioClean(im, A) {
+  const c = document.createElement('canvas'); c.width = A.w; c.height = A.h;
+  const g = c.getContext('2d'); g.drawImage(im, 0, 0);
+  const hw = 10, off = hw * 2 + 4, ext = 30, cr = 32, co = 70, [t, b] = A.ry; // (the rules wander a few pixels)
+  const copy = (sx, sy, w, h, dx, dy) => g.drawImage(c, sx, sy, w, h, dx, dy, w, h);
+  for (let p = 0; p < A.rx.length; p += 2) {
+    const l = A.rx[p], r = A.rx[p + 1];
+    for (const [x, d] of [[l, 1], [r, -1]]) copy(x - hw + d * off, t - ext, hw * 2, b - t + ext * 2, x - hw, t - ext);
+    for (const [y, d] of [[t, 1], [b, -1]]) copy(l - ext, y - hw + d * off, r - l + ext * 2, hw * 2, l - ext, y - hw);
+    for (const [x, dx] of [[l, 1], [r, -1]]) for (const [y, dy] of [[t, 1], [b, -1]]) copy(x - cr + dx * co, y - cr + dy * co, cr * 2, cr * 2, x - cr, y - cr);
+  }
+  return c;
+}
+// the picture laid out in slices: xs / ys, each slice's span in the picture (a0, a1) and on the screen (d0, d1); a
+// stretched slice laid n times (n odd: every other one mirrored, so they join, and the last meets the next slice)
+function folioSlices(g, im, xs, ys, dpr) {
+  const r = v => Math.round(v * dpr) / dpr;
+  for (const X of xs) for (const Y of ys) {
+    const nx = X.n || 1, ny = Y.n || 1, dw = (X.d1 - X.d0) / nx, dh = (Y.d1 - Y.d0) / ny;
+    for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) {
+      const x0 = r(X.d0 + i * dw), x1 = r(X.d0 + (i + 1) * dw), y0 = r(Y.d0 + j * dh), y1 = r(Y.d0 + (j + 1) * dh);
+      if (x1 <= x0 || y1 <= y0) continue;
+      const fx = i % 2, fy = j % 2;
+      g.save(); g.translate(fx ? x1 : x0, fy ? y1 : y0); g.scale(fx ? -1 : 1, fy ? -1 : 1);
+      g.drawImage(im, X.a0, Y.a0, X.a1 - X.a0, Y.a1 - Y.a0, 0, 0, x1 - x0, y1 - y0);
+      g.restore();
+    }
+  }
+}
 // an image with its corner at (x, y), turned outwards by fx/fy = ±1 (for the four corners of a page)
 function drawFlip(g, im, x, y, w, h, fx, fy) { g.save(); g.translate(x, y); g.scale(fx, fy); g.drawImage(im, 0, 0, w, h); g.restore(); }
 // an image cropped to fill a box without stretching
@@ -1060,15 +1118,199 @@ function vineRun(g, x0, y0, x1, y1, h, dpr) {
   q.fillStyle = gr; q.fillRect(0, 0, len, h);
   g.save(); g.translate(x0, y0); g.rotate(Math.atan2(y1 - y0, x1 - x0)); g.drawImage(c, 0, -h / 2, len, h); g.restore();
 }
-// gilded lettering: a dark edge, a gold body lit from above
+// gilded lettering, painted the way a miniature painter paints gold without metal paint, on letters cut the way a
+// chisel cuts them: every stroke rises from both its edges to a sharp spine down its middle (where strokes meet, the
+// spines mitre), so it has two faces, and the light, from the upper left and a little from in front, falls on each
+// face by the way it turns: a stem's left face bright and its right face in shadow, a bar's top bright and its
+// underside dark, each diagonal and each curve its own way, so no two letters catch it alike. Lit faces run to pale
+// gold and the turned-away ones through ochre to a deep red-brown, never grey; a little warm light is thrown back
+// into the shadowed faces, and the sky above is a touch brighter than the ground. A dark brown lining holds the word,
+// and a pinpoint dot of near-white or two sits on its brightest spots (chosen from the text, so they never shimmer).
+// The word is built once on its own canvas (keyed by text, font and pixel ratio), worked out on a grid finer than the
+// screen's so a phone's narrow strokes still have room for both faces, and laid on the page from there.
+// (each point's distance from the edge of the letters, plus inside, minus outside: the edge found to a fraction of a
+// pixel from the letters' own soft rim (a rim pixel's coverage says how far the edge lies from its centre, its
+// neighbours which way), then carried inwards by passing each point's nearest edge point on to its neighbours, a
+// sweep down and a sweep back, only in and just round the letters. Measured to true edge points rather than to whole pixels, a slanting or
+// curving stroke has no staircase in it, so its faces come out even.)
+function edgeDist(A, W, H) {
+  const N = W * H, sx = new Float32Array(N), sy = new Float32Array(N), d2 = new Float32Array(N).fill(1e12);
+  for (let y = 1; y < H - 1; y++) for (let x = 1, o = y * W + 1; x < W - 1; x++, o++) {
+    const a = A[o], inn = a >= 128;
+    if (!(a > 0 && a < 255) && inn === (A[o - 1] >= 128) && inn === (A[o + 1] >= 128) && inn === (A[o - W] >= 128) && inn === (A[o + W] >= 128)) continue;
+    const gx = A[o - W + 1] + 2 * A[o + 1] + A[o + W + 1] - A[o - W - 1] - 2 * A[o - 1] - A[o + W - 1];
+    const gy = A[o + W - 1] + 2 * A[o + W] + A[o + W + 1] - A[o - W - 1] - 2 * A[o - W] - A[o - W + 1];
+    const gl = Math.hypot(gx, gy); if (!gl) continue;
+    const t = (a / 255 - 0.5) / gl, ex = gx * t, ey = gy * t;
+    sx[o] = x - ex; sy[o] = y - ey; d2[o] = ex * ex + ey * ey;
+  }
+  // only the letters and a few pixels round them need a distance (the shading never looks further out)
+  const M = new Uint8Array(N), R = 4;
+  for (let y = 0; y < H; y++) {
+    let r = 99; for (let x = 0, o = y * W; x < W; x++, o++) { r = A[o] ? 0 : r + 1; if (r <= R) M[o] = 1; }
+    r = 99; for (let x = W - 1, o = y * W + x; x >= 0; x--, o--) { r = A[o] ? 0 : r + 1; if (r <= R) M[o] = 1; }
+  }
+  for (let x = 0; x < W; x++) {
+    let r = 99; for (let y = 0, o = x; y < H; y++, o += W) { r = M[o] === 1 ? 0 : r + 1; if (r <= R && !M[o]) M[o] = 2; }
+    r = 99; for (let y = H - 1, o = y * W + x; y >= 0; y--, o -= W) { r = M[o] === 1 ? 0 : r + 1; if (r <= R && !M[o]) M[o] = 2; }
+  }
+  const take = (o, n, x, y) => {
+    if (d2[n] >= 1e12) return;
+    const ex = x - sx[n], ey = y - sy[n], e = ex * ex + ey * ey;
+    if (e < d2[o]) { d2[o] = e; sx[o] = sx[n]; sy[o] = sy[n]; }
+  };
+  for (let y = 1; y < H - 1; y++) {
+    for (let x = 1, o = y * W + 1; x < W - 1; x++, o++) if (M[o]) { take(o, o - W - 1, x, y); take(o, o - W, x, y); take(o, o - W + 1, x, y); take(o, o - 1, x, y); }
+    for (let x = W - 2, o = y * W + x; x > 0; x--, o--) if (M[o]) take(o, o + 1, x, y);
+  }
+  for (let y = H - 2; y > 0; y--) {
+    for (let x = W - 2, o = y * W + x; x > 0; x--, o--) if (M[o]) { take(o, o + W + 1, x, y); take(o, o + W, x, y); take(o, o + W - 1, x, y); take(o, o + 1, x, y); }
+    for (let x = 1, o = y * W + 1; x < W - 1; x++, o++) if (M[o]) take(o, o - 1, x, y);
+  }
+  const h = new Float32Array(N);
+  for (let i = 0; i < N; i++) h[i] = d2[i] >= 1e12 ? (A[i] >= 128 ? 99 : -99) : (A[i] >= 128 ? 1 : -1) * Math.sqrt(d2[i]);
+  return h;
+}
+// the gold's colours, from the deepest shadow to the brightest light (a value of 0 to 1.25, in 256 steps)
+let _goldRamp = null;
+function goldRamp() {
+  if (_goldRamp) return _goldRamp;
+  const st = [[0, '#3a1407'], [0.12, '#5e2510'], [0.27, '#86411a'], [0.41, '#b06a2a'], [0.54, '#d0963c'], [0.66, '#e6b552'],
+    [0.78, '#f2cf72'], [0.9, '#f8e2a0'], [1, '#fbecbf'], [1.25, '#fffbec']].map(([v, c]) => [v, parseInt(c.slice(1), 16)]);
+  const r = new Uint8Array(768);
+  for (let i = 0; i < 256; i++) {
+    const v = i / 204; let j = 0; while (j < st.length - 2 && st[j + 1][0] < v) j++;
+    const [v0, c0] = st[j], [v1, c1] = st[j + 1], t = Math.max(0, Math.min(1, (v - v0) / (v1 - v0)));
+    for (let ch = 0; ch < 3; ch++) { const a = c0 >> (16 - ch * 8) & 255, b = c1 >> (16 - ch * 8) & 255; r[i * 3 + ch] = Math.round(a + (b - a) * t); }
+  }
+  return (_goldRamp = r);
+}
+const _gold = new Map();
+function goldWord(g, text, size) {
+  const m = g.getTransform(), k = Math.max(1, Math.hypot(m.a, m.b)), font = g.font, base = g.textBaseline;
+  const key = `${text}|${font}|${base}|${size}|${k}`;
+  let w = _gold.get(key); if (w) return w;
+  const t0 = performance.now();
+  const pad = size * 0.32, y0 = size * 1.25, H = size * 2.3;
+  const mk = () => { const c = document.createElement('canvas'), q = c.getContext('2d'); q.font = font; return [c, q]; };
+  const [mc, mq] = mk(), tw = decoWidth(mq, text), W = tw + pad * 2, DW = Math.ceil(W * k), DH = Math.ceil(H * k);
+  // (the finer grid: enough that the main strokes are a dozen or so of its pixels across)
+  const ss = Math.max(1, Math.min(4, Math.ceil(100 / (size * k)))), sk = k * ss, SW = DW * ss, SH = DH * ss;
+  const [sc, sq] = mk(), [oc, oq] = mk();
+  for (const [c, q, d] of [[mc, mq, k], [oc, oq, k], [sc, sq, sk]]) {
+    c.width = DW * d / k; c.height = DH * d / k; q.setTransform(d, 0, 0, d, 0, 0); q.font = font; q.textBaseline = base; q.textAlign = 'left';
+  }
+  // the light is set by the capitals' own head and foot (plain Cinzel's H: the decorative face's own H is a tall
+  // swash); where the browser cannot say, by the drawn letters themselves
+  mq.font = font.replace(/"Cinzel Decorative"/, 'Cinzel'); const hm = mq.measureText('H'); mq.font = font;
+  sq.fillStyle = '#000'; decoText(sq, text, pad, y0, (t, x, y) => sq.fillText(t, x, y));
+  const sa = sq.getImageData(0, 0, SW, SH).data;
+  let top, bot;
+  if (hm.actualBoundingBoxAscent > 0) { top = y0 - hm.actualBoundingBoxAscent; bot = y0 + hm.actualBoundingBoxDescent; }
+  else {
+    let r0 = SH, r1 = 0;
+    for (let iy = 0; iy < SH; iy++) for (let ix = 0, o = iy * SW * 4 + 3; ix < SW; ix++, o += 4) if (sa[o] > 100) { r0 = Math.min(r0, iy); r1 = iy; break; }
+    if (r1 <= r0) { r0 = (y0 - size * 0.75) * sk; r1 = y0 * sk; }
+    top = r0 / sk; bot = (r1 + 1) / sk;
+  }
+  const ch = bot - top;
+  let seed = 7; for (const c of String(text)) seed = (seed * 31 + c.charCodeAt(0)) >>> 0;
+  const R = mulberry(seed);
+  // (worked only over the rows the letters touch, and a few more)
+  let Y0 = SH, Y1 = 0;
+  for (let y = 0; y < SH; y++) for (let x = 0, o = y * SW * 4 + 3; x < SW; x++, o += 4) if (sa[o]) { if (y < Y0) Y0 = y; Y1 = y; break; }
+  Y0 = Math.max(0, Y0 - 4); Y1 = Math.min(SH - 1, Math.max(Y0, Y1 + 4));
+  const GH = Y1 - Y0 + 1, N = SW * GH, A = new Uint8Array(N);
+  for (let i = 0, o = Y0 * SW * 4 + 3; i < N; i++, o += 4) A[i] = sa[o];
+  // each stroke's height is its distance in from the nearest edge: so it rises to a spine down its middle (smoothed
+  // over a pixel, which evens the faces; the spine is kept sharp below by turning each face fully as soon as it leans)
+  const h = edgeDist(A, SW, GH), h2 = new Float32Array(N);
+  for (let y = 0; y < GH; y++) for (let x = 1, o = y * SW + 1; x < SW - 1; x++, o++) h2[o] = (h[o - 1] + 2 * h[o] + h[o + 1]) / 4;
+  for (let y = 1; y < GH - 1; y++) for (let x = 0, o = y * SW; x < SW; x++, o++) h[o] = (h2[o - SW] + 2 * h2[o] + h2[o + SW]) / 4;
+  // the light: from the upper left and a little in front (L), its glare (Hh, half way to the eye), and warm light
+  // thrown back from the lower right into the shadowed faces (B)
+  const nz = (x, y, z) => { const l = Math.hypot(x, y, z); return [x / l, y / l, z / l]; };
+  const [Lx, Ly, Lz] = nz(-0.72, -0.5, 0.5), [Hx, Hy, Hz] = nz(Lx, Ly, Lz + 1), [Bx, By, Bz] = nz(0.6, 0.55, 0.35);
+  const S = 1.15, ramp = goldRamp(), V = new Float32Array(N);
+  // which way each face leans is taken from the slope smoothed over a few pixels (so an edge's stair-steps don't
+  // streak the faces); the smoothed slope still flips sign right on the spine, so the spine stays a sharp line
+  const fx = new Float32Array(N), fy = new Float32Array(N), tx = new Float32Array(N), ty = new Float32Array(N);
+  for (let y = 1; y < GH - 1; y++) for (let x = 1, o = y * SW + 1; x < SW - 1; x++, o++) { fx[o] = h[o + 1] - h[o - 1]; fy[o] = h[o + SW] - h[o - SW]; }
+  for (let p = 0; p < 2; p++) {
+    for (let y = 0; y < GH; y++) for (let x = 1, o = y * SW + 1; x < SW - 1; x++, o++) { tx[o] = fx[o - 1] + 2 * fx[o] + fx[o + 1]; ty[o] = fy[o - 1] + 2 * fy[o] + fy[o + 1]; }
+    for (let y = 1; y < GH - 1; y++) for (let x = 0, o = y * SW; x < SW; x++, o++) { fx[o] = tx[o - SW] + 2 * tx[o] + tx[o + SW]; fy[o] = ty[o - SW] + 2 * ty[o] + ty[o + SW]; }
+  }
+  for (let y = 1; y < GH - 1; y++) {
+    const tY = Math.max(0, Math.min(1, ((y + Y0 + 0.5) / sk - top) / ch)), bias = 0.08 * (0.5 - tY);
+    for (let x = 1, o = y * SW + 1; x < SW - 1; x++, o++) {
+      if (!A[o]) continue;
+      const gl = Math.hypot(h[o + 1] - h[o - 1], h[o + SW] - h[o - SW]) / 2, fl = Math.hypot(fx[o], fy[o]) || 1, tl = S * Math.min(1, gl / 0.3) / fl;
+      let nx = -tl * fx[o], ny = -tl * fy[o], l = Math.hypot(nx, ny, 1); nx /= l; ny /= l; const nzz = 1 / l;
+      const dl = nx * Lx + ny * Ly + nzz * Lz, sp = Math.max(0, nx * Hx + ny * Hy + nzz * Hz), bk = Math.max(0, nx * Bx + ny * By + nzz * Bz);
+      let v = 0.6 + 0.8 * (dl - Lz) + 0.14 * -ny + 0.16 * bk * bk + 0.5 * sp ** 24 + bias;
+      // (the deepest shadows held up a little: still red-brown, never black)
+      V[o] = v < 0.22 ? 0.22 - (0.22 - v) * 0.45 : v;
+    }
+  }
+  // down to the screen's grid: each pixel the average of its little block (by how much of it is letter)
+  const out = oq.createImageData(DW, DH), od = out.data, VO = new Float32Array(DW * DH), s2 = ss * ss;
+  for (let Y = Math.floor(Y0 / ss); Y <= Math.floor(Y1 / ss); Y++) for (let X = 0; X < DW; X++) {
+    let r = 0, gg = 0, b = 0, a = 0, vv = 0;
+    for (let j = 0; j < ss; j++) {
+      const gy = Y * ss + j - Y0; if (gy < 0 || gy >= GH) continue;
+      for (let i = 0, o = gy * SW + X * ss; i < ss; i++, o++) {
+        const al = A[o]; if (!al) continue;
+        const v = V[o], c = Math.max(0, Math.min(255, Math.round(v * 204))) * 3;
+        r += ramp[c] * al; gg += ramp[c + 1] * al; b += ramp[c + 2] * al; a += al; vv += v * al;
+      }
+    }
+    if (!a) continue;
+    const p = (Y * DW + X) * 4; od[p] = r / a; od[p + 1] = gg / a; od[p + 2] = b / a; od[p + 3] = a / s2;
+    if (a >= 250 * s2) VO[Y * DW + X] = vv / a;
+  }
+  const [gc, gq] = mk(); gc.width = DW; gc.height = DH; gq.putImageData(out, 0, 0);
+  // the word: a soft shadow on the page, the dark brown lining, the gold on it
+  oq.save(); oq.lineJoin = 'round';
+  oq.shadowColor = 'rgba(45,14,6,0.3)'; oq.shadowOffsetX = size * 0.02 * k; oq.shadowOffsetY = size * 0.035 * k; oq.shadowBlur = size * 0.05 * k;
+  oq.strokeStyle = '#3e140a'; oq.lineWidth = Math.max(1.1, size * 0.062);
+  decoText(oq, text, pad, y0, (t, x, y) => oq.strokeText(t, x, y)); oq.restore();
+  oq.save(); oq.setTransform(1, 0, 0, 1, 0, 0); oq.drawImage(gc, 0, 0); oq.restore();
+  // pinpoint highlights: a dot of near-white on the brightest spots of the lit faces, well apart
+  const want = Math.max(1, Math.min(3, Math.round(String(text).replace(/\s/g, '').length / 4)));
+  let vmax = 0; for (let i = 0; i < VO.length; i++) if (VO[i] > vmax) vmax = VO[i];
+  const cand = [];
+  // (rather on the letters' upper parts, under the sky)
+  for (let i = 0; i < VO.length; i++) if (VO[i] > vmax - 0.15) {
+    const tY = ((Math.floor(i / DW) + 0.5) / k - top) / ch; cand.push([VO[i] - 0.12 * tY + R() * 0.04, i]);
+  }
+  cand.sort((a, b) => b[0] - a[0]);
+  const got = [];
+  for (const [, i] of cand) {
+    if (got.length >= want) break;
+    const x = (i % DW + 0.5) / k, y = (Math.floor(i / DW) + 0.5) / k;
+    if (got.some(p => Math.abs(p[0] - x) < size * 1.6)) continue;
+    got.push([x, y]);
+  }
+  // (a solid dot, its edge only just softened: about three screen pixels across on a phone's title)
+  const px1 = 1 / k, rd = Math.max(0.6, size * 0.032), rr = rd + 0.7 * px1;
+  for (const [x, y] of got) {
+    const rg = oq.createRadialGradient(x, y, 0, x, y, rr);
+    rg.addColorStop(0, 'rgba(255,254,246,1)'); rg.addColorStop(rd / rr * 0.7, 'rgba(255,253,240,1)'); rg.addColorStop(1, 'rgba(255,246,210,0)');
+    oq.fillStyle = rg; oq.beginPath(); oq.arc(x, y, rr, 0, Math.PI * 2); oq.fill();
+  }
+  goldWord.ms = performance.now() - t0;
+  w = { c: oc, W: DW / k, H: DH / k, ox: pad, oy: y0, tw };
+  // (built before the fonts arrive it would keep the fallback face, so then it is built again next time)
+  if (!document.fonts || document.fonts.check(font)) { if (_gold.size > 40) _gold.clear(); _gold.set(key, w); }
+  return w;
+}
 function goldText(g, text, x, y, size) {
-  const gr = g.createLinearGradient(0, y - size * 0.78, 0, y + size * 0.05);
-  gr.addColorStop(0, '#f7e29a'); gr.addColorStop(0.42, '#d2a24a'); gr.addColorStop(0.58, '#9c6a22'); gr.addColorStop(1, '#dcb45c');
-  g.save(); g.lineJoin = 'round';
-  g.shadowColor = 'rgba(70,40,10,0.35)'; g.shadowOffsetY = Math.max(1, size * 0.04); g.shadowBlur = size * 0.06;
-  g.strokeStyle = 'rgba(66,36,12,0.9)'; g.lineWidth = Math.max(1.2, size * 0.075); decoText(g, text, x, y, (t, x, y) => g.strokeText(t, x, y));
-  g.shadowColor = 'transparent'; g.fillStyle = gr; decoText(g, text, x, y, (t, x, y) => g.fillText(t, x, y));
-  g.restore();
+  if (!text) return;
+  const w = goldWord(g, text, size), al = g.textAlign, m = g.getTransform();
+  let lx = x - w.ox - (al === 'center' ? w.tw / 2 : al === 'right' || al === 'end' ? w.tw : 0), ty = y - w.oy;
+  // (laid on whole pixels, so it stays crisp)
+  if (!m.b && !m.c && m.a && m.d) { lx = (Math.round(m.a * lx + m.e) - m.e) / m.a; ty = (Math.round(m.d * ty + m.f) - m.f) / m.d; }
+  g.drawImage(w.c, lx, ty, w.W, w.H);
 }
 // a sigil in its knotwork roundel (whose outer edge is (r + 3) / 0.6)
 function medalGlyph(g, id, cx, cy, r, lw) {
@@ -1110,7 +1352,8 @@ const Grim = {
   },
   layout() {
     const vw = innerWidth, vh = innerHeight;
-    // a phone held sideways: one wide page, the drawing circle on the left, everything else in a column beside it
+    // a phone held sideways: the book open at two pages, the drawing circle on the left one, everything else in a
+    // column on the right one
     const side = vh < 560 && vw > vh * 1.25;
     const single = side || vw < 900 || vh > vw * 0.95;
     // (the ring round the drawing circle, in half-widths: snug on one page, and snugger upright, where the width
@@ -1118,19 +1361,20 @@ const Grim = {
     const L = { single, side: null, fr: side ? 0.99 : single ? 0.97 : 1.04 };
     SLOT_SIZE = single ? 0.32 : 0.27;
     if (side) {
-      // the height is all a sideways phone has: the book runs nearly edge to edge and the circle fills the page's height
-      const bh = vh - 8, bw = Math.min(vw - 16, bh * 2.6);
+      // the height is all a sideways phone has: the book runs nearly edge to edge (leaving the painted cover room at
+      // the sides), the left page just wide enough for the circle, which fills its height inside the knotwork border
+      // (the frame's rules a few pixels clear of it); the right page takes the rest, up to half as wide again as tall
+      const bh = vh - 8, pad = 5, ph = bh - pad * 2;
+      const B = { m: ph * 0.035, vh: Math.max(9, ph * 0.03) }; // (as borderSize gives for both pages: neither is narrower than tall)
+      const half = (ph / 2 - B.m - B.vh - 6) / L.fr, lw = Math.ceil(2 * half * L.fr + 2 * (B.m + B.vh) + 24);
+      const bw = Math.min(vw - 2 * Math.round(vh * 0.055), lw + pad * 2 + ph * 1.5);
       L.bx = (vw - bw) / 2; L.by = 4; L.bw = bw; L.bh = bh;
-      const pad = 5;
-      L.right = { x: L.bx + pad, y: L.by + pad, w: bw - pad * 2, h: bh - pad * 2 };
-      L.left = null;
-      const P = L.right;
-      // the whole drawing circle stays inside the page's border (margin m, plus room for the vine's leaves)
-      const m = Math.min(P.w, P.h) * 0.035;
-      const size = Math.min(P.h - 2 * (m + 9), P.w * 0.5);
-      L.area = { x: P.x + Math.max(m + 14, P.w * 0.04), y: P.y + (P.h - size) / 2, size };
-      const sx = L.area.x + size + 22;
-      L.side = { x: sx, y: P.y + 14, w: P.x + P.w - sx - 18, h: P.h - 28 };
+      L.left = { x: L.bx + pad, y: L.by + pad, w: lw, h: ph };
+      L.right = { x: L.left.x + lw, y: L.by + pad, w: bw - pad * 2 - lw, h: ph };
+      L.area = { x: L.left.x + lw / 2 - half, y: L.left.y + ph / 2 - half, size: half * 2 };
+      // the column inside the right page's border (its bottom, where the buttons stand, just above the knotwork)
+      const P = L.right, inset = B.m + B.vh + 8;
+      L.side = { x: P.x + inset, y: P.y + 14, w: P.w - inset * 2, h: P.h - 14 - (B.m + B.vh + 4) };
     } else if (!single) {
       const bw = Math.min(vw - 40, (vh - 30) * 1.52, 1500), bh = bw / 1.52;
       L.bx = (vw - bw) / 2; L.by = (vh - bh) / 2; L.bw = bw; L.bh = bh;
@@ -1183,15 +1427,10 @@ const Grim = {
   // the HTML page buttons under the drawing area
   placeButtons() {
     const pb = document.getElementById('pagebtns'), L = this.L; if (!pb || !L) return;
-    const vh = innerHeight;
     pb.classList.toggle('single', L.single);
-    pb.classList.toggle('upright', L.single && !L.side);
+    // (a phone held sideways sets them out as upright, at the foot of its right-hand page)
+    pb.classList.toggle('upright', L.single);
     this.fitButtons();
-    if (L.side) {
-      pb.style.left = L.side.x + 'px'; pb.style.width = L.side.w + 'px';
-      pb.style.top = 'auto'; pb.style.bottom = (vh - (L.side.y + L.side.h)) + 'px';
-      return;
-    }
     pb.style.bottom = 'auto';
     if (!L.single) {
       pb.style.left = L.right.x + 'px'; pb.style.width = L.right.w + 'px';
@@ -1417,88 +1656,89 @@ const Grim = {
     const g = this.book.getContext('2d'), L = this.L, dpr = this.dpr;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, innerWidth, innerHeight);
-    // leather cover
-    g.save();
-    const cvx = L.bx - 14, cvy = L.by - 12, cw = L.bw + 28, ch = L.bh + 24;
-    // its shadow: soft layers spreading out below it (a canvas blur this size is very slow on phones)
-    for (let k = 8; k >= 1; k--) { g.fillStyle = `rgba(0,0,0,${0.075})`; roundRect(g, cvx - k * 3, cvy + 16 - k * 2.5, cw + k * 6, ch + k * 5, 14 + k * 3); g.fill(); }
-    const lea = gart('leather'), art = !!gart('page');
+    const t0 = performance.now();
     this._classic = typeof CLASSIC !== 'undefined' && CLASSIC.on;
     document.getElementById('pagebtns')?.classList.toggle('plaques', !this._classic); // the painted brass plaques (CSS) follow the look
-    if (lea) {
-      // the painted plum leather, darker towards the foot
-      roundRect(g, cvx, cvy, cw, ch, 14); g.clip();
-      const p = g.createPattern(lea, 'repeat'), k = clamp(L.bh / 1300, 0.3, 0.75);
-      if (p.setTransform && typeof DOMMatrix !== 'undefined') p.setTransform(new DOMMatrix().translate(cvx, cvy).scale(k));
-      g.fillStyle = p; g.fillRect(cvx, cvy, cw, ch);
-      const sg = g.createLinearGradient(0, cvy, 0, cvy + ch);
-      sg.addColorStop(0, 'rgba(90,40,60,0.05)'); sg.addColorStop(1, 'rgba(20,5,14,0.5)');
-      g.fillStyle = sg; g.fillRect(cvx, cvy, cw, ch);
-    } else {
-      const lg = g.createLinearGradient(cvx, cvy, cvx, cvy + ch);
-      lg.addColorStop(0, '#4a2232'); lg.addColorStop(1, '#2a1020');
-      g.fillStyle = lg; roundRect(g, cvx, cvy, cw, ch, 14); g.fill();
-    }
+    // the painted book (until its picture has loaded, and in the old look, the drawn one)
+    // (two pages — the open spread, or a phone held sideways — the whole book; one, the right-hand page alone)
+    const fk = L.left ? 'book' : 'page', fa = folioArt(fk);
+    if (fa) this.folioBook(g, fa, FOLIO_ART[fk]); else this.drawnBook(g);
+    if (!L.single) this.codex(g, L.left);
+    else this.codexStrip(g, L.side || L.right);
+    this.drawingFrame(g);
+    this._bookMs = performance.now() - t0;
+    this.bookDirty = false;
+  },
+  // the painting round the pages, which stay where they are: its fixed slices are scaled (s) so its ruled borders,
+  // painted out, would lie under the knotwork, and so its parchment reaches each page's edges; where the screen has
+  // no room for the cover round them it gives a little (to 0.6 of that, past which the cover runs off the screen).
+  // The fold stays on the spine, and only each page's plain middle stretches (laid more than once on a long page)
+  folioBook(g, im, A) {
+    const L = this.L, P = L.right, F = L.left || P, { m, vh } = this.borderSize(P), mc = m + vh / 2;
+    const x0 = F.x + mc, x1 = P.x + P.w - mc, y0 = P.y + mc, y1 = P.y + P.h - mc, n = A.rx.length, rx1 = A.rx[n - 1];
+    const ideal = mc / (!L.left ? A.rx[0] - A.spine : (A.rx[2] - A.rx[1]) / 2);
+    let fit = Math.min((innerWidth - x1) / (A.w - rx1), y0 / A.ry[0], (innerHeight - y1) / (A.h - A.ry[1]));
+    if (L.left) fit = Math.min(fit, x0 / A.rx[0]);
+    const s = Math.max(ideal * 0.6, Math.min(ideal, fit));
+    const fixed = (a0, a1, a, d) => ({ a0, a1, d0: d + (a0 - a) * s, d1: d + (a1 - a) * s });
+    const xf = [fixed(0, A.cx[0], A.rx[0], x0)];
+    // (the fold on the spine, where the right page begins: the pages either side of it may differ in width, each
+    // middle stretched on its own)
+    if (L.left) xf.push(fixed(A.cx[1], A.cx[2], A.spine, P.x));
+    xf.push(fixed(A.cx[A.cx.length - 1], A.w, rx1, x1));
+    const yf = [fixed(0, A.cy[0], A.ry[0], y0), fixed(A.cy[1], A.h, A.ry[1], y1)];
+    const fill = f => { const o = [f[0]]; for (let i = 1; i < f.length; i++) o.push({ a0: f[i - 1].a1, a1: f[i].a0, d0: f[i - 1].d1, d1: f[i].d0, st: 1 }, f[i]); return o; };
+    const xs = fill(xf), ys = fill(yf), Y = ys[1], ky = (Y.d1 - Y.d0) / (Y.a1 - Y.a0);
+    // (a page much longer one way than the painting's: its middle laid an odd number of times, mirrored in turn)
+    const odd = r => r > 2.2 ? 2 * Math.round((r - 1) / 2) + 1 : 1;
+    let kx = Infinity;
+    for (const X of xs) if (X.st) { const k = (X.d1 - X.d0) / (X.a1 - X.a0); kx = Math.min(kx, k); X.n = odd(k / ky); }
+    Y.n = odd(ky / kx);
+    // its shadow: soft layers spreading out below it (a canvas blur this size is very slow on phones)
+    const bx = xs[0].d0, bw = xs[xs.length - 1].d1 - bx, by = ys[0].d0, bh = ys[2].d1 - by;
+    for (let k = 8; k >= 1; k--) { g.fillStyle = 'rgba(0,0,0,0.075)'; roundRect(g, bx - k * 3, by + 16 - k * 2.5, bw + k * 6, bh + k * 5, 8 + k * 3); g.fill(); }
+    folioSlices(g, im, xs, ys, this.dpr);
+    for (const Pg of (L.left ? [L.left, P] : [P])) this.pageBorderArt(g, Pg);
+  },
+  // the drawn book: a leather cover with gold rules, a few leaves beneath, parchment pages with an inked border and a
+  // shaded gutter (the old look, ◐)
+  drawnBook(g) {
+    const L = this.L;
+    g.save();
+    const cm = 14, cvx = L.bx - cm, cvy = L.by - 12, cw = L.bw + cm * 2, ch = L.bh + 24;
+    // its shadow: soft layers spreading out below it (a canvas blur this size is very slow on phones)
+    for (let k = 8; k >= 1; k--) { g.fillStyle = `rgba(0,0,0,${0.075})`; roundRect(g, cvx - k * 3, cvy + 16 - k * 2.5, cw + k * 6, ch + k * 5, 14 + k * 3); g.fill(); }
+    const lg = g.createLinearGradient(cvx, cvy, cvx, cvy + ch);
+    lg.addColorStop(0, '#4a2232'); lg.addColorStop(1, '#2a1020');
+    g.fillStyle = lg; roundRect(g, cvx, cvy, cw, ch, 14); g.fill();
     g.restore();
     g.strokeStyle = 'rgba(232,194,122,0.55)'; g.lineWidth = 1.5; roundRect(g, cvx + 6, cvy + 6, cw - 12, ch - 12, 10); g.stroke();
     g.strokeStyle = 'rgba(232,194,122,0.25)'; g.lineWidth = 1; roundRect(g, cvx + 10, cvy + 10, cw - 20, ch - 20, 8); g.stroke();
-    // brass caps on the cover's corners (the pages lie over their inner part)
-    const cap = gart('cap');
-    if (cap) {
-      const h = clamp(L.bh * 0.075, 26, 60), w = h * cap.naturalWidth / cap.naturalHeight;
-      drawFlip(g, cap, cvx - 2, cvy - 2, w, h, 1, 1); drawFlip(g, cap, cvx + cw + 2, cvy - 2, w, h, -1, 1);
-      drawFlip(g, cap, cvx - 2, cvy + ch + 2, w, h, 1, -1); drawFlip(g, cap, cvx + cw + 2, cvy + ch + 2, w, h, -1, -1);
-    }
-    // page stack edges (a thicker block of leaves in the painted book)
-    const leaves = art ? 6 : 3;
-    if (art) {
-      // only a sliver of each leaf shows at the pages' edges: no flat paper band round the vellum
-      const P0 = L.left || L.right, ex = P0.x, ey = L.right.y, ew = L.right.x + L.right.w - ex, eh = L.right.h;
-      for (let i = leaves; i > 0; i--) {
-        g.fillStyle = i % 2 ? '#cbb282' : '#dcc596';
-        g.fillRect(ex - i, ey + i * 0.5, ew + i * 2, eh + i * 0.5);
-        g.fillStyle = 'rgba(110,80,40,0.3)'; g.fillRect(ex - i, ey + eh + i - 0.6, ew + i * 2, 0.6);
-      }
-    } else for (let i = leaves; i > 0; i--) {
+    // page stack edges
+    for (let i = 3; i > 0; i--) {
       g.fillStyle = i % 2 ? '#d9c597' : '#e8d6ab';
       g.fillRect(L.bx - i * 1.5 + 2, L.by + i * 1.6, L.bw + i * 3 - 4, L.bh - i * 1.2);
-      if (art) { g.fillStyle = 'rgba(110,80,40,0.25)'; g.fillRect(L.bx - i * 1.5 + 2, L.by + L.bh + i * 0.4 - 1, L.bw + i * 3 - 4, 0.6); }
     }
-    const pages = L.single ? [L.right] : [L.left, L.right];
-    const pim = gart('page'), pat = pim ? null : g.createPattern(parchment(), 'repeat');
+    // (a phone held sideways keeps its one wide page in this look, across both pages' room)
+    const pages = !L.single ? [L.left, L.right] : L.left ? [{ x: L.left.x, y: L.left.y, w: L.right.x + L.right.w - L.left.x, h: L.left.h }] : [L.right];
+    const pat = g.createPattern(parchment(), 'repeat');
     for (const P of pages) {
       g.save();
-      if (pim) drawCover(g, pim, P.x, P.y, P.w, P.h, P === L.left);
-      else { g.fillStyle = pat; g.fillRect(P.x, P.y, P.w, P.h); }
+      g.fillStyle = pat; g.fillRect(P.x, P.y, P.w, P.h);
       // vignette
       const vg = g.createRadialGradient(P.x + P.w / 2, P.y + P.h / 2, Math.min(P.w, P.h) * 0.3, P.x + P.w / 2, P.y + P.h / 2, Math.max(P.w, P.h) * 0.75);
-      vg.addColorStop(0, 'rgba(255,248,225,0.12)'); vg.addColorStop(1, `rgba(120,75,30,${pim ? 0.24 : 0.38})`);
+      vg.addColorStop(0, 'rgba(255,248,225,0.12)'); vg.addColorStop(1, 'rgba(120,75,30,0.38)');
       g.fillStyle = vg; g.fillRect(P.x, P.y, P.w, P.h);
-      if (pim) {
-        // candlelight from the upper left, warm on the pages
-        const lx = L.bx + L.bw * 0.22, ly = L.by + L.bh * 0.15, cg = g.createRadialGradient(lx, ly, 0, lx, ly, Math.max(L.bw, L.bh) * 1.05);
-        cg.addColorStop(0, 'rgba(255,214,140,0.16)'); cg.addColorStop(0.55, 'rgba(255,190,110,0.04)'); cg.addColorStop(1, 'rgba(70,35,10,0.14)');
-        g.fillStyle = cg; g.fillRect(P.x, P.y, P.w, P.h);
-      }
       g.restore();
-      if (pim) this.pageBorderArt(g, P); else this.pageBorder(g, P);
+      this.pageBorder(g, P);
     }
     if (!L.single) {
-      const cx = L.bx + L.bw / 2, gw = art ? L.bw * 0.07 : 40;
-      const gg = g.createLinearGradient(cx - gw, 0, cx + gw, 0);
-      if (art) {
-        // a deeper fold: the pages curving down into the spine
-        gg.addColorStop(0, 'rgba(60,35,15,0)'); gg.addColorStop(0.3, 'rgba(60,35,15,0.12)'); gg.addColorStop(0.46, 'rgba(50,26,10,0.42)');
-        gg.addColorStop(0.5, 'rgba(30,14,5,0.66)'); gg.addColorStop(0.54, 'rgba(50,26,10,0.42)'); gg.addColorStop(0.7, 'rgba(60,35,15,0.12)'); gg.addColorStop(1, 'rgba(60,35,15,0)');
-      } else {
-        gg.addColorStop(0, 'rgba(60,35,15,0)'); gg.addColorStop(0.45, 'rgba(60,35,15,0.32)'); gg.addColorStop(0.5, 'rgba(40,20,8,0.5)');
-        gg.addColorStop(0.55, 'rgba(60,35,15,0.32)'); gg.addColorStop(1, 'rgba(60,35,15,0)');
-      }
+      // a plain shaded stripe down the gutter
+      const cx = L.bx + L.bw / 2, gw = 40, gg = g.createLinearGradient(cx - gw, 0, cx + gw, 0);
+      gg.addColorStop(0, 'rgba(60,35,15,0)'); gg.addColorStop(0.45, 'rgba(60,35,15,0.32)'); gg.addColorStop(0.5, 'rgba(40,20,8,0.5)');
+      gg.addColorStop(0.55, 'rgba(60,35,15,0.32)'); gg.addColorStop(1, 'rgba(60,35,15,0)');
       g.fillStyle = gg; g.fillRect(cx - gw, L.by, gw * 2, L.bh);
-      this.codex(g, L.left);
-    } else this.codexStrip(g, L.side || L.right);
-    this.drawingFrame(g);
-    this.bookDirty = false;
+    }
   },
   // the illuminated border: a band of knotwork between two inked rules, a round knotwork boss on each corner
   // (sizes in borderSize, so the page's contents can keep clear of it)
@@ -1513,7 +1753,7 @@ const Grim = {
     const dpr = Math.min(window.devicePixelRatio || 1, 3), P = { x: 0, y: 0, w, h };
     for (const c of [bg, fr]) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); c.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0); }
     const g = bg.getContext('2d');
-    drawCover(g, pim, 0, 0, w, h);
+    if (!folioLeaf(g, 0, 0, w, h)) drawCover(g, pim, 0, 0, w, h);
     const vg = g.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.3, w / 2, h / 2, Math.max(w, h) * 0.75);
     vg.addColorStop(0, 'rgba(255,248,225,0.12)'); vg.addColorStop(1, 'rgba(120,75,30,0.24)');
     g.fillStyle = vg; g.fillRect(0, 0, w, h);
@@ -1891,6 +2131,10 @@ const Grim = {
     g.drawImage(this.book, 0, 0, innerWidth, innerHeight);
     if (this.open && this.anim < 1) this.pageTurn(g, e);
     this.drawMiniMap(g, t);
+    // sideways, everything of the circle's (a large seal's rune ring and places, the ink) stays inside the left
+    // page's knotwork border
+    const clip = this.L.side && this.L.left;
+    if (clip) { const Q = this.L.left, b = this.borderSize(Q), k = b.m + b.vh; g.save(); g.beginPath(); g.rect(Q.x + k, Q.y + k, Q.w - k * 2, Q.h - k * 2); g.clip(); }
     const D = this.draft.a;
     // guide circle
     if (!D.seal) {
@@ -1947,6 +2191,7 @@ const Grim = {
       g.beginPath(); g.arc(A.cx + p.x * A.half, A.cy + p.y * A.half, 1.2 + a * 1.8, 0, TAU); g.fill();
     }
     g.restore();
+    if (clip) g.restore();
     // status
     const { SD, P, s, sy } = this.statusAt();
     g.textAlign = 'center'; g.fillStyle = this.statusCol;
@@ -2048,14 +2293,15 @@ const Grim = {
     const pim = gart('page'); if (!pim) return;
     const L = this.L, P = L.right, a = ease(clamp(this.anim * 1.15, 0, 1));
     let hx, wd;
-    if (L.single) { hx = P.x; wd = P.w * Math.cos(a * Math.PI / 2); }
-    else { hx = L.bx + L.bw / 2; wd = P.w * Math.cos(a * Math.PI); }
+    // (two pages: hinged on the fold, landing on the left page, which sideways may be narrower than the right)
+    if (!L.left) { hx = P.x; wd = P.w * Math.cos(a * Math.PI / 2); }
+    else { hx = P.x; const c = Math.cos(a * Math.PI); wd = (c >= 0 ? P.w : L.left.w) * c; }
     if (Math.abs(wd) < 1) return;
     const x = wd > 0 ? hx : hx + wd, w = Math.abs(wd);
     g.save();
     // its shadow on the page beneath, then the leaf itself, darkening as it stands up edge-on
     g.fillStyle = `rgba(40,20,5,${0.18 * (1 - w / P.w)})`; g.fillRect(x - 6, P.y + 4, w + 12, P.h);
-    drawCover(g, pim, x, P.y, w, P.h, wd < 0);
+    if (!folioLeaf(g, x, P.y, w, P.h, wd < 0, true)) drawCover(g, pim, x, P.y, w, P.h, wd < 0);
     const sh = g.createLinearGradient(hx, 0, hx + wd, 0);
     sh.addColorStop(0, 'rgba(50,25,8,0.45)'); sh.addColorStop(0.25, 'rgba(50,25,8,0.12)'); sh.addColorStop(1, `rgba(40,20,5,${0.35 * (1 - w / P.w)})`);
     g.fillStyle = sh; g.fillRect(x, P.y, w, P.h);

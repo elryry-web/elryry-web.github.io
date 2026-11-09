@@ -744,27 +744,10 @@ const Game = {
     $('#bResume').textContent = `${this.resumeMid ? '↩ Back to' : 'On to'} Lesson ${L0.roman}: ${L0.name}`;
     $('#aimbar').classList.remove('show'); this.held = null; // a seal being aimed is put down
     this.state = 'menu';
-    // one folio to a page, turned by a swipe, the arrows or the arrow keys; it opens on the folio of the lesson ahead
-    const box = $('#lessonGrid'); box.innerHTML = '';
-    const pages = []; let cards = null, at = 0;
-    LEVELS.forEach((L, i) => {
-      const locked = i >= Save.data.unlocked, done = !!Save.data.stars[i];
-      if (L.opens || !cards) {
-        const p = document.createElement('section'); p.className = 'fpage';
-        p.innerHTML = `<div class="fhead">${decoHTML(L.opens || 'The Folio')}</div><div class="fcards"></div>`;
-        box.appendChild(p); pages.push(p); cards = p.lastChild;
-      }
-      if (i === this.resumeTo) at = pages.length - 1;
-      const el = document.createElement('button');
-      el.className = 'lcard' + (locked ? ' locked' : '') + (done ? ' done' : '');
-      // a finished lesson carries the master's wax seal
-      el.innerHTML = `<div class="lr">${L.roman}</div><div class="ln">${locked ? '· locked ·' : L.name}</div>${done ? '<i class="seal" title="Finished"></i>' : ''}`;
-      if (!locked) el.onclick = () => { Sfx.init(); this.start(i); };
-      cards.appendChild(el);
-    });
-    Folio.set(pages, at);
     $('#hud').classList.remove('show');
     this.showScreen('levels');
+    // the folio is an open book, turned by a swipe, the arrows or the arrow keys; it opens on the lesson ahead
+    Folio.build(this.resumeTo);
   },
   resumeLesson() {
     if (!(this.resumeMid && this.level && this.idx === this.resumeTo)) { this.start(this.resumeTo); return; }
@@ -1354,69 +1337,240 @@ window.addEventListener('keydown', e => {
   } else if (Game.state === 'won' && k === 'Enter') Game.next();
 });
 
-// ---------- the folio of lessons: one folio to a page ----------
-// The pages sit side by side in a track that slides by its margin (no transform: a transformed layer over the
-// world has shown the canvas through it on phones). Pages off to the side are inert, so Tab never scrolls to them.
-const Folio = {
-  pages: [], at: 0,
-  set(pages, at) { this.pages = pages; this.go(at, true); },
-  go(k, instant) {
-    const n = this.pages.length; if (!n) return;
-    this.at = k = Math.max(0, Math.min(n - 1, k));
-    const track = $('#lessonGrid');
-    if (instant) { track.classList.add('drag'); $('#folioView').classList.add('drag'); }
-    track.style.marginLeft = `${-100 * k}%`;
-    if (instant) { void track.offsetWidth; track.classList.remove('drag'); }
-    this.pages.forEach((p, j) => { p.inert = j !== k; p.setAttribute('aria-hidden', j !== k ? 'true' : 'false'); });
-    // the window is as tall as the page shown (the first folio holds far more lessons than the others)
-    const view = $('#folioView'); view.scrollLeft = 0; this.fit(k);
-    if (instant) { void view.offsetWidth; view.classList.remove('drag'); }
-    $('#fPrev').disabled = k === 0; $('#fNext').disabled = k === n - 1;
-    $('#folioDots').innerHTML = this.pages.map((_, j) => `<i${j === k ? ' class="on"' : ''}></i>`).join('');
-    $('#folioNum').textContent = `${k + 1} of ${n}`;
-  },
-  // height of the window: the page shown, or while a page is dragged, the taller of it and the one coming in
-  fit(k, k2 = k) {
-    const p = this.pages, h = Math.max(p[k] ? p[k].offsetHeight : 0, p[k2] ? p[k2].offsetHeight : 0);
-    if (h) $('#folioView').style.height = h + 'px';
-  },
+// ---------- the folio of lessons: an open book (v167) ----------
+// A wide screen shows the spread (two leaves side by side, the lessons running on from the left page to the right), an
+// upright phone one page with the spine down its left edge. The art is a border-image, so its corners keep their shape
+// and only the middle stretches; BOOK is in the full-size painting's pixels (2752 x 1536; the phone page is cut from
+// x 1290). Each view is a sheet. A turn shows the new sheet beneath, the old one clipped back to the fold, and the
+// turning leaf folded flat over the fold line (its back is parchment; in a spread it carries the new left page).
+// 2D only: positions and clip-path (a 3D layer split on Firefox for Android and showed the canvas through it).
+const BOOK = {
+  spread: { w: 2752, b: [230, 332, 236, 335], spine: 1375, outer: 2635, cols: [[335, 1219], [1532, 2420]], rule: [1494, 2464] },
+  single: { w: 1462, b: [230, 332, 236, 250], spine: 85, outer: 1345, cols: [[250, 1130]], rule: [204, 1174] },
+  h: 1536, top: 52, bot: 1466, ruleY: [171, 1357], ruleIn: 13,
 };
-// a sideways swipe (finger or mouse) turns the page; an upright one is left to scroll the screen (touch-action: pan-y)
+const NUM_W = { I: 66, V: 155, X: 153, L: 125 }; // the illuminated letters, 160px tall
+const numHTML = r => [...r].map(c => `<img src="art/num-${c}.png?v=1" width="${NUM_W[c]}" height="160" alt="">`).join('');
+const Folio = {
+  views: [], sheets: [], at: 0, mode: 'single', anim: null, turn: null, resumeTo: 0,
+  build(resumeTo) { this.resumeTo = resumeTo; this.finish(); this.render(); this.go(this.viewOf(resumeTo), true); },
+  render() { this.layout(); this.paginate(); },
+  // the book's size, its border widths and the sizes of the writing, from the room the screen gives it
+  layout() {
+    const lv = $('#levels'), book = $('#book'), h2 = lv.querySelector('h2');
+    const vw = lv.clientWidth, vh = lv.clientHeight, spread = vw >= 600 && vw > vh * 1.1;
+    this.mode = spread ? 'spread' : 'single';
+    lv.classList.toggle('spread', spread); lv.classList.toggle('single', !spread); lv.classList.toggle('roomy', vh >= 900);
+    h2.style.display = (spread ? vh >= 560 : vh >= 820) ? '' : 'none';
+    book.className = this.mode; book.style.width = book.style.height = '0px';
+    const top = book.getBoundingClientRect().top - lv.getBoundingClientRect().top + lv.scrollTop;
+    const reserve = spread && vh >= 560 ? $('#levelsFoot').offsetHeight + 12 + vh * 0.04 : 8;
+    const availH = Math.max(spread ? 200 : 380, vh - top - reserve), g = BOOK[this.mode];
+    let W, H, s;
+    if (spread) {
+      H = Math.min(availH, 820); W = Math.min(vw - 128, H * 1.95, 1300);
+      if (W < H * 1.45) H = W / 1.45;
+      s = Math.min(W / g.w, H / BOOK.h) * (H < 400 ? 0.8 : 1);
+    } else {
+      W = Math.min(vw - 12, 540); H = Math.min(Math.max(availH, W * 1.05), W * 1.9);
+      s = W / g.w * 0.72; // a phone keeps the margins narrow: the writing needs the width
+    }
+    W = Math.round(W); H = Math.round(H);
+    const [bt, br, bb, bl] = g.b.map(v => v * s);
+    const mx = (W - bl - br) / (g.w - g.b[3] - g.b[1]), my = (H - bt - bb) / (BOOK.h - g.b[0] - g.b[2]);
+    Object.assign(this, { g, W, H, s, mx, my, bt, br, bb, bl });
+    const st = book.style;
+    st.width = W + 'px'; st.height = H + 'px';
+    const colW = (g.cols[0][1] - g.cols[0][0]) * mx, colH = H - bt - bb;
+    // the seal about 90px on an upright phone; the numbers and names in proportion
+    const seal = Math.round(clamp(Math.min(colW * 0.32, colH * 0.2, 96), 50, 96));
+    const vars = { bt, br, bb, bl, seal, numh: Math.round(seal * 0.42), namefs: clamp(Math.round(seal * 0.25), 14, 23),
+      headfs: clamp(Math.round(colW * 0.074), 16, 30), epad: Math.round(seal * 0.08) };
+    for (const k in vars) st.setProperty('--' + k, vars[k] + 'px');
+  },
+  // painting x / y to the book on screen (the border slices scale by s, the middle by mx / my)
+  x(px) { const g = this.g; return px <= g.b[3] ? px * this.s : px >= g.w - g.b[1] ? this.W - (g.w - px) * this.s : this.bl + (px - g.b[3]) * this.mx; },
+  y(py) { const g = this.g; return py <= g.b[0] ? py * this.s : py >= BOOK.h - g.b[2] ? this.H - (BOOK.h - py) * this.s : this.bt + (py - g.b[0]) * this.my; },
+  entryHTML(i) {
+    const L = LEVELS[i], locked = i >= Save.data.unlocked, done = !!Save.data.stars[i];
+    const label = `Lesson ${L.roman}: ${locked ? 'locked' : L.name}${done ? ', finished' : ''}`;
+    return `<button class="lentry${locked ? ' locked' : ''}${done ? ' done' : ''}${i === this.resumeTo ? ' here' : ''}" data-i="${i}" aria-label="${label}"${locked ? ' aria-disabled="true"' : ''}>`
+      + `<span class="ltext"><span class="lnum">${numHTML(L.roman)}</span><span class="lname">${locked ? '· locked ·' : L.name}</span></span>`
+      + `${done ? '<i class="seal" title="Finished"></i>' : '<i></i>'}</button>`;
+  },
+  // the lessons written onto leaves: each folio starts a new leaf under its title (in a spread that may be the right
+  // page) and fills it before going on to the next, under a running head; only a folio's last leaf is left part empty.
+  // Each leaf is measured whole as it fills (title, lessons, page number), and a lesson goes on only while the leaf
+  // stays FIT_PAD px short of the page, so no row is ever cut off and a pixel or two of screen does not change the book
+  paginate() {
+    const book = $('#book'), g = this.g, colW = (g.cols[0][1] - g.cols[0][0]) * this.mx, colH = this.H - this.bt - this.bb;
+    const FIT_PAD = 4, room = colH - FIT_PAD;
+    book.innerHTML = '';
+    const m = document.createElement('div'); m.className = 'bk-col bk-measure';
+    m.style.cssText = `width:${colW}px;bottom:auto`; book.appendChild(m);
+    const folios = [];
+    LEVELS.forEach((L, i) => { if (L.opens || !folios.length) folios.push({ title: L.opens || 'The Folio', items: [] }); folios[folios.length - 1].items.push(i); });
+    const leaves = [];
+    for (const F of folios) {
+      for (let j = 0; j < F.items.length;) {
+        const first = j === 0, items = [];
+        m.innerHTML = (first ? `<div class="bk-head">${decoHTML(F.title)}</div>` : `<div class="bk-run">${F.title}</div>`)
+          + '<div class="bk-list"></div><div class="bk-foot">· 88 ·</div>';
+        const list = m.querySelector('.bk-list');
+        // (a leaf always takes at least one lesson, however tall)
+        while (j < F.items.length) {
+          list.insertAdjacentHTML('beforeend', this.entryHTML(F.items[j]));
+          if (items.length && m.getBoundingClientRect().height > room) { list.lastElementChild.remove(); break; }
+          items.push(F.items[j++]);
+        }
+        leaves.push({ title: F.title, first, items });
+      }
+    }
+    m.remove();
+    const per = this.mode === 'spread' ? 2 : 1;
+    this.views = []; this.sheets = [];
+    for (let v = 0; v * per < leaves.length; v++) {
+      const sh = document.createElement('div'); sh.className = 'bk-sheet'; sh.hidden = true;
+      const ls = leaves.slice(v * per, v * per + per);
+      sh.innerHTML = ls.map((lf, c) => {
+        const at = g.cols[c], no = v * per + c + 1;
+        return `<div class="bk-col" style="left:${(at[0] - g.b[3]) * this.mx}px;width:${(at[1] - at[0]) * this.mx}px">`
+          + (lf.first ? `<div class="bk-head">${decoHTML(lf.title)}</div>` : `<div class="bk-run">${lf.title}</div>`)
+          + `<div class="bk-list">${lf.items.map(i => this.entryHTML(i)).join('')}</div><div class="bk-foot">· ${no} ·</div></div>`;
+      }).join('');
+      book.appendChild(sh); this.sheets.push(sh); this.views.push(ls.flatMap(lf => lf.items));
+    }
+    // the turning leaf and the shadows it throws
+    book.insertAdjacentHTML('beforeend', '<div class="bk-flap" hidden><i class="bk-rule"></i><i class="bk-rule"></i><i class="bk-shade"></i></div><i class="bk-cast" hidden></i><i class="bk-cast" hidden></i>');
+    this.flap = book.querySelector('.bk-flap'); this.casts = book.querySelectorAll('.bk-cast');
+  },
+  viewOf(i) { return Math.max(0, this.views.findIndex(v => v.includes(i))); },
+  // one view at rest
+  show(k) {
+    this.sheets.forEach((sh, j) => { sh.hidden = j !== k; sh.style.clipPath = ''; sh.style.zIndex = ''; sh.inert = false; });
+    this.flap.hidden = true; this.casts.forEach(c => { c.hidden = true; });
+    $('#book').classList.remove('turning');
+  },
+  go(k, instant) {
+    const n = this.views.length; if (!n) return;
+    if (this.anim) this.finish();
+    k = clamp(k, 0, n - 1);
+    const from = this.at; this.at = k; this.ui();
+    if (instant || k === from || Math.abs(k - from) > 1 || matchMedia('(prefers-reduced-motion: reduce)').matches) { this.turn = null; this.show(k); return; }
+    // forward: the old view's leaf turns away (t 0 to 1); back: the same turn run backwards
+    if (k > from) this.animate(from, k, 0, 1, () => this.show(k));
+    else this.animate(k, from, 1, 0, () => this.show(k));
+  },
+  ui() {
+    const n = this.views.length, k = this.at;
+    $('#fPrev').disabled = k === 0; $('#fNext').disabled = k === n - 1;
+    $('#folioNum').textContent = `Leaf ${k + 1} of ${n}`;
+  },
+  // the leaf of view A lifted from its outer edge (t 0) and laid flat on the far side of the spine (t 1), view B beneath
+  startTurn(A, B) {
+    if (this.turn && this.turn.A === A && this.turn.B === B) return;
+    const g = this.g, S = this.x(g.spine), R = this.x(g.outer), P = R - S, top = this.y(BOOK.top), ph = this.y(BOOK.bot) - top;
+    this.turn = { A, B, S, R, P, top, ph };
+    this.sheets.forEach((sh, j) => { sh.hidden = j !== A && j !== B; sh.style.clipPath = ''; sh.style.zIndex = j === A ? 2 : 1; sh.inert = true; });
+    $('#book').classList.add('turning');
+    const fl = this.flap; fl.hidden = false;
+    Object.assign(fl.style, { top: top + 'px', height: ph + 'px', backgroundSize: `${P}px ${ph}px` });
+    // the back of the leaf: the right page's ruled border mirrored, and in a spread the new left page
+    const ro = R - this.x(g.rule[1]), rw = this.x(g.rule[1]) - this.x(g.rule[0]), r0 = this.y(BOOK.ruleY[0]) - top;
+    const rh = this.y(BOOK.ruleY[1]) - this.y(BOOK.ruleY[0]), d = BOOK.ruleIn * this.s;
+    const [o, i] = fl.querySelectorAll('.bk-rule');
+    Object.assign(o.style, { left: ro + 'px', top: r0 + 'px', width: rw + 'px', height: rh + 'px' });
+    Object.assign(i.style, { left: ro + d + 'px', top: r0 + d + 'px', width: rw - 2 * d + 'px', height: rh - 2 * d + 'px' });
+    const old = fl.querySelector('.bk-col'); if (old) old.remove();
+    if (this.mode === 'spread') {
+      const col = this.sheets[B].querySelector('.bk-col').cloneNode(true);
+      col.style.left = this.bl + parseFloat(col.style.left) - (2 * S - R) + 'px';
+      col.style.top = this.bt - top + 'px'; col.style.bottom = 'auto'; col.style.height = this.H - this.bt - this.bb + 'px';
+      fl.insertBefore(col, fl.firstChild);
+    }
+  },
+  draw(t) {
+    const { R, P, top, ph, A } = this.turn, f = R - t * P, fl = this.flap, e = 2 * f - R, lift = Math.sin(Math.PI * clamp(t, 0, 1));
+    this.sheets[A].style.clipPath = `inset(0 ${this.W - f}px 0 0)`;
+    fl.style.left = e + 'px'; fl.style.width = Math.max(0, R - f) + 'px';
+    fl.style.opacity = clamp((1 - t) / 0.08, 0, 1) * clamp(t / 0.02, 0, 1);
+    const fw = Math.max(1, R - f);
+    fl.lastChild.style.background = `linear-gradient(to left, rgba(70,40,12,${.3 * lift}) 0, rgba(255,246,222,${.32 * lift}) ${Math.min(fw * .12, 26)}px, rgba(255,246,222,0) ${Math.min(fw * .45, 120)}px, rgba(60,34,10,${.16 * lift}) 100%)`;
+    // the shadow of the lifted leaf on the page it uncovers, and a thin one where its edge lies on the other page
+    const [c1, c2] = this.casts, cw = Math.min(70, P * .22) * lift;
+    c1.hidden = !(cw > 1 && f < R - 1);
+    Object.assign(c1.style, { left: f + 'px', top: top + 'px', height: ph + 'px', width: cw + 'px', background: `linear-gradient(to right, rgba(20,10,0,${.42 * lift}), rgba(20,10,0,0))` });
+    c2.hidden = !(cw > 1 && e > 0);
+    Object.assign(c2.style, { left: e - cw * .4 + 'px', top: top + 'px', height: ph + 'px', width: cw * .4 + 'px', background: `linear-gradient(to left, rgba(20,10,0,${.3 * lift}), rgba(20,10,0,0))` });
+  },
+  animate(A, B, t0, t1, done) {
+    this.startTurn(A, B); this.draw(t0);
+    const dur = 160 + 560 * Math.abs(t1 - t0), start = performance.now();
+    this.animDone = () => { this.turn = null; done(); };
+    const step = now => {
+      const u = Math.min(1, (now - start) / dur), e = 0.5 - Math.cos(Math.PI * u) / 2;
+      this.draw(t0 + (t1 - t0) * e);
+      if (u < 1) this.anim = requestAnimationFrame(step); else { this.anim = null; const d = this.animDone; this.animDone = null; d(); }
+    };
+    this.anim = requestAnimationFrame(step);
+  },
+  finish() { if (this.anim) cancelAnimationFrame(this.anim); this.anim = null; const d = this.animDone; this.animDone = null; if (d) d(); },
+};
+// a sideways swipe (finger or mouse) turns the leaf under the finger; an upright one is left to scroll the screen
 (() => {
-  const view = $('#folioView'), track = $('#lessonGrid');
-  let id = null, x0 = 0, y0 = 0, dx = 0, mode = 0, swallow = false; // mode: 0 undecided, 1 turning, -1 not ours
-  view.addEventListener('pointerdown', e => {
+  const book = $('#book');
+  let id = null, x0 = 0, y0 = 0, dx = 0, mode = 0, swallow = false, dir = 0; // mode: 0 undecided, 1 turning, -1 not ours
+  book.addEventListener('pointerdown', e => {
     if (id !== null || (e.pointerType === 'mouse' && e.button !== 0)) return;
-    id = e.pointerId; x0 = e.clientX; y0 = e.clientY; dx = 0; mode = 0; swallow = false;
+    id = e.pointerId; x0 = e.clientX; y0 = e.clientY; dx = 0; mode = 0; swallow = false; dir = 0;
   });
-  view.addEventListener('pointermove', e => {
+  book.addEventListener('pointermove', e => {
     if (e.pointerId !== id || mode < 0) return;
     const mx = e.clientX - x0, my = e.clientY - y0;
     if (!mode) {
       if (Math.abs(mx) < 8 && Math.abs(my) < 8) return;
       if (Math.abs(my) > Math.abs(mx)) { mode = -1; return; }
-      mode = 1; swallow = true; track.classList.add('drag'); view.classList.add('drag');
-      try { view.setPointerCapture(id); } catch (_) { /* (the pointer may already be gone) */ }
+      mode = 1; swallow = true; Folio.finish();
+      try { book.setPointerCapture(id); } catch (_) { /* (the pointer may already be gone) */ }
     }
-    const last = Folio.pages.length - 1;
-    dx = (Folio.at === 0 && mx > 0) || (Folio.at === last && mx < 0) ? mx * 0.3 : mx; // the first and last pages give a little
-    Folio.fit(Folio.at, Folio.at - Math.sign(dx));
-    track.style.marginLeft = `calc(${-100 * Folio.at}% + ${dx}px)`;
+    dx = mx;
+    const k = Folio.at, d = dx < 0 ? 1 : -1, n = Folio.views.length;
+    // the first and last leaves stay put
+    if ((d > 0 && k >= n - 1) || (d < 0 && k <= 0)) { if (dir) { Folio.turn = null; Folio.show(k); dir = 0; } return; }
+    if (d !== dir) { Folio.turn = null; dir = d; }
+    // the fold follows the finger: forward from the outer edge, back from the spine
+    const u = clamp(Math.abs(dx) / (Folio.x(Folio.g.outer) - Folio.x(Folio.g.spine)), 0, 1);
+    if (d > 0) { Folio.startTurn(k, k + 1); Folio.draw(u); } else { Folio.startTurn(k - 1, k); Folio.draw(1 - u); }
   });
   const end = e => {
     if (e.pointerId !== id) return;
     id = null;
-    if (mode !== 1) return;
-    track.classList.remove('drag'); view.classList.remove('drag');
-    const far = e.type === 'pointerup' && Math.abs(dx) > Math.min(70, view.clientWidth * 0.18);
-    Folio.go(Folio.at + (far ? -Math.sign(dx) : 0));
+    if (mode !== 1 || !dir || !Folio.turn) { dir = 0; return; }
+    const far = e.type === 'pointerup' && Math.abs(dx) > Math.min(70, Folio.W * 0.18), k = Folio.at;
+    const u = clamp(Math.abs(dx) / Folio.turn.P, 0, 1), { A, B } = Folio.turn;
+    const to = dir > 0 ? (far ? k + 1 : k) : (far ? k - 1 : k);
+    Folio.at = to; Folio.ui();
+    if (dir > 0) Folio.animate(A, B, u, far ? 1 : 0, () => Folio.show(to));
+    else Folio.animate(A, B, 1 - u, far ? 0 : 1, () => Folio.show(to));
+    dir = 0;
   };
-  view.addEventListener('pointerup', end); view.addEventListener('pointercancel', end);
-  const refit = () => { if (Game.state === 'menu') Folio.fit(Folio.at); };
-  addEventListener('resize', refit);
+  book.addEventListener('pointerup', end); book.addEventListener('pointercancel', end);
+  // a swipe that ends over a lesson is not a tap on it
+  book.addEventListener('click', e => { if (swallow) { swallow = false; e.stopPropagation(); e.preventDefault(); } }, true);
+  book.addEventListener('click', e => {
+    const el = e.target.closest('.lentry');
+    if (!el || el.classList.contains('locked') || Folio.anim) return;
+    Sfx.init(); Game.start(+el.dataset.i);
+  });
+  // a new size of screen lays the book out again, on the leaf that holds the lessons shown now
+  let rt = 0;
+  const refit = () => {
+    if (Game.state !== 'menu' || !Folio.views.length) return;
+    const first = (Folio.views[Folio.at] || [])[0];
+    Folio.finish(); Folio.render(); Folio.go(first == null ? 0 : Folio.viewOf(first), true);
+  };
+  addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(refit, 120); });
   if (document.fonts) document.fonts.ready.then(refit);
-  // a swipe that ends over a card is not a tap on it
-  view.addEventListener('click', e => { if (swallow) { swallow = false; e.stopPropagation(); e.preventDefault(); } }, true);
 })();
 
 function bind(id, fn) { $(id).addEventListener('click', e => { Sfx.init(); fn(e); e.currentTarget.blur(); }); }
