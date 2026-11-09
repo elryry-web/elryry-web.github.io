@@ -181,11 +181,24 @@
   #levels.spread #folioAt { visibility: hidden; }
   #book { position: relative; flex-shrink: 0; touch-action: pan-y; user-select: none; -webkit-user-select: none;
     box-shadow: 0 10px 34px rgba(0,0,0,.6); border-radius: 6px; overflow: hidden; }
-  #book.turning .bk-sheet { pointer-events: none; }
+  #book.turning .bk-sheet, #book.turning .bk-sheet * { pointer-events: none; }
   .bk-sheet { position: absolute; inset: 0; border-style: solid; border-color: transparent; border-width: var(--bt) var(--br) var(--bb) var(--bl);
     border-image: url(art/folio-book.jpg?v=1) 167 241 172 243 fill stretch; }
   #book.single .bk-sheet { border-image: url(art/folio-page.jpg?v=1) 157 227 161 171 fill stretch; }
-  .bk-col { position: absolute; top: 0; bottom: 0; display: flex; flex-direction: column; overflow: hidden; }
+  .bk-col { position: absolute; top: 0; bottom: 0; display: flex; flex-direction: column; overflow: hidden; pointer-events: none; }
+  .bk-sheet .lentry { pointer-events: auto; }
+  /* the bottom corners turn the leaf when tapped (v170). They lie under the writing column, which lets taps through
+     except on a lesson, so a lesson under a corner still wins. A pointer hovering one sees the page's corner lift a little;
+     nothing shows on touch. Placed by Folio.layout() (--cz the square, --cxn / --cxp / --cy the painted page's corner). */
+  .bk-corner { position: absolute; bottom: calc(var(--bb) * -1); width: var(--cz); height: var(--cz); padding: 0; margin: 0; border: none;
+    background: none; cursor: pointer; outline: none; -webkit-tap-highlight-color: transparent; }
+  .bk-corner.prev { left: calc(var(--bl) * -1); }
+  .bk-corner.next { right: calc(var(--br) * -1); }
+  .bk-corner::after { content: ''; position: absolute; bottom: var(--cy); width: var(--tip); height: var(--tip); opacity: 0; transition: opacity .2s;
+    filter: drop-shadow(0 0 2px rgba(50,25,5,.35)); }
+  .bk-corner.next::after { right: var(--cxn); background: linear-gradient(to bottom right, rgba(236,218,180,0) 0, rgba(240,226,192,.95) 36%, #f6ead0 49%, rgba(90,55,20,.5) 51%, rgba(120,80,40,.18) 100%); }
+  .bk-corner.prev::after { left: var(--cxp); background: linear-gradient(to bottom left, rgba(236,218,180,0) 0, rgba(240,226,192,.95) 36%, #f6ead0 49%, rgba(90,55,20,.5) 51%, rgba(120,80,40,.18) 100%); }
+  @media (hover: hover) and (pointer: fine) { .bk-corner:hover::after { opacity: .9; } }
   .bk-head { font-family: 'Cinzel Decorative', serif; font-weight: 700; color: #7a1c12; text-align: center; font-size: var(--headfs);
     line-height: 1.1; padding: 0 0 .28em; margin: 0 0 .1em; border-bottom: 3px double rgba(110,60,28,.55); }
   .bk-run { font-family: Cinzel, serif; font-weight: 600; font-size: calc(var(--namefs) * .6); letter-spacing: .14em; color: #7a1c12;
@@ -218,8 +231,10 @@
   .lentry.locked .lname { font-style: italic; color: rgba(70,45,25,.5); letter-spacing: .08em; }
   .bk-measure { visibility: hidden; pointer-events: none; }
   /* the turning leaf: its back is plain parchment (with the next left page written on it, in a spread) */
-  .bk-flap { position: absolute; z-index: 4; overflow: hidden; pointer-events: none; background: #ecdab4 url(art/folio-leaf.jpg?v=1) no-repeat; }
-  .bk-flap .bk-rule { position: absolute; border: 1px solid rgba(70,45,25,.7); }
+  .bk-flap { position: absolute; z-index: 4; overflow: hidden; pointer-events: none; }
+  /* (its paper and ruled border fade by --paper, set by Folio.draw; the writing it carries in a spread does not) */
+  .bk-flap::before { content: ''; position: absolute; inset: 0; background: #ecdab4 url(art/folio-leaf.jpg?v=1) no-repeat; background-size: inherit; opacity: var(--paper, 1); }
+  .bk-flap .bk-rule { position: absolute; border: 1px solid rgba(70,45,25,.7); opacity: var(--paper, 1); }
   .bk-flap .bk-col, .bk-flap .bk-foot { z-index: 1; }
   .bk-flap .bk-shade, .bk-cast { position: absolute; pointer-events: none; }
   .bk-flap .bk-shade { inset: 0; z-index: 2; }
@@ -720,9 +735,9 @@
   </div>
 </div>
 
-<script src="js/ink.js?v=169"></script>
-<script src="js/world.js?v=169"></script>
-<script src="js/tips.js?v=169"></script>
-<script src="js/main.js?v=169"></script>
+<script src="js/ink.js?v=170"></script>
+<script src="js/world.js?v=170"></script>
+<script src="js/tips.js?v=170"></script>
+<script src="js/main.js?v=170"></script>
 </body>
 </html>

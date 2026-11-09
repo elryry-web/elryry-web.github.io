@@ -1414,8 +1414,12 @@ const Folio = {
     const colW = (g.cols[0][1] - g.cols[0][0]) * mx, colH = H - bt - bb;
     // the seal about 90px on an upright phone; the numbers and names in proportion
     const seal = Math.round(clamp(Math.min(colW * 0.32, colH * 0.2, 96), 50, 96));
+    // the bottom corners that turn the leaf when tapped (v170): a square at each bottom corner of the book, 56-72px on
+    // a phone, scaled with the book in a spread; cxn / cxp / cy place the hover hint on the painted page's own corner
+    const cz = spread ? Math.max(56, Math.round(240 * s)) : clamp(Math.round(340 * s), 56, 72);
     const vars = { bt, br, bb, bl, seal, numh: Math.round(seal * 0.42), namefs: clamp(Math.round(seal * 0.25), 14, 23),
-      headfs: clamp(Math.round(colW * 0.074), 16, 30), epad: Math.round(seal * 0.08) };
+      headfs: clamp(Math.round(colW * 0.074), 16, 30), epad: Math.round(seal * 0.08), cz, tip: Math.round(cz * 0.3),
+      cxn: Math.round(W - this.x(g.outer)), cxp: Math.round(this.x(spread ? g.w - g.outer : g.spine)), cy: Math.round(H - this.y(BOOK.bot)) };
     for (const k in vars) st.setProperty('--' + k, vars[k] + 'px');
   },
   // painting x / y to the book on screen (the border slices scale by s, the middle by mx / my)
@@ -1459,12 +1463,16 @@ const Folio = {
       }
     }
     m.remove();
-    const per = this.mode === 'spread' ? 2 : 1;
+    const per = this.mode === 'spread' ? 2 : 1, nv = Math.ceil(leaves.length / per);
     this.views = []; this.sheets = [];
-    for (let v = 0; v * per < leaves.length; v++) {
+    // each view's bottom corners turn the leaf when tapped (none on the first leaf's back corner or the last leaf's
+    // forward one). They lie under the writing, which lets taps through to them except on a lesson, so a lesson wins.
+    // Out of the tab order: the arrow buttons and the arrow keys already turn the leaves.
+    const corner = (cls, label) => `<button type="button" class="bk-corner ${cls}" tabindex="-1" aria-label="${label}"></button>`;
+    for (let v = 0; v < nv; v++) {
       const sh = document.createElement('div'); sh.className = 'bk-sheet'; sh.hidden = true;
       const ls = leaves.slice(v * per, v * per + per);
-      sh.innerHTML = ls.map((lf, c) => {
+      sh.innerHTML = (v > 0 ? corner('prev', 'Previous page') : '') + (v < nv - 1 ? corner('next', 'Next page') : '') + ls.map((lf, c) => {
         const at = g.cols[c], no = v * per + c + 1;
         const pos = `left:${(at[0] - g.b[3]) * this.mx}px;width:${(at[1] - at[0]) * this.mx}px`;
         return `<div class="bk-col" style="${pos};bottom:${-ext}px">`
@@ -1482,6 +1490,7 @@ const Folio = {
   // one view at rest
   show(k) {
     this.sheets.forEach((sh, j) => { sh.hidden = j !== k; sh.style.clipPath = ''; sh.style.zIndex = ''; sh.inert = false; });
+    this.under(null);
     this.flap.hidden = true; this.casts.forEach(c => { c.hidden = true; });
     $('#book').classList.remove('turning');
   },
@@ -1506,6 +1515,9 @@ const Folio = {
     const g = this.g, S = this.x(g.spine), R = this.x(g.outer), P = R - S, top = this.y(BOOK.top), ph = this.y(BOOK.bot) - top;
     this.turn = { A, B, S, R, P, top, ph };
     this.sheets.forEach((sh, j) => { sh.hidden = j !== A && j !== B; sh.style.clipPath = ''; sh.style.zIndex = j === A ? 2 : 1; sh.inert = true; });
+    // in a spread the leaf carries view B's left page; the real one under it is hidden, so where the leaf's paper fades
+    // at the ends of the turn its writing stays solid and never shows twice (the two are a little apart until it lies flat)
+    this.under(this.mode === 'spread' ? B : null);
     $('#book').classList.add('turning');
     const fl = this.flap; fl.hidden = false;
     Object.assign(fl.style, { top: top + 'px', height: ph + 'px', backgroundSize: `${P}px ${ph}px` });
@@ -1518,6 +1530,7 @@ const Folio = {
     fl.querySelectorAll('.bk-col, .bk-foot').forEach(el => el.remove());
     if (this.mode === 'spread') {
       const col = this.sheets[B].querySelector('.bk-col').cloneNode(true), foot = this.sheets[B].querySelector('.bk-foot').cloneNode(true);
+      col.style.visibility = foot.style.visibility = '';
       col.style.left = this.bl + parseFloat(col.style.left) - (2 * S - R) + 'px';
       col.style.top = this.bt - top + 'px'; col.style.bottom = 'auto';
       col.style.height = this.H - this.bt - this.bb - parseFloat(this.sheets[B].querySelector('.bk-col').style.bottom) + 'px';
@@ -1525,11 +1538,22 @@ const Folio = {
       fl.insertBefore(foot, fl.firstChild); fl.insertBefore(col, fl.firstChild);
     }
   },
+  under(B) {
+    this.sheets.forEach((sh, j) => ['.bk-col', '.bk-foot'].forEach(q => sh.querySelectorAll(':scope > ' + q).forEach((el, c) => { el.style.visibility = j === B && c === 0 ? 'hidden' : ''; })));
+  },
   draw(t) {
     const { R, P, top, ph, A } = this.turn, f = R - t * P, fl = this.flap, e = 2 * f - R, lift = Math.sin(Math.PI * clamp(t, 0, 1));
-    this.sheets[A].style.clipPath = `inset(0 ${this.W - f}px 0 0)`;
+    // the old view shows only left of the leaf: under the leaf lies the new view, so while the leaf fades in or out at
+    // either end of the turn (t near 0 or 1) the page seen through it is already the new one. (Clipped at the fold f,
+    // the old left page showed through the fading leaf for the last part of a spread's turn, then the new one replaced
+    // it: the flash of the old page.)
+    this.sheets[A].style.clipPath = `inset(0 ${this.W - Math.max(0, e)}px 0 0)`;
     fl.style.left = e + 'px'; fl.style.width = Math.max(0, R - f) + 'px';
-    fl.style.opacity = clamp((1 - t) / 0.08, 0, 1) * clamp(t / 0.02, 0, 1);
+    // the leaf fades in as it lifts and out as it lies flat; in a spread only its paper fades out (into the new left page's
+    // own paper beneath), its writing stays, and at the swap the real writing takes its place on the same spot
+    const lifts = clamp(t / 0.02, 0, 1), lies = clamp((1 - t) / 0.08, 0, 1), spread = this.mode === 'spread';
+    fl.style.opacity = spread ? lifts : lifts * lies;
+    fl.style.setProperty('--paper', spread ? lies : 1);
     const fw = Math.max(1, R - f);
     fl.lastChild.style.background = `linear-gradient(to left, rgba(70,40,12,${.3 * lift}) 0, rgba(255,246,222,${.32 * lift}) ${Math.min(fw * .12, 26)}px, rgba(255,246,222,0) ${Math.min(fw * .45, 120)}px, rgba(60,34,10,${.16 * lift}) 100%)`;
     // the shadow of the lifted leaf on the page it uncovers, and a thin one where its edge lies on the other page
@@ -1556,13 +1580,16 @@ const Folio = {
 (() => {
   const book = $('#book');
   let id = null, x0 = 0, y0 = 0, dx = 0, mode = 0, swallow = false, dir = 0; // mode: 0 undecided, 1 turning, -1 not ours
+  let t0 = 0, moved = 0; // for a tap on a page corner: how long the press lasted and how far it wandered
   book.addEventListener('pointerdown', e => {
     if (id !== null || (e.pointerType === 'mouse' && e.button !== 0)) return;
-    id = e.pointerId; x0 = e.clientX; y0 = e.clientY; dx = 0; mode = 0; swallow = false; dir = 0;
+    id = e.pointerId; x0 = e.clientX; y0 = e.clientY; dx = 0; mode = 0; swallow = false; dir = 0; t0 = performance.now(); moved = 0;
   });
   book.addEventListener('pointermove', e => {
-    if (e.pointerId !== id || mode < 0) return;
+    if (e.pointerId !== id) return;
     const mx = e.clientX - x0, my = e.clientY - y0;
+    moved = Math.max(moved, Math.hypot(mx, my));
+    if (mode < 0) return;
     if (!mode) {
       if (Math.abs(mx) < 8 && Math.abs(my) < 8) return;
       if (Math.abs(my) > Math.abs(mx)) { mode = -1; return; }
@@ -1580,7 +1607,7 @@ const Folio = {
   });
   const end = e => {
     if (e.pointerId !== id) return;
-    id = null;
+    id = null; t0 = e.type === 'pointerup' ? performance.now() - t0 : Infinity; // (t0 is now the press's length)
     if (mode !== 1 || !dir || !Folio.turn) { dir = 0; return; }
     const far = e.type === 'pointerup' && Math.abs(dx) > Math.min(70, Folio.W * 0.18), k = Folio.at;
     const u = clamp(Math.abs(dx) / Folio.turn.P, 0, 1), { A, B } = Folio.turn;
@@ -1592,7 +1619,22 @@ const Folio = {
   };
   book.addEventListener('pointerup', end); book.addEventListener('pointercancel', end);
   // a swipe that ends over a lesson is not a tap on it
-  book.addEventListener('click', e => { if (swallow) { swallow = false; e.stopPropagation(); e.preventDefault(); } }, true);
+  book.addEventListener('click', e => { if (swallow) { swallow = false; e.stopImmediatePropagation(); e.preventDefault(); } }, true);
+  // a tap on a bottom corner turns the leaf that way: back on the left, on through the right. Only a tap (a short press
+  // that hardly moved; a swipe from the corner is a swipe, and its click is swallowed above). While a leaf is still
+  // turning the pages take no taps, so a quick second tap is found by where it fell, and turns one leaf more.
+  book.addEventListener('click', e => {
+    let d = 0;
+    const c = e.target.closest('.bk-corner');
+    if (c) d = c.classList.contains('next') ? 1 : -1;
+    else if (e.target === book && Folio.anim) {
+      const r = book.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, z = parseFloat(book.style.getPropertyValue('--cz')) || 0;
+      if (y > r.height - z) d = x < z ? -1 : x > r.width - z ? 1 : 0;
+    }
+    if (!d) return;
+    if (e.detail && (t0 > 600 || moved > 10)) return; // (detail 0: a screen reader's or the keyboard's click)
+    Folio.go(Folio.at + d);
+  });
   book.addEventListener('click', e => {
     const el = e.target.closest('.lentry');
     if (!el || el.classList.contains('locked') || Folio.anim) return;

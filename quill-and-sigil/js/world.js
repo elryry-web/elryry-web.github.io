@@ -3874,7 +3874,7 @@ function drawXray(g, c, t, xr) {
    soil, rock, moss and vines) takes dozens of fills. So a still tile is painted once into a small bitmap of its own
    and laid down from it each frame; its light, its water and whatever stands on it are still drawn live over it.
    A tile is painted afresh when it or a tile near it changes (once things settle), or the view moves or rescales. */
-const TC = { on: true, gkey: '', cells: null, map: new Map(), keys: [], skeys: [], calm: new Map() };
+const TC = { on: true, gkey: '', cells: null, map: new Map(), keys: [], skeys: [], calm: new Map(), stale: new Map(), lsig: '', lights: [] };
 // A tile's state in two parts: its shape (height, water, ice, the void), which the tiles round it are drawn against,
 // and its surface (frost, damp, ash, what stands on it, fire), which only it is. A change of shape repaints the
 // tiles round it too; a change of surface (a hedge burning to ash, frost spreading) repaints only the tile itself.
@@ -3882,18 +3882,25 @@ const cellStateKey = c => c.void ? 'v' : c.h.toFixed(3) + '|' + c.th + '|' + (c.
 const cellSurfaceKey = c => c.void ? '' : c.frost + '|' + (c.wet || 0).toFixed(2) + '|' + (c.ash || 0).toFixed(2) + '|' + c.feat + '|' + c.burn;
 function tileCacheFrame(t) {
   const D = dprNow();
-  const gk = cam.s + '|' + cam.ox.toFixed(2) + '|' + cam.oy.toFixed(2) + '|' + D + '|' + Object.keys(SPRITE).length + '|' + TEX_VER + '|' + texOK + '|' + LIGHT_SIG
+  const gk = cam.s + '|' + cam.ox.toFixed(2) + '|' + cam.oy.toFixed(2) + '|' + D + '|' + Object.keys(SPRITE).length + '|' + TEX_VER + '|' + texOK
     + '|' + (XR ? [...XR.set].map(c => c.x + ',' + c.y).join(';') : '');
-  if (gk !== TC.gkey || TC.cells !== World.cells) { TC.gkey = gk; TC.cells = World.cells; for (const e of TC.map.values()) tileDrop(e); TC.map.clear(); TC.keys = []; TC.skeys = []; atlasReset(); TC.gkAt = frameNo; }
+  if (gk !== TC.gkey || TC.cells !== World.cells) {
+    TC.gkey = gk; TC.cells = World.cells; for (const e of TC.map.values()) tileDrop(e); TC.map.clear(); TC.keys = []; TC.skeys = [];
+    for (const e of TC.stale.values()) tileDrop(e);
+    TC.stale.clear(); TC.lsig = LIGHT_SIG; TC.lights = LIGHTS_STILL;
+    atlasReset(); TC.gkAt = frameNo;
+  }
+  // a still light come, gone or moved (a brazier lit or put out): only the tiles it reaches are painted again
+  if (LIGHT_SIG !== TC.lsig) lightStale();
   const cs = World.cells;
   for (let i = 0; i < cs.length; i++) {
     const c = cs[i], k = cellStateKey(c), sk = cellSurfaceKey(c);
-    if (TC.skeys[i] !== sk) { TC.skeys[i] = sk; tileDrop(TC.map.get(c)); TC.map.delete(c); TC.calm.set(c, frameNo); }
+    if (TC.skeys[i] !== sk) { TC.skeys[i] = sk; tileForget(c); TC.calm.set(c, frameNo); }
     if (TC.keys[i] === k) continue;
     TC.keys[i] = k;
     for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
       const n = cellI(c.x + dx, c.y + dy); if (!n) continue;
-      tileDrop(TC.map.get(n)); TC.map.delete(n); TC.calm.set(n, frameNo);
+      tileForget(n); TC.calm.set(n, frameNo);
     }
   }
   // the tiles come to rest are painted now, before anything of this frame is drawn (painting into the atlas after
@@ -3907,6 +3914,52 @@ function tileCacheFrame(t) {
     if (TC.built >= 2 && performance.now() - t0 > TC_BUDGET) break;
     const h0 = HANG.length; buildTile(c, t); HANG.length = h0;
   }
+  if (TC.stale.size) staleFrame(t, t0);
+}
+// a tile's bitmap let go (and any new one being painted for it, see lightStale): it is drawn live till painted again
+function tileForget(c) {
+  tileDrop(TC.map.get(c)); TC.map.delete(c);
+  if (TC.stale.has(c)) { tileDrop(TC.stale.get(c)); TC.stale.delete(c); }
+}
+/* The still lights (lit braziers, the font) are painted into the tile bitmaps. When one comes, goes or moves, the tiles
+   it reaches are painted again a few a frame (staleFrame), while their old bitmaps go on being laid down; once all are
+   ready they change over in one frame, so its pool of light comes (or goes) whole and nothing is drawn live meanwhile.
+   (The lights were once part of the cache key: lighting a brazier dropped every bitmap, and every tile was drawn live
+   for some ten frames, then all were painted again at once.) */
+const lightKey = l => l.x + ',' + l.y + ',' + l.z.toFixed(2) + ',' + l.col + ',' + l.r + ',' + l.a;
+function lightStale() {
+  const was = new Set(TC.lights.map(lightKey)), now = new Set(LIGHTS_STILL.map(lightKey));
+  const ch = [...TC.lights.filter(l => !now.has(lightKey(l))), ...LIGHTS_STILL.filter(l => !was.has(lightKey(l)))];
+  TC.lsig = LIGHT_SIG; TC.lights = LIGHTS_STILL;
+  // (what was already painted for an earlier change has the lights from before this one)
+  for (const [c, e] of TC.stale) { tileDrop(e); TC.stale.set(c, null); }
+  for (const c of World.cells) if (!c.void && TC.map.has(c) && ch.some(l => lightReaches(l, c))) TC.stale.set(c, null);
+}
+// whether a light falls on anything painted in a tile's bitmap: its top, a neighbour's corner it fills in (r + 1.8),
+// its two walls and the curves at their ends (as lightTop and lightSide test them, leaving out height)
+function lightReaches(l, c) {
+  const dx = c.x + 0.5 - l.x, dy = c.y + 0.5 - l.y;
+  if (dx * dx + dy * dy <= (l.r + 1.8) ** 2) return true;
+  const side = (ox, oy, R) => {
+    const d = R ? l.x - (ox + 1) : l.y - (oy + 1), u = R ? l.y - (oy + 0.5) : l.x - (ox + 0.5);
+    return d >= 0.05 && d <= l.r && Math.abs(u) <= (l.r - d) * 1.2 + 0.55;
+  };
+  return side(c.x, c.y, true) || side(c.x, c.y, false) || side(c.x - 1, c.y + 1, true);
+}
+// paints the tiles waiting on a change of light, at most 8 a frame and within the frame's budget, then swaps them in
+function staleFrame(t, t0) {
+  let n = 0, ready = true;
+  for (const [c, e] of TC.stale) {
+    if (e) continue;
+    // (a tile no longer laid from its bitmap is painted afresh by the cache, with the lights as they are now)
+    if (!TC.map.has(c) || !tileStill(c)) { tileForget(c); continue; }
+    if (n >= 8 || performance.now() - t0 > TC_BUDGET) { ready = false; continue; }
+    const h0 = HANG.length, ne = buildTile(c, t, true); HANG.length = h0;
+    if (ne) { TC.stale.set(c, ne); n++; } else tileForget(c);
+  }
+  if (!ready) return;
+  for (const [c, e] of TC.stale) { tileDrop(TC.map.get(c)); TC.map.set(c, e); }
+  TC.stale.clear();
 }
 // whether a tile holds still enough to be laid from the cache
 const tileStill = c => TC.on && !(c.water != null && c.water > c.h && !waterCached(c)) && !(c.frost > 0) && !c.burn
@@ -3947,13 +4000,14 @@ function releaseBuffers() {
   for (const e of TC.map.values()) if (e.cv) { e.cv.width = 1; e.cv.height = 1; }
   for (const c of TC_POOL) { c.width = 1; c.height = 1; }
   atlasRelease();
-  TC_POOL.length = 0; TC.map.clear(); TC.keys = []; TC.gkey = '';
+  for (const e of TC.stale.values()) if (e && e.cv) { e.cv.width = 1; e.cv.height = 1; }
+  TC_POOL.length = 0; TC.map.clear(); TC.stale.clear(); TC.keys = []; TC.gkey = '';
   for (const k of ['a', 'b']) if (BLOOM[k]) { BLOOM[k].width = 1; BLOOM[k].height = 1; }
   if (_xrC) { _xrC.width = 1; _xrC.height = 1; }
   for (const k in _sheetC) { _sheetC[k].c.width = 1; _sheetC[k].c.height = 1; _sheetC[k].fresh = false; }
   if (SKY.ribbonGlow) { SKY.ribbonGlow.width = 1; SKY.ribbonGlow.height = 1; SKY.ribbonDrawn = false; }
 }
-function buildTile(c, t) {
+function buildTile(c, t, aside) {
   const s = cam.s, D = dprNow();
   let zLow = c.h;
   for (const R of [true, false]) { const n = R ? cellI(c.x + 1, c.y) : cellI(c.x, c.y + 1); zLow = Math.min(zLow, !n || n.void ? ROCK_FLOOR - 0.4 : n.h); }
@@ -3997,7 +4051,8 @@ function buildTile(c, t) {
   const e = { cv, slot, src, sx, sy, sw: w, sh: h, X0, Y0, w: w / D, h: h / D, hang: HANG.slice(h0), xr,
     top: !!(c.feat || landWaterCorners(c) || (c.water != null && c.water > c.h)),
     sheets: c.water != null && c.water > c.h && sheetsOn() && [0, 1, 2, 3].some(k => pours(c, k)) };
-  TC.map.set(c, e); TC.built++;
+  if (!aside) TC.map.set(c, e);
+  TC.built++;
   return e;
 }
 // the light falling on a tile laid from its bitmap: on its two walls in view, then its top (as drawCell lights them)
