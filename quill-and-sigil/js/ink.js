@@ -1312,6 +1312,65 @@ function goldText(g, text, x, y, size) {
   if (!m.b && !m.c && m.a && m.d) { lx = (Math.round(m.a * lx + m.e) - m.e) / m.a; ty = (Math.round(m.d * ty + m.f) - m.f) / m.d; }
   g.drawImage(w.c, lx, ty, w.W, w.H);
 }
+// where a capital's body lies, as fractions of its size from its centred, baseline origin: the letter is drawn large
+// offscreen and its ink counted down each column and along each row; the columns and rows holding at least 35% of the
+// fullest one are its body (the stems, bowls and bars), so a thin swash, tail or serif reaching out does not count.
+// Also its whole ink box, so the swashes can still be kept inside the frame.
+const _capBody = new Map();
+function capBody(ch) {
+  const font = '700 200px "Cinzel Decorative", serif';
+  let b = _capBody.get(ch); if (b) return b;
+  const c = document.createElement('canvas'), q = c.getContext('2d'), S = 200, W = 3 * S, H = 3 * S, ox = 1.5 * S, oy = 2 * S;
+  c.width = W; c.height = H; q.font = font; q.textAlign = 'center'; q.textBaseline = 'alphabetic'; q.fillStyle = '#000';
+  decoText(q, ch, ox, oy, (t, x, y) => q.fillText(t, x, y));
+  const d = q.getImageData(0, 0, W, H).data, col = new Float32Array(W), row = new Float32Array(H);
+  for (let y = 0, o = 3; y < H; y++) for (let x = 0; x < W; x++, o += 4) if (d[o]) { const a = d[o] / 255; col[x] += a; row[y] += a; }
+  const span = (v, n) => {
+    let mx = 0, i0 = -1, i1 = -1, b0 = -1, b1 = -1;
+    for (let i = 0; i < n; i++) { if (v[i] > mx) mx = v[i]; if (v[i] > 0) { if (i0 < 0) i0 = i; i1 = i; } }
+    for (let i = 0; i < n; i++) if (v[i] >= mx * 0.35) { if (b0 < 0) b0 = i; b1 = i; }
+    return [i0, i1 + 1, b0, b1 + 1];
+  };
+  const [x0, x1, bx0, bx1] = span(col, W), [y0, y1, by0, by1] = span(row, H);
+  if (x0 < 0) return null; // (nothing drawn)
+  b = { x0: (x0 - ox) / S, x1: (x1 - ox) / S, y0: (y0 - oy) / S, y1: (y1 - oy) / S, bx: ((bx0 + bx1) / 2 - ox) / S, by: ((by0 + by1) / 2 - oy) / S };
+  // (measured before the font arrives it would be the fallback face's, so then it is measured again next time)
+  if (!document.fonts || document.fonts.check(font)) _capBody.set(ch, b);
+  return b;
+}
+// a single capital of chiselled gold on the lapis field of a drop cap (the field box px square, its middle at cx, cy):
+// large enough that each stroke's spine reads, and centred on the letter's body, not on its swashes or serifs (a W's
+// long tail would pull it aside). The decorative face's swashes make A, G, L, N, U, V and W much wider or taller than E
+// or T, so a capital is made smaller until its ink fits 80% of the field, and smaller again (by an eighth at most) if,
+// centred on its body, a swash would reach past 42% of the field from its middle (the frame's inner rule is just
+// beyond). A swash longer still (the L's long foot) moves its body off the middle just enough to keep inside.
+function goldCap(g, ch, cx, cy, box) {
+  const b = capBody(ch);
+  let size = box * 0.72, dx = 0, dy = size * 0.36;
+  if (b) {
+    size = Math.min(size, box * 0.8 / Math.max(b.x1 - b.x0, b.y1 - b.y0));
+    const reach = Math.max(b.bx - b.x0, b.x1 - b.bx, b.by - b.y0, b.y1 - b.by);
+    size = Math.round(Math.max(size * 0.875, Math.min(size, box * 0.42 / reach)));
+    // the body's middle, then the letter slid back toward the field's middle only as far as its ink needs
+    const lim = box * 0.42, clamp = (c, a0, a1) => Math.min(Math.max(c, a1 * size - lim), a0 * size + lim);
+    dx = -clamp(b.bx * size, b.x0, b.x1); dy = -clamp(b.by * size, b.y0, b.y1);
+  } else size = Math.round(size);
+  g.save(); g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+  g.font = `700 ${size}px "Cinzel Decorative", serif`;
+  goldText(g, ch, cx + dx, cy + dy, size); g.restore();
+}
+// the same capital on a small canvas of its own, for a drop cap written in the page's HTML (the Notes leaf); drawn
+// again once the font has arrived, if it had not yet
+function goldCapCanvas(ch, box) {
+  const k = Math.max(1, window.devicePixelRatio || 1), c = document.createElement('canvas'), q = c.getContext('2d');
+  c.width = c.height = Math.ceil(box * k); c.style.width = c.style.height = box + 'px';
+  c.setAttribute('role', 'img'); c.setAttribute('aria-label', ch);
+  const draw = () => { q.setTransform(1, 0, 0, 1, 0, 0); q.clearRect(0, 0, c.width, c.height); q.setTransform(k, 0, 0, k, 0, 0); goldCap(q, ch, box / 2, box / 2, box); };
+  draw();
+  const font = `700 ${Math.round(box * 0.72)}px "Cinzel Decorative"`;
+  if (document.fonts && !document.fonts.check(font)) document.fonts.load(font).then(draw, () => { });
+  return c;
+}
 // a sigil in its knotwork roundel (whose outer edge is (r + 3) / 0.6)
 function medalGlyph(g, id, cx, cy, r, lw) {
   roundelAt(g, cx, cy, r + 3);
@@ -1403,7 +1462,15 @@ const Grim = {
       const m = pw * 0.035;
       const size = Math.max(160, Math.min((pw - 2 * (m + 9)) * 0.99 / L.fr, vh - 4 - pad * 2 - HEAD - FOOT));
       const bh = Math.min(vh - 4, HEAD + size + FOOT + pad * 2);
-      L.bx = (vw - bw) / 2; L.by = (vh - bh) / 2; L.bw = bw; L.bh = bh;
+      // the painted page's fold (left) and cover with its gilt corners (right) both stand outside the page, the cover
+      // twice as far: the page is laid so the whole painting fits (as folioBook scales it), the fold and a sliver of the
+      // facing page on the left, the cover's corners whole on the right, the page centred when there is room (v168:
+      // centred on a phone, the cover ran off the screen and its corners showed as slivers)
+      const FA = FOLIO_ART.page, kL = FA.rx[0] - FA.spine, kR = FA.w - FA.rx[1];
+      const mn = Math.min(pw, bh - pad * 2), mc = mn * 0.035 + Math.max(9, mn * 0.03) / 2;
+      const sk = Math.min(mc / kL, (vw - 4 - (pw - 2 * mc)) / (kL + kR));
+      const px = Math.max(sk * kL + 3 - mc, Math.min((vw - pw) / 2, vw - 1 - sk * kR - pw + mc));
+      L.bx = px - pad; L.by = (vh - bh) / 2; L.bw = bw; L.bh = bh;
       L.right = { x: L.bx + pad, y: L.by + pad, w: pw, h: bh - pad * 2 };
       L.left = null;
       const P = L.right;
@@ -1425,8 +1492,18 @@ const Grim = {
     return { SD, P, s, sy, end: sy + 22 * s + 4 + (15 * s + 3) + 11 * s };
   },
   // the HTML page buttons under the drawing area
+  // (v168) an upright phone's book stands over the dark page's lesson header (its top cut through it) and carries the
+  // lesson's name itself, so the header fades while the book is open there (CSS #lesson.under-book); on a short phone
+  // the book's top stands over the tool buttons too, which showed as slivers above it, so they fade then as well
+  headUnder() {
+    const el = document.getElementById('lesson'), tl = document.getElementById('tools'), L = this.L;
+    const up = !!(this.open && L && L.single && !L.side);
+    if (el) el.classList.toggle('under-book', up);
+    if (tl) tl.classList.toggle('under-book', up && tl.getBoundingClientRect().bottom > L.by + 2);
+  },
   placeButtons() {
     const pb = document.getElementById('pagebtns'), L = this.L; if (!pb || !L) return;
+    this.headUnder();
     pb.classList.toggle('single', L.single);
     // (a phone held sideways sets them out as upright, at the foot of its right-hand page)
     pb.classList.toggle('upright', L.single);
@@ -1450,6 +1527,7 @@ const Grim = {
     pb.style.left = (P.x + inset) + 'px'; pb.style.width = (P.w - inset * 2) + 'px';
     pb.style.setProperty('--bx', Math.max(0, B.m + B.bs * 0.9 + 4 - inset) + 'px');
     pb.style.rowGap = Math.max(4, B.bs * 0.9 - B.vh - 42) / 2 + 'px'; // (halved: the row break is an empty line of its own)
+    this.fitButtons(); // (again, now the row has its width: measured before it, the plaques were still as wide as the last layout left them)
     if (pb.style.display === 'flex') {
       const h = pb.offsetHeight;
       if (h && Math.abs(h - (this.btnH || 88)) > 2 && (this._relaid = (this._relaid || 0) + 1) < 4) {
@@ -1461,15 +1539,23 @@ const Grim = {
   },
   // upright, each page button's label shrinks until it fits its plaque (Firefox for Android scales text up with the
   // system font size, which used to wrap the buttons to a third row and shrink the circle); elsewhere they keep the CSS size
+  // (v168: measured by the label's own drawn width, not scrollWidth: a centred label that overflows spills out both
+  // sides, which scrollWidth does not see, so Ryan's phone showed UNDO as "UNDC"; and kept a few pixels clear of the
+  // plaque's inner frame, which NOTES touched. The letters close up first, then the type shrinks.)
   fitButtons() {
     const pb = document.getElementById('pagebtns'); if (!pb) return;
-    for (const b of pb.children) b.style.fontSize = '';
+    for (const b of pb.children) { b.style.fontSize = ''; b.style.letterSpacing = ''; }
     if (!pb.classList.contains('upright') || pb.style.display !== 'flex') return;
+    const r = document.createRange();
     for (const b of pb.children) {
       if (!b.offsetParent || b.id === 'pClose') continue;
-      for (let n = 0; n < 6 && b.scrollWidth > b.clientWidth + 0.5; n++) {
-        const fs = parseFloat(getComputedStyle(b).fontSize);
-        b.style.fontSize = Math.max(7, fs * b.clientWidth / b.scrollWidth * 0.97).toFixed(2) + 'px';
+      r.selectNodeContents(b);
+      const room = b.clientWidth - 6; // (the field inside the knotwork, less 3px each side)
+      if (r.getBoundingClientRect().width > room) b.style.letterSpacing = '0px';
+      for (let n = 0; n < 6; n++) {
+        const w = r.getBoundingClientRect().width; if (!w || w <= room) break;
+        const fs = parseFloat(getComputedStyle(b).fontSize); if (fs <= 7.01) break;
+        b.style.fontSize = Math.max(7, fs * room / w * 0.98).toFixed(2) + 'px';
       }
     }
   },
@@ -1518,6 +1604,7 @@ const Grim = {
     if (this.cv.width !== Math.round(innerWidth * Math.min(2, window.devicePixelRatio || 1)) || !this.L || this.L.bw <= 0) this.resize();
     this.open = true; this.closing = false; this.cv.style.display = 'block';
     document.getElementById('pagebtns').style.display = 'flex';
+    this.headUnder();
     // (the page itself is painted again only when its lesson or the screen changes, not at every opening)
     this.inkDirty = true;
     this.updateStatus();
@@ -1531,6 +1618,7 @@ const Grim = {
   hide() {
     this.closing = true; this.open = false;
     document.getElementById('pagebtns').style.display = 'none';
+    this.headUnder();
     document.getElementById('notes').classList.remove('show');
     Sfx.pen(0);
   },
@@ -1671,15 +1759,16 @@ const Grim = {
   },
   // the painting round the pages, which stay where they are: its fixed slices are scaled (s) so its ruled borders,
   // painted out, would lie under the knotwork, and so its parchment reaches each page's edges; where the screen has
-  // no room for the cover round them it gives a little (to 0.6 of that, past which the cover runs off the screen).
+  // no room for the cover round them it gives (smaller), so the cover and its gilt corners always show whole (one
+  // page: the fold, and a sliver of the facing page beyond it, too; layout() places that page to leave the room).
   // The fold stays on the spine, and only each page's plain middle stretches (laid more than once on a long page)
   folioBook(g, im, A) {
     const L = this.L, P = L.right, F = L.left || P, { m, vh } = this.borderSize(P), mc = m + vh / 2;
     const x0 = F.x + mc, x1 = P.x + P.w - mc, y0 = P.y + mc, y1 = P.y + P.h - mc, n = A.rx.length, rx1 = A.rx[n - 1];
     const ideal = mc / (!L.left ? A.rx[0] - A.spine : (A.rx[2] - A.rx[1]) / 2);
     let fit = Math.min((innerWidth - x1) / (A.w - rx1), y0 / A.ry[0], (innerHeight - y1) / (A.h - A.ry[1]));
-    if (L.left) fit = Math.min(fit, x0 / A.rx[0]);
-    const s = Math.max(ideal * 0.6, Math.min(ideal, fit));
+    fit = Math.min(fit, L.left ? x0 / A.rx[0] : (x0 - 3) / (A.rx[0] - A.spine));
+    const s = Math.max(ideal * 0.35, Math.min(ideal, fit));
     const fixed = (a0, a1, a, d) => ({ a0, a1, d0: d + (a0 - a) * s, d1: d + (a1 - a) * s });
     const xf = [fixed(0, A.cx[0], A.rx[0], x0)];
     // (the fold on the spine, where the right page begins: the pages either side of it may differ in width, each
@@ -1819,7 +1908,7 @@ const Grim = {
       g.font = `700 ${Math.round(fs)}px "Cinzel Decorative", serif`;
       const tw = decoWidth(g, lv.name); if (tw > bw * 0.5) { fs *= bw * 0.5 / tw; g.font = `700 ${Math.round(fs)}px "Cinzel Decorative", serif`; }
       // centred on the letters' own ink, not the font's em box (Cinzel's 'middle' sits the capitals high on the panel)
-      g.fillStyle = '#5a1c14'; g.textBaseline = 'middle';
+      g.fillStyle = '#7a1c12'; g.textBaseline = 'middle'; // (the folio headings' rubric ink)
       const nm = g.measureText(lv.name), lift = (nm.actualBoundingBoxAscent - nm.actualBoundingBoxDescent) / 2 || 0;
       decoText(g, lv.name, P.x + P.w / 2, by + bh * 0.5 + lift, (t, x, y) => g.fillText(t, x, y)); g.textBaseline = 'alphabetic';
       y = by + bh + 16 * s;
@@ -1838,8 +1927,7 @@ const Grim = {
       // the lapis field in its knotwork frame (the blue is the middle 72.5% of the painting), a gilded capital on it
       const D = capS / 0.725;
       g.drawImage(IN, x0 - D * 0.14, y - D * 0.14, D, D);
-      g.font = `700 ${Math.round(capS * 0.66)}px "Cinzel Decorative", serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
-      goldText(g, first, x0 + capS / 2, y + capS * 0.53, capS * 0.66);
+      goldCap(g, first, x0 - D * 0.14 + D / 2, y - D * 0.14 + D / 2, capS);
     } else {
       g.fillStyle = '#f3dfa8'; g.strokeStyle = gold; g.lineWidth = 1.5;
       g.fillRect(x0, y, capS, capS); g.strokeRect(x0, y, capS, capS);
@@ -2022,10 +2110,11 @@ const Grim = {
     // upright, the name sits below the page's top vine and its centre ornament
     const side = !!this.L.side, top = side ? P.y + 32 : P.y + 54;
     const MD = gart('roundel');
-    g.textAlign = 'center'; g.fillStyle = ink;
+    // the name in flat rubric ink, as the folio's own headings are set (.bk-head: Cinzel Decorative 700, #7a1c12); v167's
+    // chiselled gold here looked chunky and busy on the parchment (gold stays for the drop cap on its lapis ground)
+    g.textAlign = 'center'; g.fillStyle = MD ? '#7a1c12' : ink;
     g.font = `700 ${Math.round(20 * s + 4)}px "Cinzel Decorative", serif`;
-    if (MD) goldText(g, lv.name, P.x + P.w / 2, top, 20 * s + 4);
-    else decoText(g, lv.name, P.x + P.w / 2, top, (t, x, y) => g.fillText(t, x, y));
+    decoText(g, lv.name, P.x + P.w / 2, top, (t, x, y) => g.fillText(t, x, y));
     this.codexRects = [];
     // the row keeps inside the knotwork border (its first and last names were clipped by it)
     const B = this.borderSize(P), inner = MD ? P.w - 2 * (B.m + B.vh) - 14 : P.w - 20;

@@ -45,7 +45,8 @@
   #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; opacity: 0; transition: opacity .5s; }
   #hud.show { opacity: 1; }
   #hud button { pointer-events: auto; }
-  #lesson { position: absolute; left: 22px; top: 16px; text-shadow: 0 2px 8px rgba(0,0,0,.8); max-width: 46vw; }
+  #lesson { position: absolute; left: 22px; top: 16px; text-shadow: 0 2px 8px rgba(0,0,0,.8); max-width: 46vw; transition: opacity .3s; }
+  #lesson.under-book { opacity: 0; } /* (an upright phone's open book carries the lesson's name: set by Grim.headUnder) */
   #lnum { font-family: Cinzel, serif; letter-spacing: .25em; font-size: 12px; color: #d9a54e; }
   #ltitle { font-family: 'Cinzel Decorative', serif; font-weight: 700; font-size: 30px; color: #fff0cc; line-height: 1.1;
     background: linear-gradient(#fff5d8, #e8c27a 60%, #b8893e); -webkit-background-clip: text; background-clip: text; color: transparent; }
@@ -54,7 +55,8 @@
   #objs .box { width: 13px; height: 13px; border: 1.5px solid var(--gold); transform: rotate(45deg); display: inline-block; flex: none; }
   #objs li.done { color: #a8f0c8; }
   #objs li.done .box { background: var(--gold); box-shadow: 0 0 10px var(--gold); }
-  #tools { position: absolute; right: 18px; top: 16px; display: flex; gap: 8px; }
+  #tools { position: absolute; right: 18px; top: 16px; display: flex; gap: 8px; transition: opacity .3s; }
+  #tools.under-book { opacity: 0; } #tools.under-book .btn { pointer-events: none; } /* (a short upright phone's book stands over them) */
   #tools .btn { padding: 7px 11px; font-size: 13px; display: flex; align-items: center; gap: 6px; }
   #tools .btn span { font-size: 11px; }
   #bSound.off { opacity: .5; text-decoration: line-through; }
@@ -103,7 +105,11 @@
   #pagebtns.upright { gap: 4px 4px; }
   #pagebtns.upright::after { content: ''; flex: 0 0 100%; order: 1; }
   #pagebtns.upright .btn, #pagebtns.upright .btn.primary { box-sizing: border-box; height: 42px; min-width: 0; flex: 1 1 0;
-    white-space: nowrap; overflow: hidden; padding: 0 2px; letter-spacing: .02em; font-size: 12px; line-height: 1; }
+    white-space: nowrap; overflow: hidden; padding: 0; letter-spacing: .02em; font-size: 12px; line-height: 1; }
+  /* (v168: a slimmer 9px frame, its field laid to match, gives the labels room to stay readable) */
+  #pagebtns.upright.plaques .btn { border-width: 9px; border-image-width: 9px;
+    background-size: calc((100% - 18px) * 1.3483) calc((100% - 18px) * 1.9587); }
+  #pagebtns.upright .glyph { display: none; } /* (Notes' and Undo's marks give their room to the words) */
   #pagebtns.upright .btn.primary { font-size: 13px; }
   #pagebtns.upright #pNotes, #pagebtns.upright #pUndo { flex-grow: 1.1; }
   #pagebtns.upright #pBlot { flex-grow: .8; }
@@ -184,7 +190,8 @@
     line-height: 1.1; padding: 0 0 .28em; margin: 0 0 .1em; border-bottom: 3px double rgba(110,60,28,.55); }
   .bk-run { font-family: Cinzel, serif; font-weight: 600; font-size: calc(var(--namefs) * .6); letter-spacing: .14em; color: #7a1c12;
     text-align: center; padding-bottom: .3em; border-bottom: 1px solid rgba(110,60,28,.35); }
-  .bk-foot { margin-top: auto; padding-top: 2px; text-align: center; font-family: 'IM Fell English', serif; font-style: italic;
+  /* the page number, below the ruled border (placed by Folio.paginate) */
+  .bk-foot { position: absolute; transform: translateY(-50%); white-space: nowrap; pointer-events: none; text-align: center; font-family: 'IM Fell English', serif; font-style: italic;
     font-size: calc(var(--namefs) * .68); line-height: 1.2; color: #6a4428; }
   /* a lesson written on the page: its illuminated number, its name in ink, and the master's seal once finished */
   .lentry { display: grid; grid-template-columns: minmax(0, 1fr) var(--seal); align-items: center; column-gap: 4px; width: 100%;
@@ -196,8 +203,14 @@
   .lentry .lnum img:first-child { margin-left: 0; }
   .lentry .lname { display: block; margin-top: 3px; font-family: 'IM Fell English', serif; font-size: var(--namefs); line-height: 1.12; color: #24120a; }
   .lentry .ltext { min-width: 0; }
-  .lentry .seal { width: var(--seal); height: var(--seal); margin: calc(var(--epad) * -1) 0; pointer-events: none;
-    background: url(art/grim-seal.png?v=1) center / contain no-repeat; transform: rotate(-8deg); filter: drop-shadow(0 2px 2px rgba(40,10,0,.45)); }
+  /* the seal's box sits in the row's padding, 1px short top and bottom, so a row is 1px shorter than the seal (five rows
+     fit a phone page). Its wax, tilted, sized and with its drips, stays inside its own row: the paintings run from 43% of
+     their square above the middle to 52% below (a drip, tilted), so the seal is drawn at 0.96 of its box (at most 0.99
+     with the size range) and lifted 4% to centre the wax, which leaves a few px between neighbouring seals */
+  .lentry .seal { width: var(--seal); height: var(--seal); margin: calc(var(--epad) * -1 - 1px) 0; pointer-events: none;
+    background: url(art/seal-1.png?v=2) center / contain no-repeat;
+    transform: translateY(calc(var(--seal) * -.04)) rotate(var(--tilt, -6deg)) scale(calc(var(--sz, 1) * .96));
+    filter: drop-shadow(0 2px 2px rgba(40,10,0,.45)); }
   .lentry.here .lname::after { content: ' ☙'; color: #8e2f22; font-size: .8em; }
   .lentry.locked { cursor: default; }
   .lentry.locked:hover { background: none; }
@@ -207,7 +220,7 @@
   /* the turning leaf: its back is plain parchment (with the next left page written on it, in a spread) */
   .bk-flap { position: absolute; z-index: 4; overflow: hidden; pointer-events: none; background: #ecdab4 url(art/folio-leaf.jpg?v=1) no-repeat; }
   .bk-flap .bk-rule { position: absolute; border: 1px solid rgba(70,45,25,.7); }
-  .bk-flap .bk-col { z-index: 1; }
+  .bk-flap .bk-col, .bk-flap .bk-foot { z-index: 1; }
   .bk-flap .bk-shade, .bk-cast { position: absolute; pointer-events: none; }
   .bk-flap .bk-shade { inset: 0; z-index: 2; }
   .bk-cast { z-index: 3; }
@@ -385,9 +398,8 @@
     display: flex; align-items: center; justify-content: center; }
   #notes.illum .cap::before { content: ''; position: absolute; z-index: -1; left: -19.3%; top: -19.3%; width: 137.9%; height: 137.9%;
     background: url(art/grim-capframe.png?v=1) center / 100% 100% no-repeat; }
-  #notes.illum .cap i { font: normal 700 33px/1 'Cinzel Decorative', serif; padding-top: 3px;
-    background: linear-gradient(#f7e29a, #d2a24a 42%, #9c6a22 58%, #dcb45c); -webkit-background-clip: text; background-clip: text; color: transparent;
-    filter: drop-shadow(0 1px 0 rgba(66,36,12,.9)) drop-shadow(0 0 1px rgba(66,36,12,.9)); }
+  /* the capital: chiselled gold drawn on a canvas the size of the lapis field (goldCapCanvas in ink.js) */
+  #notes.illum .cap canvas { position: static; display: block; width: 100%; height: 100%; touch-action: auto; }
   #notes.illum .nhead { border-top: none; padding-top: 4px; display: flex; align-items: center; gap: 10px; margin-top: 10px; }
   #notes.illum .nhead::before, #notes.illum .nhead::after { content: ''; flex: 1; min-width: 20px; height: 10px;
     background: url(art/grim-knot.png?v=1) left center / auto 100% repeat-x; }
@@ -543,8 +555,8 @@
 </div>
 
 <div id="pagebtns">
-  <button class="btn" id="pNotes" title="Turn to the lesson notes and the sigils">❦ Notes</button>
-  <button class="btn" id="pUndo" title="Backspace">⌫ Undo</button>
+  <button class="btn" id="pNotes" title="Turn to the lesson notes and the sigils"><span class="glyph">❦ </span>Notes</button>
+  <button class="btn" id="pUndo" title="Backspace"><span class="glyph">⌫ </span>Undo</button>
   <button class="btn" id="pBlot" title="Delete">Blot</button>
   <button class="btn" id="pRecall" title="Restore your last spell">Recall</button>
   <button class="btn" id="pKeep" title="Keep this spell in your satchel (K)">✚ Keep</button>
@@ -680,9 +692,9 @@
   </div>
 </div>
 
-<script src="js/ink.js?v=167"></script>
-<script src="js/world.js?v=167"></script>
-<script src="js/tips.js?v=167"></script>
-<script src="js/main.js?v=167"></script>
+<script src="js/ink.js?v=168"></script>
+<script src="js/world.js?v=168"></script>
+<script src="js/tips.js?v=168"></script>
+<script src="js/main.js?v=168"></script>
 </body>
 </html>

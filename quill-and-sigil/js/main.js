@@ -954,7 +954,8 @@ const Game = {
     $('#nNum').textContent = `Lesson ${L.roman}`;
     $('#nTitle span').innerHTML = decoHTML(L.name); $('#nTitle span').style.fontSize = '';
     const nt = $('#nText'); nt.textContent = illum ? L.lesson.slice(1) : L.lesson;
-    if (illum) { const c = document.createElement('span'), i = document.createElement('i'); c.className = 'cap'; i.textContent = L.lesson[0]; c.append(i); nt.prepend(c); }
+    // (the drop cap's capital is chiselled gold drawn on a canvas, as on the desktop page; its lapis field is 50px)
+    if (illum) { const c = document.createElement('span'); c.className = 'cap'; c.append(goldCapCanvas(L.lesson[0], 50)); nt.prepend(c); }
     const box = $('#nSigils'); box.innerHTML = '';
     for (const id of SIGIL_ORDER) {
       const S = SIGILS[id], known = L.sigils.includes(id);
@@ -1348,9 +1349,28 @@ const BOOK = {
   spread: { w: 2752, b: [230, 332, 236, 335], spine: 1375, outer: 2635, cols: [[335, 1219], [1532, 2420]], rule: [1494, 2464] },
   single: { w: 1462, b: [230, 332, 236, 250], spine: 85, outer: 1345, cols: [[250, 1130]], rule: [204, 1174] },
   h: 1536, top: 52, bot: 1466, ruleY: [171, 1357], ruleIn: 13,
+  foot: 1411, // the page number, centred in the margin band between the ruled border and the page's edge
 };
 const NUM_W = { I: 66, V: 155, X: 153, L: 125 }; // the illuminated letters, 160px tall
 const numHTML = r => [...r].map(c => `<img src="art/num-${c}.png?v=1" width="${NUM_W[c]}" height="160" alt="">`).join('');
+// a finished lesson's wax seal, pressed by hand: one of six painted seals (all one crimson wax and one gold), a tilt and a
+// size, all from a hash of the lesson's name (not its place in the list), so a lesson always gets the same seal. A lesson whose pick
+// matches the lesson before it in the same folio steps on to the next seal, so neighbours differ.
+const SEAL_N = 6, sealLooks = [];
+function sealLook(i) {
+  if (sealLooks[i]) return sealLooks[i];
+  let h = 0x811c9dc5;
+  for (const ch of LEVELS[i].name) h = Math.imul(h ^ ch.codePointAt(0), 0x01000193) >>> 0;
+  const next = () => { h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d) >>> 0; h = Math.imul(h ^ (h >>> 12), 0x297a2d39) >>> 0; h = (h ^ (h >>> 15)) >>> 0; return h / 4294967296; };
+  let n = Math.floor(next() * SEAL_N);
+  if (i > 0 && !LEVELS[i].opens && sealLook(i - 1).n === n) n = (n + 1) % SEAL_N;
+  const lerp = (a, b) => a + (b - a) * next();
+  return (sealLooks[i] = { n, tilt: lerp(-8, 8).toFixed(1), size: lerp(0.95, 1.03).toFixed(3) });
+}
+const sealHTML = i => {
+  const k = sealLook(i);
+  return `<i class="seal" title="Finished" style="background-image:url(art/seal-${k.n + 1}.png?v=2);--tilt:${k.tilt}deg;--sz:${k.size}"></i>`;
+};
 const Folio = {
   views: [], sheets: [], at: 0, mode: 'single', anim: null, turn: null, resumeTo: 0,
   build(resumeTo) { this.resumeTo = resumeTo; this.finish(); this.render(); this.go(this.viewOf(resumeTo), true); },
@@ -1396,15 +1416,17 @@ const Folio = {
     const label = `Lesson ${L.roman}: ${locked ? 'locked' : L.name}${done ? ', finished' : ''}`;
     return `<button class="lentry${locked ? ' locked' : ''}${done ? ' done' : ''}${i === this.resumeTo ? ' here' : ''}" data-i="${i}" aria-label="${label}"${locked ? ' aria-disabled="true"' : ''}>`
       + `<span class="ltext"><span class="lnum">${numHTML(L.roman)}</span><span class="lname">${locked ? '· locked ·' : L.name}</span></span>`
-      + `${done ? '<i class="seal" title="Finished"></i>' : '<i></i>'}</button>`;
+      + `${done ? sealHTML(i) : '<i></i>'}</button>`;
   },
   // the lessons written onto leaves: each folio starts a new leaf under its title (in a spread that may be the right
   // page) and fills it before going on to the next, under a running head; only a folio's last leaf is left part empty.
   // Each leaf is measured whole as it fills (title, lessons, page number), and a lesson goes on only while the leaf
   // stays FIT_PAD px short of the page, so no row is ever cut off and a pixel or two of screen does not change the book
   paginate() {
-    const book = $('#book'), g = this.g, colW = (g.cols[0][1] - g.cols[0][0]) * this.mx, colH = this.H - this.bt - this.bb;
-    const FIT_PAD = 4, room = colH - FIT_PAD;
+    // the column runs down to just above the inner ruled line (the page number sits below the ruled border)
+    const book = $('#book'), g = this.g, colW = (g.cols[0][1] - g.cols[0][0]) * this.mx;
+    const ext = Math.max(0, (BOOK.ruleY[1] - BOOK.ruleIn - 6 - (BOOK.h - g.b[2])) * this.s), colH = this.H - this.bt - this.bb + ext;
+    const FIT_PAD = 4, room = colH - FIT_PAD, footTop = this.y(BOOK.foot) - this.bt;
     book.innerHTML = '';
     const m = document.createElement('div'); m.className = 'bk-col bk-measure';
     m.style.cssText = `width:${colW}px;bottom:auto`; book.appendChild(m);
@@ -1415,7 +1437,7 @@ const Folio = {
       for (let j = 0; j < F.items.length;) {
         const first = j === 0, items = [];
         m.innerHTML = (first ? `<div class="bk-head">${decoHTML(F.title)}</div>` : `<div class="bk-run">${F.title}</div>`)
-          + '<div class="bk-list"></div><div class="bk-foot">· 88 ·</div>';
+          + '<div class="bk-list"></div>';
         const list = m.querySelector('.bk-list');
         // (a leaf always takes at least one lesson, however tall)
         while (j < F.items.length) {
@@ -1434,9 +1456,11 @@ const Folio = {
       const ls = leaves.slice(v * per, v * per + per);
       sh.innerHTML = ls.map((lf, c) => {
         const at = g.cols[c], no = v * per + c + 1;
-        return `<div class="bk-col" style="left:${(at[0] - g.b[3]) * this.mx}px;width:${(at[1] - at[0]) * this.mx}px">`
+        const pos = `left:${(at[0] - g.b[3]) * this.mx}px;width:${(at[1] - at[0]) * this.mx}px`;
+        return `<div class="bk-col" style="${pos};bottom:${-ext}px">`
           + (lf.first ? `<div class="bk-head">${decoHTML(lf.title)}</div>` : `<div class="bk-run">${lf.title}</div>`)
-          + `<div class="bk-list">${lf.items.map(i => this.entryHTML(i)).join('')}</div><div class="bk-foot">· ${no} ·</div></div>`;
+          + `<div class="bk-list">${lf.items.map(i => this.entryHTML(i)).join('')}</div></div>`
+          + `<div class="bk-foot" style="${pos};top:${footTop}px">· ${no} ·</div>`;
       }).join('');
       book.appendChild(sh); this.sheets.push(sh); this.views.push(ls.flatMap(lf => lf.items));
     }
@@ -1481,12 +1505,14 @@ const Folio = {
     const [o, i] = fl.querySelectorAll('.bk-rule');
     Object.assign(o.style, { left: ro + 'px', top: r0 + 'px', width: rw + 'px', height: rh + 'px' });
     Object.assign(i.style, { left: ro + d + 'px', top: r0 + d + 'px', width: rw - 2 * d + 'px', height: rh - 2 * d + 'px' });
-    const old = fl.querySelector('.bk-col'); if (old) old.remove();
+    fl.querySelectorAll('.bk-col, .bk-foot').forEach(el => el.remove());
     if (this.mode === 'spread') {
-      const col = this.sheets[B].querySelector('.bk-col').cloneNode(true);
+      const col = this.sheets[B].querySelector('.bk-col').cloneNode(true), foot = this.sheets[B].querySelector('.bk-foot').cloneNode(true);
       col.style.left = this.bl + parseFloat(col.style.left) - (2 * S - R) + 'px';
-      col.style.top = this.bt - top + 'px'; col.style.bottom = 'auto'; col.style.height = this.H - this.bt - this.bb + 'px';
-      fl.insertBefore(col, fl.firstChild);
+      col.style.top = this.bt - top + 'px'; col.style.bottom = 'auto';
+      col.style.height = this.H - this.bt - this.bb - parseFloat(this.sheets[B].querySelector('.bk-col').style.bottom) + 'px';
+      foot.style.left = col.style.left; foot.style.top = this.bt + parseFloat(foot.style.top) - top + 'px';
+      fl.insertBefore(foot, fl.firstChild); fl.insertBefore(col, fl.firstChild);
     }
   },
   draw(t) {
