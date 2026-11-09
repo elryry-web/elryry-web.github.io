@@ -327,10 +327,14 @@ function stepBody(b, dt) {
   if (b.z < -7) {
     b.alive = false;
     if (b.kind === 'orb') {
-      // with a measured inkwell the spent ink can't bring the orb home again, so the whole lesson begins again
-      const again = !!(World.level && World.level.ink);
-      World.respawns.push({ b, t: 0.9, again });
-      Game.toast(again ? 'The orb is lost to the abyss. The lesson begins again.' : 'The orb is lost to the abyss. It re-forms where it began.'); Sfx.play('lost');
+      // the page turns back one cast once the fall has been seen (Game.lostRewind), with its ink given back; lost before
+      // any cast, the lesson begins again. h: the casts kept when it fell, so a seal cast during the beat is taken back too
+      if (!World.respawns.length) {
+        const h = typeof Game.history === 'object' ? Game.history.length : 0;
+        World.respawns.push({ b, t: 0.9, h });
+        Game.toast(h ? 'The orb is lost to the abyss. The page turns back one cast.' : 'The orb is lost to the abyss. The lesson begins again.');
+      }
+      Sfx.play('lost');
     }
   }
 }
@@ -428,7 +432,7 @@ function worldStep(dt) {
     const r = World.respawns[i]; r.t -= dt;
     if (r.t <= 0) {
       World.respawns.splice(i, 1);
-      if (r.again && Game.lostRestart) { Game.lostRestart(); return; } // (the level simulations in Node have no Game.lostRestart)
+      if (Game.lostRewind) { Game.lostRewind(r.h); return; } // (the level simulations in Node have no Game.lostRewind)
       const b = r.b; Object.assign(b, { x: b.home.x, y: b.home.y, z: b.home.z + 1.2, vx: 0, vy: 0, vz: 0, alive: true, lev: 0, drift: null, captured: false });
       for (let k = 0; k < 40; k++) { const a = Math.random() * TAU, rr = 0.8 + Math.random(); emit({ x: b.x + Math.cos(a) * rr, y: b.y + Math.sin(a) * rr, z: b.z + Math.random(), vx: -Math.cos(a) * rr * 2, vy: -Math.sin(a) * rr * 2, life: 0.5, size: 4, color: '#ffd27a', kind: 'glow' }); }
       Sfx.play('reform');
@@ -3527,6 +3531,22 @@ function drawBramble(g, c, d, t) {
   }
 }
 
+// a lit bowl's embers, painted once for the size the bowl is drawn at (painted each frame they were a clip and a new
+// gradient per brazier, which Firefox can't draw on the GPU and fetched the whole frame back for)
+const EMBER = { k: '', cv: null };
+function emberSprite(rx, ry) {
+  const D = dprNow(), k = rx.toFixed(2) + '|' + ry.toFixed(2) + '|' + D;
+  if (EMBER.k === k && EMBER.cv) return EMBER.cv;
+  const cv = EMBER.cv || document.createElement('canvas');
+  cv.width = Math.max(1, Math.ceil(rx * 2 * D)); cv.height = Math.max(1, Math.ceil(ry * 2 * D));
+  const g = cv.getContext('2d'), sx = cv.width / (rx * 2), sy = cv.height / (ry * 2);
+  g.setTransform(sx, 0, 0, sy, rx * sx, ry * sy);
+  const eg = g.createRadialGradient(0, ry * 0.2, 0, 0, ry * 0.2, rx);
+  eg.addColorStop(0, '#fff0b0'); eg.addColorStop(0.35, '#ffa040'); eg.addColorStop(1, 'rgba(160,50,20,0.9)');
+  g.fillStyle = eg; g.beginPath(); g.ellipse(0, 0, rx, ry, 0, 0, TAU); g.fill();
+  EMBER.cv = cv; EMBER.k = k;
+  return cv;
+}
 function drawBrazier(g, c, t) {
   const x = c.x, y = c.y, z = c.h, s = cam.s;
   if (SPRITE.brazier) {
@@ -3537,11 +3557,7 @@ function drawBrazier(g, c, t) {
     // the bowl's mouth: embers when lit, a slow ember ring when not
     const bx = left + 0.487 * w, byy = topY + 0.145 * h, rx = 0.36 * w, ry = 0.16 * w, bz = z + brazierBowlZ();
     if (c.lit) {
-      g.save(); g.beginPath(); g.ellipse(bx, byy, rx, ry, 0, 0, TAU); g.clip();
-      const eg = g.createRadialGradient(bx, byy + ry * 0.2, 0, bx, byy + ry * 0.2, rx);
-      eg.addColorStop(0, '#fff0b0'); eg.addColorStop(0.35, '#ffa040'); eg.addColorStop(1, 'rgba(160,50,20,0.9)');
-      g.fillStyle = eg; g.fillRect(bx - rx, byy - ry, rx * 2, ry * 2);
-      g.restore();
+      g.drawImage(emberSprite(rx, ry), bx - rx, byy - ry, rx * 2, ry * 2);
       if (Math.random() < 0.9 * AMB.k) flameP(x + 0.5 + (Math.random() - .5) * 0.22, y + 0.5 + (Math.random() - .5) * 0.22, bz + 0.05, 1.1);
     } else {
       const pulse = 0.5 + 0.5 * Math.sin(t * 2.2 + c.x);
@@ -3958,7 +3974,7 @@ function staleFrame(t, t0) {
     if (ne) { TC.stale.set(c, ne); n++; } else tileForget(c);
   }
   if (!ready) return;
-  for (const [c, e] of TC.stale) { tileDrop(TC.map.get(c)); TC.map.set(c, e); }
+  for (const [c, e] of TC.stale) { tileDrop(TC.map.get(c)); TC.map.set(c, tileSettle(e)); }
   TC.stale.clear();
 }
 // whether a tile holds still enough to be laid from the cache
@@ -3984,6 +4000,35 @@ function atlasAlloc(w, h) {
   return { p, x: 0, y: 0, W, H };
 }
 function atlasFree(s) { const k = s.W + 'x' + s.H; let fl = ATL.free.get(k); if (!fl) ATL.free.set(k, fl = []); fl.push(s); }
+// lays a tile painted on a canvas of its own into its slot (cleared first, gutter and all)
+function atlasPut(s, cv, w, h) {
+  const pg = s.p.g;
+  pg.clearRect(s.x, s.y, s.W, s.H);
+  pg.drawImage(cv, 0, 0, w, h, s.x + 2, s.y + 2, w, h);
+}
+// the canvas tiles are painted on before they go into the atlas (grown as needed, never shrunk). willReadFrequently
+// keeps it in memory rather than on the GPU, where small paint calls cost nothing to switch between.
+const TSC = { cv: null, g: null };
+function tileScratch(w, h) {
+  if (!TSC.cv) TSC.cv = document.createElement('canvas');
+  if (TSC.cv.width < w || TSC.cv.height < h) { TSC.cv.width = Math.max(TSC.cv.width, w); TSC.cv.height = Math.max(TSC.cv.height, h); }
+  if (!TSC.g) TSC.g = TSC.cv.getContext('2d', { willReadFrequently: true });
+  return TSC.g;
+}
+// a canvas for a tile of its own (from the pool, or new and kept off the GPU as tileScratch is)
+function poolCanvas() {
+  const cv = TC_POOL.pop(); if (cv) return cv;
+  const n = document.createElement('canvas'); n.getContext('2d', { willReadFrequently: true }); return n;
+}
+// a tile painted aside, swapped in: moved into the atlas if there's room (its own canvas goes back to the pool)
+function tileSettle(e) {
+  if (!e || !e.cv) return e;
+  const s = atlasAlloc(e.sw, e.sh); if (!s) return e;
+  atlasPut(s, e.cv, e.sw, e.sh);
+  if (TC_POOL.length < 64) TC_POOL.push(e.cv); else { e.cv.width = 1; e.cv.height = 1; }
+  e.cv = null; e.slot = s; e.src = s.p.cv; e.sx = s.x + 2; e.sy = s.y + 2;
+  return e;
+}
 function atlasReset() { for (const p of ATL.pages) { p.shelves = []; p.y = 0; } ATL.free.clear(); }
 function atlasRelease() { for (const p of ATL.pages) { p.cv.width = 1; p.cv.height = 1; } ATL.pages = []; ATL.free.clear(); }
 // canvases let go by the cache, kept to be reused (fewer new canvases, and less for the browser to clear up)
@@ -4002,7 +4047,8 @@ function releaseBuffers() {
   atlasRelease();
   for (const e of TC.stale.values()) if (e && e.cv) { e.cv.width = 1; e.cv.height = 1; }
   TC_POOL.length = 0; TC.map.clear(); TC.stale.clear(); TC.keys = []; TC.gkey = '';
-  for (const k of ['a', 'b']) if (BLOOM[k]) { BLOOM[k].width = 1; BLOOM[k].height = 1; }
+  if (TSC.cv) { TSC.cv.width = 1; TSC.cv.height = 1; }
+  for (const k of ['a', 'b', 'c']) if (BLOOM[k]) { BLOOM[k].width = 1; BLOOM[k].height = 1; }
   if (_xrC) { _xrC.width = 1; _xrC.height = 1; }
   for (const k in _sheetC) { _sheetC[k].c.width = 1; _sheetC[k].c.height = 1; _sheetC[k].fresh = false; }
   if (SKY.ribbonGlow) { SKY.ribbonGlow.width = 1; SKY.ribbonGlow.height = 1; SKY.ribbonDrawn = false; }
@@ -4016,16 +4062,19 @@ function buildTile(c, t, aside) {
   const zTop = c.water != null && c.water > c.h ? c.water : c.h;
   const Y0 = Math.floor((proj(c.x, c.y, zTop)[1] - 26 * s - 4) * D) / D, Y1 = Math.ceil((proj(c.x + 1, c.y + 1, zLow)[1] + 18 * s + 4) * D) / D;
   const w = Math.round((X1 - X0) * D), h = Math.round((Y1 - Y0) * D); if (w < 1 || h < 1 || w * h > 4e6) return null;
-  // a slot in the atlas (or, if it is full, a canvas of the tile's own), cleared and fenced off so nothing spills
-  const slot = atlasAlloc(w, h);
+  // a slot in the atlas (or, if it is full, a canvas of the tile's own). The tile is painted on a small canvas kept
+  // off the GPU and laid into its slot in one drawImage: painted straight into the big atlas page, Firefox read the
+  // whole page back from the GPU for many of the paint calls (gradients, clips) and sent it up again (a stall of some
+  // hundreds of ms when a brazier was lit and its tiles were painted again). A tile painted aside (staleFrame) keeps
+  // a canvas of its own until it is swapped in, so the atlas pages change in one frame only.
+  const slot = aside ? null : atlasAlloc(w, h);
   let lg, cv = null, src, sx = 0, sy = 0;
   if (slot) {
-    lg = slot.p.g; src = slot.p.cv; sx = slot.x + 2; sy = slot.y + 2;
-    lg.save(); lg.setTransform(1, 0, 0, 1, 0, 0); lg.clearRect(slot.x, slot.y, slot.W, slot.H);
-    lg.beginPath(); lg.rect(sx, sy, w, h); lg.clip();
-    lg.setTransform(D, 0, 0, D, sx - X0 * D, sy - Y0 * D);
+    lg = tileScratch(w, h); src = slot.p.cv; sx = slot.x + 2; sy = slot.y + 2;
+    lg.save(); lg.setTransform(1, 0, 0, 1, 0, 0); lg.clearRect(0, 0, w, h);
+    lg.setTransform(D, 0, 0, D, -X0 * D, -Y0 * D);
   } else {
-    cv = src = TC_POOL.pop() || document.createElement('canvas'); cv.width = w; cv.height = h;
+    cv = src = poolCanvas(); cv.width = w; cv.height = h;
     lg = cv.getContext('2d'); lg.save(); lg.setTransform(D, 0, 0, D, -X0 * D, -Y0 * D);
   }
   const h0 = HANG.length; LIGHT_ONLY = 'still'; WATER_PART = 'still';
@@ -4047,6 +4096,7 @@ function buildTile(c, t, aside) {
     lg.globalCompositeOperation = 'source-over';
   }
   lg.restore();
+  if (slot) atlasPut(slot, TSC.cv, w, h);
   // (top: whether anything is drawn over it live: water, or something standing on it)
   const e = { cv, slot, src, sx, sy, sw: w, sh: h, X0, Y0, w: w / D, h: h / D, hang: HANG.slice(h0), xr,
     top: !!(c.feat || landWaterCorners(c) || (c.water != null && c.water > c.h)),
@@ -4106,7 +4156,18 @@ function refreshCanvases() {
   lipPats = new WeakMap(); weatherPats = new WeakMap();
   SKY.base = null; SEA.bands.length = 0; _moon = null;
   for (const I of SKY.isles) I.spr = null;
+  EMBER.k = ''; FONTCOL.cv = null;
   releaseBuffers();
+}
+// the font's column of light, a gradient painted once and stretched (instead of a new gradient every frame)
+const FONTCOL = { cv: null };
+function fontColumn() {
+  if (FONTCOL.cv) return FONTCOL.cv;
+  const cv = document.createElement('canvas'); cv.width = 4; cv.height = 256;
+  const g = cv.getContext('2d'), gr = g.createLinearGradient(0, 256, 0, 0);
+  gr.addColorStop(0, 'rgba(140,240,255,0.22)'); gr.addColorStop(1, 'rgba(140,240,255,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 4, 256);
+  return FONTCOL.cv = cv;
 }
 let frameNo = 0, SKY_LAYER = null, XR = null;
 // what the drawing code emits as it draws (flames, spray, the font's sparks) is scaled by AMB.k, the time since the
@@ -4193,9 +4254,7 @@ function render(g, w, h, t, overlay) {
       g.globalAlpha = 0.35; g.drawImage(glowSprite('#7ff0ff'), cx - r, cy - r * 0.6, r * 2, r * 1.2);
       // a faint column of light, and rings of it rising from the well and widening as they fade
       const bw = 10 * s, bh = 170 * s;
-      const gr = g.createLinearGradient(0, cy, 0, cy - bh);
-      gr.addColorStop(0, 'rgba(140,240,255,0.22)'); gr.addColorStop(1, 'rgba(140,240,255,0)');
-      g.globalAlpha = 0.5 + 0.15 * Math.sin(t * 2); g.fillStyle = gr; g.fillRect(cx - bw / 2, cy - bh, bw, bh);
+      g.globalAlpha = 0.5 + 0.15 * Math.sin(t * 2); g.drawImage(fontColumn(), cx - bw / 2, cy - bh, bw, bh);
       const rx0 = 0.42 * TW * 0.7071 * s * 1.25;
       for (let k = 0; k < 4; k++) {
         const ph = ((t * 0.32 + k / 4) % 1), yy = cy - ph * 120 * s, rr = rx0 * (0.75 + ph * 0.75), al = Math.sin(ph * Math.PI) * 0.75;
@@ -4241,8 +4300,12 @@ function render(g, w, h, t, overlay) {
   // it over the whole frame every frame)
 }
 /* Bloom: the frame is shrunk twice into small buffers (the shrinking blurs it), each squared by multiplying it with
-   itself so mostly the bright parts survive, then laid back over the frame with 'screen', which only lightens. */
-const BLOOM = { on: true, a: null, b: null };
+   itself so mostly the bright parts survive, then laid back over the frame with 'screen', which only lightens.
+   The two glows and the warm haze are first put together at the smaller size, in a third buffer, and that is laid
+   over the frame once: 'screen' upon 'screen' is the same as 'screen' with the two screened together first, so the
+   look holds, and the frame is gone over once instead of three times (each a full-screen blend, which a slow
+   software canvas, as Firefox's often is on a laptop, feels most). */
+const BLOOM = { on: true, a: null, b: null, c: null };
 function bloomBuf(k, w, h) {
   let c = BLOOM[k];
   if (!c) c = BLOOM[k] = document.createElement('canvas');
@@ -4258,14 +4321,19 @@ function bloom(g) {
   ag.globalCompositeOperation = 'copy'; ag.drawImage(cv, 0, 0, a.width, a.height);
   ag.globalCompositeOperation = 'multiply'; ag.drawImage(a, 0, 0);
   bg.globalCompositeOperation = 'copy'; bg.drawImage(a, 0, 0, b.width, b.height);
-  g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.imageSmoothingQuality = 'high';
-  g.globalCompositeOperation = 'screen';
-  g.globalAlpha = 0.36; g.drawImage(a, 0, 0, W, H);
-  g.globalAlpha = 0.5; g.drawImage(b, 0, 0, W, H);
+  const c = bloomBuf('c', a.width, a.height), cg = c.getContext('2d'), cw = c.width, ch = c.height;
+  cg.imageSmoothingQuality = 'high';
+  cg.globalCompositeOperation = 'copy'; cg.globalAlpha = 0.36; cg.drawImage(a, 0, 0);
+  cg.globalCompositeOperation = 'screen'; cg.globalAlpha = 0.5; cg.drawImage(b, 0, 0, cw, ch);
   // a faint warm haze, strongest low in the frame where the sunset glows
-  const hz = g.createLinearGradient(0, 0, 0, H);
-  hz.addColorStop(0, 'rgba(120,90,160,0.03)'); hz.addColorStop(0.6, 'rgba(255,170,130,0.05)'); hz.addColorStop(1, 'rgba(255,180,140,0.09)');
-  g.globalAlpha = 1; g.fillStyle = hz; g.fillRect(0, 0, W, H);
+  if (!BLOOM.hz || BLOOM.hzH !== ch) {
+    const hz = BLOOM.hz = cg.createLinearGradient(0, 0, 0, ch); BLOOM.hzH = ch;
+    hz.addColorStop(0, 'rgba(120,90,160,0.03)'); hz.addColorStop(0.6, 'rgba(255,170,130,0.05)'); hz.addColorStop(1, 'rgba(255,180,140,0.09)');
+  }
+  cg.globalAlpha = 1; cg.fillStyle = BLOOM.hz; cg.fillRect(0, 0, cw, ch);
+  cg.globalCompositeOperation = 'source-over';
+  g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.imageSmoothingQuality = 'high';
+  g.globalCompositeOperation = 'screen'; g.globalAlpha = 1; g.drawImage(c, 0, 0, W, H);
   g.restore();
 }
 

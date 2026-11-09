@@ -807,8 +807,16 @@ const Game = {
   // the HUD's Hint button: the lesson card, open at the nudge (or as far as the hint has gone)
   openHint() { if (this.state !== 'play') return; this.note(); if (!this.hint) this.moreHint(); },
   reset() { if (!this.level) return; Sfx.play('rewind'); this.start(this.idx); },
-  // the orb fell in a lesson with a measured inkwell: begin again, ink and all (the toast already said so)
-  lostRestart() { if (this.level && this.state !== 'won') this.start(this.idx); },
+  /* the orb fell into the abyss (0.9s ago): the page turns back to before the cast that lost it, as Rewind does, ink
+     given back (the toast already said so). h is how many casts were kept when it fell: any cast since is taken back
+     too, so the page is never turned back to one where the orb is already falling. Lost before any cast: begin again. */
+  lostRewind(h) {
+    if (!this.level || this.state === 'won') return;
+    if (!(h > 0) || this.history.length < h) { this.start(this.idx); return; }
+    while (this.history.length > h) { this.history.pop(); this.casts = Math.max(0, this.casts - 1); }
+    restore(this.history.pop()); this.casts = Math.max(0, this.casts - 1); this.updateCasts();
+    parts.length = 0; Sfx.play('rewind');
+  },
   rewind() {
     if (!this.history.length || this.state === 'won') { this.toast('Nothing to rewind.'); return; }
     restore(this.history.pop()); this.casts = Math.max(0, this.casts - 1); this.updateCasts();
