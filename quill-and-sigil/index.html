@@ -140,22 +140,36 @@
   #levels { flex-direction: column; background: rgba(10,6,24,.72); overflow-y: auto; justify-content: flex-start; padding: 4vh 0; }
   #levels h2 { font-family: 'Cinzel Decorative', serif; font-size: clamp(30px, 5vw, 48px); margin: 0; color: var(--gold); text-shadow: 0 3px 12px #000; }
   #levels .orn { width: min(520px, 80vw); height: 60px; background: var(--divider-gold) center/contain no-repeat; margin-bottom: 14px; }
-  #lessonGrid { display: grid; grid-template-columns: repeat(3, minmax(150px, 210px)); gap: 14px; padding: 0 16px; }
-  @media (max-width: 640px) { #lessonGrid { grid-template-columns: repeat(2, minmax(130px, 1fr)); } }
-  .lcard { position: relative; border: 1px solid #8a6a3a; border-radius: 3px; padding: 14px 10px 12px; color: #3a2414;
+  /* the folio of lessons: one folio to a page, the pages side by side in a track that slides by its margin */
+  #folioNav { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: min(690px, 100vw); padding: 0 16px; margin-bottom: 12px; flex-shrink: 0; }
+  #folioNav .fnav { min-width: 56px; min-height: 48px; padding: 0 0 4px; font-size: 30px; line-height: 1; }
+  #folioNav .fnav:disabled { opacity: .3; cursor: default; transform: none; box-shadow: none; }
+  #folioDots { display: flex; gap: 9px; justify-content: center; }
+  #folioDots i { width: 10px; height: 10px; border-radius: 50%; border: 1px solid rgba(232,194,122,.75); }
+  #folioDots i.on { background: var(--gold); box-shadow: 0 0 6px rgba(232,194,122,.7); }
+  #folioNum { margin-top: 6px; text-align: center; font-family: Cinzel, serif; font-size: 13px; letter-spacing: .08em; color: rgba(240,215,154,.85); }
+  #folioView { width: min(690px, 100vw); overflow: hidden; flex-shrink: 0; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+  #lessonGrid { display: flex; align-items: flex-start; width: 100%; transition: margin-left .4s cubic-bezier(.22,.7,.25,1); }
+  #folioView { transition: height .4s cubic-bezier(.22,.7,.25,1); }
+  #lessonGrid.drag, #folioView.drag { transition: none; }
+  @media (prefers-reduced-motion: reduce) { #lessonGrid, #folioView { transition: none; } }
+  .fpage { flex: 0 0 100%; padding: 0 16px 26px; }
+  .fpage .fcards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 30px 14px; }
+  @media (max-width: 640px) { .fpage .fcards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px 12px; } }
+  .lcard { position: relative; border: 1px solid #8a6a3a; border-radius: 3px; padding: 14px 10px 30px; color: #3a2414;
     background: radial-gradient(ellipse at 50% 40%, #fbf1d8, #e2cc9c); box-shadow: inset 0 0 18px rgba(120,80,30,.35), 0 4px 16px rgba(0,0,0,.5);
     transition: transform .15s, box-shadow .2s; }
   .lcard:hover { transform: translateY(-3px) rotate(-.4deg); box-shadow: inset 0 0 18px rgba(120,80,30,.35), 0 0 22px rgba(232,194,122,.5); }
   .lcard .lr { font-family: 'Cinzel Decorative', serif; font-weight: 700; font-size: 28px; color: #8e2f22; }
   .lcard .ln { font-family: 'IM Fell English', serif; font-style: italic; font-size: 17px; min-height: 22px; }
-  .lcard .ls { display: flex; justify-content: center; gap: 6px; margin-top: 8px; }
+  /* a finished lesson: the master's wax seal pressed over the foot of its card */
+  .lcard .seal { position: absolute; left: 50%; bottom: -22px; width: 48px; height: 48px; margin-left: -24px; pointer-events: none;
+    background: url(art/grim-seal.png?v=1) center / contain no-repeat; transform: rotate(-8deg); filter: drop-shadow(0 2px 2px rgba(0,0,0,.5)); }
+  @media (min-width: 641px) { .lcard .seal { width: 54px; height: 54px; margin-left: -27px; bottom: -25px; } }
   .lcard.locked { filter: grayscale(.8) brightness(.55); cursor: default; }
   .lcard.locked:hover { transform: none; }
-  #lessonGrid .fhead { grid-column: 1 / -1; font-family: 'Cinzel Decorative', serif; font-weight: 700; font-size: 20px; color: var(--gold);
-    text-align: center; text-shadow: 0 2px 8px #000; margin: 14px 0 -2px; }
-  #lessonGrid .fhead:first-child { margin-top: 0; }
-  .ls i { display: inline-block; width: 16px; height: 16px; border-radius: 50%; background: rgba(90,60,40,.25); border: 1px solid rgba(90,60,40,.4); }
-  .ls i.on { background: radial-gradient(circle at 35% 35%, #e05a48, #8e1f18); border-color: #5a120e; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+  .fpage .fhead { font-family: 'Cinzel Decorative', serif; font-weight: 700; font-size: 20px; color: var(--gold);
+    text-align: center; text-shadow: 0 2px 8px #000; margin: 0 0 12px; }
 
   .card { background: rgba(8,5,18,.55); }
   .card .sheet, #satchel .sheet { position: relative; width: min(560px, 92vw); max-height: 90vh; overflow: auto; padding: 34px 40px 28px; color: #2e1f14; text-align: center;
@@ -192,6 +206,13 @@
     box-shadow: inset 0 0 30px rgba(120,80,30,.4), inset 0 0 0 1px #8a6a3a, 0 10px 30px rgba(0,0,0,.55);
     opacity: 0; pointer-events: none; transition: opacity .35s, transform .35s; }
   #note.leaf.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+  /* more below (v165): a soft fade of parchment over the foot of a leaf that scrolls, gone at the end */
+  #note.leaf::after { content: ''; position: sticky; display: block; bottom: -10px; height: 34px; margin: -34px -14px 0;
+    background: linear-gradient(rgba(226,205,160,0), rgba(226,205,160,.92) 60%, rgba(220,196,148,.55));
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 14px, #000 calc(100% - 14px), transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 14px, #000 calc(100% - 14px), transparent);
+    pointer-events: none; opacity: 0; transition: opacity .25s; }
+  #note.leaf.more::after { opacity: 1; }
   #note p { font-size: 16px; line-height: 1.42; font-style: italic; margin: 0 0 8px; }
   #note .chips { justify-content: flex-start; margin: 4px 0 6px; gap: 6px; }
   #note .chip img { width: 22px; height: 22px; }
@@ -212,6 +233,7 @@
     #note.leaf { left: calc(10px + env(safe-area-inset-left)); bottom: auto; top: 84px; width: min(300px, 36vw); max-height: calc(100vh - 150px); transform: translateX(-10px); padding: 10px 34px 8px 12px; }
     #note.leaf.show { transform: none; }
     #note p { font-size: 14px; line-height: 1.35; }
+    #note.leaf::after { bottom: -8px; margin: -34px -10px 0; }
   }
   /* ---------- satchel ---------- */
   #castrow { display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; max-width: 96vw; }
@@ -589,7 +611,8 @@
   <h2>T<span class="dh">h</span>e Folio</h2>
   <div class="orn"></div>
   <button class="btn primary" id="bResume" style="margin-bottom:16px">.</button>
-  <div id="lessonGrid"></div>
+  <div id="folioNav"><button class="btn ghost fnav" id="fPrev" title="The folio before (←)" aria-label="The folio before">‹</button><div id="folioAt"><div id="folioDots"></div><div id="folioNum" aria-live="polite"></div></div><button class="btn ghost fnav" id="fNext" title="The next folio (→)" aria-label="The next folio">›</button></div>
+  <div id="folioView"><div id="lessonGrid"></div></div>
   <div style="margin-top:20px"><button class="btn ghost" id="bBackTitle">← Title</button> <button class="btn ghost" id="bTipsAgain" title="Show every tip again, as if for the first time">↺ Show the tips again</button> <button class="btn ghost" id="bLook" title="Old look / painted look (G)">◐ Old look</button> <button class="btn ghost touch-only" id="bFull">⛶ Full screen</button> <button class="btn ghost" id="bLessonsT" style="display:none">.</button></div>
 </div>
 
@@ -616,9 +639,9 @@
   </div>
 </div>
 
-<script src="js/ink.js?v=164"></script>
-<script src="js/world.js?v=164"></script>
-<script src="js/tips.js?v=164"></script>
-<script src="js/main.js?v=164"></script>
+<script src="js/ink.js?v=165"></script>
+<script src="js/world.js?v=165"></script>
+<script src="js/tips.js?v=165"></script>
+<script src="js/main.js?v=165"></script>
 </body>
 </html>

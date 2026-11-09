@@ -10,7 +10,7 @@ const cam = { s: 1, ox: 0, oy: 0, shake: 0, tx: 0, ty: 0 };
 
 const World = {
   W: 0, H: 0, cells: [], deco: [], bodies: [], fonts: [], braziers: [],
-  gateOpen: false, t: 0, pending: [], seals: [], level: null, respawns: [], wisps: [],
+  gateOpen: false, t: 0, pending: [], seals: [], level: null, respawns: [],
 };
 
 function proj(x, y, z) { return [cam.ox + (x - y) * TW * 0.5 * cam.s, cam.oy + (x + y) * TH * 0.5 * cam.s - z * TZ * cam.s]; }
@@ -39,7 +39,7 @@ function surfaceTop(c) { if (!c || c.void) return 0; return c.water != null ? Ma
 /* ---------------- Level loading ---------------- */
 function loadWorld(lv) {
   World.level = lv; World.H = lv.t.length; World.W = lv.t[0].length;
-  World.cells = []; World.deco = []; World.bodies = []; World.pending = []; World.seals = []; World.respawns = []; World.wisps = [];
+  World.cells = []; World.deco = []; World.bodies = []; World.pending = []; World.seals = []; World.respawns = [];
   World.gateOpen = false; World.t = 0;
   for (let y = 0; y < World.H; y++) for (let x = 0; x < World.W; x++) {
     const tc = lv.t[y][x] || ' ', oc = (lv.o[y] && lv.o[y][x]) || '.';
@@ -81,7 +81,7 @@ function indexFeatures() {
   World.braziers = World.cells.filter(c => c.feat === 'brazier');
 }
 function makeBody(kind, x, y, z) {
-  const b = { kind, x, y, z, vx: 0, vy: 0, vz: 0, alive: true, lev: 0, drift: null, burn: 0, spread: false, spin: 0, rx: 0, ry: 1, home: { x, y, z }, cap: 0, captured: false, hover: z, id: Math.random() };
+  const b = { kind, x, y, z, vx: 0, vy: 0, vz: 0, alive: true, lev: 0, drift: null, burn: 0, spread: false, spin: 0, rx: 0, ry: 1, home: { x, y, z }, cap: 0, captured: false, hover: z, id: (World.bodies.length * 0.618034) % 1 };
   if (kind === 'orb') Object.assign(b, { r: 0.27, hgt: 0.54, mass: 1, floats: true, burnable: false });
   else if (kind === 'slab') Object.assign(b, { r: 0.47, hgt: 0.25, mass: 4, floats: true, burnable: false });
   else Object.assign(b, { r: 0.4, hgt: 0.86, mass: 2, floats: true, burnable: true });
@@ -95,7 +95,7 @@ function snapshot() {
 function restore(s) {
   const o = JSON.parse(s);
   World.cells = o.cells; World.bodies = o.bodies; World.gateOpen = o.gateOpen;
-  World.pending = []; World.respawns = []; World.seals = []; World.wisps = [];
+  World.pending = []; World.respawns = []; World.seals = [];
   indexFeatures();
 }
 
@@ -114,7 +114,7 @@ function blockedAt(b, nx, ny) {
   const rr = b.r * 0.82;
   for (let i = 0; i < 4; i++) {
     const c = cellAt(nx + (i & 1 ? rr : -rr), ny + (i & 2 ? rr : -rr));
-    // a shut rune gate's ward reaches the sky: nothing floats over it (a Luna float rides only 1.3 above the ground)
+    // a shut rune gate's ward reaches the sky: nothing floats over it, at any height (drawn as a column of light in the light pass)
     if (c && c.feat === 'gate' && !World.gateOpen && cellAt(b.x, b.y) !== c) return c;
     if (solidTop(c) > b.z + STEP) { if (b.imb && breakThrough(b, c)) continue; return c; }
   }
@@ -152,8 +152,12 @@ const TOUCH = [[0, 0], [0.55, 0], [-0.55, 0], [0, 0.55], [0, -0.55]];
 function imbueTick(b, dt) {
   const sp = Math.hypot(b.vx, b.vy);
   for (const id in b.imb) {
-    const e = b.imb[id]; e.age += dt; // (e.t: the tiles it has left to carry the element, spent in stepBody as it moves)
-    if (e.t <= 0 || (e.untilStop && e.age > 0.4 && sp < 0.5 && b.lev <= 0)) { delete b.imb[id]; continue; }
+    const e = b.imb[id]; e.age += dt;
+    // one rule, whatever the slot: what rides on a body lasts until the body comes to rest, an event, never a clock or a
+    // count of tiles (e.age only lets the push that sent it take hold). A float hanging still has come to rest too; one
+    // the wind is still bearing has not, until it stalls (as in arrivalCheck)
+    const borne = b.drift && b.lev > 0;
+    if (borne ? e.age > 0.6 && sp < 0.35 : e.age > 0.4 && sp < 0.5) { delete b.imb[id]; continue; }
     if (id === 'flame') {
       for (const [dx, dy] of TOUCH) { const c = cellAt(b.x + dx, b.y + dy); if (c && !c.void && Math.abs(surfaceTop(c) + featH(c) * 0.5 - b.z) < 1.7) ignite(c, true); }
       if (Math.random() < dt * 30) flameP(b.x + (Math.random() - .5) * 0.4, b.y + (Math.random() - .5) * 0.4, b.z + b.hgt * 0.6, 0.8);
@@ -185,7 +189,7 @@ function arrivalCheck(b, dt) {
   const borne = b.drift && b.lev > 0;
   if (!(b.captured || (b.arriveT > 0.3 && sp < 0.6 && !borne) || ((sails || borne) && b.arriveT > 0.6 && sp < 0.35) || (b.arriveT > 0.15 && b.offEdge) || (b.arriveD || 0) > 40)) return;
   const list = b.arrive; b.arrive = null;
-  for (const a of list) arriveEffect(b, a.id, a.n, a.dir);
+  for (const a of list) arriveEffect(b, a.id, a.id === 'stone' ? a.p || a.n : a.n, a.dir);
 }
 function arriveEffect(b, id, n, dir = null) {
   const x = b.x, y = b.y, z = b.z;
@@ -201,12 +205,23 @@ function arriveEffect(b, id, n, dir = null) {
       if (b.captured) break;
       const c = cellAt(x, y);
       if (!c || (c.feat && c.feat !== 'bramble')) break;
-      if (c.void) { const th = Math.round(b.hover || 0); c.void = false; c.water = null; c.flow = null; c.th = th; c.h = Math.min(th, z - 0.02); }
-      else c.th = Math.min(3, Math.round(c.th) + n);
+      // on arrival the orb is the mark: out of the void the stone comes up level with the ground it last stood on
+      const wasVoid = c.void;
+      raiseStone(c, n, b.hover || 0);
+      if (wasVoid) c.h = Math.min(c.th, z - 0.02);
       dust(x, y, c.th, 10); cam.shake = Math.max(cam.shake, 0.3);
       break;
     }
   }
+}
+/* One rule for stone, wherever Petra is drawn (the seal, a ring, on arrival): each Petra raises a tile one step, up
+   to 3. Out of the void the first Petra brings the stone up level with the mark (the tile you clicked, a click on
+   empty air being level 0; on arrival, the ground the orb last stood on), and each further Petra adds a step.
+   Stone that comes up to or over water drains it there. */
+function raiseStone(c, n, markZ) {
+  if (c.void) { c.void = false; c.h = -4; c.th = Math.max(-2, Math.min(3, Math.round(markZ || 0) + n - 1)); c.ice = false; c.water = null; c.flow = null; }
+  else c.th = Math.min(3, Math.round(c.th) + n);
+  if (c.water != null && c.th >= c.water) { c.water = null; c.ice = false; c.flow = null; splash(c.x + 0.5, c.y + 0.5, c.h + 0.5, 10); }
 }
 function cellsNear(x, y, R) {
   const out = [];
@@ -243,9 +258,12 @@ function stepBody(b, dt) {
     if (b.levRange == null) b.lev -= dt; // a distance float hangs as long as it is left alone
     b.levAge = (b.levAge || 0) + dt;
     if (b.levUntilStop && b.levAge > 0.5 && Math.hypot(b.vx, b.vy) < 0.5) b.lev = 0;
-    if (fin) b.hover = Math.max(sup, water != null ? water : -1e9);
+    // one float-height rule: what Luna lifts keeps the height it was lifted at, over low ground and empty air alike,
+    // and rises only where the ground (or water) beneath climbs higher than where it rose from
+    if (fin) b.hover = Math.max(b.hover, sup, water != null ? water : -1e9);
     const slab = b.kind === 'slab';
-    const target = b.hover + (slab ? 0 : 1.3) + Math.sin(World.t * 3 + b.id * 9) * (slab ? 0.02 : 0.07);
+    // a steady height: the float's gentle bob is only drawn (drawBody), so the same seal always does the same thing
+    const target = b.hover + (slab ? 0 : 1.3);
     b.vz += ((target - b.z) * 16 - b.vz * 7) * dt;
     if (b.drift) { const r = 1 - Math.exp(-1.8 * dt); b.vx += (b.drift.x - b.vx) * r; b.vy += (b.drift.y - b.vy) * r; }
     if (Math.random() < dt * 14) emit({ x: b.x + (Math.random() - 0.5) * 0.4, y: b.y + (Math.random() - 0.5) * 0.4, z: b.z, vz: -0.4 - Math.random() * 0.4, life: 0.9, size: 5, color: '#cdb0ff', kind: 'glow' });
@@ -272,7 +290,7 @@ function stepBody(b, dt) {
     if (sp > 0.6 && Math.random() < dt * 20) emit({ x: b.x, y: b.y, z: water, vz: 1.2, vx: (Math.random() - .5), vy: (Math.random() - .5), grav: 6, life: 0.5, size: 2.2, color: '#bfe6ff', kind: 'drop' });
   } else if (b.lev > 0) { if (!b.drift) { k = 0.85; cc = 0.1; } } // the air slows a lifted thing: the gust's barbs decide how far it glides
   else if (grounded) {
-    const slick = c && (c.ice || c.frost > 0.3 || c.icy);
+    const slick = (c && (c.ice || c.frost > 0.3 || c.icy)) || !!(b.onBody && b.onBody.icy);
     if (b.kind === 'orb') { k = slick ? 0.1 : 0.9; cc = slick ? 0.18 : 0.8; }
     else { k = slick ? 0.3 : 3.2; cc = slick ? 0.4 : 2.6; }
   } else k = 0.04;
@@ -286,8 +304,6 @@ function stepBody(b, dt) {
   else { if (Math.abs(b.vy) > 1.5) Sfx.play('bump', Math.min(1, Math.abs(b.vy) / 8)); b.vy = -b.vy * 0.22; }
   const moved = Math.hypot(b.x - x0, b.y - y0);
   if (b.arrive) b.arriveD = (b.arriveD || 0) + moved;
-  // what rides on a body (fire, frost, water, stone) is spent by the tiles it carries them, not by the seconds
-  if (b.imb) for (const id in b.imb) b.imb[id].t -= moved;
   if (b.levRange != null && b.lev > 0) {
     b.levRange -= moved;
     // carried its full distance: Luna lets go and it settles where it is (no coasting on to somewhere the float never reached)
@@ -407,7 +423,6 @@ function worldStep(dt) {
   updateCells(dt);
   for (const b of World.bodies) stepBody(b, dt);
   collideBodies();
-  updateWisps(dt);
   World.bodies = World.bodies.filter(b => b.alive || b.kind === 'orb');
   for (let i = World.respawns.length - 1; i >= 0; i--) {
     const r = World.respawns[i]; r.t -= dt;
@@ -482,7 +497,7 @@ function baseSpell(sp, tx, ty, tz, out) {
         if (b.captured) continue;
         let dx, dy;
         if (sp.dir) { dx = sp.dir.x; dy = sp.dir.y; }
-        else { dx = b.x - tx; dy = b.y - ty; const L = Math.hypot(dx, dy); if (L < 0.05) { const a = Math.random() * TAU; dx = Math.cos(a); dy = Math.sin(a); } else { dx /= L; dy /= L; } }
+        else { dx = b.x - tx; dy = b.y - ty; const L = Math.hypot(dx, dy); if (L < 0.05) { dx = 0; dy = 0; } else { dx /= L; dy /= L; } }
         const fall = 1 - 0.25 * Math.min(1, Math.hypot(b.x - tx, b.y - ty) / Math.max(R, 0.1));
         const dv = mag * fall / Math.pow(effMass(b), 0.7);
         b.vx += dx * dv; b.vy += dy * dv; b.vz += 1.2;
@@ -508,11 +523,7 @@ function baseSpell(sp, tx, ty, tz, out) {
         const c = cellI(x, y);
         if (c.feat === 'brazier' || c.feat === 'gate' || c.feat === 'font') continue;
         out.prev.set(c, { th: c.th, void: c.void });
-        if (c.void) { c.void = false; c.h = -4; c.th = 0; c.water = null; c.ice = false; c.flow = null; }
-        else {
-          c.th = Math.min(3, Math.round(c.th) + 1);
-          if (c.water != null && c.th >= c.water) { c.water = null; c.ice = false; c.flow = null; splash(x + 0.5, y + 0.5, c.h + 0.5, 10); }
-        }
+        raiseStone(c, 1, tz);
         for (let i = 0; i < 10; i++) emit({ x: x + Math.random(), y: y + Math.random(), z: c.th + 0.1, vx: (Math.random() - .5) * 3, vy: (Math.random() - .5) * 3, vz: 2 + Math.random() * 4, grav: 18, life: 1.2, size: 2 + Math.random() * 3, color: Math.random() < .5 ? '#9a8a74' : '#6e6258', kind: 'chunk', vr: (Math.random() - .5) * 10 });
         dust(x + 0.5, y + 0.5, Math.max(0, c.th), 8);
       }
@@ -637,7 +648,7 @@ function applySpell(sp, tx, ty, tz) {
   const mover = sp.sigil === 'gale' || sp.sigil === 'luna' || tideCurrent(sp);
   if (cnt('gale') && !mover) sp = { ...sp, reach: 2 * cnt('gale') };
   // Petra shapes the stone and Luna on its ring makes it float in place; Luna at the centre with Petra on the ring is a ferry that sails along the sign
-  if (sp.sigil === 'stone' && cnt('luna')) return spawnSlabs(sp, tx, ty, tz, cnt('luna'));
+  if (sp.sigil === 'stone' && cnt('luna')) return spawnSlabs(sp, tx, ty, tz, cnt('luna'), cnt('frost') > 0);
   // (the ferry's other ring-sigils ride on its slab: Ignis on arrival kindles where it comes to rest)
   const ferryRest = (slabs, used) => { for (const s of inf) if (!used(s)) for (const b of slabs) infuseBody(b, s, sp); };
   if (sp.sigil === 'luna' && cnt('stone')) return ferryRest(spawnFerry(sp, tx, ty, tz, cnt('stone'), cnt('gale')), s => s.id === 'stone' || s.id === 'gale');
@@ -646,7 +657,6 @@ function applySpell(sp, tx, ty, tz) {
   const now = id => inf.filter(s => s.id === id && s.rel === 'now').reduce((a, s) => a + s.n, 0);
   if (sp.sigil === 'gale' && sp.dir && now('stone') && now('luna'))
     return ferryRest(spawnFerry(sp, tx, ty, tz, now('stone'), 1, now('luna')), s => s.rel === 'now' && (s.id === 'stone' || s.id === 'luna'));
-  if ((sp.sigil === 'flame' || sp.sigil === 'frost') && cnt('luna')) return spawnWisps(sp, tx, ty, tz, cnt('luna'));
   // "at once" means at once: on Ventus, a Luna or Unda behind the sign lifts first (Luna raises what the wind holds,
   // Unda pours where it is cast and floats it), and the gust waits a breath for it to rise before it blows
   const lifts = sp.sigil === 'gale' ? inf.filter(s => s.rel === 'now' && (s.id === 'luna' || s.id === 'tide')) : [];
@@ -672,40 +682,40 @@ function applySpell(sp, tx, ty, tz) {
 function bodiesOn(cells) { const set = new Set(cells); return World.bodies.filter(b => b.alive && !b.captured && set.has(cellAt(b.x, b.y))); }
 function infuseBody(b, s, sp) {
   if (b.captured) return;
-  const T = (s.id === 'luna' ? RIDE_TILES : RING_TILES) * s.n, col = SIGILS[s.id].color; // tiles, not seconds
+  const T = RING_TILES * s.n, col = SIGILS[s.id].color; // tiles, not seconds
   for (let i = 0; i < 18; i++) { const a = Math.random() * TAU; emit({ x: b.x + Math.cos(a) * 0.4, y: b.y + Math.sin(a) * 0.4, z: b.z + 0.3, vx: -Math.cos(a), vy: -Math.sin(a), vz: 1, drag: 2, life: 0.8, size: 4, color: col, kind: 'glow' }); }
   if (s.rel === 'arrive') {
     // on Luna, a sigil ahead of the sign waits for the landing; it keeps Luna's sign (its way) and barbs (its strength)
     const luna = sp.sigil === 'luna' && sp.dir;
-    b.arrive = (b.arrive || []).concat([{ id: s.id, n: luna ? Math.max(s.n, sp.s) : s.n, dir: luna ? sp.dir : null }]); b.arriveT = 0; b.arriveD = 0; return;
+    b.arrive = (b.arrive || []).concat([{ id: s.id, n: luna ? Math.max(s.n, sp.s) : s.n, p: s.n, dir: luna ? sp.dir : null }]); b.arriveT = 0; b.arriveD = 0; return;
   }
   const until = s.rel === 'along';
   switch (s.id) {
     case 'gale': {
       // Ventus on Luna's ring bears the lifted thing along the sign
       if (sp.sigil === 'luna') { if (sp.dir) { const v = (0.7 + 0.7 * sp.s) * (1 + 0.4 * (s.n - 1)); b.drift = { x: sp.dir.x * v, y: sp.dir.y * v }; } break; }
+      // on Unda's ring Ventus only sets the water flowing (tideCurrent): the current carries what floats, the wind pushes nothing (Ryan, 2026-11-08)
+      if (sp.sigil === 'tide') break;
       const dx = sp.dir ? sp.dir.x : b.vx, dy = sp.dir ? sp.dir.y : b.vy, L = Math.hypot(dx, dy) || 1, dv = 2.5 * s.n / Math.pow(effMass(b), 0.7);
       b.vx += dx / L * dv; b.vy += dy / L * dv; break;
     }
     case 'luna': b.levRange = Math.max(b.lev > 0 && b.levRange != null ? b.levRange : 0, T); b.lev = 1e6; b.levAge = 0; b.levUntilStop = until; if (sp.sigil !== 'luna') b.drift = null; b.vz += 2; break;
     default:
-      b.imb = b.imb || {}; b.imb[s.id] = { t: T, n: s.n, untilStop: until, age: 0 };
+      b.imb = b.imb || {}; b.imb[s.id] = { n: s.n, age: 0 }; // it rides until the body comes to rest (imbueTick)
       if (s.id === 'stone') { Sfx.play('bump', 1); dust(b.x, b.y, b.z, 8); cam.shake = Math.max(cam.shake, 0.12); }
   }
 }
 function infuseCells(s, cells, sp, tx, ty, tz, out) {
   const n = s.n;
   switch (s.id) {
-    case 'gale':
-      for (const b of bodiesOn(cells)) {
-        let dx = sp.dir ? sp.dir.x : b.x - tx, dy = sp.dir ? sp.dir.y : b.y - ty; const L = Math.hypot(dx, dy) || 1;
-        const dv = (2 + 2 * n) / Math.pow(effMass(b), 0.7); b.vx += dx / L * dv; b.vy += dy / L * dv; b.vz += 1;
-      }
+    case 'gale': // on the ring of any placing spell Ventus only lengthens its arms (reach, in applySpell); it pushes nothing (Ryan, 2026-11-08)
       break;
-    case 'luna': // e.g. Unda + Luna: a bubble that lifts whatever it holds
+    case 'luna': // Luna on a placing ring lifts what stands on its tiles, 10 tiles per Luna (the one Luna number); on Unda
+      // it is a bubble, which drifts the way of Unda's sign (The Moon Pool). On Ignis or Gelu it only lifts (v165: the
+      // untaught wisps are gone)
       for (const b of bodiesOn(cells)) {
-        b.lev = 1e6; b.levRange = BUBBLE_TILES * n; b.levAge = 0; b.levUntilStop = false; b.vz += 2; // the bubble drifts BUBBLE_TILES per Luna
-        b.drift = sp.dir ? { x: sp.dir.x * (0.8 + 0.5 * n), y: sp.dir.y * (0.8 + 0.5 * n) } : null;
+        b.lev = 1e6; b.levRange = RING_TILES * n; b.levAge = 0; b.levUntilStop = false; b.vz += 2;
+        b.drift = sp.dir && sp.sigil === 'tide' ? { x: sp.dir.x * (0.8 + 0.5 * n), y: sp.dir.y * (0.8 + 0.5 * n) } : null;
         for (let i = 0; i < 12; i++) emit({ x: b.x, y: b.y, z: b.z + 0.3, vx: (Math.random() - .5) * 2, vy: (Math.random() - .5) * 2, vz: 1 + Math.random(), drag: 2, life: 1.2, size: 6, color: '#cfe8ff', kind: 'glow' });
       }
       break;
@@ -725,8 +735,7 @@ function infuseCells(s, cells, sp, tx, ty, tz, out) {
     case 'stone': {
       const c = cellAt(tx, ty);
       if (c && !c.feat) {
-        if (c.void) { c.void = false; c.h = -4; c.th = 0; c.water = null; c.flow = null; }
-        else c.th = Math.min(3, Math.round(c.th) + n);
+        raiseStone(c, n, tz);
         dust(c.x + .5, c.y + .5, Math.max(0, c.th), 8);
       }
       break;
@@ -747,8 +756,9 @@ function raiseSlab(x, y, tz, tiles, drift) { // tiles: how far it sails before i
 /* Petra + Luna on the ring: Petra's shape, raised as stone that floats where it stands, and stays: it once hung 6s
    (2s more per Luna) and fell, and a player who looked away came back to find the bridge sunk a level below the land,
    with nothing to say time had anything to do with it. (1e6, not Infinity: rewind snapshots are JSON) */
-function spawnSlabs(sp, tx, ty, tz, n) {
-  for (const [x, y] of spellCells(sp, tx, ty)) raiseSlab(x, y, tz, null, null);
+/* with Gelu on the ring too, the slabs hang as ice: an orb on one runs as on ice (stepBody reads b.onBody.icy) */
+function spawnSlabs(sp, tx, ty, tz, n, icy) {
+  for (const [x, y] of spellCells(sp, tx, ty)) { const b = raiseSlab(x, y, tz, null, null); if (b && icy) b.icy = true; }
   ring(tx, ty, tz, '#cdb0ff', 1.1); cam.shake = Math.max(cam.shake, 0.15);
 }
 /* Luna + Petra on the ring: a floating slab beneath the target, riders and all — and with Ventus on the ring too, it sails the way of the sign */
@@ -762,28 +772,6 @@ function spawnFerry(sp, tx, ty, tz, n, gale = 0, luna = 0) {
   ring(tx, ty, tz, '#cdb0ff', sp.amp ? 1.8 : 1.1); cam.shake = Math.max(cam.shake, 0.15);
   return slabs;
 }
-/* Ignis / Gelu + Luna: a drifting wisp that carries the element along the signs, over walls */
-function spawnWisps(sp, tx, ty, tz, n) {
-  const len = 4 + 2 * n + (sp.reach || 0);
-  const dirs = sp.dir ? [[sp.dir.x, sp.dir.y]] : [[1, 0], [-1, 0], [0, 1], [0, -1]];
-  for (const [dx, dy] of dirs) World.wisps.push({ el: sp.sigil, x: tx, y: ty, z: tz + 0.9, ground: tz, dx, dy, left: len, key: '' });
-  ring(tx, ty, tz, SIGILS[sp.sigil].color, 1);
-}
-function updateWisps(dt) {
-  for (let i = World.wisps.length - 1; i >= 0; i--) {
-    const w = World.wisps[i];
-    w.x += w.dx * 3 * dt; w.y += w.dy * 3 * dt;
-    const c = cellAt(w.x, w.y);
-    if (c && !c.void) w.ground = Math.max(solidTop(c), floorTop(c));
-    w.z += (w.ground + 0.9 - w.z) * Math.min(1, dt * 6);
-    const key = c ? c.x + ',' + c.y : '';
-    if (c && key !== w.key) { w.key = key; w.left--; if (w.el === 'flame') ignite(c, true); else freezeCell(c); }
-    if (w.el === 'flame') { flameP(w.x, w.y, w.z, 1); if (Math.random() < 0.5) flameP(w.x, w.y, w.z, 1); }
-    else { emit({ x: w.x, y: w.y, z: w.z, vz: -0.3, life: 1.2, size: 3, color: '#ffffff', kind: 'flake', vr: 3 }); emit({ x: w.x, y: w.y, z: w.z, life: 0.4, size: 7, color: '#bfeeff', kind: 'glow' }); }
-    if (!c || w.left <= 0) { World.wisps.splice(i, 1); burst(w.x, w.y, w.z, w.el === 'flame' ? '#ffb060' : '#dff6ff', 16, 2); }
-  }
-}
-
 /* ---------------- Particles ---------------- */
 const parts = [];
 const MAXP = 3000;
@@ -2646,6 +2634,23 @@ function edgeBands(g, x, y, z, on, diag, w, stops) {
   }
   g.restore();
 }
+/* A pit more than one step deep (v165): its walls darken toward the floor, so it reads as a hole with a bottom and not
+   as a patch of bare earth at ground level. The shade fills the pit's column, from its rim (the highest ground beside
+   it) down to its floor; the ground in front, drawn later, covers what the eye could not see. */
+function pitShade(g, c, z) {
+  let rim = z;
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const n = cellI(c.x + dx, c.y + dy); if (n && !n.void) rim = Math.max(rim, n.h); }
+  const deep = rim - z; if (deep < 1.4) return;
+  const x = c.x, y = c.y, P = (u, v, w) => proj(x + u, y + v, w);
+  const hull = [P(0, 0, rim), P(1, 0, rim), P(1, 0, z), P(1, 1, z), P(0, 1, z), P(0, 1, rim)];
+  const y0 = P(0, 0, rim)[1], y1 = P(1, 1, z)[1], a = Math.min(0.62, 0.3 * deep);
+  const gr = g.createLinearGradient(0, y0, 0, y1); gr.addColorStop(0, 'rgba(28,16,8,0)'); gr.addColorStop(0.35, 'rgba(28,16,8,' + (a * 0.45).toFixed(3) + ')'); gr.addColorStop(1, 'rgba(20,10,4,' + a.toFixed(3) + ')');
+  g.save(); g.fillStyle = gr; poly(g, hull); g.fill();
+  // the floor's far edge: a dark seam where the back walls meet it
+  g.strokeStyle = 'rgba(15,8,3,' + (a * 0.9).toFixed(3) + ')'; g.lineWidth = Math.max(1, cam.s * 1.2);
+  g.beginPath(); const f0 = P(0, 1, z), f1 = P(0, 0, z), f2 = P(1, 0, z); g.moveTo(f0[0], f0[1]); g.lineTo(f1[0], f1[1]); g.lineTo(f2[0], f2[1]); g.stroke();
+  g.restore();
+}
 const DIAG = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
 function drawCell(g, c, t, part) {
   const d = World.deco[c.y * World.W + c.x];
@@ -2666,6 +2671,7 @@ function drawCell(g, c, t, part) {
   const big = rounded ? growPoly(outline.map(([u, v]) => proj(x + u, y + v, z)), 0.6) : growQuad([A, B, C, D], 0.6);
   g.fillStyle = topColor(c, d); poly(g, big); g.fill();
   texTop(g, c.icy ? 'ice' : c.h >= 1 ? 'stoneTop' : c.h < -0.01 ? 'dirt' : 'grass', z, big);
+  if (z < -1.4 && !(c.water != null && c.water > c.h)) pitShade(g, c, z);
   if (c.h >= 1 && !c.icy && texOK) {
     g.fillStyle = blockTone(x, y); poly(g, big); g.fill();
     if (SPRITE.lichen && hash2(x * 3.3 + 1.1, y * 2.7 + 4.4) < 0.15) lichenTop(g, z, big, 0.65);
@@ -3660,7 +3666,14 @@ function drawShadow(g, b) {
   g.fillStyle = `rgba(10,5,20,${0.35 * k})`;
   g.beginPath(); g.ellipse(P[0], P[1], b.r * TW * 0.75 * s * (1.2 - k * 0.2), b.r * TH * 0.75 * s * (1.2 - k * 0.2), 0, 0, TAU); g.fill();
 }
+// a float bobs gently, in the drawing only (its height in the world stays steady)
 function drawBody(g, b, t) {
+  const bob = b.lev > 0 && !b.captured && b.kind !== 'slab' ? Math.sin(t * 3 + b.id * 9) * 0.07 : 0;
+  if (!bob) return drawBodyAt(g, b, t);
+  const z = b.z; b.z += bob;
+  try { drawBodyAt(g, b, t); } finally { b.z = z; }
+}
+function drawBodyAt(g, b, t) {
   const s = cam.s;
   drawShadow(g, b);
   if (b.imb || b.arrive) { // elemental aura of an imbued body
@@ -3680,7 +3693,9 @@ function drawBody(g, b, t) {
   if (b.kind === 'slab') {
     const r = b.r;
     if (b.lev > 0) { const [gx, gy] = proj(b.x, b.y, b.z); g.save(); g.globalCompositeOperation = 'lighter'; g.globalAlpha = 0.45 + 0.15 * Math.sin(t * 4); g.drawImage(glowSprite('#cdb0ff'), gx - 40 * s, gy - 14 * s, 80 * s, 40 * s); g.restore(); }
-    if (texOK) texturedBox(g, b.x - r, b.y - r, b.x + r, b.y + r, b.z, b.z + b.hgt, { colT: '#a29f80', colL: '#6c6f58', colR: '#575a48', top: 'stoneTop', side: 'stoneSideStack', tint: 'rgba(150,110,210,0.16)' });
+    if (texOK && b.icy) texturedBox(g, b.x - r, b.y - r, b.x + r, b.y + r, b.z, b.z + b.hgt, { colT: '#dff4fc', colL: '#a9daf0', colR: '#86bedc', top: 'ice', side: 'ice', sideAlpha: 0.75, alpha: 0.9, rim: 'rgba(255,255,255,0.8)', tint: 'rgba(150,110,210,0.12)' });
+    else if (b.icy) prism(g, b.x - r, b.y - r, b.x + r, b.y + r, b.z, b.z + b.hgt, '#dff4fc', '#a9daf0', '#86bedc', 'rgba(255,255,255,0.8)');
+    else if (texOK) texturedBox(g, b.x - r, b.y - r, b.x + r, b.y + r, b.z, b.z + b.hgt, { colT: '#a29f80', colL: '#6c6f58', colR: '#575a48', top: 'stoneTop', side: 'stoneSideStack', tint: 'rgba(150,110,210,0.16)' });
     else prism(g, b.x - r, b.y - r, b.x + r, b.y + r, b.z, b.z + b.hgt, '#bcb2cc', '#857a98', '#665c7a', 'rgba(255,255,255,0.25)');
     const P = proj(b.x, b.y, b.z + b.hgt);
     g.strokeStyle = `rgba(205,176,255,${0.5 + 0.3 * Math.sin(t * 3)})`; g.lineWidth = 1.2 * s;
@@ -4113,9 +4128,11 @@ function render(g, w, h, t, overlay) {
     const [hx, hy] = proj(b.x, b.y, b.z), hr = b.r * TW * 0.78 * s * 3.4;
     g.globalAlpha = 0.32 + (b.captured ? 0.25 : 0); g.drawImage(glowSprite('#ffc860'), hx - hr, hy - hr * 0.5, hr * 2, hr);
   }
+  const wards = []; // shut gates, their columns drawn after this loop
   for (const c of World.cells) {
     if (c.feat === 'brazier' && c.lit) { const [cx, cy] = proj(c.x + .5, c.y + .5, c.h + brazierBowlZ() + 0.3), r = (110 + Math.sin(t * 13 + c.x) * 6) * s; g.globalAlpha = 0.3; g.drawImage(glowSprite('#ff8a3a'), cx - r, cy - r * 0.7, r * 2, r * 1.4); }
     if (c.burn) { const [cx, cy] = proj(c.x + .5, c.y + .5, c.h + .5), r = 90 * s; g.globalAlpha = 0.25; g.drawImage(glowSprite('#ff7030'), cx - r, cy - r * 0.7, r * 2, r * 1.4); }
+    if (c.feat === 'gate' && c.open < 1) wards.push(c);
     if (c.feat === 'font') {
       const [cx, cy] = proj(c.x + .5, c.y + .5, c.h), r = 70 * s;
       g.globalAlpha = 0.35; g.drawImage(glowSprite('#7ff0ff'), cx - r, cy - r * 0.6, r * 2, r * 1.2);
@@ -4133,6 +4150,32 @@ function render(g, w, h, t, overlay) {
         g.globalAlpha = al * 0.5; g.lineWidth = 1 * s; g.beginPath(); g.ellipse(cx, yy, rr * 0.6, rr * 0.3, 0, 0, TAU); g.stroke();
       }
     }
+  }
+  // a shut gate stops floats at any height (blockedAt), so its ward is drawn as tall as it blocks: a still column of
+  // light over the whole tile, rising far above its stone and fading out (no hard top edge), gone as the gate sinks.
+  // Columns that cross on screen (a gate behind a gate, as round The Eye's font) and are shut alike are filled as one
+  // path, so their light is laid once instead of doubling into a glare over the font and the stones between them.
+  const cols = wards.map(c => {
+    const k = 1 - c.open, z0 = c.h + 1.6 * k, H = 5, x0 = c.x + 0.08, y0 = c.y + 0.08, x1 = c.x + 0.92, y1 = c.y + 0.92;
+    const P = [proj(x0, y1, z0), proj(x1, y1, z0), proj(x1, y0, z0), proj(x1, y0, z0 + H), proj(x0, y0, z0 + H), proj(x0, y1, z0 + H)];
+    return { k, P, F1: proj(x1, y1, z0 + H), l: P[0][0], r: P[2][0], t: P[4][1], b: P[1][1] };
+  });
+  const near = (a, b) => a.k === b.k && a.l < b.r && b.l < a.r && a.t < b.b && b.t < a.b;
+  while (cols.length) {
+    const grp = [cols.pop()];
+    for (let i = 0; i < grp.length; i++) for (let j = cols.length - 1; j >= 0; j--) if (near(grp[i], cols[j])) grp.push(cols.splice(j, 1)[0]);
+    const k = grp[0].k; let lo = -Infinity, hi = Infinity; const edges = [];
+    g.beginPath();
+    for (const w of grp) {
+      const P = w.P; g.moveTo(P[0][0], P[0][1]); for (let i = 1; i < 6; i++) g.lineTo(P[i][0], P[i][1]); g.closePath();
+      lo = Math.max(lo, P[1][1]); hi = Math.min(hi, w.F1[1]); edges.push(P[1], w.F1);
+    }
+    const gr = g.createLinearGradient(0, lo, 0, hi);
+    gr.addColorStop(0, 'rgba(180,160,255,0.34)'); gr.addColorStop(0.55, 'rgba(160,150,255,0.12)'); gr.addColorStop(1, 'rgba(160,150,255,0)');
+    g.globalAlpha = k; g.fillStyle = gr; g.fill();
+    g.strokeStyle = gr; g.lineWidth = 1.4 * s; g.beginPath();
+    for (let i = 0; i < edges.length; i += 2) { g.moveTo(edges[i][0], edges[i][1]); g.lineTo(edges[i + 1][0], edges[i + 1][1]); }
+    g.stroke();
   }
   }
   g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';

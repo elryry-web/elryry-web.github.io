@@ -18,7 +18,7 @@ const SIGN_NOTES = {
   plain: 'A sign is a stroke drawn outward through one of the eight small circles: it points the spell as the world lies. A short barb across it adds strength, two at most. Unadorned, stone, fire, ice and water set one tile; each sign is its own arm: opposite signs make one line through your mark; signs at right angles fill the ground between.',
   // added to the plain notes only once Featherfall II has taught the outer circle (ringTaught)
   ring: ' A second ring around the seal widens the spell; around Luna, it doubles how far the float carries.',
-  combos: 'A sign points the spell as the world lies; each barb across it adds strength. On Luna, the sign and barbs aim and strengthen only what rides on its ring. Each place on the ring holds one mark. A small sigil in a slot infuses the spell: behind the sign (red) it acts at once; beside it (blue), along the way; ahead of it (green), on arrival, once what the spell moves comes to rest. On the ring of a gust, Petra turns what the wind moves to stone. On the ring of fire, stone, ice or water, each Ventus carries every arm two tiles farther.',
+  combos: 'A sign points the spell as the world lies; each barb across it adds strength. On Luna, the sign and barbs aim and strengthen only what rides on its ring. Each place on the ring holds one mark. A small sigil in a slot infuses the spell: behind the sign (red) it acts at once; beside it (blue), along the way; ahead of it (green), on arrival, once what the spell moves comes to rest. Fire, frost, water or stone carried at once or along the way stays with what the spell moves until it comes to rest. On the ring of a gust, Petra turns what the wind moves to stone. Luna on a ring floats what the spell holds ten tiles for each Luna. On the ring of fire, stone, ice or water, each Ventus carries every arm two tiles farther.',
 };
 // has the outer circle been taught yet? (Featherfall II teaches it; before that nothing mentions or shows it)
 function ringTaught(L = Game.level) {
@@ -680,9 +680,10 @@ function placeReach(sp) {
 }
 // No spell lasts a length of time (a hard rule since v161): what floats or carries an element does so for a distance in
 // tiles, and keeps it for as long as it is left alone. world.js reads these; the aim bar says them.
-const RING_TILES = 10;   // Ignis, Gelu, Unda or Petra riding on what a gust moves (and Luna on arrival), per sigil
-const RIDE_TILES = 20;   // Luna riding a gust: the air stops a glide well before this (about 15 tiles at most), then it hangs
-const BUBBLE_TILES = 6;  // Unda + Luna: how far the bubble drifts, per Luna
+// One number for every ring-sigil (v165): Luna on any ring floats what it holds 10 tiles per Luna (on a gust, on
+// arrival, or Unda's bubble). Ignis, Gelu, Unda or Petra ride what a gust moves until it comes to rest, with no count. (Luna on Petra's
+// ring is Petra's own pairing: the stones hang for good. Luna at the centre floats 10, 20 with the outer circle.)
+const RING_TILES = 10;
 // the ferry's slab sails as far as it used to in (6 + 2 per Petra + 2 per extra Luna) seconds, gathering speed from rest
 // (0.55s lost): about 10 / 15 / 19 tiles for no barb / one / two, so The Ferry's one barb still lands short of the font
 function ferrySpeed(s, gale) { return gale ? (0.8 + 0.6 * s) * (1 + 0.4 * (gale - 1)) : 0; }
@@ -745,11 +746,11 @@ function describeSpell(sp, short = false) {
     if (isFerry(sp) && s.rel === 'now' && (s.id === 'luna' || s.id === 'stone')) continue;
     if (short && sp.sigil === 'luna' && s.id === 'gale' && sp.dir) continue; // already said: "Ventus bears it …"
     if (reach && s.id === 'gale') continue; // already said: "every arm … farther"
-    // (and how far what rides on the orb lasts: a distance, never a time)
-    const far = ` for ${s.rel === 'along' ? 'up to ' : ''}${(s.id === 'luna' ? RIDE_TILES : RING_TILES) * s.n} tiles`;
-    const what = !gust ? (short ? '' : placedWhat(sp, s)) : s.id === 'stone' ? (s.rel === 'arrive' ? ': stone rises under it where it comes to rest' : ': turns it to stone' + far)
+    // (and how long what rides on the orb lasts: a Luna float a distance, anything else until the orb comes to rest; never a time)
+    const far = ` for ${s.rel === 'along' ? 'up to ' : ''}${RING_TILES * s.n} tiles`, rest = ' until it comes to rest';
+    const what = !gust ? (short ? '' : placedWhat(sp, s)) : s.id === 'stone' ? (s.rel === 'arrive' ? ': stone rises under it where it comes to rest' : ': turns it to stone' + rest)
       : s.rel === 'arrive' ? (s.id === 'luna' ? `: where it comes to rest it floats ${RING_TILES * s.n} tiles` : ': where it comes to rest')
-      : s.id === 'luna' ? ': floats it' + far : s.id === 'gale' ? '' : ': it carries the element' + far;
+      : s.id === 'luna' ? ': floats it' + far : s.id === 'gale' ? '' : ': it carries the element' + rest;
     t += ` · + ${SIGILS[s.id].name}${s.n > 1 ? ' ×' + s.n : ''} ${REL_NAME[s.rel]}${what}`;
   }
   return t;
@@ -760,7 +761,8 @@ function placedWhat(sp, s) {
   if (sp.sigil === 'stone' && s.id === 'luna') return ': the stone hangs where it rises';
   if (sp.sigil === 'stone' && s.id === 'frost') return ': raised as ice, slick underfoot';
   if (sp.sigil === 'tide' && s.id === 'frost') return ': the water freezes as it pours';
-  if (sp.sigil === 'tide' && s.id === 'luna') return `: a bubble lifts what the water holds${sp.dir ? ' and drifts ' + BUBBLE_TILES * s.n + ' tiles ' + worldDirArrow(sp.dir) : ''}`;
+  if (sp.sigil === 'tide' && s.id === 'luna') return `: a bubble lifts what the water holds${sp.dir ? ' and drifts ' + RING_TILES * s.n + ' tiles ' + worldDirArrow(sp.dir) : ' and floats it ' + RING_TILES * s.n + ' tiles'}`;
+  if ((sp.sigil === 'flame' || sp.sigil === 'frost') && s.id === 'luna') return `: lifts what stands there and floats it ${RING_TILES * s.n} tiles`;
   return '';
 }
 function shortSpell(sp) {
