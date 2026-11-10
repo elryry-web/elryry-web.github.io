@@ -127,7 +127,10 @@ function supportFor(b) {
   }
   return s;
 }
-const effMass = b => b.mass * (b.imb && b.imb.stone ? 3 : 1);
+// v176: Petra along the way turns the orb to stone as it sets off (its weight and what it smashes or burns through are
+// always the tiles it is moving into, never its starting tile); only its touch on the ground waits until it has left that tile
+const imbOn = (b, id) => !!(b.imb && b.imb[id]);
+const effMass = b => b.mass * (imbOn(b, 'stone') ? 3 : 1);
 /* returns the cell that blocks the move, or null; imbued bodies may burn or smash through features */
 function blockedAt(b, nx, ny) {
   const rr = b.r * 0.82;
@@ -142,12 +145,12 @@ function blockedAt(b, nx, ny) {
 function breakThrough(b, c) {
   if (!c || !c.feat || floorTop(c) > b.z + STEP) return false;
   if (c.feat !== 'bramble' && c.feat !== 'iceblock') return false;
-  if (b.imb.flame) {
+  if (imbOn(b, 'flame')) {
     if (c.feat === 'bramble') { c.feat = null; c.burn = 0; c.ash = 1; for (let i = 0; i < 18; i++) flameP(c.x + Math.random(), c.y + Math.random(), c.h + Math.random() * 0.6, 1.4); smoke(c.x + .5, c.y + .5, c.h + .4, 5); Sfx.play('catch'); }
     else { c.feat = null; c.melting = false; c.wet = 1; steam(c.x + .5, c.y + .5, c.h + .5, 14); }
     return true;
   }
-  if (b.imb.stone) {
+  if (imbOn(b, 'stone')) {
     const ice = c.feat === 'iceblock'; c.feat = null; c.burn = 0; c.melting = false;
     for (let i = 0; i < 16; i++) emit({ x: c.x + Math.random(), y: c.y + Math.random(), z: c.h + Math.random() * 0.8, vx: (Math.random() - .5) * 4, vy: (Math.random() - .5) * 4, vz: 2 + Math.random() * 3, grav: 14, life: 1.1, size: 2 + Math.random() * 2, color: ice ? '#cfefff' : '#5a4a2a', kind: ice ? 'shard' : 'chunk', vr: (Math.random() - .5) * 10 });
     Sfx.play('bump', 1); cam.shake = Math.max(cam.shake, 0.2);
@@ -177,18 +180,25 @@ function imbueTick(b, dt) {
     // the wind is still bearing has not, until it stalls (as in arrivalCheck)
     const borne = b.drift && b.lev > 0;
     if (borne ? e.age > 0.6 && sp < 0.35 : e.age > 0.4 && sp < 0.5) { delete b.imb[id]; continue; }
+    // v176: along the way acts only on the road, never where the body started (that is at once's): nothing until it has
+    // left its starting tile, and that tile untouched after. It may still touch what it passes on its last tile while it
+    // is moving; the burst where it stops is on arrival's
+    if (e.sx != null) {
+      if (!e.left) { if (Math.floor(b.x) === e.sx && Math.floor(b.y) === e.sy) continue; e.left = true; }
+    }
+    const away = c => c && !(c.x === e.sx && c.y === e.sy);
     if (id === 'flame') {
-      for (const [dx, dy] of TOUCH) { const c = cellAt(b.x + dx, b.y + dy); if (c && !c.void && Math.abs(surfaceTop(c) + featH(c) * 0.5 - b.z) < 1.7) ignite(c, true); }
+      for (const [dx, dy] of TOUCH) { const c = cellAt(b.x + dx, b.y + dy); if (c && !c.void && away(c) && Math.abs(surfaceTop(c) + featH(c) * 0.5 - b.z) < 1.7) ignite(c, true); }
       if (Math.random() < dt * 30) flameP(b.x + (Math.random() - .5) * 0.4, b.y + (Math.random() - .5) * 0.4, b.z + b.hgt * 0.6, 0.8);
     } else if (id === 'frost') {
       const c = cellAt(b.x, b.y);
-      if (c && !c.void) {
+      if (c && !c.void && away(c)) {
         if (c.water != null && !c.ice && b.z < c.water + 1.7) { c.ice = true; for (let i = 0; i < 6; i++) emit({ x: c.x + Math.random(), y: c.y + Math.random(), z: c.water + 0.05, vz: 1 + Math.random(), grav: 3, life: 0.8, size: 3, color: '#bfeeff', kind: 'shard', vr: 5 }); }
         else if (c.water == null && b.z < c.h + 0.6) c.frost = Math.max(c.frost, 0.85);
       }
       if (Math.random() < dt * 20) emit({ x: b.x, y: b.y, z: b.z + b.hgt, vx: (Math.random() - .5), vy: (Math.random() - .5), vz: 0.3, life: 1, size: 3, color: '#ffffff', kind: 'flake', vr: 3 });
     } else if (id === 'tide') {
-      for (const [dx, dy] of TOUCH) douseCell(cellAt(b.x + dx, b.y + dy));
+      for (const [dx, dy] of TOUCH) { const c = cellAt(b.x + dx, b.y + dy); if (away(c)) douseCell(c); }
       if (Math.random() < dt * 20) emit({ x: b.x, y: b.y, z: b.z + b.hgt, vx: (Math.random() - .5), vy: (Math.random() - .5), vz: 1, grav: 8, life: 0.6, size: 2, color: '#9fd6ff', kind: 'drop' });
     } else if (id === 'stone') {
       // a stone orb grinds along: grit kicked up behind it, more the faster it rolls, and dust while it is quick
@@ -197,6 +207,19 @@ function imbueTick(b, dt) {
     }
   }
   if (!Object.keys(b.imb).length) b.imb = null;
+}
+// Luna along the way: lift once the body leaves its starting tile, then float its own tiles; if it never leaves it (it came
+// to rest first), the Luna is spent
+function lunaWaitTick(b, dt) {
+  const w = b.lunaWait; w.age += dt;
+  if (Math.floor(b.x) !== w.sx || Math.floor(b.y) !== w.sy) {
+    b.lunaWait = null;
+    if (b.captured) return;
+    b.levRange = Math.max(b.lev > 0 && b.levRange != null ? b.levRange : 0, w.T); b.lev = 1e6; b.levAge = 0; b.levUntilStop = false;
+    if (!w.keep) b.drift = null;
+    b.vz += 2;
+    for (let i = 0; i < 12; i++) emit({ x: b.x, y: b.y, z: b.z + 0.3, vx: (Math.random() - .5) * 2, vy: (Math.random() - .5) * 2, vz: 1 + Math.random(), drag: 2, life: 1.2, size: 6, color: '#cfe8ff', kind: 'glow' });
+  } else if (w.age > 0.4 && Math.hypot(b.vx, b.vy) < 0.5) b.lunaWait = null;
 }
 function arrivalCheck(b, dt) {
   b.arriveT += dt;
@@ -263,6 +286,7 @@ function stepBody(b, dt) {
   const x0 = b.x, y0 = b.y;
   if (b.arrive) arrivalCheck(b, dt);
   if (b.imb) imbueTick(b, dt);
+  if (b.lunaWait) lunaWaitTick(b, dt);
   if (b.captured) {
     const f = b.captured;
     const ft = f.h + 0.32 + Math.sin(World.t * 2.4) * 0.06;
@@ -277,7 +301,7 @@ function stepBody(b, dt) {
   const fin = sup > -1e8;
   const water = c && !c.void && c.water != null && !c.ice && c.water > c.h + 0.01 ? c.water : null;
   const inWater = water != null && b.z < water + 0.03 && b.lev <= 0;
-  const heavy = !!(b.imb && b.imb.stone);
+  const heavy = imbOn(b, 'stone');
   let grounded = false;
   const z0 = b.z;
   if (b.lev > 0) {
@@ -723,6 +747,14 @@ function infuseBody(b, s, sp) {
     b.arrive = (b.arrive || []).concat([{ id: s.id, n: luna ? Math.max(s.n, sp.s) : s.n, p: s.n, dir: luna ? sp.dir : null }]); b.arriveT = 0; b.arriveD = 0; return;
   }
   const until = s.rel === 'along';
+  // v176 (Ryan, The Lamplighter's Road: "is it the right behavior that at once lasts the entire duration?"): fire, frost,
+  // water and stone at once act once, where the body stands as the spell takes hold, the same burst as on arrival but at
+  // the start (Ignis flares round the tile and its neighbours, Gelu freezes them, Unda pours there, Petra raises stone
+  // under it), and are spent. Along the way they ride with it only while it travels: from the moment it leaves the tile it
+  // started on until it comes to rest, never on that starting tile (Ryan: "otherwise you would use along the way and never
+  // at once"), and with no burst where it stops (that is on arrival's). (Unda behind a gust's sign already pours before
+  // the gust: applySpell's lifts.) Luna and Ventus keep their own at-once rules below.
+  if (s.rel === 'now' && s.id !== 'gale' && s.id !== 'luna') { arriveEffect(b, s.id, s.n); return; }
   switch (s.id) {
     case 'gale': {
       // Ventus on Luna's ring bears the lifted thing along the sign
@@ -732,9 +764,17 @@ function infuseBody(b, s, sp) {
       const dx = sp.dir ? sp.dir.x : b.vx, dy = sp.dir ? sp.dir.y : b.vy, L = Math.hypot(dx, dy) || 1, dv = 2.5 * s.n / Math.pow(effMass(b), 0.7);
       b.vx += dx / L * dv; b.vy += dy / L * dv; break;
     }
-    case 'luna': b.levRange = Math.max(b.lev > 0 && b.levRange != null ? b.levRange : 0, T); b.lev = 1e6; b.levAge = 0; b.levUntilStop = until; if (sp.sigil !== 'luna') b.drift = null; b.vz += 2; break;
+    // v176 (Ryan: "it just changes where it starts counting its 10 tiles"): Luna along the way waits until the body has
+    // left the tile it started on, then lifts it and floats it its own 10 tiles, as at once does from the start; never cut
+    // short when the body stops (lunaWaitTick)
+    case 'luna':
+      if (until) { const w = b.lunaWait; b.lunaWait = { T: Math.max(w ? w.T : 0, T), sx: w ? w.sx : Math.floor(b.x), sy: w ? w.sy : Math.floor(b.y), age: 0, keep: sp.sigil === 'luna' }; break; }
+      b.levRange = Math.max(b.lev > 0 && b.levRange != null ? b.levRange : 0, T); b.lev = 1e6; b.levAge = 0; b.levUntilStop = false; if (sp.sigil !== 'luna') b.drift = null; b.vz += 2; break;
     default:
-      b.imb = b.imb || {}; b.imb[s.id] = { n: s.n, age: 0 }; // it rides until the body comes to rest (imbueTick)
+      // along the way it rides until the body comes to rest (imbueTick), but touches nothing until the body has left the tile
+      // it started on (sx, sy: that tile, plain numbers for the JSON rewind snapshots; a second sigil of the same kind keeps
+      // the first one's start)
+      b.imb = b.imb || {}; { const was = b.imb[s.id]; b.imb[s.id] = was ? { ...was, n: s.n, age: 0 } : { n: s.n, age: 0, sx: Math.floor(b.x), sy: Math.floor(b.y), left: false }; }
       if (s.id === 'stone') { Sfx.play('bump', 1); dust(b.x, b.y, b.z, 8); cam.shake = Math.max(cam.shake, 0.12); }
   }
 }
@@ -3802,7 +3842,7 @@ function drawBodyAt(g, b, t, bub) {
   }
 }
 
-/* The orb turned to stone (Petra at once or along the way on a moving spell): a ball of the land's own stone texture,
+/* The orb turned to stone (Petra along the way on a moving spell; v176: at once it raises stone under the orb instead): a ball of the land's own stone texture,
    shaded round and lit from the upper left, with the orb's gold light showing through its cracks. Painted once at
    128px (again when the stone texture arrives) and turned with the orb's roll. */
 let _stoneOrb = null;

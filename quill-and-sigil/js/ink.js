@@ -18,7 +18,7 @@ const SIGN_NOTES = {
   plain: 'A sign is a stroke drawn outward through one of the eight small circles: it points the spell as the world lies. A short barb across it adds strength, two at most. Unadorned, stone, fire, ice and water set one tile; each sign is its own arm: opposite signs make one line through your mark; signs at right angles fill the ground between.',
   // added to the plain notes only once Featherfall II has taught the outer circle (ringTaught)
   ring: ' A second ring around the seal widens the spell; around Luna, it doubles how far the float carries.',
-  combos: 'A sign points the spell as the world lies; each barb across it adds strength. On Luna, the sign and barbs aim and strengthen only what rides on its ring. Each place on the ring holds one mark. A small sigil in a slot infuses the spell: behind the sign (red) it acts at once; beside it (blue), along the way; ahead of it (green), on arrival, once what the spell moves comes to rest. Fire, frost, water or stone carried at once or along the way stays with what the spell moves until it comes to rest. On the ring of a gust, Petra turns what the wind moves to stone. Luna on a ring floats what the spell holds ten tiles for each Luna. On the ring of fire, stone, ice or water, each Ventus carries every arm two tiles farther.',
+  combos: 'A sign points the spell as the world lies; each barb across it adds strength. On Luna, the sign and barbs aim and strengthen only what rides on its ring. Each place on the ring holds one mark. A small sigil in a slot infuses the spell: behind the sign (red) it acts at once, where what the spell moves stands as the spell takes hold; beside it (blue), along the way, once it has left that spot and until it comes to rest; ahead of it (green), on arrival, where it comes to rest. Fire, frost, water or stone at once or on arrival flares once, round that spot; along the way it rides with what the spell moves and touches what it passes. On the ring of a gust, Petra along the way turns what the wind moves to stone; at once or on arrival, stone rises under it. Luna on a ring floats what the spell holds ten tiles for each Luna. On the ring of fire, stone, ice or water, each Ventus carries every arm two tiles farther.',
 };
 // has the outer circle been taught yet? (Featherfall II teaches it; before that nothing mentions or shows it)
 function ringTaught(L = Game.level) {
@@ -739,7 +739,8 @@ function placeReach(sp) {
 // No spell lasts a length of time (a hard rule since v161): what floats or carries an element does so for a distance in
 // tiles, and keeps it for as long as it is left alone. world.js reads these; the aim bar says them.
 // One number for every ring-sigil (v165): Luna on any ring floats what it holds 10 tiles per Luna (on a gust, on
-// arrival, or Unda's bubble). Ignis, Gelu, Unda or Petra ride what a gust moves until it comes to rest, with no count. (Luna on Petra's
+// arrival, or Unda's bubble). Ignis, Gelu, Unda or Petra along the way ride what a gust moves from the tile it leaves until it
+// comes to rest, with no count; at once or on arrival they flare once where it starts or stops (v176). (Luna on Petra's
 // ring is Petra's own pairing: the stones hang for good. Luna at the centre floats 10, 20 with the outer circle.)
 const RING_TILES = 10;
 // the ferry's slab sails as far as it used to in (6 + 2 per Petra + 2 per extra Luna) seconds, gathering speed from rest
@@ -797,18 +798,21 @@ function describeSpell(sp, short = false) {
   // say how far, not when
   const reach = placeReach(sp);
   if (reach) t += ` · + Ventus${reach > 2 ? ' ×' + reach / 2 : ''}: every arm ${reach} tiles farther`;
-  // on a gust, say what the ring-sigils whose effect is easy to miss will do: Petra at once or along the way turns what
-  // the wind moves to stone; anything on arrival waits until it comes to rest (a bounce is not an arrival)
+  // on a gust, say where each ring-sigil acts (v176: three parts of the trip, no overlap): at once where the orb stands as
+  // the spell takes hold, along the way once it has left that tile until it comes to rest (Petra: it turns to stone), on
+  // arrival where it comes to rest (a bounce is not an arrival)
   const gust = sp.sigil === 'gale' && !isFerry(sp) && !short;
   for (const s of sp.sats || []) {
     if (isFerry(sp) && s.rel === 'now' && (s.id === 'luna' || s.id === 'stone')) continue;
     if (short && sp.sigil === 'luna' && s.id === 'gale' && sp.dir) continue; // already said: "Ventus bears it …"
     if (reach && s.id === 'gale') continue; // already said: "every arm … farther"
     // (and how long what rides on the orb lasts: a Luna float a distance, anything else until the orb comes to rest; never a time)
-    const far = ` for ${s.rel === 'along' ? 'up to ' : ''}${RING_TILES * s.n} tiles`, rest = ' until it comes to rest';
-    const what = !gust ? (short ? '' : placedWhat(sp, s)) : s.id === 'stone' ? (s.rel === 'arrive' ? ': stone rises under it where it comes to rest' : ': turns it to stone' + rest)
+    // (Luna along the way lifts once the orb has left its tile and floats its own tiles from there: v176)
+    const far = ` ${RING_TILES * s.n} tiles${s.rel === 'along' ? ' once it has left its tile' : ''}`, rest = ' until it comes to rest';
+    const start = ' where it stands as the spell takes hold', road = ' from the tile it leaves' + rest;
+    const what = !gust ? (short ? '' : placedWhat(sp, s)) : s.id === 'stone' ? (s.rel === 'arrive' ? ': stone rises under it where it comes to rest' : s.rel === 'now' ? ': stone rises under it' + start : ': turns it to stone' + road)
       : s.rel === 'arrive' ? (s.id === 'luna' ? `: where it comes to rest it floats ${RING_TILES * s.n} tiles` : ': where it comes to rest')
-      : s.id === 'luna' ? ': floats it' + far : s.id === 'gale' ? '' : ': it carries the element' + rest;
+      : s.id === 'luna' ? ': floats it' + far : s.id === 'gale' ? '' : s.rel === 'now' ? ':' + start : ': it carries the element' + road;
     t += ` · + ${SIGILS[s.id].name}${s.n > 1 ? ' ×' + s.n : ''} ${REL_NAME[s.rel]}${what}`;
   }
   return t;
