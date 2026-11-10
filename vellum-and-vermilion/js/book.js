@@ -20,8 +20,8 @@
   var RED = '#a8261a', INKC = '#2a1b10', GOLD = '#b88b3a';
   var QN = ['I', 'II', 'III', 'IV', 'V'], FN = ['i', 'ii', 'iii', 'iv', 'v', 'vi'];
   var NFACES = 8, F_BEST = 6, F_COLO = 7;
-  var NAMES = { snail: 'The Snail Knight', rabbit: 'The Rabbit Archer', cat: 'The Cat and the Mouse', fox: 'The Fox in the Cowl',
-    owl: 'The Owl', fishbird: 'The Fishbird', monkey: 'The Piping Monkey', dragon: 'The Border-Nibbling Dragon', monk: 'The Tired Monk' };
+  var NAMES = { snail: 'Snail Knight', rabbit: 'Rabbit Archer', cat: 'Cat and Mouse', fox: 'Fox Monk',
+    owl: 'Owl', fishbird: 'Fishbird', monkey: 'Piping Monkey', dragon: 'Dragon', monk: 'Tired Monk' };
   var LETTERS = [6, 12, 18, 24, 30];
   function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
   function now() { return performance.now(); }
@@ -316,7 +316,7 @@
     g.textAlign = 'center';
     y += ts * 0.55;
     g.fillStyle = 'rgba(42,27,16,0.8)'; var is = clamp(w * 0.036, 10, 17); font(g, is, FELL, 'italic');
-    g.fillText(ellip(g, 'a book of knotwork, in five quires', cw), w / 2, y + is); y += is * 2.2;
+    g.fillText(ellip(g, 'thirty knotwork pages in five quires', cw), w / 2, y + is); y += is * 2.2;
     // contents
     var save = G.save(), rows = [];
     for (var q = 1; q <= 5; q++) {
@@ -324,8 +324,8 @@
       rows.push({ face: q, a: 'Quire ' + QN[q - 1], b: G.RULES[q].title, c: k + '/6', done: k === 6 });
     }
     var bk = BEASTS.filter(found).length;
-    rows.push({ face: F_BEST, a: '', b: 'The Bestiary of the Margins', c: bk + '/9', done: bk === 9 });
-    rows.push({ face: F_COLO, a: '', b: 'The Colophon', c: allDone() ? '❧' : '', done: allDone() });
+    rows.push({ face: F_BEST, a: '', b: 'The Bestiary', c: bk + '/9', done: bk === 9 });
+    rows.push({ face: F_COLO, a: '', b: 'Colophon', c: allDone() ? '❧' : '', done: allDone() });
     var avail = h - y - Math.max(40, h * 0.08), rh = clamp(avail / rows.length, 16, 46), fs = clamp(rh * 0.42, 10, 19);
     rows.forEach(function (r, i) {
       var ry = y + i * rh, by = ry + rh * 0.62;
@@ -347,7 +347,7 @@
     });
     g.textAlign = 'center';
     g.fillStyle = 'rgba(42,27,16,0.55)'; font(g, clamp(w * 0.03, 9, 14), FELL, 'italic');
-    g.fillText(ellip(g, 'tap a page to open it · swipe to turn the leaf', cw), w / 2, h - Math.max(24, h * 0.055));
+    g.fillText(ellip(g, 'tap a page to play · swipe to turn', cw), w / 2, h - Math.max(24, h * 0.055));
   }
   function faceQuire(q, g, w, h, mx, top, cw, H) {
     var y = rubricTitle(g, 'Quire ' + QN[q - 1] + ' · ' + G.RULES[q].title, w, top, cw, clamp(w * 0.062, 11, 28));
@@ -389,7 +389,7 @@
       if (l.n === nxt) marker = { face: q, x: r.x - 4, y: r.y - 4, s: clamp(bs * 0.32, 18, 34) };
       // caption: folio and name (a sealed page keeps its name)
       font(g, cap, FELL, 'italic'); g.fillStyle = ok ? INKC : 'rgba(42,27,16,0.45)';
-      var txt = FN[l.folio - 1] + ' · ' + (ok ? l.name : 'sealed');
+      var txt = FN[l.folio - 1] + ' · ' + (ok ? l.name : 'locked');
       g.fillText(ellip(g, txt, cellW * 0.96), cx + cellW / 2, by + bs + cap * 1.25);
       if (sv) { g.fillStyle = '#9a6f10'; font(g, cap, FELL); }
       H.push({ x: cx, y: cy, w: cellW, h: cellH, act: { page: l.n, ok: ok } });
@@ -406,10 +406,10 @@
     silCache[key] = cv; return cv;
   }
   function faceBestiary(g, w, h, mx, top, cw, H, t) {
-    var y = rubricTitle(g, 'The Bestiary of the Margins', w, top, cw, clamp(w * 0.062, 11, 28));
+    var y = rubricTitle(g, 'The Bestiary', w, top, cw, clamp(w * 0.062, 11, 28));
     var fk = BEASTS.filter(found).length, ss = clamp(w * 0.034, 10, 16);
     font(g, ss, FELL, 'italic'); g.fillStyle = 'rgba(42,27,16,0.8)';
-    y += ss * 1.6; g.fillText(fk ? fk + ' of nine found in the margins' : 'none yet found in the margins', w / 2, y);
+    y += ss * 1.6; g.fillText(fk ? fk + ' of 9 found' : 'none found yet', w / 2, y);
     y += ss * 0.8;
     var nameH = clamp(h * 0.09, 22, 54), gh = h - y - nameH - Math.max(26, h * 0.05), cell = Math.min(cw / 3, gh / 3);
     var gx = (w - cell * 3) / 2, gy = y + (gh - cell * 3) / 2, r = cell * 0.42;
@@ -437,7 +437,7 @@
       g.fillText(best.sel.text, w / 2, ny); g.globalAlpha = 1;
     } else if (fk) {
       font(g, clamp(nameH * 0.32, 9, 15), FELL, 'italic'); g.fillStyle = 'rgba(42,27,16,0.55)';
-      g.fillText(ellip(g, 'tap a beast to wake it', cw), w / 2, ny);
+      g.fillText(ellip(g, 'tap a creature to wake it', cw), w / 2, ny);
     }
   }
   function faceColophon(g, w, h, mx, top, cw, H) {
@@ -445,9 +445,9 @@
     if (!done) {
       y += h * 0.12;
       var s = clamp(w * 0.05, 12, 24); font(g, s, FELL, 'italic'); g.fillStyle = INKC;
-      wrap(g, 'Here the book is not yet finished.', cw).forEach(function (ln) { g.fillText(ln, w / 2, y); y += s * 1.3; });
+      wrap(g, 'The book is not finished yet.', cw).forEach(function (ln) { g.fillText(ln, w / 2, y); y += s * 1.3; });
       y += s * 0.6; var s2 = clamp(w * 0.034, 10, 16); font(g, s2, FELL, 'italic'); g.fillStyle = 'rgba(42,27,16,0.7)';
-      g.fillText(k + ' of thirty pages illuminated', w / 2, y); y += s2 * 2;
+      g.fillText(k + ' of 30 pages finished', w / 2, y); y += s2 * 2;
       // thirty little squares, gilt where a page is done
       var n = G.LEVELS.length, per = 10, sq = Math.min(cw / per * 0.7, 18), gap = sq * 0.45, rowW = per * sq + (per - 1) * gap;
       for (var i = 0; i < n; i++) {
@@ -465,11 +465,10 @@
     g.fillStyle = RED; var ls = fitFont(g, 'LUMEN — light', UNC, clamp(w * 0.085, 14, 40), cw);
     g.fillText('LUMEN — light', w / 2, y); y += ls * 0.9;
     var ns = clamp(w * 0.035, 10, 17); font(g, ns, FELL, 'italic'); g.fillStyle = INKC;
-    var note = 'Thirty pages, and every ribbon whole. The beasts have their tails, the gold has caught the light, and the abbot never woke. ' +
-      'Thank you for keeping me company at this desk. Here the book ends; pray for the scribe.';
+    var note = 'All thirty pages are finished. Thank you for playing.';
     wrap(g, note, cw * 0.94).forEach(function (ln) { y += ns * 1.35; g.fillText(ln, w / 2, y); });
     y += ns * 1.6; g.textAlign = 'right'; g.fillStyle = RED; font(g, ns, FELL, 'italic');
-    g.fillText('— the scribe, by the last of the candle', mx + cw, y); g.textAlign = 'center';
+    g.fillText('— the scribe', mx + cw, y); g.textAlign = 'center';
   }
   function renderCover(cv, w, h) {
     var g = prep(cv, w, h);
@@ -785,7 +784,7 @@
       if (a.page) { if (a.ok) toPlay(a.page); else nudgeSeal(); return; }
       if (a.beast) {
         if (a.found) { best.woke[a.beast] = now(); best.sel = { id: a.beast, text: NAMES[a.beast] || a.beast }; best.selT = now(); startLive(); if (window.SFX) window.SFX.whole('gold'); }
-        else { best.sel = { id: '', text: 'Not yet found — keep illuminating' }; best.selT = now(); startLive(); if (window.SFX) window.SFX.wiggle(); }
+        else { best.sel = { id: '', text: 'Not found yet. Finish more pages.' }; best.selT = now(); startLive(); if (window.SFX) window.SFX.wiggle(); }
         return;
       }
     }

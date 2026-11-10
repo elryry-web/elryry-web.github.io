@@ -117,7 +117,7 @@
     <button id="bBook" title="The book">&larr; Book</button>
     <span class="sp"></span>
     <button id="bRule" class="icon" title="This quire's rule">?</button>
-    <button id="bHint" title="Hint: set one tile right and pin it">&#10022; Hint</button>
+    <button id="bHint" title="Hint: fixes one tile and pins it">&#10022; Hint</button>
     <button id="bReset" class="icon" title="Reset the page">&#8634;</button>
     <button id="bSound" class="icon" title="Sound">&#9835;</button>
   </div>
@@ -133,14 +133,14 @@
   <h2 id="ruleTitle"></h2>
   <canvas id="ruleArt" width="200" height="80"></canvas>
   <p id="ruleText"></p>
-  <p id="ruleHow" style="font-size:16px;opacity:.8">Tap a tile to turn it. Hold a tile (or right-click) to pin it with a gold nail.</p>
-  <div class="row"><button id="ruleOk">To work</button></div>
+  <p id="ruleHow" style="font-size:16px;opacity:.8">Tap a tile to turn it. Hold it (or right-click) to pin it so it can't turn.</p>
+  <div class="row"><button id="ruleOk">Start</button></div>
 </div></div>
 
 <div id="resetModal" class="modal"><div class="card">
-  <h2>Scrape the page clean?</h2>
-  <p>Every tile goes back to how you found it, and the nails come out.</p>
-  <div class="row"><button id="resetNo">Keep it</button><button id="resetYes">Scrape it</button></div>
+  <h2>Start this page over?</h2>
+  <p>All tiles go back to where they started and all pins come out.</p>
+  <div class="row"><button id="resetNo">Cancel</button><button id="resetYes">Start over</button></div>
 </div></div>
 
 <div id="bk_scr">
@@ -153,19 +153,19 @@
       <div class="side back"><canvas id="bk_cK"></canvas><div class="shade" id="bk_shK"></div></div>
     </div>
     <span id="bk_mark">&#9753;</span>
-    <div class="corner" id="bk_cornL" title="Turn back"></div><div class="corner" id="bk_cornR" title="Turn on"></div>
+    <div class="corner" id="bk_cornL" title="Previous page"></div><div class="corner" id="bk_cornR" title="Next page"></div>
   </div>
-  <button id="bk_prev" class="nav" title="Turn back (&larr;)">&lsaquo;</button><button id="bk_next" class="nav" title="Turn on (&rarr;)">&rsaquo;</button>
+  <button id="bk_prev" class="nav" title="Previous page (&larr;)">&lsaquo;</button><button id="bk_next" class="nav" title="Next page (&rarr;)">&rsaquo;</button>
   <div id="coverUI"><button id="bk_open">Open the book</button><button id="bk_cont"></button></div>
 </div>
 
-<script src="js/levels.js?v=3"></script>
+<script src="js/levels.js?v=4"></script>
 <script src="js/puzzle.js?v=3"></script>
 <script src="js/art.js?v=3"></script>
 <script src="js/drolleries.js?v=3"></script>
 <script src="js/audio.js?v=3"></script>
 <script src="js/board.js?v=3"></script>
-<script src="js/book.js?v=4"></script>
-<script src="js/main.js?v=3"></script>
+<script src="js/book.js?v=6"></script>
+<script src="js/main.js?v=5"></script>
 </body>
 </html>

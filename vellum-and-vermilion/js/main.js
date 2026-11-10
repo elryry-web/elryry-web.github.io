@@ -6,11 +6,11 @@
   var $ = function (id) { return document.getElementById(id); };
 
   var RULES = {
-    1: { title: 'The Plain Interlace', text: 'Turn the tiles until every ribbon runs whole: no end left loose, no ribbon running off the page.' },
-    2: { title: 'The Pigments', text: 'One strand, one pigment: a strand may not join marks of two different colours.' },
-    3: { title: 'The Beasts', text: 'Every beast runs head to tail. A head joined to a head, or a tail to a tail, will not do.' },
-    4: { title: 'The Gilded Twins', text: 'Tiles bound in gold leaf turn together. Tap one and its twins turn too; a nail pins them all.' },
-    5: { title: 'The Great Initials', text: 'Everything you have learned, on the great pages. Take your time; the abbot is asleep.' }
+    1: { title: 'The Plain Interlace', text: 'Turn the tiles until every ribbon joins up into a closed loop.' },
+    2: { title: 'The Pigments', text: 'Some tiles have a coloured mark. A ribbon can only pass through marks of one colour.' },
+    3: { title: 'The Beasts', text: 'Some ribbons end in a head or a tail. Each one has to run from a head to a tail.' },
+    4: { title: 'The Gilded Twins', text: 'Tiles framed in gold turn together. Tap one and the others turn with it.' },
+    5: { title: 'The Great Initials', text: 'These pages use all the rules so far.' }
   };
 
   /* ---------- save ---------- */
