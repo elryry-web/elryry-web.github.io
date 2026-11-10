@@ -860,7 +860,7 @@ const Game = {
     $('#noteKeys').style.display = this.idx === 0 ? '' : 'none';
     const ringOnly = id => L.centers && !L.centers.includes(id);
     $('#noteSigils').innerHTML = L.sigils.map(id => `<span class="chip" style="--c:${SIGILS[id].color}"><img src="${glyphIcon(id)}" alt="">${SIGILS[id].name}${ringOnly(id) ? ' <small>(ring only)</small>' : ''}</span>`).join('') + (L.ink ? `<span class="chip ink">ink for ${L.ink} seal${L.ink > 1 ? 's' : ''}</span>` : '');
-    $('#note').scrollTop = 0;
+    $('#noteIn').scrollTop = 0;
     $('#note').classList.add('show');
     fitLand(true);
   },
@@ -876,7 +876,7 @@ const Game = {
     const L = this.level; if (!L) return;
     this.hint = Math.min(2, (this.hint || 0) + 1); Sfx.play('page');
     this.leafHint(); renderHint($('#nHint'), $('#nHintB'), L, this.hint);
-    if (this.noteOpen()) { fitLand(true); $('#note').scrollTop = $('#noteHint').offsetTop - 10; }
+    if (this.noteOpen()) { fitLand(true); $('#noteIn').scrollTop = $('#noteHint').offsetTop - 10; }
   },
   // the HUD's Hint button: the lesson card, open at the nudge (or as far as the hint has gone)
   openHint() { if (this.state !== 'play') return; this.note(); if (!this.hint) this.moreHint(); },
@@ -1326,8 +1326,9 @@ function fitLand(ease) {
   leafMore();
 }
 // a leaf too long for its room says so: a soft fade at its foot while more lies below (gone once read to the end)
-function leafMore() { const n = $('#note'); n.classList.toggle('more', n.scrollHeight - n.clientHeight - n.scrollTop > 6); }
-$('#note').addEventListener('scroll', leafMore, { passive: true });
+// (the writing scrolls inside the leaf's still paper, v173)
+function leafMore() { const n = $('#noteIn'); $('#note').classList.toggle('more', n.scrollHeight - n.clientHeight - n.scrollTop > 6); }
+$('#noteIn').addEventListener('scroll', leafMore, { passive: true });
 // coming back to the page (or the browser restoring a lost canvas): every kept drawing is made afresh, in case the
 // browser wiped them while the page was away
 function refreshAll() { try { refreshCanvases(); } catch (e) { console.warn(e); } Grim.bookDirty = true; Grim.inkDirty = true; }

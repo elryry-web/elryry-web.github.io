@@ -2132,7 +2132,7 @@ const Grim = {
     const x0 = P.x + P.w / 2 - cw * ids.length / 2;
     ids.forEach((id, k) => {
       const cx = x0 + cw * (k + 0.5), cy = top + (side ? 30 : 36), r = MD ? Math.min(11, cw * 0.27 - 3) : Math.min(16, cw * 0.36);
-      if (MD) medalGlyph(g, id, cx, cy, r, 1.4);
+      if (MD) medalGlyph(g, id, cx, cy, r, 1.4, true); // in the sigil's colour, as in the wide codex
       else { g.strokeStyle = ink; g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, r, 0, TAU); g.stroke(); drawGlyph(g, id, cx, cy, r * 0.8, '#2a1830', 1.4); }
       g.fillStyle = red; g.font = `${cw < 54 ? 8 : 10}px Cinzel, serif`; g.fillText(SIGILS[id].name.toUpperCase(), cx, cy + (MD ? (r + 3) / 0.6 + 9 : r + 12)); // clear of the roundel's knotwork
       this.codexRects.push({ id, x: cx - cw / 2, y: cy - r, w: cw, h: r * 2 + 16 });

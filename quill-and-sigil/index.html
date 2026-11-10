@@ -249,6 +249,10 @@
      and under load Safari dropped tiles of it, leaving blank patches on the win card) */
   #satchel .sheet { transform: translateY(16px) scale(.98); transition: transform .5s; }
   #satchel.show .sheet { transform: none; }
+  /* (v173) the satchel's paper stays put and only its contents scroll inside it (a sheet that was itself the scroller,
+     and transformed, could lose its parchment in patches on Firefox for Android while it scrolled) */
+  #satchel .sheet { display: flex; flex-direction: column; overflow: hidden; padding: 0; background-color: #e7d3a6; }
+  #satchel .sin { flex: 0 1 auto; min-height: 0; overflow: auto; padding: 34px 40px 28px; border-radius: inherit; }
   #win .sheet { overflow: visible; max-height: none; }
   .sheet .num { font-family: Cinzel, serif; letter-spacing: .3em; color: #8e2f22; font-size: 13px; }
   .sheet h3 { font-family: 'Cinzel Decorative', serif; font-weight: 700; font-size: 32px; margin: 4px 0 0; color: #2a1830; }
@@ -297,14 +301,18 @@
   #winText { text-align: center !important; }
   /* ---------- the lesson leaf (v146): the lesson's words beside the land, never over it; only when asked for (v148) ---------- */
   #note.leaf { position: fixed; z-index: 12; left: 50%; bottom: var(--above, calc(104px + env(safe-area-inset-bottom))); transform: translate(-50%, 10px);
-    width: min(520px, calc(100vw - 32px)); max-height: 36vh; overflow: auto; padding: 14px 40px 10px 18px; color: #2e1f14; text-align: left;
-    background: radial-gradient(ellipse at 50% 35%, #fbf2da, #e7d3a6 70%, #d4b880); border-radius: 4px;
+    width: min(520px, calc(100vw - 32px)); max-height: 36vh; display: flex; flex-direction: column; color: #2e1f14; text-align: left;
+    background: #e7d3a6 radial-gradient(ellipse at 50% 35%, #fbf2da, #e7d3a6 70%, #d4b880); border-radius: 4px;
     box-shadow: inset 0 0 30px rgba(120,80,30,.4), inset 0 0 0 1px #8a6a3a, 0 10px 30px rgba(0,0,0,.55);
     opacity: 0; pointer-events: none; transition: opacity .35s, transform .35s; }
   #note.leaf.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
-  /* more below (v165): a soft fade of parchment over the foot of a leaf that scrolls, gone at the end */
-  #note.leaf::after { content: ''; position: sticky; display: block; bottom: -10px; height: 34px; margin: -34px -14px 0;
-    background: linear-gradient(rgba(226,205,160,0), rgba(226,205,160,.92) 60%, rgba(220,196,148,.55));
+  /* (v173) the paper stays put and only the writing inside it scrolls: on Firefox for Android a leaf that was itself
+     the scroller, over a land redrawn every frame, lost its parchment in patches while it scrolled */
+  #note .lin { position: relative; flex: 0 1 auto; min-height: 0; overflow: auto; padding: 14px 40px 10px 18px; border-radius: inherit; }
+  /* more below (v165): a soft fade of parchment over the foot of a leaf that scrolls, gone at the end
+     (v173: laid on the still paper, not in the scrolling writing; the strip a sticky fade used to show, 24px of 34) */
+  #note.leaf::after { content: ''; position: absolute; left: 4px; right: 26px; bottom: 0; height: 24px;
+    background: linear-gradient(rgba(226,205,160,0), rgba(226,205,160,.92) 60%, rgba(220,196,148,.55)) top / 100% 34px no-repeat;
     -webkit-mask-image: linear-gradient(90deg, transparent, #000 14px, #000 calc(100% - 14px), transparent);
     mask-image: linear-gradient(90deg, transparent, #000 14px, #000 calc(100% - 14px), transparent);
     pointer-events: none; opacity: 0; transition: opacity .25s; }
@@ -326,10 +334,11 @@
   }
   /* a phone on its side: a narrow column at the left */
   @media (max-height: 500px) and (orientation: landscape) {
-    #note.leaf { left: calc(10px + env(safe-area-inset-left)); bottom: auto; top: 84px; width: min(300px, 36vw); max-height: calc(100vh - 150px); transform: translateX(-10px); padding: 10px 34px 8px 12px; }
+    #note.leaf { left: calc(10px + env(safe-area-inset-left)); bottom: auto; top: 84px; width: min(300px, 36vw); max-height: calc(100vh - 150px); transform: translateX(-10px); }
+    #note .lin { padding: 10px 34px 8px 12px; }
     #note.leaf.show { transform: none; }
     #note p { font-size: 14px; line-height: 1.35; }
-    #note.leaf::after { bottom: -8px; margin: -34px -10px 0; }
+    #note.leaf::after { left: 2px; right: 24px; height: 26px; }
   }
   /* ---------- satchel ---------- */
   #castrow { display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; max-width: 96vw; }
@@ -396,6 +405,9 @@
     box-shadow: inset 0 0 40px rgba(120,80,30,.45), inset 0 0 0 1px #8a6a3a, inset 0 0 0 6px rgba(255,255,255,.2), inset 0 0 0 7px rgba(138,106,58,.6), 0 20px 60px rgba(0,0,0,.7);
     transform-origin: 0 50%; transform: scaleX(.3) skewY(4deg); /* a 2D swing: on Firefox for Android the book canvas cut through the 3D one in bands */ transition: transform .45s cubic-bezier(.2,.8,.3,1); }
   #notes.show .sheet { transform: none; }
+  /* (v173) the old look's plain sheet: the paper stays put and the writing scrolls inside it, as on the painted page */
+  #notes:not(.illum) .sheet { display: flex; flex-direction: column; overflow: hidden; padding: 0; background-color: #e7d3a6; }
+  #notes:not(.illum) .nin { flex: 0 1 auto; min-height: 0; overflow: auto; padding: 26px 26px 20px; border-radius: inherit; }
   #notes .sheet p { font-size: 16px; }
   .nhead { font-family: Cinzel, serif; font-size: 11px; letter-spacing: .14em; color: #8e2f22; text-transform: uppercase; margin: 6px 0 4px;
     padding-top: 8px; border-top: 1px solid rgba(90,60,40,.3); }
@@ -538,7 +550,7 @@
     #title .sub { font-size: 22px; } #title .orn { height: 36px; margin: 2px 0 8px; }
     #title .btn { font-size: 15px; padding: 10px 22px; }
     #title .foot { display: none; }
-    .card .sheet, #satchel .sheet { padding: 18px 24px 16px; max-height: 94vh; }
+    .card .sheet, #satchel .sin { padding: 18px 24px 16px; } .card .sheet, #satchel .sheet { max-height: 94vh; }
     .sheet h3 { font-size: 24px; } .sheet .div { height: 24px; } .sheet p { font-size: 15px; line-height: 1.4; }
     #win .div { --stamp: 80px; height: calc(var(--stamp) * .84); } #win .div::before { top: calc(50% - 12px); height: 24px; }
     #levels { padding: 2vh 0; } #levels .orn { height: 30px; margin-bottom: 6px; }
@@ -633,7 +645,7 @@
 </div>
 
 <div id="satchel">
-  <div class="sheet">
+  <div class="sheet"><div class="sin">
     <div class="num">kept spells</div>
     <h3>Your Satc<span class="dh">h</span>el</h3>
     <div class="div"></div>
@@ -643,7 +655,7 @@
       <button class="btn ghost light" id="sClose">Close</button>
     </div>
     <div class="keys">Tap a kept spell to lay it on the page · in the world, <span class="mouse-only">press <b>1–9</b> or </span>tap a slot beside the grimoire button to cast it at once.</div>
-  </div>
+  </div></div>
 </div>
 
 <div id="title" class="screen">
@@ -712,14 +724,14 @@
   <div id="levelsFoot"><button class="btn ghost" id="bBackTitle">← Title</button> <button class="btn ghost" id="bTipsAgain" title="Show every tip again, as if for the first time">↺ Show the tips again</button> <button class="btn ghost" id="bLook" title="Old look / painted look (G)">◐ Old look</button> <button class="btn ghost touch-only" id="bFull">⛶ Full screen</button> <button class="btn ghost" id="bLessonsT" style="display:none">.</button></div>
 </div>
 
-<div id="note" class="leaf">
+<div id="note" class="leaf"><div class="lin" id="noteIn">
   <button class="leafx" id="bStart" title="Put the lesson away (Esc)">×</button>
   <p id="noteText"></p>
   <div class="chips" id="noteSigils"></div>
   <div id="noteHint"></div>
   <div class="row"><button class="btn ghost" id="bHint">The Master’s Hint</button></div>
   <div class="keys mouse-only" id="noteKeys">Space opens the grimoire · Enter inscribes · K keeps a spell · 1–9 casts a kept spell · H a hint · Z rewinds · R restarts</div>
-</div>
+</div></div>
 
 <div id="win" class="card">
   <div class="sheet">
@@ -735,9 +747,9 @@
   </div>
 </div>
 
-<script src="js/ink.js?v=172"></script>
-<script src="js/world.js?v=172"></script>
-<script src="js/tips.js?v=172"></script>
-<script src="js/main.js?v=172"></script>
+<script src="js/ink.js?v=173"></script>
+<script src="js/world.js?v=173"></script>
+<script src="js/tips.js?v=173"></script>
+<script src="js/main.js?v=173"></script>
 </body>
 </html>
