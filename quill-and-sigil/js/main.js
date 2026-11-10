@@ -1156,7 +1156,14 @@ function aimOverlay(g, t) {
         : f < 0.13 ? `barely wets ${where}` : `fills ${where} ${['¼', '¼', '½', '¾', 'nearly'][Math.round(f * 4)]}`;
     } else if (F) note = 'runs off here';
   }
-  const desc = describeSpell(sp, true) + (note ? ' · ' + note : '');
+  // a placed shape keeps its length wherever it is aimed, but the tiles past the map's edge aren't drawn (or cast),
+  // so say how many of them land: every tile inside the map counts, void ones (drawn dashed) included
+  let fit = '';
+  if (cells.length) {
+    const whole = spellCells(sp, A.x, A.y, true).length;
+    if (whole > cells.length) fit = `${cells.length} of ${whole} tiles on the map`;
+  }
+  const desc = describeSpell(sp, true) + (fit ? ' · ' + fit : '') + (note ? ' · ' + note : '');
   if ($('#aimDesc').textContent !== desc) $('#aimDesc').textContent = desc;
   const R = spellRadius(sp), zTop = A.c && !A.body && !A.air ? standTop(A.c) : A.z;
   if (R > 0 && !isLine(sp)) {
@@ -1318,7 +1325,10 @@ function fitLand(ease) {
   const leaf = $('#note'), open = leaf.classList.contains('show');
   // under the land, the leaf stands just above the grimoire button and the kept-spell slots, however tall they wrap
   leaf.style.setProperty('--above', innerHeight - $('#bottom').getBoundingClientRect().top + 10 + 'px');
-  const top = leaf.offsetTop, under = top > innerHeight * 0.4; // (offset*: the leaf's place without its slide-in)
+  // (v174) a leaf that spans the screen (a phone held upright) stands under the land; a narrow column (wide screens, a
+  // phone on its side) beside it. Told apart by the leaf's top (to v173), a tall leaf on an upright phone (large text) counted as
+  // "beside", and the land was fitted to the right of a leaf that fills the width: off the screen's edge.
+  const top = leaf.offsetTop, under = leaf.offsetWidth > innerWidth * 0.5; // (offset*: the leaf's place without its slide-in)
   const pads = !open ? undefined : under ? [null, innerHeight - top + 12] : [null, null, leaf.offsetLeft + leaf.offsetWidth + 8];
   const from = ease && cam.b && { ...cam.b };
   fitCamera(innerWidth, innerHeight, pads);

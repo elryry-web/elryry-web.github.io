@@ -491,7 +491,8 @@ function spellBodies(sp, tx, ty) {
   return World.bodies.filter(b => b.alive && (set.has(Math.floor(b.x) + ',' + Math.floor(b.y)) || Math.hypot(b.x - tx, b.y - ty) <= 0.7));
 }
 function placedArms(sp) { return sp.arms && sp.arms.length ? sp.arms : sp.dir ? [{ x: sp.dir.x, y: sp.dir.y, f: sp.s }] : []; }
-function spellCells(sp, tx, ty) {
+// all: keep the cells that fall off the map too (the aim bar counts them: "11 of 15 tiles on the map")
+function spellCells(sp, tx, ty, all) {
   const ix = Math.floor(tx), iy = Math.floor(ty), out = [];
   if (isLine(sp) || sp.sigil === 'stone') {
     // (older spells without arms fall back to their averaged direction)
@@ -505,7 +506,7 @@ function spellCells(sp, tx, ty) {
       if (Math.hypot(x + 0.5 - tx, y + 0.5 - ty) <= R) out.push([x, y]);
   }
   const seen = new Set();
-  return out.filter(([x, y]) => x >= 0 && y >= 0 && x < World.W && y < World.H && !seen.has(x + ',' + y) && seen.add(x + ',' + y));
+  return out.filter(([x, y]) => (all || x >= 0 && y >= 0 && x < World.W && y < World.H) && !seen.has(x + ',' + y) && seen.add(x + ',' + y));
 }
 function bodiesInRadius(tx, ty, R) { return World.bodies.filter(b => b.alive && Math.hypot(b.x - tx, b.y - ty) <= R + b.r * 0.5); }
 
@@ -4420,8 +4421,22 @@ function pickFace(c, sx, sy, top) {
   }
   return null;
 }
-// the land under the pointer, front to back: the first tile whose ground, standing thing or cliff is under it
+// the land under the pointer, front to back: the first tile whose ground, standing thing or cliff is under it.
+// Except that the pointer on the font's own ground aims at the font where all that covers it there is a gate or
+// x-rayed land: the font is the goal and is meant to be seen through those. Since v172 the shut gates round the font on
+// The Eye and The Compass Rose hid every pixel of it, so no tap could aim at it, and a line of fire cast from a gate
+// beside it fell a tile short of one brazier (v174). Braziers, ice and other things standing in front still win.
 function pickLand(sx, sy) {
+  const r = pickLandFront(sx, sy);
+  if (!r || r.c.feat === 'font' || !(r.c.feat === 'gate' || (XR && XR.set.has(r.c)))) return r;
+  for (const c of World.fonts || []) {
+    if (c.feat !== 'font' || c.void) continue;
+    const z = surfaceTop(c), p = unproj(sx, sy, z);
+    if (p.x >= c.x && p.x < c.x + 1 && p.y >= c.y && p.y < c.y + 1) return { x: p.x, y: p.y, z, c, top: standTop(c) };
+  }
+  return r;
+}
+function pickLandFront(sx, sy) {
   for (let d = World.W + World.H - 2; d >= 0; d--) {
     for (let x = Math.min(World.W - 1, d); x >= 0; x--) {
       const y = d - x; if (y < 0 || y >= World.H) continue;
