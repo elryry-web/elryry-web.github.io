@@ -758,7 +758,7 @@ function describeSpell(sp, short = false) {
 
 /* what a ring-sigil does to a placed spell (the fifth folio's pairings), for the aim preview */
 function placedWhat(sp, s) {
-  if (sp.sigil === 'stone' && s.id === 'luna') return ': the stone hangs where it rises';
+  if (sp.sigil === 'stone' && s.id === 'luna') return ': the stone hangs level with the ground nearest your mark';
   if (sp.sigil === 'stone' && s.id === 'frost') return ': raised as ice, slick underfoot';
   if (sp.sigil === 'tide' && s.id === 'frost') return ': the water freezes as it pours';
   if (sp.sigil === 'tide' && s.id === 'luna') return `: a bubble lifts what the water holds${sp.dir ? ' and drifts ' + RING_TILES * s.n + ' tiles ' + worldDirArrow(sp.dir) : ' and floats it ' + RING_TILES * s.n + ' tiles'}`;
@@ -1371,9 +1371,16 @@ function goldCapCanvas(ch, box) {
   if (document.fonts && !document.fonts.check(font)) document.fonts.load(font).then(draw, () => { });
   return c;
 }
-// a sigil in its knotwork roundel (whose outer edge is (r + 3) / 0.6)
-function medalGlyph(g, id, cx, cy, r, lw) {
-  roundelAt(g, cx, cy, r + 3);
+// a sigil in its knotwork roundel (whose outer edge is (r + 3) / 0.6). With `tint`, the roundel's open middle is
+// filled with the sigil's own colour and a thin ink ring sits inside it, as the phone's notes leaf shows it
+// (glyphIcon: a coloured disc filling the roundel's middle, an ink ring at 0.87 of it, the glyph at about 0.68)
+function medalGlyph(g, id, cx, cy, r, lw, tint) {
+  const m = r + 3; // the roundel's open middle
+  if (tint) { // (the disc runs a hair under the roundel's inner gold rim, so no parchment shows between them)
+    g.fillStyle = SIGILS[id].color; g.beginPath(); g.arc(cx, cy, m + 0.8, 0, TAU); g.fill();
+  }
+  roundelAt(g, cx, cy, m);
+  if (tint) { g.strokeStyle = '#2a1830'; g.lineWidth = lw * 0.7; g.beginPath(); g.arc(cx, cy, m * 0.87, 0, TAU); g.stroke(); }
   drawGlyph(g, id, cx, cy, r * 0.82, '#2a1830', lw);
 }
 
@@ -1997,7 +2004,7 @@ const Grim = {
       // (a roundel's outer edge is (r + 3) / 0.6: kept to 84% of the row, so neighbours never touch)
       const r = MD ? Math.min(12.5 * s * k, rowH * 0.42 * 0.6 - 3) : 15 * s * k;
       const rx = x0 + col * colW, ry = y + row * rowH, cx = rx + (MD ? (r + 3) / 0.6 + 2 : r + 4), cy = ry + rowH / 2;
-      if (MD) medalGlyph(g, id, cx, cy, r, 1.6);
+      if (MD) medalGlyph(g, id, cx, cy, r, 1.6, true); // in the sigil's colour, as on the phone's notes leaf
       else {
         g.strokeStyle = ink; g.lineWidth = 1.1; g.beginPath(); g.arc(cx, cy, r, 0, TAU); g.stroke();
         g.strokeStyle = gold; g.lineWidth = 0.6; g.beginPath(); g.arc(cx, cy, r + 3, 0, TAU); g.stroke();

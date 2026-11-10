@@ -35,6 +35,25 @@ function featH(c) {
 }
 function solidTop(c) { const f = floorTop(c); return f === -Infinity ? f : f + featH(c); }
 function surfaceTop(c) { if (!c || c.void) return 0; return c.water != null ? Math.max(c.h, c.water) : c.h; }
+/* A mark on empty air stands level with the ground nearest the tile of air aimed at (the nearest tile that isn't void,
+   by distance in tiles from that tile's centre to the tile; of two as near, the higher). Stone that hangs out of the void (Luna
+   with Petra) hangs at the mark's height, so aiming into a chasm hangs a bridge level with its banks, not at the
+   bottom; plain stone from empty air still comes up at level 0 (voidStoneZ). (v171b; until then a click on empty air
+   was level 0 for everything.) */
+function airMarkZ(x, y) {
+  // (from the centre of the tile the point is in, so every point on one tile of air gives the same height: v172;
+  // measured from the point itself, one void tile between a high bank and a low one changed height across it)
+  x = Math.floor(x) + 0.5; y = Math.floor(y) + 0.5;
+  let best = Infinity, z = 0;
+  for (const c of World.cells) {
+    if (c.void) continue;
+    const dx = Math.max(c.x - x, 0, x - c.x - 1), dy = Math.max(c.y - y, 0, y - c.y - 1), d = Math.hypot(dx, dy), h = surfaceTop(c);
+    if (d < best - 1e-6) { best = d; z = h; } else if (d < best + 1e-6 && h > z) z = h;
+  }
+  return z;
+}
+// the height of a mark at a world point: the ground's top there, or over empty air the nearest ground's (airMarkZ)
+function markHeight(x, y) { const c = cellAt(x, y); return c && !c.void ? surfaceTop(c) : airMarkZ(x, y); }
 
 /* ---------------- Level loading ---------------- */
 function loadWorld(lv) {
@@ -215,9 +234,14 @@ function arriveEffect(b, id, n, dir = null) {
   }
 }
 /* One rule for stone, wherever Petra is drawn (the seal, a ring, on arrival): each Petra raises a tile one step, up
-   to 3. Out of the void the first Petra brings the stone up level with the mark (the tile you clicked, a click on
-   empty air being level 0; on arrival, the ground the orb last stood on), and each further Petra adds a step.
+   to 3. Out of the void the first Petra brings the stone up level with the mark (the tile you clicked; on arrival, the
+   ground the orb last stood on; for a mark on empty air see voidStoneZ), and each further Petra adds a step.
    Stone that comes up to or over water drains it there. */
+/* A mark on empty air stands level with the nearest ground (airMarkZ, pick), and stone that hangs (Luna with Petra:
+   hanging slabs and ferries) hangs there. Plain stone raised from a mark on empty air still comes up at level 0: level
+   with the nearest ground it would make a whole bridge without Luna (one Petra a tile into The Hanging Stones' chasm
+   won with a gust), which is what Luna on Petra's ring is taught for. (v171b, my call) */
+function voidStoneZ(sp, tz) { return sp.air ? 0 : tz; }
 function raiseStone(c, n, markZ) {
   if (c.void) { c.void = false; c.h = -4; c.th = Math.max(-2, Math.min(3, Math.round(markZ || 0) + n - 1)); c.ice = false; c.water = null; c.flow = null; }
   else c.th = Math.min(3, Math.round(c.th) + n);
@@ -485,7 +509,9 @@ function spellCells(sp, tx, ty) {
 }
 function bodiesInRadius(tx, ty, R) { return World.bodies.filter(b => b.alive && Math.hypot(b.x - tx, b.y - ty) <= R + b.r * 0.5); }
 
-function castSpell(sp, tx, ty, tz) {
+// air: the mark is on empty air (pick's last case), where plain stone still comes up at level 0 (voidStoneZ)
+function castSpell(sp, tx, ty, tz, air) {
+  if (air) sp = { ...sp, air: true };
   World.seals.push({ sp, x: tx, y: ty, z: tz, t: 0, R: Math.max(0.9, spellRadius(sp) || 0.8) });
   Sfx.play('cast'); Sfx.play(sp.sigil, sp);
   for (const s of sp.sats || []) setTimeout(() => Sfx.play(s.id, sp), 120);
@@ -527,7 +553,7 @@ function baseSpell(sp, tx, ty, tz, out) {
         const c = cellI(x, y);
         if (c.feat === 'brazier' || c.feat === 'gate' || c.feat === 'font') continue;
         out.prev.set(c, { th: c.th, void: c.void });
-        raiseStone(c, 1, tz);
+        raiseStone(c, 1, voidStoneZ(sp, tz));
         for (let i = 0; i < 10; i++) emit({ x: x + Math.random(), y: y + Math.random(), z: c.th + 0.1, vx: (Math.random() - .5) * 3, vy: (Math.random() - .5) * 3, vz: 2 + Math.random() * 4, grav: 18, life: 1.2, size: 2 + Math.random() * 3, color: Math.random() < .5 ? '#9a8a74' : '#6e6258', kind: 'chunk', vr: (Math.random() - .5) * 10 });
         dust(x + 0.5, y + 0.5, Math.max(0, c.th), 8);
       }
@@ -739,7 +765,7 @@ function infuseCells(s, cells, sp, tx, ty, tz, out) {
     case 'stone': {
       const c = cellAt(tx, ty);
       if (c && !c.feat) {
-        raiseStone(c, n, tz);
+        raiseStone(c, n, voidStoneZ(sp, tz));
         dust(c.x + .5, c.y + .5, Math.max(0, c.th), 8);
       }
       break;
@@ -4348,26 +4374,106 @@ function ambient(dt) {
 }
 
 /* Picking: screen -> world point on the visible surface */
+/* One rule for every spell (v172): the pointer anywhere on what is drawn on a tile (its ground or water, the cliff
+   below its edge, or a thing standing on it: an ice block, a brazier, a gate, a bramble, a crate, the orb) aims at that
+   tile, and the mark is at that tile's own height (surfaceTop). So no part of a tile aims at another height than any
+   other part, and a line across mixed heights acts on each of its tiles at that tile's height (the spells read each
+   cell's own top; only tiles of empty air take the mark's height). Until v172 pick tested only the bare ground, so the
+   top of a thing standing on a tile aimed through it at the ground behind: on The Mill Pond the top of the left ice
+   block aimed a tile back (7,4) or at the bank beside it (7,5), and only its lower half aimed at the block itself, so
+   the fire line could run behind the blocks and miss the brazier. */
+// the top of what is drawn on a tile: its ground or water, or a thing standing on it
+function standTop(c) {
+  if (!c || c.void) return 0;
+  const f = featH(c);
+  return f > 0.05 ? Math.max(surfaceTop(c), floorTop(c) + f) : surfaceTop(c);
+}
+/* the pointer on a box's top or on its two front faces (x = x1 and y = y1; only those face the camera): the point
+   it hits, pulled just inside the box's footprint, or null */
+function boxHit(x0, y0, x1, y1, zlo, zhi, sx, sy) {
+  const e = 0.02, q = unproj(sx, sy, zhi);
+  if (q.x >= x0 && q.x < x1 && q.y >= y0 && q.y < y1) return { x: q.x, y: q.y, face: 0 };
+  const a = TW * 0.5 * cam.s, b = TH * 0.5 * cam.s, t = TZ * cam.s, u = (sx - cam.ox) / a;
+  for (const R of [true, false]) {
+    // R: the face at x = x1, y along it; L: the face at y = y1, x along it (from sx = ox + (x-y)*a)
+    const X = R ? x1 : y1 + u, Y = R ? x1 - u : y1;
+    if (R ? Y < y0 || Y > y1 : X < x0 || X > x1) continue;
+    const z = (cam.oy + (X + Y) * b - sy) / t;
+    if (z > zhi || z < zlo) continue;
+    return { x: Math.min(Math.max(X, x0 + e), x1 - e), y: Math.min(Math.max(Y, y0 + e), y1 - e), face: R ? 1 : 2 };
+  }
+  return null;
+}
+/* The pointer on a tile's cliff down to lower ground (its front faces) aims at that tile, at its top, just inside the
+   edge. A cliff down to the void is left to the empty-air case in pick (the mark comes out level with the nearest
+   ground, which is the cliff's own tile), so a click just off a level-0 bank still aims one tile into the void.
+   (v171b; until then a click on any cliff fell through to the empty-air case at level 0, and could come back as a point
+   over ground at the wrong height: on The Hanging Stones a click on the last ground tile's cliff put a slab on that
+   tile yet hung the slabs over the chasm two levels low, while a click on the back of the tile hung them level.) */
+function pickFace(c, sx, sy, top) {
+  for (const R of [true, false]) {
+    const n = R ? cellI(c.x + 1, c.y) : cellI(c.x, c.y + 1);
+    if (!n || n.void || surfaceTop(n) >= top - 0.01) continue;
+    // this one face, from the lower neighbour's top up to this tile's
+    const h = boxHit(c.x, c.y, c.x + 1, c.y + 1, surfaceTop(n), top, sx, sy);
+    if (h && h.face === (R ? 1 : 2)) return { x: h.x, y: h.y, z: top, c };
+  }
+  return null;
+}
+// the land under the pointer, front to back: the first tile whose ground, standing thing or cliff is under it
+function pickLand(sx, sy) {
+  for (let d = World.W + World.H - 2; d >= 0; d--) {
+    for (let x = Math.min(World.W - 1, d); x >= 0; x--) {
+      const y = d - x; if (y < 0 || y >= World.H) continue;
+      const c = cellI(x, y); if (c.void) continue;
+      const z = surfaceTop(c), top = standTop(c);
+      const p = unproj(sx, sy, z);
+      if (p.x >= x && p.x < x + 1 && p.y >= y && p.y < y + 1) return { x: p.x, y: p.y, z, c, top };
+      // a thing standing on the tile: its top and front faces aim at the tile, at the tile's own height
+      if (top > z + 0.05) { const h = boxHit(x, y, x + 1, y + 1, floorTop(c), top, sx, sy); if (h) return { x: h.x, y: h.y, z, c, top }; }
+      const f = pickFace(c, sx, sy, z);
+      if (f) return { ...f, top };
+    }
+  }
+  return null;
+}
+/* A resting body (the orb, a crate) is aimed at where the pointer meets it at half its height, kept on the tile it
+   stands on, at that tile's height: "cast it right on the orb" now lands on the orb, where a click on its top used to
+   land on the ground behind it, most of a tile back. Land in front of it that rises above its foot hides it. */
+function pickResting(sx, sy) {
+  let best = null;
+  for (const b of World.bodies) {
+    if (!b.alive || b.captured) continue;
+    const c = cellAt(b.x, b.y); if (!c || c.void) continue;
+    if (!boxHit(b.x - b.r, b.y - b.r, b.x + b.r, b.y + b.r, b.z, b.z + b.hgt, sx, sy)) continue;
+    if (best && b.x + b.y <= best.b.x + best.b.y) continue; // (the one in front)
+    const q = unproj(sx, sy, b.z + b.hgt * 0.5), e = 0.02;
+    best = { b, c, x: Math.min(Math.max(q.x, c.x + e), c.x + 1 - e), y: Math.min(Math.max(q.y, c.y + e), c.y + 1 - e) };
+  }
+  return best;
+}
 function pick(sx, sy) {
   // a click on (or near) a body aims at that body, even when it floats above the ground
   let best = null, bd = Infinity;
   for (const b of World.bodies) {
     if (!b.alive || b.captured) continue;
-    if (b.lev <= 0 && b.z - supportFor(b) < 0.4) continue; // resting bodies are aimed at through the ground as usual
+    if (b.lev <= 0 && b.z - supportFor(b) < 0.4) continue; // resting bodies: pickResting
     const [bx, by] = proj(b.x, b.y, b.z + b.r);
     const r = Math.max(b.r * TW * 0.78 * cam.s * 1.8, 22), d = Math.hypot(sx - bx, sy - by);
     if (d < r && d < bd) { bd = d; best = b; }
   }
   if (best) return { x: best.x, y: best.y, z: best.z, c: cellAt(best.x, best.y), body: best };
-  for (let d = World.W + World.H - 2; d >= 0; d--) {
-    for (let x = Math.min(World.W - 1, d); x >= 0; x--) {
-      const y = d - x; if (y < 0 || y >= World.H) continue;
-      const c = cellI(x, y); if (c.void) continue;
-      const z = surfaceTop(c);
-      const p = unproj(sx, sy, z);
-      if (p.x >= x && p.x < x + 1 && p.y >= y && p.y < y + 1) return { x: p.x, y: p.y, z, c };
-    }
-  }
-  const p = unproj(sx, sy, 0);
-  return { x: p.x, y: p.y, z: 0, c: null };
+  const land = pickLand(sx, sy), rest = pickResting(sx, sy);
+  if (rest && !(land && land.c.x + land.c.y > rest.c.x + rest.c.y && land.top > rest.b.z + 0.05))
+    return { x: rest.x, y: rest.y, z: surfaceTop(rest.c), c: rest.c };
+  if (land) return { x: land.x, y: land.y, z: land.z, c: land.c };
+  // empty air: the mark stands level with the ground nearest its tile (airMarkZ), so find the point under the pointer
+  // at that height (from level 0, then at that ground's height, until the two agree), and the aim is where it looks
+  let z = 0, p = unproj(sx, sy, 0);
+  for (let i = 0; i < 4; i++) { const z2 = airMarkZ(p.x, p.y); if (Math.abs(z2 - z) < 1e-6) break; z = z2; p = unproj(sx, sy, z); }
+  // never a point over ground at another height than that ground's (the v171 bug: over ground, at level 0)
+  const g = cellAt(p.x, p.y);
+  if (g && !g.void) return { x: p.x, y: p.y, z: surfaceTop(g), c: g };
+  // (if the search stopped between two tiles of air, the height is the one of the tile the point is on)
+  return { x: p.x, y: p.y, z: airMarkZ(p.x, p.y), c: null, air: true };
 }
