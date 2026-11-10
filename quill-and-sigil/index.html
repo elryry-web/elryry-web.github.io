@@ -132,6 +132,17 @@
   .screen, .card { position: fixed; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center;
     opacity: 0; pointer-events: none; transition: opacity .5s; }
   .screen.show, .card.show { opacity: 1; pointer-events: auto; }
+  /* (v175) a hidden screen takes no touch at all, whatever its insides say. The folio's lessons (pointer-events: auto
+     since v170) went on catching taps from under the land and the grimoire: strokes begun on one never drew, and a tap
+     there opened that lesson (Ryan, drawing on The Glass Road, found himself on The Hanging Stones) */
+  .screen:not(.show) *, .card:not(.show) * { pointer-events: none !important; }
+  #note:not(.show) .leafx { pointer-events: none; }
+  /* (v175) a new edition of the game waits for the player: a quiet line on the title page and in the folio */
+  .edition { display: none; background: none; border: none; padding: 6px 10px; font: italic 15px 'IM Fell English', serif;
+    color: #f0d79a; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+  body.edition-ready .edition { display: inline-block; }
+  #title .edition { margin-top: 14px; }
+  body.edition-ready #levelsFoot .edition { display: block; margin: 0 auto 6px; }
   #title { flex-direction: column; justify-content: flex-start; padding-top: 7vh; text-align: center; background: linear-gradient(rgba(10,6,24,.55), rgba(10,6,24,0) 55%); }  #title h1 { margin: 0; font-family: 'Cinzel Decorative', serif; font-weight: 700; font-size: clamp(44px, 9vw, 104px); line-height: 1;
     background: linear-gradient(#fff8e2, #f0cf86 45%, #b8893e 80%, #8a5a20); -webkit-background-clip: text; background-clip: text; color: transparent;
     filter: drop-shadow(0 4px 18px rgba(0,0,0,.7)) drop-shadow(0 0 30px rgba(232,194,122,.25)); }
@@ -183,7 +194,7 @@
   #folioNum { text-align: center; font-family: Cinzel, serif; font-size: 14px; letter-spacing: .08em; color: rgba(240,215,154,.9); }
   #levels.spread #folioNav { position: absolute; z-index: 6; left: 0; right: 0; top: calc(50% - 24px); width: auto; margin: 0;
     padding: 0 max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left)); pointer-events: none; }
-  #levels.spread #folioNav .fnav { pointer-events: auto; }
+  #levels.show.spread #folioNav .fnav { pointer-events: auto; }
   #levels.spread #folioAt { visibility: hidden; }
   #book { position: relative; flex-shrink: 0; touch-action: pan-y; user-select: none; -webkit-user-select: none;
     box-shadow: 0 10px 34px rgba(0,0,0,.6); border-radius: 6px; overflow: hidden; }
@@ -192,7 +203,7 @@
     border-image: url(art/folio-book.jpg?v=1) 167 241 172 243 fill stretch; }
   #book.single .bk-sheet { border-image: url(art/folio-page.jpg?v=1) 157 227 161 171 fill stretch; }
   .bk-col { position: absolute; top: 0; bottom: 0; display: flex; flex-direction: column; overflow: hidden; pointer-events: none; }
-  .bk-sheet .lentry { pointer-events: auto; }
+  #levels.show .bk-sheet .lentry { pointer-events: auto; }
   /* the bottom corners turn the leaf when tapped (v170). They lie under the writing column, which lets taps through
      except on a lesson, so a lesson under a corner still wins. A pointer hovering one sees the page's corner lift a little;
      nothing shows on touch. Placed by Folio.layout() (--cz the square, --cxn / --cxp / --cy the painted page's corner). */
@@ -698,6 +709,7 @@
     <button class="btn primary" id="bBegin">Begin the Lessons</button>
     <button class="btn ghost" id="bContinue">The Folio</button>
   </div>
+  <button class="edition">A new edition is ready. Tap to open it.</button>
   <div class="foot">Draw seals with your quill · guide the light home · best with sound</div>
   <button class="btn ghost" id="bPhone" title="Play the game in a phone-sized frame, as it plays by touch">▯ Phone preview</button>
 </div>
@@ -729,7 +741,7 @@
   <button class="btn primary" id="bResume" style="margin-bottom:16px">.</button>
   <div id="bookRow"><div id="folioNav"><button class="btn ghost fnav" id="fPrev" title="The leaf before (←)" aria-label="The leaf before">‹</button><div id="folioAt"><div id="folioNum" aria-live="polite"></div></div><button class="btn ghost fnav" id="fNext" title="The next leaf (→)" aria-label="The next leaf">›</button></div>
   <div id="book"></div></div>
-  <div id="levelsFoot"><button class="btn ghost" id="bBackTitle">← Title</button> <button class="btn ghost" id="bTipsAgain" title="Show every tip again, as if for the first time">↺ Show the tips again</button> <button class="btn ghost" id="bLook" title="Old look / painted look (G)">◐ Old look</button> <button class="btn ghost touch-only" id="bFull">⛶ Full screen</button> <button class="btn ghost" id="bLessonsT" style="display:none">.</button></div>
+  <div id="levelsFoot"><button class="edition">A new edition is ready. Tap to open it.</button><button class="btn ghost" id="bBackTitle">← Title</button> <button class="btn ghost" id="bTipsAgain" title="Show every tip again, as if for the first time">↺ Show the tips again</button> <button class="btn ghost" id="bLook" title="Old look / painted look (G)">◐ Old look</button> <button class="btn ghost touch-only" id="bFull">⛶ Full screen</button> <button class="btn ghost" id="bLessonsT" style="display:none">.</button></div>
 </div>
 
 <div id="note" class="leaf"><div class="lin" id="noteIn">
@@ -755,9 +767,9 @@
   </div>
 </div>
 
-<script src="js/ink.js?v=174"></script>
-<script src="js/world.js?v=174"></script>
-<script src="js/tips.js?v=174"></script>
-<script src="js/main.js?v=174"></script>
+<script src="js/ink.js?v=175"></script>
+<script src="js/world.js?v=175"></script>
+<script src="js/tips.js?v=175"></script>
+<script src="js/main.js?v=175"></script>
 </body>
 </html>

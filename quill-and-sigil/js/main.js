@@ -92,6 +92,7 @@ const Sfx = {
       case 'frost': for (let i = 0; i < 9; i++) this.tone(1800 + Math.random() * 2600, 0.6, { vol: 0.035, rev: 1, t: 0.4 + i * 0.05 }); this.noise(0.8, { type: 'highpass', f: 5000, vol: 0.05, t: 0.4 }); break;
       case 'luna': [392, 494, 587, 740].forEach((f, i) => this.tone(f, 2.2, { type: 'triangle', vol: 0.04, rev: 1, attack: 0.15, t: 0.4 + i * 0.08 })); break;
       case 'bump': this.tone(110 + Math.random() * 30, 0.15, { vol: 0.12 * (arg || 0.5), f2: 60 }); this.noise(0.06, { type: 'lowpass', f: 800, vol: 0.06 * (arg || 0.5) }); break;
+      case 'pop': this.tone(700, 0.09, { f2: 1600, vol: 0.05, rev: 0.3 }); this.noise(0.05, { type: 'highpass', f: 3000, vol: 0.025 }); break; // Unda + Luna's bubble lets go
       case 'catch': this.noise(0.4, { type: 'bandpass', f: 900, f2: 300, vol: 0.06, attack: 0.03 }); break;
       case 'kindle': this.noise(0.8, { type: 'lowpass', f: 400, f2: 1400, vol: 0.12, attack: 0.1 }); this.tone(330, 1.5, { vol: 0.05, rev: 1 }); this.tone(494, 1.5, { vol: 0.04, rev: 1, t: 0.1 }); break;
       case 'gate': this.tone(55, 2.2, { vol: 0.3, f2: 45, attack: 0.3 }); this.noise(2.0, { type: 'lowpass', f: 300, vol: 0.12, attack: 0.3 }); [293.7, 440, 587.3].forEach((f, i) => this.tone(f, 2.5, { vol: 0.05, rev: 1, t: 0.4 + i * 0.15 })); break;
@@ -480,13 +481,16 @@ const LEVELS = [
   // raises its cast tile a step, and a two-sign line that raises the plateau level with the ledge also raises the ditch only
   // to 2, so the orb rolls down into it and cannot climb out (without the ditch that line won 5/9). Also fails: a one-barb
   // gust over the bridge; a plain gust of any strength; the gust before the bridge. Ledge and ditch are plain ground, so the
-  // lesson needs no new rule; its text names them.
+  // lesson needs no new rule; its text names them. v175: stone raised from empty air now comes up level with the nearest
+  // ground (Ryan, The Moon Road), which let a plain Petra line cast a tile into the chasm bridge it (20 combos 9/9), so the chasm
+  // has a stepping stone at 2 (10,3): a plain line over it raises it a step, a wall. 160 plain void casts (x 6-13, one sign
+  // or two, 0-3 Ventus) 0/9; plain gusts hopping onto the stone, 39 chains of one to three, 0/9; the intended seals 9/9.
   {
     name: 'The Hanging Stones', sigils: ['gale', 'stone', 'luna'], centers: ['gale', 'stone'], ringOf: { gale: [], stone: ['luna', 'gale'] },
     par: 2, ink: 2, combos: true, opens: 'The Fifth Folio',
-    lesson: 'No gust can leap the chasm. From its ledge, a firm gust carries the orb over the ditch. Petra on the edge raises that tile a step, too high to climb. Luna on Petra’s ring hangs the stones level with the nearest ground instead, and Ventus on its ring stretches the arm. Here Ventus takes no ring-sigil, and Petra only Luna and Ventus.',
+    lesson: 'No gust can leap the chasm. From its ledge, a firm gust carries the orb over the ditch. Petra on the edge, or over the stone in the chasm, raises it a step, too high to climb. Luna on Petra’s ring hangs the stones level with the nearest ground instead, and Ventus on its ring stretches the arm. Here Ventus takes no ring-sigil, and Petra only Luna and Ventus.',
     hint: 'Petra in the centre, cast on the last tile of ground before the chasm, its sign toward the font (lower right) crossed by two barbs. On its ring a small Luna and two small Ventus, in any slots. Then Ventus on the orb toward the font, crossed by two barbs.',
-    t: [' 222222       2222 ', '3111222       22222', '3111222       22222', '3111222       22222', '3111222       22222', '3111222       22222', ' 222222       2222 '],
+    t: [' 222222       2222 ', '3111222       22222', '3111222       22222', '3111222   2   22222', '3111222       22222', '3111222       22222', ' 222222       2222 '],
     o: ['...................', '...................', '...................', 'O.............G....', '...................', '...................', '...................'],
   },
   // The orb sits in a sunken pool (3×3 at -1) on an upper isle; the font lies on a lower-left isle across eight rows of void
@@ -570,9 +574,12 @@ const LEVELS = [
   // The hollow font closes the brute shortcut (a bubble of two or three Luna from the road across the void): a float rides at
   // 3.3 and the font in its hollow catches only up to 2.4, so the bubble passes over it and is lost, while the orb rolling off
   // the bridge at 2 drops in. Fails: any single seal and any pair of seals on the orb (728 and ~19,000 swept, 0 wins); a
-  // hanging stone bridge (the orb stops at 14.3); Petra and Gelu without Luna (the road's end rises to 3, a wall); bubbles of
+  // hanging stone bridge (the orb stops at 14.3); Petra and Gelu without Luna cast on the road's end (it rises to 3, a wall); bubbles of
   // two or three Luna from the pool (into the void). Creative route: after the bubble, the ferry (Ventus toward the font,
-  // two barbs, Petra and Luna behind the sign) carries the orb over from the road (taught in The Ferry).
+  // two barbs, Petra and Luna behind the sign) carries the orb over from the road (taught in The Ferry). v175 creative route, Ryan's: after the bubble, Petra and Gelu
+  // (and Ventus) without Luna cast on the void, sign toward the font: stone from empty air comes up level with the nearest
+  // ground, so the ice bridges level with the road; then the gust (9/9 cast at x8 b1 V2 or b2 V1, x9 b1 or b2 V1, x11 two signs
+  // V0-1). Until v175 that ice came up at level 0.
   // Taught in: the bubble, The Moon Pool; hanging slabs and Ventus lengthening Petra's arm, The Hanging Stones; ice on Petra's
   // ring, The Glass Bridge; barbs and signed gusts, the first folios. Luna and Gelu together on Petra's ring has no lesson of
   // its own (each is taught alone, and the lesson text says each sigil on the ring does its own work).
@@ -791,7 +798,7 @@ const Game = {
     this.coverAt = id === 'win' || id === 'note' || id === 'levels' ? performance.now() : 0;
   },
   title() {
-    this.state = 'title'; this.level = null;
+    this.state = 'title'; this.level = null; this.playing(null);
     loadWorld(TITLE_LEVEL);
     for (const c of World.cells) if (c.feat === 'brazier') c.lit = true;
     const f = World.fonts[0], b = makeBody('orb', f.x + 0.5, f.y + 0.5, 1);
@@ -805,7 +812,22 @@ const Game = {
     $('#bBegin').textContent = at > 0 ? `Continue: Lesson ${LEVELS[at].roman}` : 'Begin the Lessons';
     $('#bContinue').style.display = Save.data.unlocked > 1 ? '' : 'none';
   },
-  resumeAt() { return Math.max(0, Math.min(LEVELS.length, Save.data.unlocked || 1) - 1); },
+  // (v175) the lesson last opened (or the one after the last won), if it is still open; else the furthest one open
+  resumeAt() {
+    const far = Math.max(0, Math.min(LEVELS.length, Save.data.unlocked || 1) - 1), at = Save.data.at;
+    return Number.isInteger(at) && at >= 0 && at <= far ? at : far;
+  },
+  // (v175) the lesson in play, kept for this tab only: a reload of the page (the browser putting a heavy tab away and
+  // bringing it back, or a refresh) opens that lesson again rather than the title. null: none in play.
+  playing(i) {
+    try { if (i == null) sessionStorage.removeItem('quillsigil.playing'); else sessionStorage.setItem('quillsigil.playing', String(i)); } catch (e) { }
+  },
+  wasPlaying() {
+    try {
+      const s = sessionStorage.getItem('quillsigil.playing'), i = s == null ? NaN : +s;
+      return Number.isInteger(i) && i >= 0 && i < Math.min(LEVELS.length, Save.data.unlocked || 1) ? i : -1;
+    } catch (e) { return -1; }
+  },
   lessons() {
     // the button at the head of the folio goes back to the lesson you were on: one left mid-play carries on where it
     // stood, one just won goes on to the next, and from the title page it is the furthest lesson open
@@ -839,6 +861,9 @@ const Game = {
     if (i !== this.idx) { Grim.lastStrokes = null; this.hint = 0; } // (the hint already shown stays shown on a restart)
     this.tapped = false;
     this.idx = i; this.level = LEVELS[i]; this.casts = 0; this.history = []; this.winT = 0; this.held = null;
+    // (v175) remembered at once, so the title's Continue and a reload of the page both come back to this lesson
+    if (Save.data.at !== i) { Save.data.at = i; Save.save(); }
+    this.playing(i);
     Grim.draft.clear(); Grim.ghost = null; Grim.bookDirty = true; Grim.inkDirty = true;
     parts.length = 0;
     loadWorld(this.level);
@@ -987,6 +1012,8 @@ const Game = {
     const stars = this.casts <= par ? 3 : this.casts <= par + 2 ? 2 : 1;
     Save.data.stars[this.idx] = Math.max(Save.data.stars[this.idx] || 0, stars);
     Save.data.unlocked = Math.max(Save.data.unlocked, Math.min(LEVELS.length, this.idx + 2));
+    // (v175) where the player left off is now the lesson after this one; a reload on the win card goes to the title
+    Save.data.at = Math.min(LEVELS.length - 1, this.idx + 1); Game.playing(null);
     Save.save();
     const last = this.idx === LEVELS.length - 1, wonIdx = this.idx;
     // (the lesson's wax seal, as its folio entry shows it, fetched now so it is ready when the card stamps it)
@@ -1121,22 +1148,37 @@ function aimOverlay(g, t) {
   const sp = Game.held, A = Game.aim, s = cam.s;
   const cells = (isLine(sp) || sp.sigil === 'stone' || sp.sigil === 'flame' || sp.sigil === 'frost' || sp.sigil === 'tide') ? spellCells(sp, A.x, A.y) : [];
   g.save();
-  // Unda's tiles only measure out the water; it runs to the lowest of them. So its footprint is drawn flat, at the
-  // highest of its tiles (drawn each at its own height, tiles down in a hollow slid under the ones beside it and the
-  // shape looked broken), and the pool it will really make is drawn below — and named in the aim bar
+  // the seal sits on top of what stands on the aimed tile (standTop), or at the picked point itself (empty air, a
+  // resting orb or crate)
+  const zTop = A.c && !A.body && !A.air ? standTop(A.c) : A.z;
   const tide = sp.sigil === 'tide';
-  const zFlat = tide ? Math.max(0, ...cells.map(([x, y]) => cellI(x, y)).filter(c => !c.void).map(surfaceTop)) : 0;
-  // stone out of the void is drawn where it will come up or hang: a hanging slab (Luna on Petra's ring) level with
-  // the mark, plain stone level with the mark on ground but at level 0 from empty air (voidStoneZ, world.js)
+  // stone out of the void comes up or hangs level with the mark, plain or hanging (Luna on Petra's ring), on ground or from
+  // empty air (voidStoneZ, world.js; until v175 plain stone from empty air came up at level 0)
   const hangs = sp.sigil === 'stone' && (sp.sats || []).some(s => s.id === 'luna');
   const zVoid = sp.sigil !== 'stone' || hangs ? A.z : Math.round(voidStoneZ({ air: A.air }, A.z));
-  // each tile is drawn on top of what is drawn there (an ice block, a brazier: standTop, world.js), the way pick aims
-  // at it, so the preview never hides under a block (v172); tiles the stone won't touch (raiseSlab, castSpell) are left out
+  // the whole shape is drawn flat at the seal's height, over the land, so a line or a rectangle reads as one piece:
+  // drawn each at its own height, it stepped up onto ice blocks, braziers and gates and down onto ice, and looked
+  // broken (v175). Where what a tile's square would stand on (its ground or what stands there, standTop, the way pick
+  // aims at it; for stone out of the void, where it will come up) is above or below the plane, a faint line drops to a
+  // dot on it. Unda has no dots: its water runs to the lowest of its tiles, and the pool it will make is drawn below
+  // and named in the aim bar. Tiles the stone won't touch (raiseSlab, castSpell) are left out
+  const shown = [];
   for (const [x, y] of cells) {
     const c = cellI(x, y);
     if (sp.sigil === 'stone' && c.feat && (hangs ? c.feat !== 'font' : c.feat === 'brazier' || c.feat === 'gate' || c.feat === 'font')) continue;
-    const z = tide ? zFlat : c.void ? zVoid : standTop(c);
-    const P = [proj(x, y, z), proj(x + 1, y, z), proj(x + 1, y + 1, z), proj(x, y + 1, z)];
+    shown.push([x, y, c, c.void ? zVoid : standTop(c)]);
+  }
+  if (!tide) {
+    g.strokeStyle = hexA(sp.color, 0.5); g.fillStyle = hexA(sp.color, 0.85); g.lineWidth = 1.2;
+    for (const [x, y, , zr] of shown) {
+      if (Math.abs(zr - zTop) < 0.05) continue;
+      const a = proj(x + 0.5, y + 0.5, zTop), b = proj(x + 0.5, y + 0.5, zr);
+      g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke();
+      g.beginPath(); g.ellipse(b[0], b[1], 3 * s, 1.6 * s, 0, 0, TAU); g.fill();
+    }
+  }
+  for (const [x, y, c] of shown) {
+    const P = [proj(x, y, zTop), proj(x + 1, y, zTop), proj(x + 1, y + 1, zTop), proj(x, y + 1, zTop)];
     g.fillStyle = hexA(sp.color, (tide ? 0.08 : 0.16) + 0.08 * Math.sin(t * 5)); poly(g, P); g.fill();
     g.strokeStyle = hexA(sp.color, tide ? 0.6 : 0.8); g.lineWidth = 1.2; g.setLineDash(c.void || tide ? [4, 4] : []); poly(g, P); g.stroke();
   }
@@ -1165,7 +1207,7 @@ function aimOverlay(g, t) {
   }
   const desc = describeSpell(sp, true) + (fit ? ' · ' + fit : '') + (note ? ' · ' + note : '');
   if ($('#aimDesc').textContent !== desc) $('#aimDesc').textContent = desc;
-  const R = spellRadius(sp), zTop = A.c && !A.body && !A.air ? standTop(A.c) : A.z;
+  const R = spellRadius(sp);
   if (R > 0 && !isLine(sp)) {
     const [cx, cy] = proj(A.x, A.y, A.z);
     g.strokeStyle = hexA(sp.color, 0.7); g.lineWidth = 1.5; g.setLineDash([6, 5]); g.lineDashOffset = -t * 20;
@@ -1372,6 +1414,8 @@ wc.addEventListener('pointermove', e => {
 wc.addEventListener('pointerdown', e => {
   Sfx.init();
   if (e.pointerType === 'touch') {
+    // a primary touch means no other finger is down: drop any finger whose pointerup never came, or every later touch is a pinch
+    if (e.isPrimary && FING.size) { FING.clear(); PINCH.on = false; }
     if (!FING.size) { PINCH.used = false; PINCH.aim = Game.aim; }
     FING.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (FING.size >= 2) {
@@ -1724,6 +1768,9 @@ const Folio = {
   // a tap on a bottom corner turns the leaf that way: back on the left, on through the right. Only a tap (a short press
   // that hardly moved; a swipe from the corner is a swipe, and its click is swallowed above). While a leaf is still
   // turning the pages take no taps, so a quick second tap is found by where it fell, and turns one leaf more.
+  // (v175) the folio answers only while it is open: hidden, it lay over the land and the grimoire, and a tap through
+  // the grimoire opened whichever lesson sat under the finger
+  book.addEventListener('click', e => { if (Game.state !== 'menu') { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
   book.addEventListener('click', e => {
     let d = 0;
     const c = e.target.closest('.bk-corner');
@@ -1854,8 +1901,38 @@ bind('#pvBars', () => { PV.bars = !PV.bars; PV.apply(); });
 bind('#pvReload', () => PV.reload());
 window.addEventListener('resize', () => { if (PV.isOpen) PV.apply(); });
 
+/* (v175) A new edition never swaps or reloads the page under the player. Its worker waits (sw.js) until the game is
+   next started fresh, or until the player taps the quiet "A new edition is ready" line, shown only on the title page
+   and in the folio. Only that tap reloads, and the reload comes back to the lesson in play (Game.playing). */
+const Edition = {
+  waiting: null, going: false,
+  watch(reg) {
+    const found = w => {
+      if (!w || !navigator.serviceWorker.controller) return; // (the first visit's worker replaces nothing)
+      const ready = () => { if (w.state === 'installed') { this.waiting = w; document.body.classList.add('edition-ready'); } };
+      ready(); w.addEventListener('statechange', ready);
+    };
+    found(reg.waiting); // (one found on an earlier visit, still waiting)
+    reg.addEventListener('updatefound', () => found(reg.installing));
+    // a tab left open for hours asks again when it comes back into view (at most every ten minutes)
+    let asked = performance.now();
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden || performance.now() - asked < 600000) return;
+      asked = performance.now(); reg.update().catch(() => { });
+    });
+  },
+  go() {
+    if (this.going) return;
+    this.going = true;
+    if (!this.waiting) { location.reload(); return; }
+    this.waiting.postMessage('skipWaiting');
+    setTimeout(() => location.reload(), 3000); // (should the new worker never say it has taken over)
+  },
+};
+for (const el of document.querySelectorAll('.edition')) el.addEventListener('click', () => Edition.go());
 if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && window.top === window.self) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => { }));
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (Edition.going) location.reload(); });
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').then(reg => Edition.watch(reg)).catch(() => { }));
 }
 
 // ornament dividers for the HTML cards
@@ -1889,7 +1966,13 @@ Save.load();
 Satchel.load();
 Grim.init(document.getElementById('page'));
 resize();
-Game.title();
+{
+  // (v175) a reload in the middle of a lesson (Firefox for Android or Safari putting the tab away, a refresh, a new
+  // edition opened) comes straight back to that lesson; a fresh visit opens on the title page
+  const back = Game.wasPlaying();
+  Game.title();
+  if (back >= 0) Game.start(back);
+}
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { Grim.bookDirty = true; Grim.fitButtons(); });
 ['700 30px "Cinzel Decorative"', '30px "Pinyon Script"', 'italic 16px "IM Fell English"', '600 12px Cinzel', '700 30px Cinzel'].forEach(f => { try { document.fonts.load(f).then(() => { Grim.bookDirty = true; }); } catch (e) { } });
 
@@ -1897,8 +1980,9 @@ let lastT = performance.now(), acc = 0;
 const WORLD_PAUSED = new Set(['menu', 'draw', 'aim']);
 const FIXED = 1 / 120;
 function loop(now) {
-  if (!PV.isOpen) tick(now); else lastT = now; // the phone preview covers this game: let it rest
-  requestAnimationFrame(loop);
+  requestAnimationFrame(loop); // asked for first, so one frame that throws can never stop the game for good
+  try { if (!PV.isOpen) tick(now); else lastT = now; } // the phone preview covers this game: let it rest
+  catch (err) { console.error(err); }
 }
 function tick(now) {
   const dt = clamp((now - lastT) / 1000, 0, 0.05); lastT = Math.max(lastT, now);

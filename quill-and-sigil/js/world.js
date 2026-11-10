@@ -38,8 +38,8 @@ function surfaceTop(c) { if (!c || c.void) return 0; return c.water != null ? Ma
 /* A mark on empty air stands level with the ground nearest the tile of air aimed at (the nearest tile that isn't void,
    by distance in tiles from that tile's centre to the tile; of two as near, the higher). Stone that hangs out of the void (Luna
    with Petra) hangs at the mark's height, so aiming into a chasm hangs a bridge level with its banks, not at the
-   bottom; plain stone from empty air still comes up at level 0 (voidStoneZ). (v171b; until then a click on empty air
-   was level 0 for everything.) */
+   bottom; since v175 plain stone from empty air comes up there too (voidStoneZ). (v171b; until then a click on empty
+   air was level 0 for everything.) */
 function airMarkZ(x, y) {
   // (from the centre of the tile the point is in, so every point on one tile of air gives the same height: v172;
   // measured from the point itself, one void tile between a high bank and a low one changed height across it)
@@ -237,11 +237,13 @@ function arriveEffect(b, id, n, dir = null) {
    to 3. Out of the void the first Petra brings the stone up level with the mark (the tile you clicked; on arrival, the
    ground the orb last stood on; for a mark on empty air see voidStoneZ), and each further Petra adds a step.
    Stone that comes up to or over water drains it there. */
-/* A mark on empty air stands level with the nearest ground (airMarkZ, pick), and stone that hangs (Luna with Petra:
-   hanging slabs and ferries) hangs there. Plain stone raised from a mark on empty air still comes up at level 0: level
-   with the nearest ground it would make a whole bridge without Luna (one Petra a tile into The Hanging Stones' chasm
-   won with a gust), which is what Luna on Petra's ring is taught for. (v171b, my call) */
-function voidStoneZ(sp, tz) { return sp.air ? 0 : tz; }
+/* A mark on empty air stands level with the nearest ground (airMarkZ, pick), and stone raised there comes up level with
+   it, plain or hanging (Luna with Petra: hanging slabs and ferries), so a bridge cast over a gap comes up level with the
+   bank nearest the mark, where the aim preview draws it. v175 (Ryan, The Moon Road: "Petra gelu shouldn't snap to the
+   bottom here"); from v171b plain stone from empty air came up at level 0, to keep a plain Petra cast a tile into The
+   Hanging Stones' chasm from bridging it. That lesson now has a stepping stone in the chasm that plain Petra raises a
+   step, so it still needs Luna. */
+function voidStoneZ(sp, tz) { return tz; }
 function raiseStone(c, n, markZ) {
   if (c.void) { c.void = false; c.h = -4; c.th = Math.max(-2, Math.min(3, Math.round(markZ || 0) + n - 1)); c.ice = false; c.water = null; c.flow = null; }
   else c.th = Math.min(3, Math.round(c.th) + n);
@@ -510,7 +512,7 @@ function spellCells(sp, tx, ty, all) {
 }
 function bodiesInRadius(tx, ty, R) { return World.bodies.filter(b => b.alive && Math.hypot(b.x - tx, b.y - ty) <= R + b.r * 0.5); }
 
-// air: the mark is on empty air (pick's last case), where plain stone still comes up at level 0 (voidStoneZ)
+// air: the mark is on empty air (pick's last case; stone there comes up level with the mark, voidStoneZ)
 function castSpell(sp, tx, ty, tz, air) {
   if (air) sp = { ...sp, air: true };
   World.seals.push({ sp, x: tx, y: ty, z: tz, t: 0, R: Math.max(0.9, spellRadius(sp) || 0.8) });
@@ -747,6 +749,7 @@ function infuseCells(s, cells, sp, tx, ty, tz, out) {
       for (const b of bodiesOn(cells)) {
         b.lev = 1e6; b.levRange = RING_TILES * n; b.levAge = 0; b.levUntilStop = false; b.vz += 2;
         b.drift = sp.dir && sp.sigil === 'tide' ? { x: sp.dir.x * (0.8 + 0.5 * n), y: sp.dir.y * (0.8 + 0.5 * n) } : null;
+        b.bubble = sp.sigil === 'tide'; // drawn as a bubble round it while it floats (drawBubble; nothing in the world reads it)
         for (let i = 0; i < 12; i++) emit({ x: b.x, y: b.y, z: b.z + 0.3, vx: (Math.random() - .5) * 2, vy: (Math.random() - .5) * 2, vz: 1 + Math.random(), drag: 2, life: 1.2, size: 6, color: '#cfe8ff', kind: 'glow' });
       }
       break;
@@ -3712,13 +3715,15 @@ function drawShadow(g, b) {
 // a float bobs gently, in the drawing only (its height in the world stays steady)
 function drawBody(g, b, t) {
   const bob = b.lev > 0 && !b.captured && b.kind !== 'slab' ? Math.sin(t * 3 + b.id * 9) * 0.07 : 0;
-  if (!bob) return drawBodyAt(g, b, t);
+  const bub = b.bubble || b.bubPop ? bubbleState(b, t) : false;
+  if (!bob && !bub) return drawBodyAt(g, b, t);
   const z = b.z; b.z += bob;
-  try { drawBodyAt(g, b, t); } finally { b.z = z; }
+  try { drawBodyAt(g, b, t, bub); if (bub) drawBubble(g, b, t, true); } finally { b.z = z; }
 }
-function drawBodyAt(g, b, t) {
+function drawBodyAt(g, b, t, bub) {
   const s = cam.s;
   drawShadow(g, b);
+  if (bub) drawBubble(g, b, t, false); // the bubble's far side, behind what it holds
   if (b.imb || b.arrive) { // elemental aura of an imbued body
     const [cx, cy] = proj(b.x, b.y, b.z + b.hgt * 0.5);
     g.save(); g.globalCompositeOperation = 'lighter';
@@ -3833,6 +3838,135 @@ function stoneOrbSprite() {
   return c;
 }
 
+/* Unda + Luna's bubble (The Moon Pool, The Moon Road): a clear ball of water round what it lifts, for as long as it
+   floats, and a gentle pop when it sets it down or the font takes the orb. Drawing only: b.bubble is set where the
+   bubble is made (infuseCells) and nothing in the world reads it. Painted once into three 192px sprites (the far side;
+   the near side with its rim, its window highlight and a pale crescent of moonlight; a ring of thin-film colour, lilac
+   for Luna, that turns slowly) and drawn scaled round the thing each frame. Under prefers-reduced-motion it holds still:
+   no wobble, no turning sheen, no flying drops. */
+const BUB_N = 192, BUB_POP = 0.45;
+let _bubSpr = null, _rmq;
+function reducedMotion() {
+  if (_rmq === undefined) _rmq = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null;
+  return !!(_rmq && _rmq.matches);
+}
+function bubbleSprites() {
+  if (_bubSpr) return _bubSpr;
+  const N = BUB_N, R = N / 2;
+  const mk = () => { const c = document.createElement('canvas'); c.width = c.height = N; return [c, c.getContext('2d')]; };
+  const disc = g => { g.beginPath(); g.arc(R, R, R - 1, 0, TAU); };
+  // far side: clear water, deeper in colour toward the edge, and the back wall catching the light low on the right
+  const [back, gb] = mk();
+  let gr = gb.createRadialGradient(R * 0.85, R * 0.8, 0, R, R, R - 1);
+  gr.addColorStop(0, 'rgba(160,210,255,0.03)'); gr.addColorStop(0.55, 'rgba(110,175,245,0.07)');
+  gr.addColorStop(0.85, 'rgba(90,155,235,0.17)'); gr.addColorStop(1, 'rgba(150,205,255,0.3)');
+  gb.fillStyle = gr; disc(gb); gb.fill();
+  gb.save(); disc(gb); gb.clip();
+  gr = gb.createRadialGradient(R * 1.3, R * 1.45, 0, R * 1.3, R * 1.45, R * 0.8);
+  gr.addColorStop(0, 'rgba(195,228,255,0.3)'); gr.addColorStop(1, 'rgba(195,228,255,0)');
+  gb.fillStyle = gr; gb.fillRect(0, 0, N, N); gb.restore();
+  // thin-film colour: a ring of soft hues, brighter in three patches, faded out toward the middle
+  const [sheen, gs] = mk();
+  const pal = [[205, 176, 255], [255, 192, 228], [255, 232, 172], [186, 255, 226], [170, 220, 255], [205, 176, 255]], W = 60;
+  for (let i = 0; i < W; i++) {
+    const u = i / W * (pal.length - 1), j = Math.floor(u), f = u - j, a = i / W * TAU;
+    const c = pal[j].map((v, q) => Math.round(v + (pal[j + 1][q] - v) * f));
+    gs.fillStyle = `rgba(${c},${(0.3 + 0.7 * (0.5 + 0.5 * Math.sin(3 * a + 1))).toFixed(3)})`;
+    gs.beginPath(); gs.moveTo(R, R); gs.arc(R, R, R - 1, a - 0.01, a + TAU / W + 0.01); gs.closePath(); gs.fill();
+  }
+  gs.globalCompositeOperation = 'destination-in';
+  gr = gs.createRadialGradient(R, R, 0, R, R, R - 1);
+  gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(0.66, 'rgba(0,0,0,0)'); gr.addColorStop(0.9, 'rgba(0,0,0,0.6)');
+  gr.addColorStop(0.97, 'rgba(0,0,0,0.85)'); gr.addColorStop(1, 'rgba(0,0,0,0.3)');
+  gs.fillStyle = gr; gs.fillRect(0, 0, N, N);
+  // near side: a thin film over what it holds, a bright rim where the skin is seen edge on, highlights, the moon
+  const [front, gf] = mk();
+  gf.fillStyle = 'rgba(150,200,255,0.06)'; disc(gf); gf.fill();
+  gr = gf.createRadialGradient(R, R, 0, R, R, R - 1);
+  gr.addColorStop(0, 'rgba(210,236,255,0)'); gr.addColorStop(0.78, 'rgba(210,236,255,0)'); gr.addColorStop(0.9, 'rgba(205,232,255,0.16)');
+  gr.addColorStop(0.975, 'rgba(238,249,255,0.6)'); gr.addColorStop(1, 'rgba(255,255,255,0.2)');
+  gf.fillStyle = gr; disc(gf); gf.fill();
+  gf.strokeStyle = 'rgba(255,255,255,0.35)'; gf.lineWidth = 1.4; gf.beginPath(); gf.arc(R, R, R - 2, 0, TAU); gf.stroke();
+  gf.lineCap = 'round';
+  for (const [w, a] of [[R * 0.2, 0.1], [R * 0.11, 0.28], [R * 0.05, 0.85]]) { // the window highlight, upper left
+    gf.strokeStyle = `rgba(255,255,255,${a})`; gf.lineWidth = w;
+    gf.beginPath(); gf.arc(R, R, R * 0.74, Math.PI * 1.08, Math.PI * 1.42); gf.stroke();
+  }
+  gf.fillStyle = 'rgba(255,255,255,0.85)'; gf.beginPath(); gf.arc(R + R * 0.74 * Math.cos(Math.PI * 1.53), R + R * 0.74 * Math.sin(Math.PI * 1.53), R * 0.04, 0, TAU); gf.fill();
+  gf.strokeStyle = 'rgba(235,246,255,0.32)'; gf.lineWidth = R * 0.05; // light through the far wall, lower right
+  gf.beginPath(); gf.arc(R, R, R * 0.84, Math.PI * 0.12, Math.PI * 0.36); gf.stroke();
+  // Luna: a pale crescent of moonlight on the skin, upper right, in a faint lilac glow
+  const mx = R + R * 0.42, my = R - R * 0.4, m = R * 0.14;
+  gr = gf.createRadialGradient(mx, my, 0, mx, my, m * 2.8);
+  gr.addColorStop(0, 'rgba(205,176,255,0.42)'); gr.addColorStop(1, 'rgba(205,176,255,0)');
+  gf.fillStyle = gr; gf.fillRect(mx - m * 3, my - m * 3, m * 6, m * 6);
+  const mc = document.createElement('canvas'); mc.width = mc.height = Math.ceil(m * 2 + 4);
+  const gm = mc.getContext('2d'), o = m + 2;
+  gm.fillStyle = 'rgba(248,242,255,0.95)'; gm.beginPath(); gm.arc(o, o, m, 0, TAU); gm.fill();
+  gm.globalCompositeOperation = 'destination-out'; gm.beginPath(); gm.arc(o + m * 0.42, o - m * 0.3, m * 0.86, 0, TAU); gm.fill();
+  gf.drawImage(mc, mx - o, my - o);
+  return (_bubSpr = { back, front, sheen });
+}
+// where the bubble sits on what it holds: [the height of its middle, its radius in pixels at scale 1]
+function bubbleGeom(b) {
+  if (b.kind === 'orb') return [b.z + b.r, b.r * TW * 0.78 * 1.62];
+  const r = b.r, h = b.hgt / 2; // a box: round enough to hold all eight corners as drawn
+  return [b.z + h, Math.max(Math.hypot(r * TW, h * TZ), r * TH + h * TZ) * 1.08];
+}
+// true while there is a bubble or its pop to draw; starts the pop when the float ends
+function bubbleState(b, t) {
+  const on = !!b.bubble && b.lev > 0 && b.alive && !b.captured;
+  if (b.bubble && !on) {
+    b.bubble = false;
+    if ((b.bubK || 0) > 0.3) { const [z, R] = bubbleGeom(b); b.bubPop = { x: b.x, y: b.y, z, R, t0: t, seed: b.id * 7 + 1 }; Sfx.play('pop'); }
+  }
+  b.bubK = on ? (reducedMotion() ? 1 : (b.bubK || 0) + (1 - (b.bubK || 0)) * 0.16) : 0;
+  if (b.bubPop && !(t - b.bubPop.t0 >= 0 && t - b.bubPop.t0 < BUB_POP)) b.bubPop = null;
+  return on || !!b.bubPop;
+}
+// front: the near side (after the thing is drawn) and any pop; otherwise the far side (before it)
+function drawBubble(g, b, t, front) {
+  const s = cam.s, rm = reducedMotion();
+  if (b.bubK > 0) {
+    const [z, R0] = bubbleGeom(b), [cx, cy] = proj(b.x, b.y, z), k = b.bubK, S = bubbleSprites();
+    const R = R0 * s * (0.6 + 0.4 * k) * (rm ? 1 : 1 + 0.018 * Math.sin(t * 1.7 + b.id));
+    g.save(); g.translate(cx, cy); g.globalAlpha = k;
+    // the skin breathes: a slow squash along a slowly turning axis
+    if (!rm) { const a = 0.6 * Math.sin(t * 0.55 + b.id * 2), w = 0.03 * Math.sin(t * 2.3 + b.id * 5); g.rotate(a); g.scale(1 + w, 1 - w); g.rotate(-a); }
+    if (!front) g.drawImage(S.back, -R, -R, 2 * R, 2 * R);
+    else {
+      g.save(); g.rotate(rm ? 0.8 : t * 0.22 + b.id); g.globalAlpha = k * 0.55; g.drawImage(S.sheen, -R, -R, 2 * R, 2 * R); g.restore();
+      g.drawImage(S.front, -R, -R, 2 * R, 2 * R);
+    }
+    g.restore();
+  }
+  if (front && b.bubPop) drawBubblePop(g, b.bubPop, t, rm);
+}
+// the pop: a flash of the film, the rim flung out and thinning, and a few drops thrown off that fall
+function drawBubblePop(g, P, t, rm) {
+  const s = cam.s, p = (t - P.t0) / BUB_POP, [cx, cy] = proj(P.x, P.y, P.z), R = P.R * s, e = 1 - Math.pow(1 - p, 3);
+  g.save();
+  if (p < 0.35) {
+    g.globalCompositeOperation = 'lighter'; g.globalAlpha = 0.3 * (1 - p / 0.35);
+    const r = R * 1.25; g.drawImage(glowSprite('#cfe8ff'), cx - r, cy - r, 2 * r, 2 * r);
+    g.globalCompositeOperation = 'source-over';
+  }
+  g.globalAlpha = Math.pow(1 - p, 1.4);
+  g.strokeStyle = 'rgba(236,248,255,0.95)'; g.lineWidth = Math.max(0.6, 2.4 * (1 - p)) * s;
+  g.beginPath(); g.arc(cx, cy, R * (1 + (rm ? 0.08 : 0.4) * e), 0, TAU); g.stroke();
+  g.strokeStyle = 'rgba(205,176,255,0.7)'; g.lineWidth = Math.max(0.5, 1.4 * (1 - p)) * s;
+  g.beginPath(); g.arc(cx, cy, R * (1 + (rm ? 0.04 : 0.22) * e), 0, TAU); g.stroke();
+  if (!rm) {
+    const rnd = mulberry(P.seed), T = p * BUB_POP;
+    for (let i = 0; i < 9; i++) {
+      const a = i * TAU / 9 + rnd() * 0.5, v = R * (1.5 + rnd()), d = R * 0.92 + v * T, r = (1.4 + rnd() * 1.4) * s;
+      g.fillStyle = i % 4 === 1 ? 'rgba(222,204,255,0.95)' : 'rgba(214,238,255,0.95)';
+      g.beginPath(); g.arc(cx + Math.cos(a) * d, cy + Math.sin(a) * d * 0.8 + 260 * s * T * T, r * (1 - 0.4 * p), 0, TAU); g.fill();
+    }
+  }
+  g.restore();
+}
+
 /* Spell seal projected onto the ground */
 const ringCache = {};
 function sealRing(sp) {
@@ -3928,6 +4062,7 @@ function tileCacheFrame(t) {
   const gk = cam.s + '|' + cam.ox.toFixed(2) + '|' + cam.oy.toFixed(2) + '|' + D + '|' + Object.keys(SPRITE).length + '|' + TEX_VER + '|' + texOK
     + '|' + (XR ? [...XR.set].map(c => c.x + ',' + c.y).join(';') : '');
   if (gk !== TC.gkey || TC.cells !== World.cells) {
+    if (TC.cells !== World.cells) TC.calm.clear(); // keyed by cell: a new land's cells would otherwise keep every old one alive
     TC.gkey = gk; TC.cells = World.cells; for (const e of TC.map.values()) tileDrop(e); TC.map.clear(); TC.keys = []; TC.skeys = [];
     for (const e of TC.stale.values()) tileDrop(e);
     TC.stale.clear(); TC.lsig = LIGHT_SIG; TC.lights = LIGHTS_STILL;

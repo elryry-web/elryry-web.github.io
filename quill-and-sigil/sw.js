@@ -2,7 +2,7 @@
    The game's own files are fetched fresh when there is a connection (so updates arrive at once)
    and served from the cache when there is not. Fonts are cached on first use.
    Bump VERSION together with the ?v=N script versions in index.html. */
-const VERSION = 174;
+const VERSION = 175;
 const CACHE = 'quill-sigil-v' + VERSION;
 const CORE = [
   './',
@@ -30,9 +30,13 @@ const CORE = [
   './art/num-L.png?v=1',
 ];
 
+// (v175) A new edition waits: it never takes over a page in play. It takes over when the game is next started fresh,
+// or when the player taps "A new edition is ready" on the title page or in the folio (the page then asks it to go
+// ahead and reloads itself). Until then the old worker serves, and it too fetches the newest files first.
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)));
 });
+self.addEventListener('message', e => { if (e.data === 'skipWaiting') self.skipWaiting(); });
 
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys()

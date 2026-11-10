@@ -199,6 +199,42 @@ function cornerCount(raw) {
   }
   return peaks.length;
 }
+/* How well a closed stroke fits a triangle and a quadrilateral: the best polygon with its corners on the stroke,
+   scored by how far the stroke strays from it at worst (over the shape's size). cornerCount looks for sharp turns,
+   and a corner drawn soft (a fingertip, or the pen smoothing in a small ring slot) spreads its turn out until it
+   isn't one; a soft square then counted 3 and read as Ignis. A square can't be fitted by any triangle (b3 ≈ 0.2–0.3)
+   but fits four sides closely (b4 ≲ 0.1) however round its corners; a triangle fits three (b3 ≲ 0.1); a circle
+   fits neither (b3 ≈ 0.25, b4 ≈ 0.14). */
+function polyFit(raw) {
+  const M = 36, r = resample(raw.concat([raw[0]]), M + 1); r.pop();
+  let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+  for (const q of r) { x0 = Math.min(x0, q.x); x1 = Math.max(x1, q.x); y0 = Math.min(y0, q.y); y1 = Math.max(y1, q.y); }
+  const size = Math.max(x1 - x0, y1 - y0) || 1;
+  // E[i][j]: the worst stray of the stroke from i on to j off the straight side i–j
+  const E = Array.from({ length: M }, () => new Float64Array(M));
+  for (let i = 0; i < M; i++) for (let j = 0; j < M; j++) {
+    if (i === j) continue;
+    const a = r[i], b = r[j], vx = b.x - a.x, vy = b.y - a.y, L2 = vx * vx + vy * vy || 1e-12;
+    let m = 0;
+    for (let k = (i + 1) % M; k !== j; k = (k + 1) % M) {
+      const p = r[k], t = Math.max(0, Math.min(1, ((p.x - a.x) * vx + (p.y - a.y) * vy) / L2));
+      m = Math.max(m, Math.hypot(p.x - a.x - t * vx, p.y - a.y - t * vy));
+    }
+    E[i][j] = m / size;
+  }
+  let b3 = 1e9, b4 = 1e9;
+  for (let i = 0; i < M; i++) for (let j = i + 1; j < M; j++) {
+    const eij = E[i][j];
+    if (eij >= b3 && eij >= b4) continue;
+    for (let k = j + 1; k < M; k++) {
+      const e3 = Math.max(eij, E[j][k]);
+      b3 = Math.min(b3, Math.max(e3, E[k][i]));
+      if (e3 >= b4) continue;
+      for (let l = k + 1; l < M; l++) b4 = Math.min(b4, Math.max(e3, E[k][l], E[l][i]));
+    }
+  }
+  return { b3, b4 };
+}
 /* Spirals are best told by their winding: steady turning while the radius grows */
 function spiralTest(raw) {
   const rs = resample(raw, 64);
@@ -284,21 +320,27 @@ function recognize(raw) {
   const sp = spiralTest(raw);
   if (starry) { best.frost = Math.min(best.frost, 0.05 + Math.max(0, best.frost - 0.05) * 0.3); best.gale += 0.06; }
   else if (sp.turns > 1.25 && (sp.corr > 0.75 || curled)) best.gale = Math.min(best.gale, 0.04 + Math.max(0, 0.9 - Math.max(sp.corr, 0.75)) * 0.2);
-  // corners: a square must have them; circles and crescents must not
-  const sharp = maxTurn(raw);
-  if (sharp < 0.85) {
-    best.stone += 0.08; best.flame += 0.05; best.frost += 0.05;
-  } else if (sharp > 1.15) best.none += 0.06;
   // an open stroke (ends far apart) is never a plain circle
   const gap = endGap(raw);
+  // closed polygons: a triangle is three straight sides and a square four, however soft their corners and whichever
+  // way they point (polyFit). Only a shape that is neither falls back on counting its sharp corners.
+  const closedPoly = gap < 0.3 && sp.turns < 1.25, pf = closedPoly ? polyFit(raw) : null;
+  const tri = !!pf && pf.b3 < 0.14, quad = !!pf && pf.b3 > 0.17 && pf.b4 < 0.115;
+  // corners: a square must have them; circles and crescents must not (a fitted square or triangle has them,
+  // even when drawn too softly for a sharp turn)
+  const sharp = maxTurn(raw);
+  if (sharp < 0.85) {
+    if (!quad) best.stone += 0.08;
+    if (!tri) best.flame += 0.05;
+    best.frost += 0.05;
+  } else if (sharp > 1.15) best.none += 0.06;
   // (0.42 ≈ a circle left open by 50°: less open than that it is still a circle, never an open-C Luna)
   if (gap > 0.42) best.none += 0.1;
-  // closed polygons: count the corners so a triangle is a triangle whichever way it points
-  if (gap < 0.3 && sp.turns < 1.25) {
-    const cc = cornerCount(raw);
-    if (cc === 2) { best.luna = Math.min(best.luna, 0.05 + Math.max(0, best.luna - 0.05) * 0.5); best.none += 0.06; }
-    else if (cc === 3) { best.flame = Math.min(best.flame, 0.05 + Math.max(0, best.flame - 0.05) * 0.25); best.stone += 0.06; }
-    else if (cc === 4) { best.stone = Math.min(best.stone, 0.05 + Math.max(0, best.stone - 0.05) * 0.4); best.flame += 0.06; }
+  if (closedPoly) {
+    const cc = tri || quad ? 0 : cornerCount(raw);
+    if (tri) { best.flame = Math.min(best.flame, 0.05 + Math.max(0, best.flame - 0.05) * 0.25); best.stone += 0.06; }
+    else if (quad) { best.stone = Math.min(best.stone, 0.05 + Math.max(0, best.stone - 0.05) * 0.4); best.flame += 0.06; best.none += 0.06; }
+    else if (cc === 2) { best.luna = Math.min(best.luna, 0.05 + Math.max(0, best.luna - 0.05) * 0.5); best.none += 0.06; }
   }
   let id = null, d = 1e9;
   for (const k in best) if (best[k] < d) { d = best[k]; id = k; }
@@ -309,20 +351,34 @@ function recognize(raw) {
 /* A closed, roundish stroke qualifies as a seal */
 function circleFit(pts) {
   if (pts.length < 8) return null;
-  let cx = 0, cy = 0;
   const rs = resample(pts, 64);
-  for (const p of rs) { cx += p.x; cy += p.y; }
-  cx /= rs.length; cy /= rs.length;
-  let m = 0; const rr = rs.map(p => Math.hypot(p.x - cx, p.y - cy));
-  for (const r of rr) m += r; m /= rr.length;
-  let sd = 0; for (const r of rr) sd += (r - m) ** 2; sd = Math.sqrt(sd / rr.length);
-  let ang = 0;
-  for (let i = 1; i < rs.length; i++) {
-    let a0 = Math.atan2(rs[i - 1].y - cy, rs[i - 1].x - cx), a1 = Math.atan2(rs[i].y - cy, rs[i].x - cx);
-    let da = a1 - a0; while (da > Math.PI) da -= TAU; while (da < -Math.PI) da += TAU; ang += da;
+  const centre = q => { let x = 0, y = 0; for (const p of q) { x += p.x; y += p.y; } return { x: x / q.length, y: y / q.length }; };
+  // the running angle swept about c, point by point
+  const sweep = c => { const cum = [0]; let ang = 0; for (let i = 1; i < rs.length; i++) { let da = Math.atan2(rs[i].y - c.y, rs[i].x - c.x) - Math.atan2(rs[i - 1].y - c.y, rs[i - 1].x - c.x); while (da > Math.PI) da -= TAU; while (da < -Math.PI) da += TAU; cum.push(ang += da); } return cum; };
+  // A hand that closes its circle by running on past the start (v175: Ryan's Moon Road seal was refused) is judged on its
+  // first full turn: the overshoot neither drags the centre toward itself nor counts as an end left far from the start.
+  // Two passes, since the overshoot first skews the centre the turn is measured about.
+  let c = centre(rs), cum = sweep(c), k = cum.findIndex(a => Math.abs(a) >= TAU);
+  if (k > 0) { c = centre(rs.slice(0, k + 1)); cum = sweep(c); k = cum.findIndex(a => Math.abs(a) >= TAU); }
+  const turn = k > 0 ? rs.slice(0, k + 1) : rs;
+  if (k > 0) c = centre(turn);
+  const rad = p => Math.hypot(p.x - c.x, p.y - c.y);
+  let m = 0; for (const p of turn) m += rad(p); m /= turn.length;
+  let sd = 0; for (const p of turn) sd += (rad(p) - m) ** 2; sd = Math.sqrt(sd / turn.length);
+  // how far it is from closing, in radii: the end's distance from the start; or, for an overshoot, how far the second pass
+  // strays from the first at the same angle, scaled so a stray of 0.2 radius sits at the 0.75 limit a gap has — an overshoot
+  // that rides back over its start closes, a spiral whose second turn grows away from the first does not
+  let gap = Math.hypot(pts[0].x - pts[pts.length - 1].x, pts[0].y - pts[pts.length - 1].y) / m;
+  if (k > 0) {
+    let st = 0, n = 0, i = 0;
+    for (let j = k; j < rs.length; j++) {
+      const want = cum[j] - Math.sign(cum[j]) * TAU;
+      while (i < k && Math.abs(cum[i + 1]) <= Math.abs(want)) i++;
+      st += Math.abs(rad(rs[j]) - rad(rs[i])); n++;
+    }
+    gap = Math.min(gap, st / n / m * 3.75);
   }
-  const gap = Math.hypot(pts[0].x - pts[pts.length - 1].x, pts[0].y - pts[pts.length - 1].y);
-  return { cx, cy, r: m, round: sd / m, cover: Math.abs(ang), gap: gap / m };
+  return { cx: c.x, cy: c.y, r: m, round: sd / m, cover: Math.abs(cum[cum.length - 1]), gap };
 }
 
 /* ---------------- Draft: strokes -> structure -> spell ---------------- */
@@ -343,7 +399,9 @@ class Draft {
     let pick = -1;
     // A lone round stroke on the dotted ring (0.8× its size or more) is the seal, however squarish the hand;
     // a smaller one that reads plainly as a sigil is a sigil traced first (the faint trace is drawn at about 0.6–0.7×)
-    const plainSigil = j => { const r = recognize(this.strokes[j].pts); return !!(r && r.ok && r.id !== 'none'); };
+    // — but never Petra: a squarish loop that size alone is a boxy seal (v175: since Petra reads soft squares, a lone boxy
+    // seal flashed "Petra" until something was drawn inside it); a Petra traced first is read once its seal goes around it
+    const plainSigil = j => { const r = recognize(this.strokes[j].pts); return !!(r && r.ok && r.id !== 'none' && r.id !== 'stone'); };
     const lone = j => round[j].r >= 0.8 * GUIDE_R || (round[j].r >= 0.55 * GUIDE_R && !plainSigil(j));
     for (const want of [j => holds(round[j], j), lone]) {
       for (let j = 0; j < round.length; j++) if (round[j] && want(j) && (pick < 0 || nearGuide(round[j]) < nearGuide(round[pick]))) pick = j;
