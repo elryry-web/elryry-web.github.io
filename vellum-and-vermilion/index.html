@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Vellum &amp; Vermilion</title>
+<meta name="theme-color" content="#5a2a14">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=Uncial+Antiqua&display=swap" rel="stylesheet">
+<style>
+  :root { --ink: #2a1b10; --red: #a8261a; --gold: #b88b3a; --vellum: #ecdcb6; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #3b2414; color: var(--ink);
+    font-family: "IM Fell English", Georgia, serif; touch-action: manipulation;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; overscroll-behavior: none; }
+  #page { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  #app { position: fixed; inset: 0; display: grid; padding: max(6px, env(safe-area-inset-top)) 10px max(8px, env(safe-area-inset-bottom));
+    grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr auto auto auto 1fr;
+    grid-template-areas: "hud" "." "head" "board" "foot" "."; }
+  /* wide: the board and the side column sit together as one centred group */
+  body.wide #app { --side: 320px; --gap: 40px; grid-template-columns: auto var(--side); grid-template-rows: auto 1fr auto auto 1fr;
+    justify-content: center; grid-template-areas: "board hud" "board ." "board head" "board foot" "board .";
+    column-gap: var(--gap); padding: 14px 22px; }
+  #hud { grid-area: hud; display: flex; align-items: center; gap: 6px; }
+  #hud .sp { flex: 1; }
+  button { font-family: inherit; color: var(--ink); background: rgba(255,248,228,0.55); border: 1.5px solid rgba(60,35,15,0.55);
+    border-radius: 6px; font-size: 17px; min-height: 40px; min-width: 40px; padding: 4px 10px; cursor: pointer; touch-action: manipulation; white-space: nowrap; }
+  button:active { background: rgba(214,170,70,0.45); }
+  button.icon { font-size: 19px; padding: 4px 8px; }
+  body.wide #hud { gap: 6px; flex-wrap: nowrap; padding-top: 4px; }
+  body.wide #hud .sp { display: none; }
+  body.wide #hud button { font-size: 15px; padding: 4px 7px; min-width: 36px; }
+  body.wide #hud button.icon { font-size: 17px; }
+  #head { grid-area: head; text-align: center; padding: 2px 0 6px; }
+  body.wide #head { text-align: left; padding-top: 8px; }
+  #rubric { font-family: "Uncial Antiqua", serif; color: var(--red); font-size: 22px; letter-spacing: 0.5px; line-height: 1.15; }
+  #pname { font-size: 19px; font-style: italic; margin-top: 2px; }
+  #boardWrap { grid-area: board; display: flex; align-items: center; justify-content: center; min-height: 0; min-width: 0; position: relative; }
+  #board { display: block; }
+  #foot { grid-area: foot; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 0 4px; }
+  body.wide #foot { align-items: flex-start; }
+  #grumbleRow { display: flex; align-items: flex-start; gap: 8px; width: 100%; max-width: 520px; }
+  body.wide #grumbleRow { flex-direction: column; align-items: center; gap: 4px; }
+  #lines { flex: 1; position: relative; min-height: 56px; font-size: 18px; line-height: 28px; padding: 0 4px; width: 100%;
+    background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 27px, rgba(150,60,40,0.28) 27px, rgba(150,60,40,0.28) 28px); }
+  #lines .ini { font-family: "Uncial Antiqua", serif; color: var(--red); font-size: 34px; line-height: 30px; float: left; margin: 0 5px 0 0;
+    padding: 1px 4px 0; border-radius: 3px; background: linear-gradient(135deg, #f6dd8e, #d6a944 55%, #f3d67c);
+    box-shadow: inset 0 0 0 1.5px #7a5410; text-shadow: 1px 1px 0 #fff0b8; transform-origin: 50% 60%; }
+  #lines .ini.blank { visibility: hidden; }
+  #lines .ini.pop { animation: inipop .45s cubic-bezier(.3,1.6,.5,1); }
+  @keyframes inipop { 0% { transform: scale(0.2) rotate(-20deg); opacity: 0; } 100% { transform: none; opacity: 1; } }
+  #lines .hid { color: transparent; }
+  #droll { width: 86px; height: 86px; flex: none; }
+  body.wide #droll { order: -1; width: min(120px, 24vh); height: min(120px, 24vh); }
+  #next { font-family: "Uncial Antiqua", serif; font-size: 19px; color: #fff4dc; background: var(--red); border-color: #5a140c;
+    padding: 6px 18px; visibility: hidden; opacity: 0; transition: opacity .5s; }
+  #next.show { visibility: visible; opacity: 1; }
+  .modal { position: fixed; inset: 0; background: rgba(30,15,5,0.55); display: none; align-items: center; justify-content: center; z-index: 40; padding: 16px; }
+  .modal.show { display: flex; }
+  .card { background: #f3e6c6; border: 2px solid #6b3a1a; border-radius: 6px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); padding: 18px 20px;
+    max-width: 420px; width: 100%; max-height: 90%; overflow: auto; }
+  .card h2 { font-family: "Uncial Antiqua", serif; color: var(--red); font-weight: normal; margin: 0 0 8px; font-size: 22px; }
+  .card p { font-size: 18px; margin: 8px 0; line-height: 1.35; }
+  .card .row { display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px; }
+
+  /* ---------- the book screen: the cover on the desk, then the leaves ---------- */
+  #bk_scr { position: fixed; inset: 0; z-index: 20; display: none; overflow: hidden; transition: opacity .26s;
+    background: radial-gradient(ellipse 80% 70% at 50% 42%, #6a4222 0%, #45291500 60%), radial-gradient(ellipse at 50% 50%, #3e2412 0%, #1d1007 100%); }
+  #bk_scr.fade { opacity: 0; pointer-events: none; }
+  #bk_scr::before { content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(circle at 88% 8%, rgba(255,190,90,0.22), rgba(255,170,70,0) 45%); animation: candle 3.2s ease-in-out infinite; }
+  @keyframes candle { 0%,100% { opacity: .85; } 30% { opacity: 1; } 55% { opacity: .7; } 70% { opacity: .95; } }
+  #bkTop { position: absolute; left: 0; right: 0; top: 0; height: 52px; display: flex; align-items: center; gap: 10px; padding: max(6px, env(safe-area-inset-top)) 10px 0; z-index: 3; }
+  #bkTop button, #bk_scr .nav { background: rgba(243,230,198,0.88); }
+  #bk_pos { flex: 1; text-align: right; color: #e9d3a5; font-style: italic; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #bk_spread { position: absolute; perspective: 2400px; transform-origin: 50% 50%; }
+  #bk_spread.nudge { animation: nudge .32s; }
+  @keyframes nudge { 20% { transform: translateX(-5px); } 45% { transform: translateX(4px); } 70% { transform: translateX(-2px); } }
+  #bk_spread .face { position: absolute; top: 0; box-shadow: 0 6px 22px rgba(0,0,0,0.45); }
+  #bk_spread canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  #bk_spread .shade { position: absolute; inset: 0; pointer-events: none; }
+  #bk_leaf { position: absolute; top: 0; display: none; transform-style: preserve-3d; z-index: 2; will-change: transform; }
+  #bk_leaf .side { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; overflow: hidden; }
+  #bk_leaf .back { transform: rotateY(180deg); }
+  #bk_leaf.cover .front { border-radius: 2px 7px 7px 2px; box-shadow: 2px 2px 0 #efe2c2, 4px 4px 0 #d9c69c, 5px 6px 0 #c3ab7c, 8px 12px 26px rgba(0,0,0,0.65); overflow: visible; }
+  #bk_leaf.cover .front canvas { border-radius: 2px 7px 7px 2px; }
+  #bk_leaf .glint { position: absolute; inset: 0; pointer-events: none; display: none; overflow: hidden; border-radius: inherit; }
+  #bk_leaf.cover .glint { display: block; }
+  #bk_leaf .glint::after { content: ""; position: absolute; top: -20%; bottom: -20%; width: 28%; left: -40%;
+    background: linear-gradient(100deg, rgba(255,230,160,0) 0%, rgba(255,230,160,0.18) 45%, rgba(255,245,210,0.32) 50%, rgba(255,230,160,0.18) 55%, rgba(255,230,160,0) 100%);
+    transform: skewX(-12deg); animation: glint 6.5s ease-in-out infinite 1.2s; }
+  @keyframes glint { 0% { left: -40%; } 38%,100% { left: 120%; } }
+  #bk_mark { position: absolute; display: none; z-index: 3; color: var(--red); line-height: 1; pointer-events: none;
+    text-shadow: 0 0 6px rgba(255,240,200,0.9), 0 0 2px #fff4d8; animation: mark 1.6s ease-in-out infinite; }
+  @keyframes mark { 0%,100% { transform: scale(1) rotate(-6deg); } 50% { transform: scale(1.18) rotate(4deg); } }
+  #bk_spread .corner { position: absolute; z-index: 4; cursor: pointer; }
+  #bk_scr .nav { position: absolute; z-index: 3; font-size: 30px; line-height: 1; width: 46px; height: 64px; padding: 0; border-radius: 8px; top: calc(50% + 20px); transform: translateY(-50%); }
+  #bk_prev { left: 6px; } #bk_next { right: 6px; }
+  #bk_scr .nav:disabled { opacity: .3; cursor: default; }
+  body:not(.bkSpread) #bk_scr .nav { top: auto; bottom: max(8px, env(safe-area-inset-bottom)); transform: none; height: 46px; width: 64px; }
+  #coverUI { position: absolute; left: 0; right: 0; bottom: max(22px, env(safe-area-inset-bottom)); display: none; flex-direction: column; align-items: center; gap: 10px; z-index: 5; }
+  #coverUI button { font-family: "Uncial Antiqua", serif; font-size: 19px; min-width: 220px; }
+  #bk_open { color: #fff4dc; background: var(--red); border-color: #5a140c; }
+  #bk_cont { background: rgba(243,230,198,0.9); font-size: 16px !important; }
+  body.bkClosed #coverUI { display: flex; }
+  body.bkClosed #bkTop, body.bkClosed #bk_scr .nav, body.bkClosed .corner { display: none; }
+  body:not(.bkOpen) #bk_scr .nav, body:not(.bkOpen) #bkTop { visibility: hidden; }
+  body.bkClosed #bk_spread { cursor: pointer; }
+  #ruleArt { display: block; margin: 6px auto; }
+</style>
+</head>
+<body>
+<canvas id="page"></canvas>
+<div id="app">
+  <div id="hud">
+    <button id="bBook" title="The book">&larr; Book</button>
+    <span class="sp"></span>
+    <button id="bRule" class="icon" title="This quire's rule">?</button>
+    <button id="bHint" title="Hint: set one tile right and pin it">&#10022; Hint</button>
+    <button id="bReset" class="icon" title="Reset the page">&#8634;</button>
+    <button id="bSound" class="icon" title="Sound">&#9835;</button>
+  </div>
+  <div id="head"><div id="rubric"></div><div id="pname"></div></div>
+  <div id="boardWrap"><canvas id="board"></canvas></div>
+  <div id="foot">
+    <div id="grumbleRow"><div id="lines"></div><canvas id="droll"></canvas></div>
+    <button id="next">Turn the page &#10087;</button>
+  </div>
+</div>
+
+<div id="ruleModal" class="modal"><div class="card">
+  <h2 id="ruleTitle"></h2>
+  <canvas id="ruleArt" width="200" height="80"></canvas>
+  <p id="ruleText"></p>
+  <p id="ruleHow" style="font-size:16px;opacity:.8">Tap a tile to turn it. Hold a tile (or right-click) to pin it with a gold nail.</p>
+  <div class="row"><button id="ruleOk">To work</button></div>
+</div></div>
+
+<div id="resetModal" class="modal"><div class="card">
+  <h2>Scrape the page clean?</h2>
+  <p>Every tile goes back to how you found it, and the nails come out.</p>
+  <div class="row"><button id="resetNo">Keep it</button><button id="resetYes">Scrape it</button></div>
+</div></div>
+
+<div id="bk_scr">
+  <div id="bkTop"><button id="bk_close">Close the book</button><span id="bk_pos"></span></div>
+  <div id="bk_spread">
+    <div class="face" id="bk_fA"><canvas id="bk_cA"></canvas><div class="shade" id="bk_shA"></div></div>
+    <div class="face" id="bk_fB"><canvas id="bk_cB"></canvas><div class="shade" id="bk_shB"></div></div>
+    <div id="bk_leaf">
+      <div class="side front"><canvas id="bk_cF"></canvas><div class="shade" id="bk_shF"></div><div class="glint"></div></div>
+      <div class="side back"><canvas id="bk_cK"></canvas><div class="shade" id="bk_shK"></div></div>
+    </div>
+    <span id="bk_mark">&#9753;</span>
+    <div class="corner" id="bk_cornL" title="Turn back"></div><div class="corner" id="bk_cornR" title="Turn on"></div>
+  </div>
+  <button id="bk_prev" class="nav" title="Turn back (&larr;)">&lsaquo;</button><button id="bk_next" class="nav" title="Turn on (&rarr;)">&rsaquo;</button>
+  <div id="coverUI"><button id="bk_open">Open the book</button><button id="bk_cont"></button></div>
+</div>
+
+<script src="js/levels.js?v=3"></script>
+<script src="js/puzzle.js?v=3"></script>
+<script src="js/art.js?v=3"></script>
+<script src="js/drolleries.js?v=3"></script>
+<script src="js/audio.js?v=3"></script>
+<script src="js/board.js?v=3"></script>
+<script src="js/book.js?v=4"></script>
+<script src="js/main.js?v=3"></script>
+</body>
+</html>
