@@ -206,6 +206,6 @@ window.STORY = window.STORY || [];
       { text: "The Prior's case wasn't heard first.", logic: ['not', 'prior', 'h1'] }
     ],
     solution: { will: ['hedge', 'h1', 'f4'], walter: ['ale', 'h2', 'f6'], simon: ['mule', 'h3', 'f2'], margery: ['flour', 'h4', 'f12'], prior: ['weir', 'h5', 'f0'] },
-    epilogue: "The Prior's case came last and was put off until Midsummer, and Margery Baxter's was the dearest, twelvepence, which Hob paid for short flour, saying the flour had got wet. Alys paid sixpence for the weak ale and then told Walter Crane, in front of the jury, what he owed her."
+    epilogue: "The Prior's case came last and was put off until Midsummer. Margery Baxter's case, the short flour, was the dearest, and Hob paid the twelvepence, saying the flour had got wet. Alys paid sixpence for the weak ale and then told Walter Crane, in front of the jury, what he owed her."
   });
 })();

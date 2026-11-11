@@ -216,7 +216,7 @@ STORY.push({
     { text: "Hob's debt falls due at Martinmas.", logic: ['is', 'hob', 'martin'] }
   ],
   solution: { hob: ['heap', 'd6', 'martin'], joan: ['stall', 'd2', 'luke'], tom: ['pig', 'd4', 'saints'], piers: ['bridge', 'd8', 'andrew'] },
-  epilogue: "Piers Carter owes eightpence in bridge toll by St Andrew's Day, and says he will pay it into the toll box when somebody empties the toll box. Hob owes sixpence for the dung heap by Martinmas, and told Walter the heap belongs to the mill, and the mill's troubles all start in the abbey's water."
+  epilogue: "Piers Carter owes eightpence in bridge toll by St Andrew's Day, and says he will pay it into the toll box when somebody empties the toll box. Hob owes sixpence for the dung heap by Martinmas. He told Walter the heap was the abbey's fault, since everything wrong at the mill starts with the abbey's water."
 });
 
 STORY.push({
@@ -227,7 +227,7 @@ STORY.push({
   characters: ['Brother Clement', 'Brother Anselm', 'Brother Odo', 'Kit', 'Hob'],
   size: '4×4',
   grade: 'Journeyman',
-  intro: "The Prior set four of us to watch the eel water, one each night from Monday to Thursday, each at a different place along the drain, from the sluice by the abbey wall past the willow and the reed bed to the black pool by Hob's mill. Each of us saw one thing. We all told it at Chapter at once, and Brother Odo told it longest, though he had slept through most of his night, so the Prior made us go again one at a time while I wrote.",
+  intro: "The Prior set four of us to watch the eel water, one each night from Monday to Thursday, each at a different place along the drain, from the sluice by the abbey wall past the willow and the reed bed to the black pool by Hob's mill. Each of us saw one thing. We all told it at Chapter at once, so the Prior made us go again one at a time while I wrote. Brother Odo told his longest, though he had slept through most of his night.",
   task: 'Can you work out which night each monk watched, where he watched from, and what he saw?',
   categories: [
     { id: 'who', name: 'Watchers', items: [

@@ -11,7 +11,7 @@ STORY.push({
   size: '3×4',
   grade: 'Apprentice',
   chapterIntro: "In Mardle, as in most places, the choirboys choose one of themselves at St Nicholas to be bishop until Holy Innocents, and he wears a mitre and gives orders and people mostly do as he says, because it is Christmas. The cracked bell is to hang where it is until after Twelfth Night, and the Abbot has been asked not to ring it, and rings it only on feast days.",
-  intro: "On the eve of St Nicholas the choirboys of St Mary's chose their bishop in the vestry, and Father Simon asked me to keep the count, because he says a priest should not know who voted for whom. Four boys stood, each with a promise, and the others made their marks on my wax tablet, which I put down by the brazier while I trimmed the candle. When I picked it up the marks had run together, and I put the count back from what the boys remembered.",
+  intro: "On the eve of St Nicholas the choirboys of St Mary's chose their bishop in the vestry, and Father Simon asked me to keep the count, because he says a priest should not know who voted for whom. Four boys stood, each with a promise, and the others made their marks on my wax tablet, which I put down by the brazier while I trimmed the candle. When I picked it up the marks had run together, and I put the count together again from what the boys remembered.",
   task: 'Can you work out how many votes each boy got, and what each promised?',
   categories: [
     { id: 'who', name: 'Boys', items: [
@@ -144,7 +144,7 @@ STORY.push({
   characters: ['Brother Wystan', 'Dame Isabel', 'the Abbot', 'the Prior', 'Father Simon', 'Walter Crane', 'Alys Pennock'],
   size: '4×5',
   grade: 'Journeyman',
-  intro: "Dame Isabel keeps Christmas at Mardle Hall with a dinner for the abbey and the town, and she gives her gifts at the table, though gifts are for New Year, because she says by New Year people have forgotten who gave them what. Five guests sat at her table. Her steward writes the seating in French, and I read French slowly, so I have the places counted outward from her chair and the rest only roughly.",
+  intro: "Dame Isabel keeps Christmas at Mardle Hall with a dinner for the abbey and the town. She gives her gifts at the table, though gifts are for New Year, because she says that at New Year everyone gives at once and nobody remembers who gave what. Five guests sat at her table. Her steward writes the seating in French, and I read French slowly, so I have the places counted outward from her chair and the rest only roughly.",
   task: 'Can you work out where each guest sat, which dish was set before each, and what Dame Isabel gave them?',
   categories: [
     { id: 'who', name: 'Guests', items: [
@@ -185,7 +185,7 @@ STORY.push({
     { text: 'The Abbot, the guest given the knife and the one with the capon pie were three different people.', logic: ['allDiff', ['abbot', 'knife', 'capon']] }
   ],
   solution: { abbot: ['s1', 'swan', 'gloves'], simon: ['s2', 'pike', 'knife'], prior: ['s3', 'capon', 'wax'], walter: ['s4', 'brawn', 'purse'], alys: ['s5', 'frumenty', 'hood'] },
-  epilogue: "Alys sat at the far end with the frumenty and wore the hood home over her coif. Walter was given the purse and counted what was in it under the table. The Prior had the capon pie and the wax, and weighed it at home, and it was a pound."
+  epilogue: "Alys sat at the far end with the frumenty and wore the hood home over her coif. Walter was given the purse and counted what was in it under the table. The Prior had the capon pie and the wax, and weighed the wax at home, and it was a pound."
 });
 
 STORY.push({
@@ -244,7 +244,7 @@ STORY.push({
   characters: ['Brother Wystan', 'the Abbot', 'the Prior', 'Brother Odo', 'Hob', 'Kit'],
   size: '4×5',
   grade: 'Master',
-  intro: "Dame Isabel sent a Twelfth Night cake to the abbey guest house with a bean baked inside, and whoever finds the bean is king of the feast until morning, though hers have a pea in as well, for a queen, which is her own idea. Five sat along the bench, counted from the fire, and each cut his own slice in turn while I poured. Kit, who has liked giving orders since December, says he found the bean and the pea both.",
+  intro: "Dame Isabel sent a Twelfth Night cake to the abbey guest house with a bean baked inside, and whoever finds the bean is king of the feast until morning. Her cakes have a pea in as well, for a queen, which is her own idea. Five sat along the bench, counted from the fire, and each cut his own slice in turn while I poured. Kit, who has liked giving orders since December, says he found the bean and the pea both.",
   task: 'Can you work out where each guest sat, in which turn he cut his slice, and what he found in it?',
   categories: [
     { id: 'who', name: 'Guests', items: [

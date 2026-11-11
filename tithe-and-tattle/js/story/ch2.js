@@ -11,7 +11,7 @@ STORY.push({
   size: '3×4',
   grade: 'Apprentice',
   chapterIntro: "The old bell has been cracked since before I came, and has been struck with a mallet on the rim, which Brother Odo says is the same thing. In November word came that the new bell was waiting on the quay at Lynn, cast and paid for, mostly, and Piers Carter said he would fetch it the week after Martinmas, once the pigs were in.",
-  intro: "Will Hayward keeps the hedges and the common, and from Michaelmas to Martinmas he also watches the pigs that go into Mardle Wood for the acorns and takes the pannage for Dame Isabel, which he reckons by a rule of his own, a penny for a hog and a halfpenny for a young one and something else again for a sow, which I asked him to say twice and wrote down differently both times. On the last day four owners came to fetch their pigs home.",
+  intro: "Will Hayward keeps the hedges and the common. From Michaelmas to Martinmas he also watches the pigs that go into Mardle Wood for the acorns, and takes the pannage for Dame Isabel by a rule of his own, a penny for a hog, a halfpenny for a young one and something else again for a sow. I asked him to say it twice and wrote it down differently both times. On the last day four owners came to fetch their pigs home.",
   task: 'Can you work out how many pigs each owner had in the wood, and what each paid?',
   categories: [
     { id: 'who', name: 'Owners', items: [
@@ -40,7 +40,7 @@ STORY.push({
     { text: 'Whoever had three pigs paid threepence, which is the only part of the reckoning I followed.', logic: ['is', 'p3', 'f3'] }
   ],
   solution: { odo: ['p6', 'f4'], simon: ['p3', 'f3'], hob: ['p4', 'f2'], margery: ['p5', 'f5'] },
-  epilogue: "Brother Odo drove the abbey's six pigs home for fourpence and Margery Baxter paid fivepence for her five, and Hob paid twopence for four, after the otters. Father Simon paid threepence for three and asked why the abbey's pigs came cheaper than his, and Will explained it again."
+  epilogue: "Brother Odo drove the abbey's six pigs home for fourpence and Margery Baxter paid fivepence for her five, and Hob paid twopence for four, after a long talk about otters. Father Simon paid threepence for three and asked why the abbey's pigs came cheaper than his, and Will explained it again."
 });
 
 STORY.push({
@@ -52,7 +52,7 @@ STORY.push({
   characters: ['Brother Wystan', 'Widow Tolley', 'Brother Odo', 'Alys Pennock', 'Margery Baxter', 'Agnes Sutor'],
   size: '4×4',
   grade: 'Apprentice',
-  intro: "After Martinmas the pigs that came home from the wood are killed, because there is not enough to keep them on through the winter, and this year four were killed outside the abbey gate on four days of the next week, Monday to Thursday, each by a different hand, and each went mostly into one thing. I was in the scriptorium all week, so I asked Widow Tolley, who watches the square from her door. She had every day right and called Agnes Sutor the Baxter girl throughout.",
+  intro: "After Martinmas the pigs that came home from the wood are killed, because there is not enough fodder to keep them on through the winter. This year four were killed outside the abbey gate on four days of the next week, Monday to Thursday, each by a different hand, and each went mostly into one thing. I was in the scriptorium all week, so I asked Widow Tolley, who watches the square from her door. She had every day right and called Agnes Sutor the Baxter girl throughout.",
   task: 'Can you work out who cut up each pig, on which day, and what they made of it?',
   categories: [
     { id: 'who', name: 'Cooks', items: [
@@ -100,7 +100,7 @@ STORY.push({
   characters: ['Brother Wystan', 'Piers Carter', 'Kit', 'Isolda Brewer', 'Ralph Smith', 'Dame Isabel de Mardle', 'Sim Shepherd'],
   size: '4×4',
   grade: 'Journeyman',
-  intro: "Piers Carter brought the new bell home from the quay at Lynn on his cart, with Bishop the mule, and Kit rode on top of the bell the whole way, which nobody had allowed. The journey has four stages, in order from Lynn, the quay, the Lynn road, the causeway over the fen and the ford below Mardle, and at each one Piers was held up, met somebody, and has a reason. Kit has told me the journey three times and once put the ford first.",
+  intro: "Piers Carter brought the new bell home from the quay at Lynn on his cart, with Bishop the mule, and Kit rode on top of the bell the whole way, which nobody had allowed. The journey's four stages, in order from Lynn, are the quay, the Lynn road, the causeway over the fen and the ford below Mardle. At each one Piers met somebody and was held up, and he has a reason for each. Kit has told me the journey three times and once put the ford first.",
   task: 'Can you work out whom Piers met at each stage, how long he was held up there, and his reason?',
   categories: [
     { id: 'who', name: 'Met', items: [
@@ -148,7 +148,7 @@ STORY.push({
   characters: ['Brother Wystan', 'Abbot Gervase', 'Brother Odo', 'Brother Anselm', 'Walter Crane', 'Ralph Smith'],
   size: '4×4',
   grade: 'Journeyman',
-  intro: "The bell went up on Saturday in four turns, a turn at each of Terce, Sext, None and Vespers, in that order, each man on a different rope and at a different job, and I was to write it all down, but I was holding the Abbot's ladder and saw mostly his feet. Afterwards I asked the Abbot who had held which rope, and he told me the Warden pears had come through the frost better than the others. Brother Odo told me the rest, and Walter Crane corrected him.",
+  intro: "The bell went up on Saturday in four turns, one at each of Terce, Sext, None and Vespers, in that order, each turn a different man on a different rope at a different job. I was to write it all down, but I was holding the Abbot's ladder and saw mostly his feet. Afterwards I asked the Abbot who had held which rope, and he told me the Warden pears had come through the frost better than the others. Brother Odo told me the rest, and Walter Crane corrected him.",
   task: 'Can you work out which rope each man held, what his job was, and at which hour?',
   categories: [
     { id: 'who', name: 'Men', items: [
@@ -195,7 +195,7 @@ STORY.push({
   characters: ['Brother Wystan', 'Prior Hamo', 'Brother Odo', 'Brother Clement', 'Brother Anselm', 'Kit', 'Alys Pennock', 'Hob', 'Father Simon', 'Widow Tolley', 'Walter Crane'],
   size: '4×5',
   grade: 'Journeyman',
-  intro: "The office has eight hours, which are Matins, Lauds, Prime, Terce, Sext, None, Vespers and Compline, in that order through the day and night, and in the first week the Prior gave the new bell to a different ringer on each day from Monday to Friday, for one of the day hours, and each day somebody different came to the gate to complain about it. I kept the week in two columns, and Brother Clement, who was helping, wrote the complaints in Latin in the column for the hours.",
+  intro: "The office has eight hours, which are Matins, Lauds, Prime, Terce, Sext, None, Vespers and Compline, in that order through the day and night. In the first week the Prior gave the new bell to a different ringer on each day from Monday to Friday, for one of the day hours, and each day somebody different came to the gate to complain about it. I kept the week in two columns, and Brother Clement, who was helping, wrote the complaints in Latin in the column for the hours.",
   task: 'Can you work out who rang on each day, at which hour, and who came to complain?',
   categories: [
     { id: 'who', name: 'Ringers', items: [
@@ -248,7 +248,7 @@ STORY.push({
   characters: ['Brother Wystan', 'Abbot Gervase', 'Prior Hamo', 'Brother Odo', 'Brother Clement', 'Brother Anselm'],
   size: '4×5',
   grade: 'Master',
-  intro: "The bell cracked at Compline on Friday. Five of the house were out of choir, and the Prior had each of them, himself as well, say where he had been, what he heard and what he had in his hands. Afterwards he let me copy it all, which he has not done before. Brother Anselm hummed through his whole account. The Abbot answered every question and then asked whether the founder at Lynn would take the bell back.",
+  intro: "The bell cracked at Compline on Friday. Five of the house were out of choir, the Prior among them, and he had each of the five say where he had been, what he heard and what he had in his hands. Afterwards he let me copy it all, which he has not done before. Brother Anselm hummed through his whole account. The Abbot answered every question and then asked whether the founder at Lynn would take the bell back.",
   task: 'Can you work out where each of them was at Compline, what he heard, and what he carried?',
   categories: [
     { id: 'who', name: 'Monks', items: [

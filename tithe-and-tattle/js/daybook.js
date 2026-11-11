@@ -167,7 +167,7 @@
           pool: ['a capon', 'a pair of gloves', 'a whetstone', 'a jug of ale', 'a dozen eggs', 'a cheese', 'a new bowstring', 'a cabbage'] }
       ],
       intros: [
-        "On Sunday after Mass the men and women of Mardle shot at the Butts, as the law says they must, and I was sent to write down the hits because Walter Crane had lost his tally stick in the nettles. Joan Fletcher checked my figures and took them off to argue with Tom Webbe, and they came back in a different order.",
+        "On Sunday after Mass the men and women of Mardle shot at the Butts, as the law says they must, and I was sent to write down the hits because Walter Crane had lost his tally stick in the nettles. Joan Fletcher checked my figures and took them off to argue with Tom Webbe, and the figures came back in a different order.",
         "{N} archers shot at the Butts this Sunday and I stood well back by the hawthorn with my tablet, which is where the Prior said a monk should stand. From the hawthorn you can hear the arrows but not always the names. I have written down everything I was told, and a good deal of it was shouted.",
         "The Abbot asked me to watch the shooting and tell him about it after, because from his window he can only see the backs of people. I tried to watch everything at once. I have {n} names and a great many arrows, and somewhere in the middle of it Will Hayward's dog ran off with a glove."
       ]
@@ -301,7 +301,7 @@
           pool: ['the abbey', 'Ely', 'Lynn market', 'the mill', 'the Swan', 'the fen', 'the manor', "St Mary's"] }
       ],
       intros: [
-        "Kit kept the toll at the Long Bridge on Thursday while the bridge-warden was at the Swan, and he gave me his account of who crossed, which he had partly in his head and partly in a song. The toll box itself nobody empties, so the money could not tell me anything. I have written down what Kit said as carefully as I could.",
+        "Kit kept the toll at the Long Bridge on Thursday while the bridge-warden was at the Swan, and he gave me his account of who crossed, which he had partly in his head and partly in a song. Nobody ever empties the toll box, so there was no telling Thursday's money from the rest of what is in it. I have written down what Kit said as carefully as I could.",
         "I sat on the parapet of the Long Bridge for a morning so that the Prior might have a true account of the toll, and Piers Carter's mule Bishop stood in the middle of the bridge for most of it, so that everyone who crossed had to go round him and argue. I wrote down the travellers, and some of the arguing got into the notes.",
         "{N} people crossed the Long Bridge before Vespers, and I had it all on my tablet until I leaned on the parapet to watch a heron. The heron caught nothing. The tablet survived, but the wax had warmed in the sun, and now the names and the rest of it have slid together at the bottom."
       ]
@@ -424,7 +424,7 @@
       E(['leaves'], function (c) { var r = c.bot('leaves'), r2 = c.any([r]);
         return 'It was ' + c.N(r) + ' who copied the fewest, ' + c.v(r, 'leaves') + ', and not ' + c.not(r2, 'leaves', r) + ', who asked me to make that very clear and stood behind me while I did it.'; }),
       E(['book', 'ink'], function (c) { var r = c.any(), k = c.v(r, 'ink');
-        return c.N(r) + ' was copying ' + c.v(r, 'book') + ' in ' + k + ' ink, which is not how the Prior likes it done, and he has asked me who gave ' + c.him(r) + ' the ' + k + ', and I am fairly sure it was me.'; })
+        return c.N(r) + ' was copying ' + c.v(r, 'book') + ' in ' + k + ' ink, which is not how the Prior likes it done, and he has asked me who gave ' + c.N(r) + ' the ' + k + ', and I am fairly sure it was me.'; })
     ],
     bridge: [
       E(['toll'], function (c) { var r = c.top('toll');
