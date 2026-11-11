@@ -301,7 +301,7 @@
           pool: ['the abbey', 'Ely', 'Lynn market', 'the mill', 'the Swan', 'the fen', 'the manor', "St Mary's"] }
       ],
       intros: [
-        "Kit kept the toll at the Long Bridge on Thursday while the bridge-warden was at the Swan, and he gave me his account of who crossed, which he had partly in his head and partly in a song. Nobody ever empties the toll box, so there was no telling Thursday's money from the rest of what is in it. I have written down what Kit said as carefully as I could.",
+        "Kit kept the toll at the Long Bridge on Thursday while the bridge-warden was at the Swan, and he gave me his account of who crossed, which he had partly in his head and partly in a song. The warden only empties the toll box at the quarter days, so there was no telling Thursday's money from the rest of what was in it. I have written down what Kit said as carefully as I could.",
         "I sat on the parapet of the Long Bridge for a morning so that the Prior might have a true account of the toll, and Piers Carter's mule Bishop stood in the middle of the bridge for most of it, so that everyone who crossed had to go round him and argue. I wrote down the travellers, and some of the arguing got into the notes.",
         "{N} people crossed the Long Bridge before Vespers, and I had it all on my tablet until I leaned on the parapet to watch a heron. The heron caught nothing. The tablet survived, but the wax had warmed in the sun, and now the names and the rest of it have slid together at the bottom."
       ]
@@ -428,7 +428,7 @@
     ],
     bridge: [
       E(['toll'], function (c) { var r = c.top('toll');
-        return c.N(r) + ' paid the most, ' + c.v(r, 'toll') + ', and asked where it went, and I said the toll box, and nobody has opened the toll box since the old warden died, and nobody knows where the key is.'; }),
+        return c.N(r) + ' paid the most, ' + c.v(r, 'toll') + ', and asked where it went. I said the toll box, which the warden empties at the quarter days.'; }),
       E(['load'], function (c) { var r = c.any();
         return c.N(r) + ' had ' + c.v(r, 'load') + ' and took most of the morning getting it over, and the bridge-warden\'s boy helped with the wheel and would not take anything for it, though he has mentioned it to me since.'; }),
       E(['hour'], function (c) { var r = c.bot('hour'), r2 = c.top('hour');
