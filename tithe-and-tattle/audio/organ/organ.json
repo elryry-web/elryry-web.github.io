@@ -1,0 +1,88 @@
+{
+ "source": "VCSL Renaissance Organ, 8' Room (Sam Gossner), CC0, https://github.com/sgossner/VCSL",
+ "sr": 22050,
+ "notes": {
+  "D3": {
+   "file": "D3.wav",
+   "m": 50,
+   "hz": 146.802,
+   "loopStart": 0.2,
+   "loopEnd": 1.698549,
+   "gain": 0.347,
+   "from": "RenOrgan_8foot_Room_D2_rr1.wav"
+  },
+  "F#3": {
+   "file": "Fs3.wav",
+   "m": 54,
+   "hz": 184.918,
+   "loopStart": 0.2,
+   "loopEnd": 1.697959,
+   "gain": 0.2881,
+   "from": "RenOrgan_8foot_Room_F#2_rr1.wav"
+  },
+  "G#3": {
+   "file": "Gs3.wav",
+   "m": 56,
+   "hz": 207.593,
+   "loopStart": 0.2,
+   "loopEnd": 1.702993,
+   "gain": 0.3409,
+   "from": "RenOrgan_8foot_Room_G#2_rr1.wav"
+  },
+  "A#3": {
+   "file": "As3.wav",
+   "m": 58,
+   "hz": 233.056,
+   "loopStart": 0.2,
+   "loopEnd": 1.701814,
+   "gain": 0.3757,
+   "from": "RenOrgan_8foot_Room_A#2_rr1.wav"
+  },
+  "C4": {
+   "file": "C4.wav",
+   "m": 60,
+   "hz": 261.612,
+   "loopStart": 0.2,
+   "loopEnd": 1.702222,
+   "gain": 0.3023,
+   "from": "RenOrgan_8foot_Room_C3_rr1.wav"
+  },
+  "D4": {
+   "file": "D4.wav",
+   "m": 62,
+   "hz": 293.622,
+   "loopStart": 0.2,
+   "loopEnd": 1.698549,
+   "gain": 0.3624,
+   "from": "RenOrgan_8foot_Room_D3_rr1.wav"
+  },
+  "E4": {
+   "file": "E4.wav",
+   "m": 64,
+   "hz": 329.462,
+   "loopStart": 0.2,
+   "loopEnd": 1.69941,
+   "gain": 0.3459,
+   "from": "RenOrgan_8foot_Room_E3_rr1.wav"
+  },
+  "F#4": {
+   "file": "Fs4.wav",
+   "m": 66,
+   "hz": 369.894,
+   "loopStart": 0.2,
+   "loopEnd": 1.700408,
+   "gain": 0.3275,
+   "from": "RenOrgan_8foot_Room_F#3_rr1.wav"
+  },
+  "G#4": {
+   "file": "Gs4.wav",
+   "m": 68,
+   "hz": 415.258,
+   "loopStart": 0.2,
+   "loopEnd": 1.700272,
+   "gain": 0.4589,
+   "from": "RenOrgan_8foot_Room_G#3_rr1.wav"
+  }
+ },
+ "drones": {}
+}

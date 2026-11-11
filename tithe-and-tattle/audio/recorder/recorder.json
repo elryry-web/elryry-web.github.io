@@ -1,0 +1,70 @@
+{
+ "source": "VCSL Baroque Alto Recorder, Sustain (Sam Gossner), CC0, https://github.com/sgossner/VCSL",
+ "sr": 24000,
+ "notes": {
+  "F4": {
+   "file": "F4.wav",
+   "m": 65,
+   "hz": 349.595,
+   "loopStart": 0.22,
+   "loopEnd": 1.719083,
+   "gain": 0.4707,
+   "from": "AltRecorder_Sus_F3_rr1_Main.wav"
+  },
+  "G#4": {
+   "file": "Gs4.wav",
+   "m": 68,
+   "hz": 415.739,
+   "loopStart": 0.22,
+   "loopEnd": 1.718542,
+   "gain": 0.3909,
+   "from": "AltRecorder_Sus_G#3_rr1_Main.wav"
+  },
+  "A#4": {
+   "file": "As4.wav",
+   "m": 70,
+   "hz": 465.19,
+   "loopStart": 0.22,
+   "loopEnd": 1.718292,
+   "gain": 0.311,
+   "from": "AltRecorder_Sus_A#3_rr1_Main.wav"
+  },
+  "C5": {
+   "file": "C5.wav",
+   "m": 72,
+   "hz": 523.476,
+   "loopStart": 0.22,
+   "loopEnd": 1.721375,
+   "gain": 0.3107,
+   "from": "AltRecorder_Sus_C4_rr1_Main.wav"
+  },
+  "D5": {
+   "file": "D5.wav",
+   "m": 74,
+   "hz": 587.338,
+   "loopStart": 0.22,
+   "loopEnd": 1.72075,
+   "gain": 0.9295,
+   "from": "AltRecorder_Sus_D4_rr1_Main.wav"
+  },
+  "E5": {
+   "file": "E5.wav",
+   "m": 76,
+   "hz": 659.803,
+   "loopStart": 0.22,
+   "loopEnd": 1.718917,
+   "gain": 0.3288,
+   "from": "AltRecorder_Sus_E4_rr1_Main.wav"
+  },
+  "F#5": {
+   "file": "Fs5.wav",
+   "m": 78,
+   "hz": 739.66,
+   "loopStart": 0.22,
+   "loopEnd": 1.719667,
+   "gain": 0.3201,
+   "from": "AltRecorder_Sus_F#4_rr1_Main.wav"
+  }
+ },
+ "drones": {}
+}

@@ -1,10 +1,12 @@
-/* Tithe & Tattle: a small score of background music, synthesized with Web Audio.
+/* Tithe & Tattle: a small score of background music in Web Audio: synthesized, with recorded bagpipe,
+ * recorder and organ (audio/, see MUSIC.md) that fall back to synthesis.
  * All six pieces are new compositions in the manner of English and northern French music c.1300-1340.
  * Tuning is Pythagorean (pure fifths), so drones and open fifths sit still.
  *
  *   1. Estampie of the Eel Rents   estampie: five puncti, each played with an ouvert then a clos ending
- *                                   D Dorian. Bagpipe (chanter and one drone) with tabor from the second
- *                                   punctus. Town dance. Title, Chronicle and other town screens.
+ *                                   G Dorian, in the pipe's own key. Bagpipe (chanter and drones; real
+ *                                   samples from audio/pipe/, the synth as a fallback) with tabor from the
+ *                                   second punctus. Town dance. Title, Chronicle and other town screens.
  *   2. Hob's Weir (carol)          carol: burden, verse, burden... four burdens round three verses.
  *                                   F Lydian with B-flat. Burden: pipe and tabor over a symphony
  *                                   (hurdy-gurdy) drone; verses: gittern alone, closing each verse with a
@@ -15,9 +17,10 @@
  *                                   second closed (sixth to octave, C-sharp to D). D Dorian. Solo harp,
  *                                   low and sparse. Quiet.
  *   5. Mist on the Lode            slow free-rhythm melody in phrases with breaths. G Dorian (B-flat).
- *                                   Recorder over a symphony drone on G and D. Quiet.
+ *                                   Alto recorder (samples from audio/recorder/) over a symphony drone
+ *                                   on G and D. Quiet.
  *   6. Compline at St Alnoth       chant-like solo line, then the same line in parallel-fifth organum,
- *                                   framed by the abbey bells. D Hypodorian. Small organ and bells.
+ *                                   framed by the abbey bells. D Hypodorian. Small organ (samples from audio/organ/) and bells.
  *                                   Abbey: town screens.
  *
  * Score notation: a line is space-separated tokens PITCH/UNITS (D4/2, Bb3/1, C#5/3), r/UNITS for a rest,
@@ -41,18 +44,19 @@
   // ================================================================ the score
   var PIECES = [
     {
-      id: 'estampie', title: 'Estampie of the Eel Rents', form: 'estampie', mode: 'D Dorian', moods: ['town'],
+      id: 'estampie', title: 'Estampie of the Eel Rents', form: 'estampie', mode: 'G Dorian (B-flat)', moods: ['town'],
       unit: 0.2, accent: 3, level: 0.81,
-      voices: { mel: { inst: 'chanter', legato: true }, drone: { inst: 'bagdrone', hold: 'D3' }, tab: { inst: 'tabor' } },
+      // set in the pipe's own key: a bagpipe in G, chanter F4 to G5 over drones on G2 and G3
+      voices: { mel: { inst: 'chanter', legato: true }, drone: { inst: 'bagdrone', hold: 'G3' }, tab: { inst: 'tabor' } },
       sections: {
-        P1: { mel: 'D4/2 F4/1 | A4/2 A4/1 | C5/2 A4/1 | G4/2 A4/1 | F4/2 G4/1 | A4/2 F4/1 | G4/1 F4/1 E4/1 | D4/2 E4/1' },
-        P2: { mel: 'A4/2 C5/1 | D5/2 C5/1 | A4/2 C5/1 | D5/3 | C5/2 A4/1 | G4/2 F4/1 | G4/2 A4/1 | C5/2 A4/1', tab: 'x/2 o/1*' },
-        P3: { mel: 'F4/1 G4/1 A4/1 | F4/1 G4/1 A4/1 | G4/2 E4/1 | C4/2 D4/1 | F4/1 G4/1 A4/1 | C5/2 A4/1 | G4/2 F4/1 | E4/2 D4/1', tab: 'x/2 o/1*' },
-        P4: { mel: 'D4/2 C4/1 | D4/2 E4/1 | F4/2 E4/1 | D4/3 | A4/2 G4/1 | F4/2 E4/1 | F4/2 G4/1 | A4/3', tab: 'x/3 o/2 o/1*' },
-        P5: { mel: 'D5/2 C5/1 | A4/2 C5/1 | D5/2 C5/1 | A4/2 G4/1 | A4/2 C5/1 | D5/2 A4/1 | G4/1 A4/1 G4/1 | F4/2 G4/1', tab: 'x/2 o/1 x/1 o/1 o/1*' },
-        O: { mel: 'F4/2 G4/1 | A4/2 G4/1 | F4/1 E4/1 F4/1 | E4/3', tab: 'x/2 o/1*' },     // ouvert: open, on E
-        C: { mel: 'F4/2 G4/1 | A4/2 G4/1 | F4/1 E4/1 C4/1 | D4/3', tab: 'x/2 o/1*' },     // clos: shut, on D
-        END: { mel: 'D4/6', tab: 'x/3 r/3' }
+        P1: { mel: 'G4/2 Bb4/1 | D5/2 D5/1 | F5/2 D5/1 | C5/2 D5/1 | Bb4/2 C5/1 | D5/2 Bb4/1 | C5/1 Bb4/1 A4/1 | G4/2 A4/1' },
+        P2: { mel: 'D5/2 F5/1 | G5/2 F5/1 | D5/2 F5/1 | G5/3 | F5/2 D5/1 | C5/2 Bb4/1 | C5/2 D5/1 | F5/2 D5/1', tab: 'x/2 o/1*' },
+        P3: { mel: 'Bb4/1 C5/1 D5/1 | Bb4/1 C5/1 D5/1 | C5/2 A4/1 | F4/2 G4/1 | Bb4/1 C5/1 D5/1 | F5/2 D5/1 | C5/2 Bb4/1 | A4/2 G4/1', tab: 'x/2 o/1*' },
+        P4: { mel: 'G4/2 F4/1 | G4/2 A4/1 | Bb4/2 A4/1 | G4/3 | D5/2 C5/1 | Bb4/2 A4/1 | Bb4/2 C5/1 | D5/3', tab: 'x/3 o/2 o/1*' },
+        P5: { mel: 'G5/2 F5/1 | D5/2 F5/1 | G5/2 F5/1 | D5/2 C5/1 | D5/2 F5/1 | G5/2 D5/1 | C5/1 D5/1 C5/1 | Bb4/2 C5/1', tab: 'x/2 o/1 x/1 o/1 o/1*' },
+        O: { mel: 'Bb4/2 C5/1 | D5/2 C5/1 | Bb4/1 A4/1 Bb4/1 | A4/3', tab: 'x/2 o/1*' },     // ouvert: open, on A
+        C: { mel: 'Bb4/2 C5/1 | D5/2 C5/1 | Bb4/1 A4/1 F4/1 | G4/3', tab: 'x/2 o/1*' },    // clos: shut, on G
+        END: { mel: 'G4/6', tab: 'x/3 r/3' }
       },
       order: [{ s: 'P1' }, { s: 'O', mute: ['tab'] }, { s: 'P1' }, { s: 'C', mute: ['tab'] },
         'P2', 'O', 'P2', 'C', 'P3', 'O', 'P3', 'C', 'P4', 'O', 'P4', 'C', 'P5', 'O', 'P5', 'C', 'END']
@@ -123,7 +127,7 @@
         P1: { rec: 'D5/4 C5/2 | Bb4/2 A4/2 G4/4 | r/2 | A4/2 Bb4/2 C5/4 | Bb4/2 A4/6 | r/4' },
         P2: { rec: 'G4/2 A4/2 Bb4/2 D5/4 | C5/2 Bb4/2 C5/4 | D5/8 | r/4' },
         P3: { rec: 'F5/3 E5/1 D5/4 | C5/2 D5/2 Bb4/2 A4/4 | r/2 | G4/2 A4/2 Bb4/2 A4/2 | G4/8 | r/4' },
-        P4: { rec: 'D4/4 F4/2 G4/2 | A4/4 G4/4 | r/2 | Bb4/2 A4/2 G4/2 F4/2 | G4/10 | r/4' },
+        P4: { rec: 'F4/4 G4/2 A4/2 | Bb4/4 G4/4 | r/2 | Bb4/2 A4/2 G4/2 F4/2 | G4/10 | r/4' },
         OUT: { rec: 'r/6' }
       },
       order: ['IN', 'P1', 'P2', 'P3', 'P1', 'P4', 'OUT']
@@ -407,7 +411,7 @@
       var a = ac.createGain(); a.gain.setValueAtTime(0, t); a.gain.linearRampToValueAtTime(peak, t + 0.3);
       o.connect(lp); lp.connect(pkf); pkf.connect(a); a.connect(out); o.start(t);
       E.track(o, [o, lp, pkf, a]);
-      var grace = hz(m >= 72 ? 67 : 74);
+      var grace = hz(m >= 77 ? 72 : 79);       // C5 above the top notes, else high G
       return {
         set: function (t2, m2, same) {
           if (same) o.frequency.setValueAtTime(grace, t2 - 0.035);
@@ -465,9 +469,121 @@
     E.track(src, [src, a]);
   };
 
-  // one event of a piece, at absolute time t0 + ev.t
-  function play(E, P, ev, t0, out, legato) {
-    var V = P.voices[ev.v], I = INST[V.inst], t = t0 + ev.t, g = (V.gain || 1) * ev.vel;
+  // ================================================================ recorded instruments (audio/<set>/)
+  // Made by tools/make-samples.py (see MUSIC.md). A set loads the first time a piece that needs it is
+  // chosen; until it is ready, or if it fails, the piece plays on the synth voices above, so the music
+  // never waits long and is never silent. Each note loops the steady part of its sample and is bent by
+  // playbackRate from the nearest sample's measured pitch to this file's Pythagorean hz().
+  var AUDIO_V = 6;
+  var SETS = { pipe: {}, recorder: {}, organ: {} };
+  var SAMPLED = { chanter: 'pipe', bagdrone: 'pipe', recorder: 'recorder', organ: 'organ' };
+  // loudness of each recorded voice against its synth stand-in (the samples are levelled to one RMS)
+  var SLEVEL = { chanter: 0.215, bagdrone: 0.26, recorder: 0.92, organ: 0.46 };
+  function setsFor(P) {
+    var s = [];
+    Object.keys(P.voices).forEach(function (k) { var n = SAMPLED[P.voices[k].inst]; if (n && s.indexOf(n) < 0) s.push(n); });
+    return s;
+  }
+  function setsReady(P) { return setsFor(P).every(function (n) { return SETS[n].state === 'ready'; }); }
+  function setsLoading(P) { return setsFor(P).some(function (n) { return SETS[n].state === 'loading'; }); }
+  function getOk(url, how) {
+    return fetch(url).then(function (r) { if (!r.ok) throw new Error(url + ': ' + r.status); return r[how](); });
+  }
+  function loadSet(name, ac) {
+    var S = SETS[name];
+    if (S.state) return S.p;
+    S.state = 'loading';
+    var base = 'audio/' + name + '/';
+    S.p = getOk(base + name + '.json?v=' + AUDIO_V, 'json').then(function (man) {
+      var all = [];
+      ['notes', 'drones'].forEach(function (kind) { Object.keys(man[kind] || {}).forEach(function (k) { all.push(man[kind][k]); }); });
+      return Promise.all(all.map(function (e) {
+        return getOk(base + e.file + '?v=' + AUDIO_V, 'arrayBuffer')
+          .then(function (ab) { return new Promise(function (res, rej) { ac.decodeAudioData(ab, res, rej); }); })
+          .then(function (b) { e.buf = b; });
+      })).then(function () {
+        S.notes = Object.keys(man.notes).map(function (k) { return man.notes[k]; });
+        S.drones = Object.keys(man.drones || {}).map(function (k) { return man.drones[k]; });
+        S.state = 'ready';
+      });
+    }).catch(function (err) { S.state = 'failed'; S.err = String(err && err.message || err); });
+    return S.p;
+  }
+  function nearest(list, m) {
+    var best = list[0];
+    list.forEach(function (e) { if (Math.abs(e.m - m) < Math.abs(best.m - m)) best = e; });
+    return best;
+  }
+  // one looping sample voice, silent until its gain is scheduled
+  function sVoice(E, e, rate, t, off, out) {
+    var ac = E.ac, src = ac.createBufferSource();
+    src.buffer = e.buf; src.loop = true; src.loopStart = e.loopStart; src.loopEnd = e.loopEnd;
+    src.playbackRate.value = rate;
+    var a = ac.createGain(); a.gain.value = 0;
+    src.connect(a); a.connect(out); src.start(Math.max(0, t), off || 0);
+    E.track(src, [src, a]);
+    return { src: src, a: a, e: e, rate: rate };
+  }
+  function inLoop(e) { return e.loopStart + Math.random() * (e.loopEnd - e.loopStart - 0.1); }
+
+  var SINST = {};
+  // the chanter: the first note of a phrase sounds the sample's own attack; later notes crossfade, in
+  // 12 ms, to a voice already inside its loop (as fingers change a reed's note without re-tonguing)
+  SINST.chanter = {
+    legato: true,
+    open: function (E, t, m, g, out) {
+      var ac = E.ac, S = SETS.pipe, X = 0.012, v = null;
+      var lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 4200; lp.Q.value = 0.5;
+      var bus = ac.createGain(); bus.gain.value = SLEVEL.chanter * g;
+      lp.connect(bus); bus.connect(out);
+      function to(t2, m2, first) {
+        var e = nearest(S.notes, m2), n = sVoice(E, e, hz(m2) / e.hz, first ? t2 : t2 - X, first ? 0 : inLoop(e), lp);
+        if (first) { n.a.gain.setValueAtTime(0, t2); n.a.gain.linearRampToValueAtTime(e.gain, t2 + 0.025); }
+        else { n.a.gain.setValueAtTime(0, t2 - X); n.a.gain.linearRampToValueAtTime(e.gain, t2); }
+        if (v) {
+          v.a.gain.setValueAtTime(v.e.gain, t2 - X); v.a.gain.linearRampToValueAtTime(0, t2);
+          v.src.stop(t2 + 0.02);
+        }
+        v = n;
+      }
+      to(t, m, true);
+      return {
+        set: function (t2, m2, same) { if (same) to(t2 - 0.035, m2 >= 77 ? 72 : 79); to(t2, m2); },
+        close: function (t2) {
+          var last = v, done = last.src.onended;
+          last.a.gain.setValueAtTime(last.e.gain, t2); last.a.gain.linearRampToValueAtTime(0, t2 + 0.25);
+          last.src.playbackRate.setValueAtTime(last.rate, t2); last.src.playbackRate.linearRampToValueAtTime(last.rate * 0.97, t2 + 0.25);
+          last.src.stop(t2 + 0.3);
+          last.src.onended = function () { if (done) done(); try { lp.disconnect(); bus.disconnect(); } catch (e) { /* gone */ } };
+        }
+      };
+    }
+  };
+  // the drones: the nearest drone sample, with the one an octave below it if the set has it
+  SINST.bagdrone = function (E, t, m, d, g, out) {
+    var S = SETS.pipe, top = nearest(S.drones, m), list = [[top, m]];
+    S.drones.forEach(function (e) { if (e.m === top.m - 12) list.push([e, m - 12]); });
+    list.forEach(function (p) {
+      var e = p[0], rate = hz(p[1]) / e.hz, v = sVoice(E, e, rate * 0.95, t, 0, out);
+      v.src.playbackRate.setValueAtTime(rate * 0.95, t); v.src.playbackRate.exponentialRampToValueAtTime(rate, t + 0.6);
+      var end = env(v.a.gain, t, d, 0.5, 0.35, e.gain * SLEVEL.bagdrone * g);
+      v.src.stop(end + 0.05);
+    });
+  };
+  // recorder and organ: one voice per note, its own attack, a short release into the room
+  [['recorder', 0.012, 0.09], ['organ', 0.01, 0.16]].forEach(function (r) {
+    var name = r[0], W = WINDS[name];
+    SINST[name] = function (E, t, m, d, g, out) {
+      var e = nearest(SETS[name].notes, m), dd = Math.max(0.05, d - W.legatoGap);
+      var v = sVoice(E, e, hz(m) / e.hz, t, 0, out);
+      var end = env(v.a.gain, t, dd, r[1], r[2], e.gain * SLEVEL[name] * g);
+      v.src.stop(end + 0.02);
+    };
+  });
+
+  // one event of a piece, at absolute time t0 + ev.t; samp: play its recorded voices
+  function play(E, P, ev, t0, out, legato, samp) {
+    var V = P.voices[ev.v], I = (samp && SINST[V.inst]) || INST[V.inst], t = t0 + ev.t, g = (V.gain || 1) * ev.vel;
     var m = ev.m != null ? ev.m + (V.oct || 0) : null;
     if (I.legato) {
       var h = legato[ev.v];
@@ -480,6 +596,7 @@
   // ================================================================ the player
   var LOOK = 0.6, TICK = 150, TAIL = 4.5;
   var E = null, on = true, mood = 'town', gestured = false, timer = 0, cur = null, nextAt = 0, festive = false, lastId = {}, held = false;
+  var pend = null, pendSince = 0, WAIT = 5;    // a chosen piece waiting (at most WAIT s) for its samples
   function rnd(a, b) { return a + Math.random() * (b - a); }
   function gap(md) { return md === 'quiet' ? rnd(35, 65) : rnd(18, 32); }
   function engine() {
@@ -498,7 +615,7 @@
   function begin(P, at) {
     var g = E.ac.createGain(); g.gain.value = P.level || 1; g.connect(E.bus);
     lastId[mood] = P.id;
-    cur = { P: P, F: flatten(P), t0: at, i: 0, g: g, src: [], legato: {}, cut: Infinity };
+    cur = { P: P, F: flatten(P), t0: at, i: 0, g: g, src: [], legato: {}, cut: Infinity, samp: setsReady(P) };
     cur.endAt = at + cur.F.end;
   }
   function pump(now) {
@@ -507,7 +624,7 @@
     while (cur.i < F.ev.length && cur.t0 + F.ev[cur.i].t < h) {
       var ev = F.ev[cur.i++];
       if (ev.t >= cur.cut) { cur.i = F.ev.length; break; }
-      try { play(E, cur.P, ev, cur.t0, cur.g, cur.legato); } catch (e) { /* skip a bad note */ }
+      try { play(E, cur.P, ev, cur.t0, cur.g, cur.legato, cur.samp); } catch (e) { /* skip a bad note */ }
     }
     E.owner = null;
   }
@@ -548,8 +665,12 @@
       pump(now);
       if (now > cur.endAt + TAIL) { var soft = cur.ending; finish(); nextAt = now + (soft ? rnd(3, 6) : gap(mood)); }
     } else if (now >= nextAt - LOOK) {
-      begin(choose(), Math.max(now + 0.1, nextAt));
-      pump(now);
+      if (!pend) { pend = choose(); pendSince = now; setsFor(pend).forEach(function (n) { loadSet(n, E.ac); }); }
+      if (!setsLoading(pend) || now > pendSince + WAIT) {
+        var P = pend; pend = null;
+        begin(P, Math.max(now + 0.1, nextAt));
+        pump(now);
+      }
     }
     timer = setTimeout(tick, TICK);
   }
@@ -584,7 +705,7 @@
     if (!on) {
       if (timer) { clearTimeout(timer); timer = 0; }
       if (cur) { fade(E.ac.currentTime, 0.35); var c = cur; cur = null; setTimeout(function () { try { c.g.disconnect(); } catch (e) { /* gone */ } }, 600); }
-      nextAt = 0;
+      nextAt = 0; pend = null;
       setTimeout(function () { if (!on && E.connected) { E.out.disconnect(); E.connected = false; } }, 500);
     } else {
       if (!E.connected) { E.out.connect(E.dest); E.connected = true; }
@@ -600,6 +721,7 @@
       settle = 0;
       if (want === mood) return;
       mood = want;
+      pend = null;
       if (!E || !on) return;
       if (cur) { if (cur.P.moods.indexOf(mood) < 0) softEnd(); }
       else if (nextAt) nextAt = Math.min(nextAt, E.ac.currentTime + rnd(5, 9));
@@ -612,24 +734,33 @@
   API.play = function (id) {     // for testing: start a piece now
     if (!engine() || !byId[id]) return false;
     if (cur) finish();
-    begin(byId[id], E.ac.currentTime + 0.1); gestured = true; kick();
+    pend = byId[id]; pendSince = nextAt = E.ac.currentTime;      // tick() starts it once its samples are in
+    setsFor(pend).forEach(function (n) { loadSet(n, E.ac); });
+    gestured = true; kick();
     return true;
   };
-  API.render = function (id, sr) {
+  // render a piece offline (a Promise of an AudioBuffer). opts.synth: the synth voices only;
+  // opts.only: a list of voice names to keep (for measuring levels)
+  API.render = function (id, sr, opts) {
+    opts = opts || {};
     var P = byId[id], F = flatten(P);
     sr = sr || 44100;
     var oac = new OfflineAudioContext(1, Math.ceil((F.end + 5) * sr), sr);
-    var e = new Engine(oac, oac.destination), g = oac.createGain(), lg = {};
-    g.gain.value = P.level || 1;
-    g.connect(e.bus);
-    F.ev.forEach(function (ev) { play(e, P, ev, 0.25, g, lg); });
-    return oac.startRendering();
+    return Promise.all(opts.synth ? [] : setsFor(P).map(function (n) { return loadSet(n, (E && E.ac) || oac); })).then(function () {
+      var e = new Engine(oac, oac.destination), g = oac.createGain(), lg = {}, samp = !opts.synth && setsReady(P);
+      g.gain.value = P.level || 1;
+      g.connect(e.bus);
+      F.ev.forEach(function (ev) { if (!opts.only || opts.only.indexOf(ev.v) >= 0) play(e, P, ev, 0.25, g, lg, samp); });
+      return oac.startRendering();
+    });
   };
   API.debug = function () {
     var now = E ? E.ac.currentTime : 0;
     return { on: on, mood: mood, gestured: gestured, timer: !!timer, held: held, state: E ? E.ac.state : 'none', connected: E ? E.connected : false,
       playing: cur ? cur.P.id : null, at: cur ? +(now - cur.t0).toFixed(2) : null, cut: cur && cur.cut < Infinity ? +cur.cut.toFixed(2) : null,
-      nextIn: !cur && nextAt ? +(nextAt - now).toFixed(1) : null, live: E ? E.live.length : 0, cached: Object.keys(dataCache).length };
+      nextIn: !cur && nextAt ? +(nextAt - now).toFixed(1) : null, live: E ? E.live.length : 0, cached: Object.keys(dataCache).length,
+      sampled: cur ? cur.samp : null, waiting: pend ? pend.id : null,
+      sets: Object.keys(SETS).reduce(function (o, k) { o[k] = SETS[k].state || 'idle'; if (SETS[k].err) o[k] += ' (' + SETS[k].err + ')'; return o; }, {}) };
   };
   return API;
 });

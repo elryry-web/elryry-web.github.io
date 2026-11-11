@@ -1,0 +1,98 @@
+{
+ "source": "FreePats Bagpipe (Gilles Sadowski), CC0, https://freepats.zenvoid.org/Ethnic/bagpipe.html",
+ "sr": 22050,
+ "notes": {
+  "F4": {
+   "file": "F4.wav",
+   "m": 65,
+   "hz": 341.383,
+   "loopStart": 0.249977,
+   "loopEnd": 1.448027,
+   "gain": 0.842,
+   "from": "samples/F4_31.wav"
+  },
+  "G4": {
+   "file": "G4.wav",
+   "m": 67,
+   "hz": 382.872,
+   "loopStart": 0.249977,
+   "loopEnd": 1.450748,
+   "gain": 0.5098,
+   "from": "samples/G4_31.wav"
+  },
+  "A4": {
+   "file": "A4.wav",
+   "m": 69,
+   "hz": 432.495,
+   "loopStart": 0.249977,
+   "loopEnd": 1.447664,
+   "gain": 0.652,
+   "from": "samples/A4_31.wav"
+  },
+  "A#4": {
+   "file": "As4.wav",
+   "m": 70,
+   "hz": 454.367,
+   "loopStart": 0.249977,
+   "loopEnd": 1.451655,
+   "gain": 0.5583,
+   "from": "samples/A#4_31.wav"
+  },
+  "C5": {
+   "file": "C5.wav",
+   "m": 72,
+   "hz": 511.944,
+   "loopStart": 0.249977,
+   "loopEnd": 1.44966,
+   "gain": 0.5681,
+   "from": "samples/C5_31.wav"
+  },
+  "D5": {
+   "file": "D5.wav",
+   "m": 74,
+   "hz": 579.64,
+   "loopStart": 0.249977,
+   "loopEnd": 1.448617,
+   "gain": 0.6908,
+   "from": "samples/D5_31.wav"
+  },
+  "F5": {
+   "file": "F5.wav",
+   "m": 77,
+   "hz": 677.143,
+   "loopStart": 0.249977,
+   "loopEnd": 1.449478,
+   "gain": 0.5874,
+   "from": "samples/F5_31.wav"
+  },
+  "G5": {
+   "file": "G5.wav",
+   "m": 79,
+   "hz": 769.367,
+   "loopStart": 0.249977,
+   "loopEnd": 1.45093,
+   "gain": 0.4474,
+   "from": "samples/G5_31.wav"
+  }
+ },
+ "drones": {
+  "G2": {
+   "file": "drone-G2.wav",
+   "m": 43,
+   "hz": 98.196,
+   "loopStart": 0.249977,
+   "loopEnd": 2.358005,
+   "gain": 0.1807,
+   "from": "samples/drone_G2_1.wav"
+  },
+  "G3": {
+   "file": "drone-G3.wav",
+   "m": 55,
+   "hz": 196.184,
+   "loopStart": 0.249977,
+   "loopEnd": 3.251111,
+   "gain": 0.4171,
+   "from": "samples/drone_G3_3.wav"
+  }
+ }
+}

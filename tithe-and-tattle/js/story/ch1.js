@@ -47,7 +47,7 @@ STORY.push({
   characters: ['Widow Tolley', 'Joan Fletcher', 'Tom Webbe', 'Will Hayward', 'Cecily Tolley', 'Walter Crane'],
   size: '3×4',
   grade: 'Apprentice',
-  intro: "Widow Tolley watched the whole fair from her door and told me afterwards who had the four pitches along the north side of the square, pitch 1 nearest the cross and pitch 4 nearest the Swan. She is never wrong about a day, and the fair is only one day, so that was no use, and she called Joan Fletcher \"the Fletcher boy\" and her own granddaughter Cecily \"Agnes\", and Tom Webbe she called \"the singing one\" all through.",
+  intro: "Widow Tolley watched the whole fair from her door, and afterwards she told me who had the four pitches along the north side of the square. Pitch 1 is nearest the cross and pitch 4 nearest the Swan. She is never wrong about a date, but the fair only lasts a day, so that was no help. Names are another matter. She called Joan Fletcher \"the Fletcher boy\", her own granddaughter Cecily \"Agnes\", and Tom Webbe \"the singing one\". I have put the right names in.",
   task: 'Can you work out what each stallholder sold, and which pitch each had?',
   categories: [
     { id: 'who', name: 'Stallholders', items: [
