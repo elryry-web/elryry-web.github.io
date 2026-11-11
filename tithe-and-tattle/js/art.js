@@ -17,7 +17,7 @@
  *             Any slot 'portrait-<castId>' falls back to this when the manifest has no PNG for it.
  *   map       estate map of Mardle and the abbey, portrait, aspect 1 : ART.MAP_ASPECT (1.3).
  *             ART.MAP_PLACES = [{id, label, fx, fy, re}] marker positions in fractions; a PNG map must match them.
- *             The fractions are measured on the painted art/map.jpg (the fen map, manifest v2); the procedural map shares them only roughly.
+ *             The fractions are measured on the painted art/map.jpg (the fen map with the stone bridge, manifest v3); the procedural map shares them only roughly.
  */
 (function () {
   'use strict';
@@ -315,17 +315,17 @@
     ['orchard', 'the orchard, ponds and barn', 0.86, 0.87, /orchard|pear|fishpond|barn|bee|skep/i],
     ['hall', 'Mardle Hall', 0.19, 0.342, /hall|manor|dovecote|hallmote/i],
     ['lynn', 'the Lynn road', 0.08, 0.19, /lynn/i],
-    ['church', 'St Mary’s', 0.245, 0.551, /st mary|parish church|churchyard/i],
-    ['bridge', 'the Long Bridge', 0.519, 0.705, /bridge|ferry|toll/i],
-    ['mill', 'Hob’s mill and weir', 0.43, 0.72, /mill|weir/i],
-    ['swan', 'the Swan', 0.405, 0.645, /swan|alehouse/i],
-    ['butts', 'the Butts', 0.094, 0.606, /butts/i],
-    ['meadow', 'the water meadow', 0.62, 0.52, /meadow|hay/i],
+    ['church', 'St Mary’s', 0.262, 0.515, /st mary|parish church|churchyard/i],
+    ['bridge', 'the Long Bridge', 0.555, 0.712, /bridge|ferry|toll/i],
+    ['mill', 'Hob’s mill and weir', 0.45, 0.68, /mill|weir/i],
+    ['swan', 'the Swan', 0.41, 0.6, /swan|alehouse/i],
+    ['butts', 'the Butts', 0.16, 0.556, /butts/i],
+    ['meadow', 'the water meadow', 0.69, 0.47, /meadow|hay/i],
     ['fen', 'the fen', 0.38, 0.22, /fen|eel|reed|trap/i],
     ['common', 'the common', 0.19, 0.81, /common|pannage/i],
     ['wood', 'Mardle Wood', 0.125, 0.895, /wood/i],
     ['bounds', 'the parish bounds', 0.081, 0.712, /bound|rogation/i],
-    ['square', 'the market square', 0.328, 0.611, /market|square|cross|tolley/i],
+    ['square', 'the market square', 0.338, 0.585, /market|square|cross|tolley/i],
     ['abbey', 'the Abbey of St Alnoth', 0.86, 0.63, /abbey|alnoth/i]
   ];
   var RIVER = [[0.74, 0.14], [0.68, 0.22], [0.6, 0.3], [0.53, 0.39], [0.5, 0.47], [0.49, 0.56], [0.46, 0.65], [0.42, 0.75], [0.36, 0.84], [0.3, 0.93], [0.27, 1.01]];
@@ -671,7 +671,7 @@
     load: function (base) {
       base = base || 'art/';
       if (typeof fetch === 'undefined') return Promise.resolve();
-      return fetch(base + 'manifest.json?v=19', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : {}; }).then(function (m) {
+      return fetch(base + 'manifest.json?v=20', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : {}; }).then(function (m) {
         return Promise.all(Object.keys(m || {}).map(function (slot) {
           var e = typeof m[slot] === 'string' ? { file: m[slot] } : (m[slot] || {});
           if (!e.file) return null;
