@@ -13,7 +13,8 @@
      beastHead   Insular beast head in a whole tile box: neck enters from the top edge, snout toward +y
                  (opts.body, opts.snap 0..1 jaw snap, opts.blink 0..1)
      beastTail   curled, finned tail in a whole tile box, entering from the top (opts.body, opts.wag 0..1)
-     mark        pigment lozenge (opts.pigment)
+     mark        pigment lozenge (opts.pigment); a loaded mark.<pigment> PNG (the painted gems) takes its place,
+                 drawn crisp from a per-size cache with a drop shadow (manifest crisp, default for mark.*)
      twinFrame   gilt corner brackets of a gilded-twin tile (opts.glow 0..1 tap shimmer, opts.lit 0..1)
      twinEmblem  the twin group's sign (opts.kind 0..3, opts.glow)
      initial.<L> great-initial letter body (fallback draws from opts.path/dots/S, the mask outline)
@@ -45,9 +46,124 @@
     ink:         { base: '#5a4330', dark: '#2a1b10', light: '#9b8064', edge: '#4c3828', name: 'sepia' },
     bare:        { base: '#dcc9a0', dark: '#a98f62', light: '#f1e6c8', edge: '#c9b385', name: 'bare vellum' }
   };
+  // a fourth jewel for pages without marks, so three jewels always contrast with the page's ground
+  RIB.amethyst = { base: '#8a3fa8', dark: '#4f1f66', light: '#c08ad8', edge: '#73348e', name: 'amethyst' };
   var HAIR = '#2a1508', GILT = '#c08f38', GILT_L = '#ecca6e', MADDER = '#6c1b15';
-  var images = {}, metas = {}, fadedCache = {};
+
+  /* ---------- panel grounds: deep manuscript grounds the gold filigree reads on ----------
+     base: the ground; dk / lt: rgb of the painted mottle; band: the frame's dotted band (a brighter
+     related tone, as the madder's red band); deep: rgb of the dark slivers (band hairlines, the shadow
+     under the frame, the cut at a crossing); clash: ribbon colours of the same hue family, kept off it */
+  var GROUND = {
+    madder:    { base: '#6c1b15', dk: '45,6,4',  lt: '150,46,30',  band: '#9c2a1c', deep: '50,6,3',  clash: ['vermilion', 'crimson'], name: 'madder red' },
+    lapis:     { base: '#14275c', dk: '5,10,32', lt: '50,82,160',  band: '#2b4a98', deep: '6,10,34', clash: ['lapis', 'ultramarine'], name: 'lapis navy' },
+    verdigris: { base: '#123d32', dk: '3,20,15', lt: '40,110,88',  band: '#1f6b56', deep: '3,22,16', clash: ['verdigris', 'emerald'], name: 'deep verdigris' },
+    folium:    { base: '#3b1744', dk: '20,4,26', lt: '110,52,124', band: '#6a2c78', deep: '24,5,30', clash: ['amethyst'], name: 'folium purple' },
+    ink:       { base: '#17141d', dk: '4,3,8',   lt: '62,56,76',   band: '#7e2418', deep: '6,4,10',  clash: [], name: 'ink black' }
+  };
+  var GROUND_ORDER = ['madder', 'lapis', 'verdigris', 'folium'];
+  var JEWELS = ['ultramarine', 'emerald', 'crimson', 'amethyst'];
+  function marksOf(l) { var m = {}; (l.marks || []).forEach(function (k) { m[k[1]] = 1; }); return m; }
+  function groundsFit(l) {   // the everyday grounds none of whose clashing colours are among the page's marks
+    var m = marksOf(l);
+    return GROUND_ORDER.filter(function (gn) { return !GROUND[gn].clash.some(function (c) { return m[c]; }); });
+  }
+  // one ground per page, worked out once along the whole book: great initials take the ink ground;
+  // every other page takes a ground clear of its marks and never its neighbour's, preferring the one
+  // used longest ago (so each quire shows several); a depth-first search backs up when a later page
+  // would be left with no ground of its own. Where a run of three- and four-pigment pages leaves no
+  // everyday ground at all, an ordinary page may borrow the ink ground (as few as the book needs)
+  var groundTable = null;
+  function buildGrounds(L) {
+    var A = [], steps = 0;
+    function go(i, inkLeft) {
+      if (i >= L.length) return true;
+      if (++steps > 50000) return false;
+      var l = L[i], prev = i ? A[i - 1] : null, fit;
+      if (l.initial) fit = ['ink'];
+      else {
+        fit = groundsFit(l).filter(function (c) { return c !== prev; });
+        var last = {}, used = {};
+        A.forEach(function (g, j) { last[g] = j; used[g] = (used[g] || 0) + 1; });
+        fit.sort(function (a, b) {
+          var la = a in last ? last[a] : -99, lb = b in last ? last[b] : -99;
+          return la - lb || (used[a] || 0) - (used[b] || 0) || GROUND_ORDER.indexOf(a) - GROUND_ORDER.indexOf(b);
+        });
+        if (inkLeft > 0) fit.push('ink');   // the ink ground clashes with nothing
+      }
+      for (var k = 0; k < fit.length; k++) {
+        if (fit[k] === prev) continue;
+        A[i] = fit[k];
+        if (go(i + 1, inkLeft - (fit[k] === 'ink' && !l.initial ? 1 : 0))) return true;
+      }
+      A.length = i;
+      return false;
+    }
+    for (var K = 0; K <= 4; K++) {
+      A = []; steps = 0;
+      if (go(0, K)) { var T = {}; L.forEach(function (l, i) { T[l.n] = A[i]; }); return T; }
+    }
+    return null;
+  }
+  function groundName(l) {
+    if (!l) return 'madder';
+    var L = (typeof window !== 'undefined' && window.LEVELS) || null;
+    if (L && !groundTable) groundTable = buildGrounds(L) || {};
+    if (groundTable && groundTable[l.n] && L[l.n - 1] && L[l.n - 1].mask === l.mask) return groundTable[l.n];
+    // a page outside the book: the first fitting ground from a turn of the order set by its number
+    if (l.initial) return 'ink';
+    var fit = groundsFit(l), k = ((l.n || 1) - 1) % 4;
+    for (var j = 0; j < 4; j++) { var gn = GROUND_ORDER[(k + j) % 4]; if (fit.indexOf(gn) >= 0) return gn; }
+    return 'ink';
+  }
+  // the three jewels for a page without marks on this ground (none of the ground's own hue)
+  function jewelsFor(gn) {
+    var c = (GROUND[gn] || GROUND.madder).clash;
+    return JEWELS.filter(function (j) { return c.indexOf(j) < 0; }).slice(0, 3);
+  }
+  var images = {}, metas = {}, fadedCache = {}, crispCache = {};
   var cache = {};
+
+  // a small PNG (a crisp slot: the mark.* gems) is pre-rendered once per device-pixel size, halving the
+  // source repeatedly for a clean downscale, with a soft dark drop shadow so it lifts off any ribbon or
+  // ground; it is then drawn on whole device pixels when the context isn't rotated
+  function devScale(ctx) {
+    try { var m = ctx.getTransform(), s = Math.sqrt(m.a * m.a + m.b * m.b); if (s > 0) return s; } catch (e) {}
+    return window.devicePixelRatio || 1;
+  }
+  function crispOf(slot, img, W, H) {
+    var key = slot + ':' + W + 'x' + H;
+    if (crispCache[key]) return crispCache[key];
+    var src = img, sw = img.naturalWidth, sh = img.naturalHeight;
+    while (sw / 2 >= W && sh / 2 >= H) {
+      var hw = Math.max(1, Math.round(sw / 2)), hh = Math.max(1, Math.round(sh / 2));
+      var hc = document.createElement('canvas'); hc.width = hw; hc.height = hh;
+      var hg = hc.getContext('2d'); hg.imageSmoothingEnabled = true; hg.imageSmoothingQuality = 'high';
+      hg.drawImage(src, 0, 0, sw, sh, 0, 0, hw, hh);
+      src = hc; sw = hw; sh = hh;
+    }
+    var p = Math.ceil(Math.max(2, W * 0.1)), cv = document.createElement('canvas');
+    cv.width = W + 2 * p; cv.height = H + 2 * p;
+    var g = cv.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+    g.shadowColor = 'rgba(16,6,2,0.7)'; g.shadowBlur = Math.max(1.5, W * 0.07); g.shadowOffsetY = Math.max(0.6, W * 0.035);
+    g.drawImage(src, 0, 0, sw, sh, p, p, W, H);
+    var n = Object.keys(crispCache).length;
+    if (n > 120) crispCache = {};
+    return (crispCache[key] = { cv: cv, p: p, W: W, H: H });
+  }
+  function drawCrisp(ctx, slot, img, x, y, w, h) {
+    var s = devScale(ctx), W = Math.max(1, Math.round(w * s)), H = Math.max(1, Math.round(h * s)), c = crispOf(slot, img, W, H), m = null;
+    try { m = ctx.getTransform(); } catch (e) {}
+    if (m && Math.abs(m.b) < 1e-6 && Math.abs(m.c) < 1e-6 && m.a > 0 && m.d > 0) {
+      // axis-aligned: centre the cached bitmap on whole device pixels
+      var dx = m.a * (x + w / 2) + m.e - W / 2, dy = m.d * (y + h / 2) + m.f - H / 2;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(c.cv, Math.round(dx) - c.p, Math.round(dy) - c.p);
+    } else {
+      var k = w / W;
+      ctx.drawImage(c.cv, x + w / 2 - (W / 2 + c.p) * k, y + h / 2 - (H / 2 + c.p) * (h / H), c.cv.width * k, c.cv.height * (h / H));
+    }
+  }
 
   function rand(seed) {
     var a = seed | 0;
@@ -140,7 +256,7 @@
     return 'rgb(' + ((pa[0] + (pb[0] - pa[0]) * t) | 0) + ',' + ((pa[1] + (pb[1] - pa[1]) * t) | 0) + ',' + ((pa[2] + (pb[2] - pa[2]) * t) | 0) + ')';
   }
 
-  /* ---------- the panel: mask outline geometry, madder ground with gold filigree, gilded frame, ivy ---------- */
+  /* ---------- the panel: mask outline geometry, the page's ground with gold filigree, gilded frame, ivy ---------- */
   // frameGeom: the mask's boundary loops (pixels), with outward offset paths for the frame rules.
   // rr: corner radius at the mask edge (0 = square corners, as on a rectangular page)
   function frameGeom(w, h, inm, S, ox, oy, rr) {
@@ -294,14 +410,15 @@
     return gg;
   }
   // the gilded frame round the panel (offsets outward from the mask edge, b = frame thickness):
-  // fine gold rule on the ground, inner gold rule, red band with cream dots, broad outer gold rule;
+  // fine gold rule on the ground, inner gold rule, coloured band with cream dots, broad outer gold rule;
   // dark-brown hairlines outside each gold rule
-  function drawFrame(ctx, G, b, box) {
+  function drawFrame(ctx, G, b, box, GR) {
     var hl = Math.max(0.6, b * 0.04), gold = burnish(ctx, box[0], box[1], box[2], box[3]);
+    GR = GR || GROUND.madder;
     ctx.lineJoin = 'round'; ctx.lineCap = 'butt';
-    // red band
-    ctx.strokeStyle = '#9c2a1c'; ctx.lineWidth = b * 0.56; ctx.stroke(G.path(b * 0.44));
-    ctx.strokeStyle = 'rgba(50,6,3,0.4)'; ctx.lineWidth = Math.max(0.6, b * 0.05); ctx.stroke(G.path(b * 0.2)); ctx.stroke(G.path(b * 0.69));
+    // the band, in the ground's own brighter tone
+    ctx.strokeStyle = GR.band; ctx.lineWidth = b * 0.56; ctx.stroke(G.path(b * 0.44));
+    ctx.strokeStyle = 'rgba(' + GR.deep + ',0.4)'; ctx.lineWidth = Math.max(0.6, b * 0.05); ctx.stroke(G.path(b * 0.2)); ctx.stroke(G.path(b * 0.69));
     // broad outer rule
     ctx.strokeStyle = HAIR; ctx.lineWidth = b * 0.26 + 2 * hl; ctx.stroke(G.path(b * 0.85));
     ctx.strokeStyle = gold; ctx.lineWidth = b * 0.26; ctx.stroke(G.path(b * 0.85));
@@ -317,14 +434,15 @@
     // rubrication dots
     var dr = Math.max(0.75, b * 0.07);
     G.dots(b * 0.44, Math.max(dr * 4, b * 0.34)).forEach(function (p) {
-      ctx.fillStyle = 'rgba(50,6,3,0.45)'; ctx.beginPath(); ctx.arc(p[0] + dr * 0.25, p[1] + dr * 0.3, dr, 0, 6.283); ctx.fill();
+      ctx.fillStyle = 'rgba(' + GR.deep + ',0.45)'; ctx.beginPath(); ctx.arc(p[0] + dr * 0.25, p[1] + dr * 0.3, dr, 0, 6.283); ctx.fill();
       ctx.fillStyle = '#f6e6bd'; ctx.beginPath(); ctx.arc(p[0], p[1], dr, 0, 6.283); ctx.fill();
     });
   }
   // the whole puzzle panel, drawn once to an offscreen canvas (the board caches it per size and DPR):
-  // ivy at the outer corners, madder ground with gold filigree over the masked cells, the gilded frame
-  // tracing the mask outline. o: w, h, inm (mask flags), S (tile), pad (mask origin), band (frame
-  // thickness), ivy (margin for the tendrils), cssW, cssH, dpr, round (corner radius), rect, seed
+  // ivy at the outer corners, the page's ground with gold filigree over the masked cells, the gilded
+  // frame tracing the mask outline. o: w, h, inm (mask flags), S (tile), pad (mask origin), band (frame
+  // thickness), ivy (margin for the tendrils), cssW, cssH, dpr, round (corner radius), rect, seed,
+  // ground (a GROUND name; madder if absent)
   function makePanel(o) {
     var cv = document.createElement('canvas');
     cv.width = Math.max(1, Math.round(o.cssW * o.dpr)); cv.height = Math.max(1, Math.round(o.cssH * o.dpr));
@@ -333,23 +451,23 @@
     var b = o.band, S = o.S, G = frameGeom(o.w, o.h, o.inm, S, o.pad, o.pad, o.round || 0), R = rand(o.seed || 7);
     var box = [o.pad - b, o.pad - b, o.w * S + 2 * b, o.h * S + 2 * b];
     if (o.ivy > 3) G.corners(b).forEach(function (c) { ivyCorner(g, c, o.ivy, R); });
-    var gp = G.path(b * 0.3);
-    g.fillStyle = MADDER; g.fill(gp);
+    var gp = G.path(b * 0.3), GR = GROUND[o.ground] || GROUND.madder;
+    g.fillStyle = GR.base; g.fill(gp);
     g.save(); g.clip(gp);
-    // a painted mottle in the madder
+    // a painted mottle in the ground
     var nb = Math.round(o.w * o.h * 1.5);
     for (var i = 0; i < nb; i++) {
       var x = box[0] + R() * box[2], y = box[1] + R() * box[3], r = S * (0.4 + R() * 1.1), dk = R() < 0.5;
       var m = g.createRadialGradient(x, y, 0, x, y, r);
-      m.addColorStop(0, dk ? 'rgba(45,6,4,0.3)' : 'rgba(150,46,30,0.22)'); m.addColorStop(1, 'rgba(0,0,0,0)');
+      m.addColorStop(0, dk ? 'rgba(' + GR.dk + ',0.3)' : 'rgba(' + GR.lt + ',0.22)'); m.addColorStop(1, 'rgba(0,0,0,0)');
       g.fillStyle = m; g.fillRect(x - r, y - r, 2 * r, 2 * r);
     }
     filigree(g, box[0], box[1], box[2], box[3], S, R, Math.max(0.55, Math.min(1.3, S * 0.016)));
     // a soft shadow under the frame's inner edge
-    g.strokeStyle = 'rgba(30,4,2,0.4)'; g.lineWidth = b * 0.6; g.stroke(G.path(b * 0.1));
+    g.strokeStyle = 'rgba(' + GR.deep + ',0.45)'; g.lineWidth = b * 0.6; g.stroke(G.path(b * 0.1));
     g.restore();
     if (images.border && o.rect) g.drawImage(images.border, box[0], box[1], box[2], box[3]);
-    else drawFrame(g, G, b, box);
+    else drawFrame(g, G, b, box, GR);
     return { cv: cv, geom: G };
   }
 
@@ -787,6 +905,8 @@
     // the board's enamel look: RIB colours, the cached panel (ground, filigree, gilded frame, ivy) and
     // layered gold-edged ribbon strokes
     RIB: RIB, HAIR: HAIR, GILT: GILT, MADDER: MADDER, makePanel: makePanel, ribLayers: ribLayers, ribMix: ribMix,
+    // the page's panel ground (a GROUND name, from the level) and the jewels that contrast with it
+    GROUND: GROUND, groundName: groundName, ground: function (name) { return GROUND[name] || GROUND.madder; }, jewelsFor: jewelsFor,
     rib: function (name) { return RIB[name] || RIB.gold; },
     // register another drawn slot (drolleries.js uses this)
     define: function (slot, fn) { DRAW[slot] = fn; },
@@ -815,9 +935,12 @@
     },
     draw: function (ctx, slot, x, y, w, h, t, opts) {
       opts = opts || {};
+      // a pigment mark draws its painted gem (mark.<pigment>) when that PNG is loaded
+      if (slot === 'mark' && opts.pigment && images['mark.' + opts.pigment]) slot = 'mark.' + opts.pigment;
       var img = images[slot], m = metas[slot];
       ctx.save();
-      if (img) {
+      if (img && m && m.crisp && !opts.angle) drawCrisp(ctx, slot, img, x, y, w, h);
+      else if (img) {
         if (m && m.fit) {   // keep the PNG's own aspect: fit inside the box, bottom-centre unless told otherwise
           var k = Math.min(w / img.naturalWidth, h / img.naturalHeight), dw = img.naturalWidth * k, dh = img.naturalHeight * k;
           x += (w - dw) * (opts.alignX != null ? opts.alignX : 0.5); y += (h - dh) * (opts.alignY != null ? opts.alignY : 1);
@@ -837,7 +960,7 @@
     load: function (base) {
       base = base || 'art/';
       if (typeof fetch === 'undefined') return Promise.resolve();
-      return fetch(base + 'manifest.json?v=2', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : {}; }).then(function (m) {
+      return fetch(base + 'manifest.json?v=3', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : {}; }).then(function (m) {
         return Promise.all(Object.keys(m).map(function (slot) {
           var e = typeof m[slot] === 'string' ? { file: m[slot] } : (m[slot] || {});
           if (!e.file) return null;
@@ -846,7 +969,9 @@
             img.onload = function () {
               images[slot] = img; delete fadedCache[slot];
               metas[slot] = { aspect: img.naturalWidth / img.naturalHeight, stem: e.stem != null ? e.stem : 0.5,
-                fit: e.fit != null ? !!e.fit : slot.indexOf('drollery.') === 0 };
+                fit: e.fit != null ? !!e.fit : slot.indexOf('drollery.') === 0,
+                crisp: e.crisp != null ? !!e.crisp : slot.indexOf('mark.') === 0 };
+              Object.keys(crispCache).forEach(function (k) { if (k.indexOf(slot + ':') === 0) delete crispCache[k]; });
               res();
             };
             img.onerror = function () { res(); };

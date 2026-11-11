@@ -9,9 +9,10 @@
      450   the great initial's gold body sweeps in from the top-left
      650   twins' gilt brackets and emblems light
      700   gold sheen sweeps across the panel and its gilded frame
-   Look: a cached panel (ART.makePanel: madder ground, gold filigree, gilded frame tracing the mask,
+   Look: a cached panel (ART.makePanel: the page's ground (ART.groundName: madder, lapis navy, deep
+   verdigris, folium purple, or ink for the great initials), gold filigree, gilded frame tracing the mask,
    ivy at the corners) under broad gold-edged enamel ribbons (ART.ribLayers). On pages without
-   pigment marks, whole strands take ultramarine / emerald / crimson by strand; s.color (passed to the
+   pigment marks, whole strands take three jewels clear of the ground's hue by strand; s.color (passed to the
    callbacks and the bells) stays the puzzle's own colour.
      ~2500 done (main.js writes the grumble, wakes the drollery and shows "Turn the page") */
 (function () {
@@ -43,6 +44,7 @@
     var M = this.M = P.prepare(level);
     this.weave = P.weave(M);
     this.isInitial = !!level.initial;
+    this.groundName = ART.groundName(level); this.ground = ART.ground(this.groundName);
     this.rots = (saved.rots && saved.rots.length === M.n) ? saved.rots.slice() : M.start.slice();
     this.pins = new Uint8Array(M.n);
     (saved.pins || []).forEach(function (c) { if (P.turnable(M.kinds[c])) this.pins[c] = 1; }, this);
@@ -61,12 +63,13 @@
     this.letter = null;
     this.fit(this.fitW || 300, this.fitH || 300);
   };
-  // pages without pigment marks: colour the solution's strands ultramarine / emerald / crimson so that
-  // strands sharing a crossing (and, where easy, neighbouring strands) differ
+  // pages without pigment marks: colour the solution's strands with the three jewels that contrast with
+  // the page's ground (of ultramarine / emerald / crimson / amethyst) so that strands sharing a crossing
+  // (and, where easy, neighbouring strands) differ
   B._jewels = function () {
     var M = this.M, c; this.jewel = null;
     for (c = 0; c < M.n; c++) if (M.mark[c]) return;
-    var st = P.trace(M, M.sol), cells = [], W = {}, JN = ['ultramarine', 'emerald', 'crimson'], rot = ((M.level && M.level.n) || 1) % 3;
+    var st = P.trace(M, M.sol), cells = [], W = {}, JN = ART.jewelsFor(this.groundName), rot = ((M.level && M.level.n) || 1) % 3;
     JN = JN.slice(rot).concat(JN.slice(0, rot));   // pages start on different jewels
     st.strands.forEach(function (s, si) { s.pieces.forEach(function (q) { (cells[q.c] = cells[q.c] || []).push(si); }); });
     function add(a, b, w) { if (a === b) return; var k = a < b ? a + ',' + b : b + ',' + a; W[k] = (W[k] || 0) + w; }
@@ -365,6 +368,7 @@
     g.arc(cx, cy, h, aa, ab, d < 0);
     g.lineTo(ob[0], ob[1]);
   }
+  var GEM = 0.58;   // a painted pigment gem's box, in tiles (the bezel itself is about three quarters of it)
   function pieceLen(a, b, h) { return b < 0 ? h : (P.opp(a) === b ? 2 * h : Math.PI * h / 2); }
   function pieceMid(a, b, h) {
     if (b < 0) return [mid(a, h)[0] * 0.5, mid(a, h)[1] * 0.5];
@@ -422,12 +426,12 @@
     if (horiz) g.rect(-h, -half, 2 * h, 2 * half); else g.rect(-half, -h, 2 * half, 2 * h);
     g.clip();
     var gr = horiz ? g.createLinearGradient(-h, 0, h, 0) : g.createLinearGradient(0, -h, 0, h);
-    var a = (half + S * 0.03) / S, sh = 'rgba(40,8,4,';
+    var a = (half + S * 0.03) / S, sh = 'rgba(' + this.ground.deep + ',';
     gr.addColorStop(0, sh + '0)'); gr.addColorStop(clamp(0.5 - a - 0.14, 0, 1), sh + '0)');
     gr.addColorStop(0.5 - a, sh + '0.22)'); gr.addColorStop(0.5 + a, sh + '0.22)');
     gr.addColorStop(clamp(0.5 + a + 0.14, 0, 1), sh + '0)'); gr.addColorStop(1, sh + '0)');
     g.fillStyle = gr; g.fillRect(-h, -h, 2 * h, 2 * h);
-    g.strokeStyle = '#3a0c08'; g.lineWidth = 2 * half + 2 * Math.max(1.2, S * 0.03); g.lineCap = 'butt';
+    g.strokeStyle = 'rgba(' + this.ground.deep + ',0.92)'; g.lineWidth = 2 * half + 2 * Math.max(1.2, S * 0.03); g.lineCap = 'butt';
     g.beginPath(); overPath(g); g.stroke();
     g.restore();
   };
@@ -440,11 +444,11 @@
     var e = this.illum ? t - this.illum.t0 : -1;
     function K(a, d) { return e < 0 ? 0 : clamp((e - a) / d, 0, 1); }
     var borderK = K(150, 900), letterK = K(450, 1100), twinK = K(650, 600), sheenK = K(700, 1000);
-    // the panel: madder ground, filigree, gilded frame tracing the mask, ivy (drawn once, cached)
+    // the panel: the page's ground, filigree, gilded frame tracing the mask, ivy (drawn once per page and size)
     if (!this.panel) {
       var inm = M.kinds.map(function (k) { return k !== ' '; }), rect = inm.every(Boolean);
       this.panel = ART.makePanel({ w: M.w, h: M.h, inm: inm, S: S, pad: pad, band: this.band, ivy: this.ivy,
-        cssW: this.cssW, cssH: this.cssH, dpr: this.dpr, rect: rect, seed: (M.level.n || 7) * 31 + 7,
+        cssW: this.cssW, cssH: this.cssH, dpr: this.dpr, rect: rect, seed: (M.level.n || 7) * 31 + 7, ground: this.groundName,
         round: rect ? 0 : S * (this.isInitial ? 0.3 : 0.18) });
     }
     g.drawImage(this.panel.cv, 0, 0, this.cssW, this.cssH);
@@ -545,8 +549,17 @@
           } else ART.draw(g, 'knot', -h, -h, S, S, t, { body: body, rib: rb, rw: 0.36 });
         }
         if (M.mark[c]) {
-          var pm = pieceMid(a, b, h), ms = S * 0.3;
-          ART.draw(g, 'mark', pm[0] - ms / 2, pm[1] - ms / 2, ms, ms, t, { pigment: M.mark[c], gilt: true });
+          var pm = pieceMid(a, b, h);
+          if (ART.has('mark.' + M.mark[c])) {
+            // the painted gem: larger, and kept upright (its light falls from the top-left) as the tile turns
+            var ms = S * GEM, ca = Math.cos(ang), sa = Math.sin(ang), qx = pm[0] * ca - pm[1] * sa, qy = pm[0] * sa + pm[1] * ca;
+            g.save(); g.rotate(-ang);
+            ART.draw(g, 'mark', qx - ms / 2, qy - ms / 2, ms, ms, t, { pigment: M.mark[c] });
+            g.restore();
+          } else {
+            ms = S * 0.3;
+            ART.draw(g, 'mark', pm[0] - ms / 2, pm[1] - ms / 2, ms, ms, t, { pigment: M.mark[c], gilt: true });
+          }
         }
       }
       g.restore();

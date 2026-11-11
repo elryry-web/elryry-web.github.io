@@ -7,5 +7,9 @@
   "drollery.fishbird": { "file": "drollery-fishbird.png", "stem": 0.204, "v": 1 },
   "drollery.monkey":   { "file": "drollery-monkey.png",   "stem": 0.225, "v": 1 },
   "drollery.dragon":   { "file": "drollery-dragon.png",   "stem": 0.282, "v": 1 },
-  "drollery.monk":     { "file": "drollery-monk.png",     "stem": 0.226, "v": 1 }
+  "drollery.monk":     { "file": "drollery-monk.png",     "stem": 0.226, "v": 1 },
+  "mark.lapis":        { "file": "gem-lapis.png",         "v": 1 },
+  "mark.vermilion":    { "file": "gem-vermilion.png",     "v": 1 },
+  "mark.verdigris":    { "file": "gem-verdigris.png",     "v": 1 },
+  "mark.orpiment":     { "file": "gem-orpiment.png",      "v": 1 }
 }
