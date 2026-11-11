@@ -10,5 +10,8 @@
   "map": { "file": "map.jpg", "v": 3 },
   "portrait-hamo": { "file": "portrait-hamo.png", "v": 1 },
   "portrait-gervase": { "file": "portrait-gervase.png", "v": 1 },
-  "portrait-wystan": { "file": "portrait-wystan.png", "v": 1 }
+  "portrait-wystan": { "file": "portrait-wystan.png", "v": 1 },
+  "portrait-hob": { "file": "portrait-hob.png", "v": 1 },
+  "portrait-alys": { "file": "portrait-alys.png", "v": 1 },
+  "portrait-isabel": { "file": "portrait-isabel.png", "v": 1 }
 }
