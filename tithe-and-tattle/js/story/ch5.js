@@ -44,7 +44,7 @@ window.STORY = window.STORY || [];
     characters: ['Widow Tolley', 'Joan Fletcher', 'Alys Pennock', 'Agnes Sutor', 'Margery Baxter', 'Tom Webbe', 'Walter Crane', 'Piers Carter', 'Hob', 'Father Simon'],
     size: '4×4',
     grade: 'Journeyman',
-    intro: "On Hock Tuesday the women of Mardle go out with ropes and catch the men, and a man is let go when he pays, and the money goes to St Mary's for the roof. Father Simon asked the abbey to write it down, since the money never comes to what he was told. Widow Tolley saw all of it from her door and told me, calling each man by another man's name, though she had the day right and the prices, a penny to fourpence.",
+    intro: "On Hock Tuesday the women of Mardle go out with ropes and catch the men, and a man is let go when he pays, and the money goes to St Mary's for the roof. Father Simon asked the abbey to write it down, since the money never comes to what he was told. Widow Tolley saw all of it from her door and told me, calling each man by another man's name, though she had the prices right, a penny to fourpence.",
     task: 'Can you work out which man each woman caught, where, and what he paid?',
     categories: [
       { id: 'who', name: 'Women', items: [it('joan', 'Joan Fletcher'), it('alys', 'Alys Pennock'), it('agnes', 'Agnes Sutor'), it('margery', 'Margery Baxter')] },
