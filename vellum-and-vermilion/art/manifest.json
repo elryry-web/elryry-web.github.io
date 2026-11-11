@@ -11,5 +11,8 @@
   "mark.lapis":        { "file": "gem-lapis.png",         "v": 1 },
   "mark.vermilion":    { "file": "gem-vermilion.png",     "v": 1 },
   "mark.verdigris":    { "file": "gem-verdigris.png",     "v": 1 },
-  "mark.orpiment":     { "file": "gem-orpiment.png",      "v": 1 }
+  "mark.orpiment":     { "file": "gem-orpiment.png",      "v": 1 },
+  "beast.headShut":    { "file": "beast-head-shut.png",   "v": 1 },
+  "beast.headOpen":    { "file": "beast-head-open.png",   "v": 1 },
+  "beast.tail":        { "file": "beast-tail.png",        "v": 1 }
 }

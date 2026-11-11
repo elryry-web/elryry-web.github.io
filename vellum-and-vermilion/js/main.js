@@ -270,9 +270,16 @@
     } else if (q === 3) {
       // a beast runs head to tail: tail in at the left, head out at the right
       var vg = ART.PIG.verdigris.base;
-      ART.ribbon(g, function (gg) { gg.moveTo(52, 40); gg.bezierCurveTo(85, 6, 115, 74, 148, 40); }, 9, vg);
-      ART.draw(g, 'beastHead', 130, 22, 36, 36, 0, { angle: -Math.PI / 2, body: vg });
-      ART.draw(g, 'beastTail', 34, 22, 36, 36, 0, { angle: Math.PI / 2, body: vg });
+      var hs = ART.beastStop && ART.beastStop('head', 0.33), ts = ART.beastStop && ART.beastStop('tail', 0.33);
+      if (hs != null && ts != null) {
+        // painted beasts: the ribbon meets each one level, where the art takes over from it
+        var x0 = 52 - ts * 36, x1 = 148 + hs * 36, xm = (x0 + x1) / 2;
+        ART.ribbon(g, function (gg) {
+          gg.moveTo(x0, 40); gg.bezierCurveTo(x0 + 18, 40, xm - 18, 16, xm, 16); gg.bezierCurveTo(xm + 18, 16, x1 - 18, 40, x1, 40);
+        }, 9, vg);
+      } else ART.ribbon(g, function (gg) { gg.moveTo(52, 40); gg.bezierCurveTo(85, 6, 115, 74, 148, 40); }, 9, vg);
+      ART.draw(g, 'beastHead', 130, 22, 36, 36, 0, { angle: -Math.PI / 2, body: vg, flat: vg, band: 0.33 });
+      ART.draw(g, 'beastTail', 34, 22, 36, 36, 0, { angle: Math.PI / 2, body: vg, flat: vg, band: 0.33 });
     } else if (q === 4) {
       // two twins: the same gilt brackets, the same emblem, turned the same way
       [44, 100].forEach(function (x) {

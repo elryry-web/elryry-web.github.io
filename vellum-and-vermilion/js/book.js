@@ -227,7 +227,7 @@
     var pr = save.prog[n], rots = (!solved && pr && pr.r && pr.r.length === l.w * l.h) ? pr.r : '';
     var key = n + ':' + (solved ? 'S' : 'U' + rots);
     if (thumbs[key]) return thumbs[key];
-    if (!tb) { tb = new window.Board(document.createElement('canvas'), {}); clearInterval(tb._idle); }
+    if (!tb) { tb = new window.Board(document.createElement('canvas'), {}); clearInterval(tb._idle); tb.mini = true; }
     tb.setLevel(l, solved ? { solved: true } : (rots ? { rots: rots.split('').map(Number), pins: [] } : {}));
     tb.fit(260, 260); tb.draw();
     if (tb.raf) { cancelAnimationFrame(tb.raf); tb.raf = 0; }

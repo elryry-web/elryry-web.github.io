@@ -13,6 +13,10 @@
      beastHead   Insular beast head in a whole tile box: neck enters from the top edge, snout toward +y
                  (opts.body, opts.snap 0..1 jaw snap, opts.blink 0..1)
      beastTail   curled, finned tail in a whole tile box, entering from the top (opts.body, opts.wag 0..1)
+                 The painted PNGs beast.headShut, beast.headOpen (shown while it snaps) and beast.tail take
+                 their place when loaded: retinted to the strand (opts.fill, opts.amt; bare when none), never
+                 upside down (opts.q, the tile's quarter turn on screen; else from opts.angle), ringed in gilt
+                 (opts.gilt). ART.beastStop(kind) says where the board's ribbon gives way to the art
      mark        pigment lozenge (opts.pigment); a loaded mark.<pigment> PNG (the painted gems) takes its place,
                  drawn crisp from a per-size cache with a drop shadow (manifest crisp, default for mark.*)
      twinFrame   gilt corner brackets of a gilded-twin tile (opts.glow 0..1 tap shimmer, opts.lit 0..1)
@@ -48,6 +52,23 @@
   };
   // a fourth jewel for pages without marks, so three jewels always contrast with the page's ground
   RIB.amethyst = { base: '#8a3fa8', dark: '#4f1f66', light: '#c08ad8', edge: '#73348e', name: 'amethyst' };
+  // matte tempera for whole strands, as an illuminator lays it on vellum: sh (the same pigment darkened,
+  // a shadow stroke along the edge away from the light), bd (the flat body colour), lt (body and lead white,
+  // a narrower tint along the lit edge), mo (how strongly the hand-laid paint mottles). bare ribbons have
+  // none and keep their flat gouache
+  var PAINT = {
+    ultramarine: ['#1b2862', '#30499e', '#8193c9', 1],
+    lapis:       ['#1a2756', '#304886', '#7b8cbd', 1],
+    emerald:     ['#173d25', '#2f7646', '#8cb994', 1],
+    verdigris:   ['#1b4e47', '#33887a', '#93c6b8', 1.5],
+    crimson:     ['#561424', '#9e2a3e', '#d48d96', 1],
+    vermilion:   ['#7e2412', '#cc4826', '#eb9c78', 0.9],
+    orpiment:    ['#946a1e', '#d9b03e', '#f2dd9c', 0.9],
+    amethyst:    ['#3d1d49', '#77418a', '#b895c3', 1],
+    gold:        ['#6b4a18', '#b48a40', '#e1c78a', 1.1],
+    ink:         ['#1a1009', '#5a4330', '#a08060', 1]
+  };
+  Object.keys(PAINT).forEach(function (k) { var p = PAINT[k]; RIB[k].sh = p[0]; RIB[k].bd = p[1]; RIB[k].lt = p[2]; RIB[k].mo = p[3]; });
   var HAIR = '#2a1508', GILT = '#c08f38', GILT_L = '#ecca6e', MADDER = '#6c1b15';
 
   /* ---------- panel grounds: deep manuscript grounds the gold filigree reads on ----------
@@ -163,6 +184,204 @@
       var k = w / W;
       ctx.drawImage(c.cv, x + w / 2 - (W / 2 + c.p) * k, y + h / 2 - (H / 2 + c.p) * (h / H), c.cv.width * k, c.cv.height * (h / H));
     }
+  }
+
+  /* ---------- painted beasts: beast.headShut, beast.headOpen, beast.tail ---------- */
+  // Each PNG is a side profile in pale cream with dark ink outlines: the head faces left, its neck band
+  // running right to a hard cut; the tail's band runs right the same way. Measured in source pixels:
+  // a = the band's centre at the tile's entry edge, phi = the turn that lays the band along the axis,
+  // band = its width (outline to outline) where it meets the board's ribbon, len = the reach from a to the
+  // snout or the tail's curl, f0..f1 = the span (along the axis, back from a) where the art fades into
+  // the ribbon (only below fy across it, so a head's lappet stays), eye = [x, y, r] of the eye's white.
+  // The cream is retinted to the strand's ramp once per colour and size and kept, ringed in gold.
+  var BEAST = {
+    'beast.headShut': { a: [422.0, 149.3], phi: -0.0937, band: 130, len: 421, f0: -36, f1: -4, fy: -76, eye: [122, 88.5, 15], kind: 'head' },
+    'beast.headOpen': { a: [422.0, 149.1], phi: -0.0937, band: 130, len: 421, f0: -36, f1: -4, fy: -76, eye: [129.5, 84.5, 15], kind: 'head', mouth: true },
+    'beast.tail':     { a: [440.0, 78.0], phi: 0.085, band: 138, len: 438, f0: -44, f1: -6, fy: -999, kind: 'tail' }
+  };
+  var BEAST_BAND = 0.34, BEAST_MARGIN = 0.02;   // the art band's share of a tile (the board's ribbon body is 0.36)
+  var beastPrep = {}, beastCache = {}, beastCacheN = 0, beastBad = {};
+  function sstep(a, b, x) { var t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); }
+  // once per PNG: what each pixel is (cream body to retint, or ink, tongue, teeth and eye to keep),
+  // its place on the ramp, and the fade into the ribbon
+  function prepBeast(slot) {
+    if (beastPrep[slot] || beastBad[slot]) return beastPrep[slot] || null;
+    var img = images[slot], B = BEAST[slot];
+    if (!img || !B) return null;
+    var W = img.naturalWidth, H = img.naturalHeight, d;
+    try {
+      var cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+      var g = cv.getContext('2d'); g.drawImage(img, 0, 0); d = g.getImageData(0, 0, W, H).data;
+    } catch (e) { beastBad[slot] = 1; return null; }   // a tainted canvas (file://): the drawn beast instead
+    var N = W * H, Lm = new Float32Array(N), cream = new Uint8Array(N), i;
+    for (i = 0; i < N; i++) {
+      var r = d[i * 4], gg = d[i * 4 + 1], b = d[i * 4 + 2], mx = Math.max(r, gg, b), mn = Math.min(r, gg, b);
+      Lm[i] = (0.3 * r + 0.59 * gg + 0.11 * b) / 255;
+      if (d[i * 4 + 3] > 128 && Lm[i] > 0.5 && (mx - mn) / Math.max(1, mx) < 0.32) cream[i] = 1;
+    }
+    // the cream in small islands is kept as painted: the eye's white, and the teeth in an open mouth
+    var lab = new Int32Array(N), stack = new Int32Array(N), keep = new Uint8Array(N), n = 0;
+    for (i = 0; i < N; i++) {
+      if (!cream[i] || lab[i]) continue;
+      n++; var sp = 0, cnt = 0, sx = 0, sy = 0, list = []; stack[sp++] = i; lab[i] = n;
+      while (sp) {
+        var p = stack[--sp], px = p % W, py = (p / W) | 0; cnt++; sx += px; sy += py; if (list.length < 700) list.push(p);
+        if (px > 0 && cream[p - 1] && !lab[p - 1]) { lab[p - 1] = n; stack[sp++] = p - 1; }
+        if (px < W - 1 && cream[p + 1] && !lab[p + 1]) { lab[p + 1] = n; stack[sp++] = p + 1; }
+        if (py > 0 && cream[p - W] && !lab[p - W]) { lab[p - W] = n; stack[sp++] = p - W; }
+        if (py < H - 1 && cream[p + W] && !lab[p + W]) { lab[p + W] = n; stack[sp++] = p + W; }
+      }
+      if (cnt < 600) {
+        var mx2 = sx / cnt, my2 = sy / cnt, isle = false;
+        if (B.eye && Math.hypot(mx2 - B.eye[0], my2 - B.eye[1]) < B.eye[2] + 8) isle = true;
+        if (B.mouth && cnt > 20 && mx2 < 175 && my2 > 125) isle = true;
+        if (isle) for (var j = 0; j < list.length; j++) keep[list[j]] = 1;
+      }
+    }
+    // w: how much of the pixel is cream to retint; x: its place on the ramp; f: the fade into the ribbon
+    var wt = new Float32Array(N), xr = new Float32Array(N), fade = new Float32Array(N), cp = Math.cos(B.phi), sp2 = Math.sin(B.phi);
+    for (i = 0; i < N; i++) {
+      var R = d[i * 4], G = d[i * 4 + 1], Bb = d[i * 4 + 2], M2 = Math.max(R, G, Bb), m2 = Math.min(R, G, Bb), L = Lm[i];
+      var sat = (M2 - m2) / Math.max(1, M2);
+      wt[i] = keep[i] ? 0 : (1 - sstep(0.28, 0.4, sat)) * (1 - sstep(30, 50, R - G));
+      xr[i] = L < 0.62 ? 0.1 : L < 0.8 ? 0.1 + (L - 0.62) / 0.18 * 0.32 : L < 0.91 ? 0.42 + (L - 0.8) / 0.11 * 0.2 : Math.min(1, 0.62 + (L - 0.91) / 0.06 * 0.3);
+      var X = i % W - B.a[0], Y = ((i / W) | 0) - B.a[1];
+      fade[i] = beastFade(B, cp * X - sp2 * Y, sp2 * X + cp * Y);
+    }
+    return (beastPrep[slot] = { W: W, H: H, d: d, L: Lm, w: wt, x: xr, fade: fade });
+  }
+  // how much of the art shows at (xa, ya), measured from the cut along and across the neck: none past the cut,
+  // rising over the last stretch of the neck so the ribbon shows through there (the ears are never faded)
+  function beastFade(B, xa, ya) { return xa >= 0 ? 0 : ya < B.fy ? 1 : 1 - sstep(B.f0, B.f1, xa); }
+  // the ramp a beast is retinted to: a painted strand's own, the bare vellum's, or one made from a flat colour
+  function beastRamp(o) {
+    var r = o.fill;
+    if (r && r.sh) return { key: r.sh + r.bd + r.lt, sh: r.sh, bd: r.bd, lt: r.lt };
+    if (o.flat) return { key: 'flat' + o.flat, sh: mix(o.flat, '#120800', 0.45), bd: o.flat, lt: mix(o.flat, '#fffbe8', 0.5) };
+    var b = RIB.bare;
+    return { key: 'bare', sh: mix(b.edge, b.dark, 0.5), bd: b.base, lt: b.light };
+  }
+  // one tinted, faded, downscaled and gilt-rimmed copy at kc device pixels per source pixel
+  function beastCanvas(slot, ramp, kc, rim) {
+    var key = slot + '|' + ramp.key + '|' + Math.round(kc * 4000) + '|' + (rim ? rim.join(',') : '');
+    if (beastCache[key]) return beastCache[key];
+    var P = prepBeast(slot); if (!P) return null;
+    var W = P.W, H = P.H, N = W * H, lut = [], k, i;
+    for (k = 0; k <= 64; k++) lut.push(rgbOf(beastAt(ramp, k / 64)));
+    var low = lut[Math.round(0.1 * 64)], ref = [170, 154, 128];
+    var src = document.createElement('canvas'); src.width = W; src.height = H;
+    var sg = src.getContext('2d'), id = sg.createImageData(W, H), o = id.data, d = P.d;
+    for (i = 0; i < N; i++) {
+      var q = i * 4, a = P.fade[i] > 0 ? d[q + 3] : 0;   // cut square at the neck; faded after the rim is on
+      if (a < 1) { o[q + 3] = 0; continue; }
+      var w = P.w[i], r = d[q], g = d[q + 1], b = d[q + 2];
+      if (w > 0) {
+        var L = P.L[i];
+        if (L >= 0.62) {
+          var c = lut[Math.round(P.x[i] * 64)];
+          r += (c[0] - r) * w; g += (c[1] - g) * w; b += (c[2] - b) * w;
+        } else {   // an outline's soft edge: shift only its share of cream
+          var f = w * sstep(0.22, 0.62, L);
+          r += (low[0] - ref[0]) * f; g += (low[1] - ref[1]) * f; b += (low[2] - ref[2]) * f;
+        }
+      }
+      o[q] = r < 0 ? 0 : r > 255 ? 255 : r; o[q + 1] = g < 0 ? 0 : g > 255 ? 255 : g; o[q + 2] = b < 0 ? 0 : b > 255 ? 255 : b; o[q + 3] = a;
+    }
+    sg.putImageData(id, 0, 0);
+    // halve in steps for a clean small copy
+    var tw = Math.max(2, Math.round(W * kc)), th = Math.max(2, Math.round(H * kc)), cur = src, cw = W, ch = H;
+    while (cw / 2 >= tw && ch / 2 >= th) {
+      var hw = Math.round(cw / 2), hh = Math.round(ch / 2), hc = document.createElement('canvas'); hc.width = hw; hc.height = hh;
+      var hg = hc.getContext('2d'); hg.imageSmoothingEnabled = true; hg.imageSmoothingQuality = 'high';
+      hg.drawImage(cur, 0, 0, cw, ch, 0, 0, hw, hh); cur = hc; cw = hw; ch = hh;
+    }
+    var pad = rim ? Math.ceil(rim[0]) + 2 : 1, cv = document.createElement('canvas');
+    cv.width = tw + 2 * pad; cv.height = th + 2 * pad;
+    var g2 = cv.getContext('2d'); g2.imageSmoothingEnabled = true; g2.imageSmoothingQuality = 'high';
+    var art = document.createElement('canvas'); art.width = tw; art.height = th;
+    var ag = art.getContext('2d'); ag.imageSmoothingEnabled = true; ag.imageSmoothingQuality = 'high';
+    ag.drawImage(cur, 0, 0, cw, ch, 0, 0, tw, th);
+    if (rim) {   // the board's gilt edge: a dark hairline, the gold, a burnished lip, stamped round the silhouette
+      var sil = document.createElement('canvas'); sil.width = tw; sil.height = th;
+      var sl = sil.getContext('2d');
+      [[rim[0], HAIR], [rim[1], GILT], [rim[2], GILT_L]].forEach(function (st) {
+        sl.globalCompositeOperation = 'source-over'; sl.clearRect(0, 0, tw, th); sl.drawImage(art, 0, 0);
+        sl.globalCompositeOperation = 'source-in'; sl.fillStyle = st[1]; sl.fillRect(0, 0, tw, th);
+        var R0 = st[0], steps = Math.max(12, Math.ceil(R0 * 5));
+        for (var ring = 1; ring <= 2; ring++) {
+          var rr = R0 * ring / 2;
+          for (var s = 0; s < steps; s++) { var an = s / steps * 6.2832; g2.drawImage(sil, pad + Math.cos(an) * rr, pad + Math.sin(an) * rr); }
+        }
+      });
+    }
+    g2.drawImage(art, pad, pad);
+    // then fade art and rim together where the neck runs into the ribbon, so no gilt edge crosses the band
+    var B = BEAST[slot], cp = Math.cos(B.phi), sp = Math.sin(B.phi), sx = W / tw, sy = H / th;
+    var fm = g2.createImageData(cv.width, cv.height), fd = fm.data;
+    for (var py = 0; py < cv.height; py++) for (var px = 0; px < cv.width; px++) {
+      var X = (px - pad + 0.5) * sx - B.a[0], Y = (py - pad + 0.5) * sy - B.a[1];
+      fd[(py * cv.width + px) * 4 + 3] = Math.round(255 * beastFade(B, cp * X - sp * Y, sp * X + cp * Y));
+    }
+    var fc = document.createElement('canvas'); fc.width = cv.width; fc.height = cv.height; fc.getContext('2d').putImageData(fm, 0, 0);
+    g2.globalCompositeOperation = 'destination-in'; g2.drawImage(fc, 0, 0); g2.globalCompositeOperation = 'source-over';
+    if (++beastCacheN > 60) { beastCache = {}; beastCacheN = 1; }
+    return (beastCache[key] = { cv: cv, pad: pad, kc: kc });
+  }
+  // the scale of a painted beast in a tile of side 1: along its axis (fitted to the tile) and across it
+  // (its band matched to the ribbon); null when the painted beast isn't ready
+  function beastGeom(kind, band) {
+    var B = kind === 'tail' ? BEAST['beast.tail'] : BEAST['beast.headShut'];
+    var kl = band / B.band, ka = Math.min(kl, (1 - BEAST_MARGIN) / B.len);
+    return { B: B, kl: kl, ka: ka, stop: -0.5 + (-B.f0 + 3) * ka };
+  }
+  function beastReady(kind) {
+    var s = kind === 'tail' ? ['beast.tail'] : ['beast.headShut'];
+    return s.every(function (x) { return images[x] && !beastBad[x]; });
+  }
+  // draw a painted beast into a tile box; false when it can't (the drawn beast is used instead).
+  // o.q: the tile's settled quarter turn on screen (the board's frame enters from the top); without it,
+  // o.angle gives the entry direction as for the drawn beast. o.fill: the strand's pigment record,
+  // o.amt: how much of it has flooded in (or is left as it drains); o.flat: a flat colour (the rule card)
+  function paintedBeast(ctx, kind, x, y, w, h, t, o) {
+    if (!beastReady(kind)) return false;
+    var slot = kind === 'tail' ? 'beast.tail' : (o.snap > 0.06 && o.snap < 0.85 && images['beast.headOpen'] && !beastBad['beast.headOpen'] ? 'beast.headOpen' : 'beast.headShut');
+    var B = BEAST[slot], S = Math.min(w, h), gilt = !!o.gilt;
+    var Gm = beastGeom(kind, gilt ? BEAST_BAND : (o.band || 0.33)), dev = devScale(ctx);
+    var kc = Gm.kl * S * dev;
+    var rim = null;
+    if (gilt) {
+      var E = Math.max(1, S * 0.042), HL = Math.max(0.7, S * 0.012), bandGap = (0.36 - BEAST_BAND) / 2 * S;
+      rim = [(E + HL + bandGap) * dev, (E + bandGap) * dev, (E * 0.45 + bandGap) * dev].map(function (v) { return Math.round(v * 4) / 4; });
+    }
+    var ramp = o.fill || o.flat ? beastRamp(o) : null, bare = beastRamp({}), amt = o.fill ? (o.amt == null ? 1 : o.amt) : o.flat ? 1 : 0;
+    var c0 = amt < 1 ? beastCanvas(slot, bare, kc, rim) : null, c1 = ramp && amt > 0 ? beastCanvas(slot, ramp, kc, rim) : null;
+    if (!c0 && !c1) { if (!prepBeast(slot)) return false; }
+    var q = o.q;
+    if (q == null) q = ((Math.round((o.angle || 0) / (Math.PI / 2)) % 4) + 4) % 4;
+    var mir = q === 3 || q === 0;
+    ctx.translate(x + w / 2, y + h / 2);
+    if (o.q == null) ctx.rotate(o.angle || 0);
+    ctx.translate(0, -S / 2);
+    if (kind === 'tail' && o.wag) {   // a flick about where the art takes over from the ribbon
+      var wy = (Gm.stop + 0.5) * S;
+      ctx.translate(0, wy); ctx.rotate(Math.sin(o.wag * Math.PI * 3) * (1 - o.wag) * 0.08); ctx.translate(0, -wy);
+    }
+    ctx.rotate(-Math.PI / 2);
+    if (mir) ctx.scale(1, -1);
+    ctx.scale(Gm.ka * S, Gm.kl * S); ctx.rotate(B.phi); ctx.translate(-B.a[0], -B.a[1]);
+    [c0, c1].forEach(function (c, i) {
+      if (!c) return;
+      ctx.globalAlpha = i === 1 && c0 ? amt : 1;
+      ctx.drawImage(c.cv, -c.pad / c.kc, -c.pad / c.kc, c.cv.width / c.kc, c.cv.height / c.kc);
+    });
+    ctx.globalAlpha = 1;
+    if (kind !== 'tail' && o.blink > 0.6 && B.eye) {   // the lid drops over the eye
+      var lr = amt >= 0.5 && ramp ? ramp : bare, ex = B.eye[0], ey = B.eye[1], er = B.eye[2] + 1.5;
+      ctx.fillStyle = beastAt(lr, 0.62); ctx.strokeStyle = INK; ctx.lineWidth = 2.6; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.arc(ex, ey, er, 0, 6.2832); ctx.fill(); ctx.stroke();
+      ctx.lineWidth = 3.4; ctx.beginPath(); ctx.moveTo(ex - er * 0.95, ey + 1); ctx.quadraticCurveTo(ex, ey + er * 0.6, ex + er * 0.95, ey + 1); ctx.stroke();
+    }
+    return true;
   }
 
   function rand(seed) {
@@ -474,7 +693,7 @@
   /* ---------- enamel ribbons on the board ---------- */
   // one ribbon path in layers: dark hairline, gold edge, gouache body (darker edge, mid, centre) and a
   // faint lighter stripe. rib: {base, edge, light}; edges: draw the gold; dash: dash array for the body
-  function ribLayers(ctx, path, w, S, rib, edges, dash, stripe) {
+  function ribLayers(ctx, path, w, S, rib, edges, dash, stripe, fx) {
     var E = Math.max(1, S * 0.042), HL = Math.max(0.7, S * 0.012);
     ctx.lineCap = 'butt'; ctx.lineJoin = 'round';
     if (edges) {
@@ -485,6 +704,8 @@
     if (edges) {   // a burnished inner lip on the gold
       ctx.strokeStyle = GILT_L; ctx.lineWidth = w + E * 0.9; ctx.beginPath(); path(ctx); ctx.stroke();
     }
+    if (!rib) return;   // edges only (a painted body is drawn over them in full)
+    if (rib.sh) { paintBody(ctx, path, w, S, rib, dash, fx || {}); if (dash) ctx.setLineDash([]); return; }
     // the gouache body: a soft darkening toward the edges in fine steps (flat paint, not a tube)
     for (var k = 0; k < 5; k++) {
       ctx.strokeStyle = mix(rib.edge, rib.base, k / 4); ctx.lineWidth = w * (1 - k * 0.075);
@@ -497,7 +718,127 @@
     if (dash) ctx.setLineDash([]);
   }
   function ribMix(a, b, t) {
-    return { base: mix(a.base, b.base, t), edge: mix(a.edge, b.edge, t), light: mix(a.light, b.light, t), dark: mix(a.dark, b.dark, t) };
+    var o = { base: mix(a.base, b.base, t), edge: mix(a.edge, b.edge, t), light: mix(a.light, b.light, t), dark: mix(a.dark, b.dark, t) };
+    if (a.sh || b.sh) {   // a painted strand draining to bare (or back): the modelling fades with the colour
+      var A = a.sh ? a : { sh: a.edge, bd: a.base, lt: a.base, rich: 0 }, Bb = b.sh ? b : { sh: b.edge, bd: b.base, lt: b.base, rich: 0 };
+      o.sh = mix(A.sh, Bb.sh, t); o.bd = mix(A.bd, Bb.bd, t); o.lt = mix(A.lt, Bb.lt, t);
+      o.rich = (A.rich == null ? 1 : A.rich) * (1 - t) + (Bb.rich == null ? 1 : Bb.rich) * t;
+    }
+    return o;
+  }
+
+  /* ---------- painted strands: matte tempera, mottle, lead-white penwork ---------- */
+  // the colour across a painted ribbon at x (0 = its shadowed edge, 0.5 = the body, 1 = its lit edge)
+  function rampAt(rib, x) {
+    if (x < 0.5) { var s = x / 0.5; return mix(rib.sh, rib.bd, s * s * (3 - 2 * s)); }
+    return mix(rib.bd, rib.lt, Math.pow((x - 0.5) / 0.5, 1.4) * 0.7);
+  }
+  // the same, held close to the body colour: the painted beasts keep their own shading but read as matte paint
+  function beastAt(rib, x) {
+    if (x < 0.5) { var s = x / 0.5; return mix(rib.sh, rib.bd, 0.3 + 0.7 * s * s * (3 - 2 * s)); }
+    return mix(rib.bd, rib.lt, 0.5 * Math.pow((x - 0.5) / 0.5, 1.4));
+  }
+  // hand-laid paint: broad soft blotches where it lies thicker or thinner, and a faint fine tooth;
+  // drawn once and used as a pattern
+  var grainCv = null, grainPats = typeof WeakMap === 'function' ? new WeakMap() : null;
+  function grainCanvas() {
+    if (grainCv) return grainCv;
+    var N = 128, cv = document.createElement('canvas'); cv.width = cv.height = N;
+    var g = cv.getContext('2d'), id = g.createImageData(N, N), d = id.data, R = rand(9137);
+    function grid(n) { var a = []; for (var i = 0; i < n * n; i++) a.push(R() * 2 - 1); return a; }
+    function smp(a, n, x, y) {   // tileable bilinear value noise
+      var fx = x * n / N, fy = y * n / N, x0 = Math.floor(fx), y0 = Math.floor(fy), tx = fx - x0, ty = fy - y0;
+      tx = tx * tx * (3 - 2 * tx); ty = ty * ty * (3 - 2 * ty);
+      function v(i, j) { return a[((j % n + n) % n) * n + ((i % n + n) % n)]; }
+      return (v(x0, y0) * (1 - tx) + v(x0 + 1, y0) * tx) * (1 - ty) + (v(x0, y0 + 1) * (1 - tx) + v(x0 + 1, y0 + 1) * tx) * ty;
+    }
+    var A = grid(5), Bn = grid(11), Cn = grid(40);
+    for (var y = 0; y < N; y++) for (var x = 0; x < N; x++) {
+      var v = smp(A, 5, x, y) * 0.62 + smp(Bn, 11, x, y) * 0.28 + smp(Cn, 40, x, y) * 0.07 + (R() - 0.5) * 0.09, i = (y * N + x) * 4;
+      if (v > 0) { d[i] = 44; d[i + 1] = 24; d[i + 2] = 8; d[i + 3] = Math.min(255, v * 62); }
+      else { d[i] = 252; d[i + 1] = 244; d[i + 2] = 222; d[i + 3] = Math.min(255, -v * 50); }
+    }
+    g.putImageData(id, 0, 0);
+    return (grainCv = cv);
+  }
+  function grainPattern(ctx) {
+    var p = grainPats && grainPats.get(ctx);
+    if (!p) { p = ctx.createPattern(grainCanvas(), 'repeat'); if (grainPats) grainPats.set(ctx, p); }
+    return p;
+  }
+  // fx: ang (the tile's turn, so the light stays at the top-left of the page), cell / piece (fix where the
+  // penwork breaks), mini (a thumbnail: modelling only), len (the path's length),
+  // ext (path(ctx, ext) runs its ends this much further, so strokes moved toward the light leave no gaps)
+  var PEN = 'line';   // lead-white penwork: 'line' or 'dots'
+  var SHADE = 0.3, TINT = 0.13;   // the shadow and the tint, in ribbons, where the light falls square across
+  function paintBody(ctx, path, w, S, rib, dash, fx) {
+    var rich = rib.rich == null ? 1 : rib.rich, ang = fx.ang || 0, ext = fx.ext || 0;
+    // the light falls from the top-left of the page whatever the tile's turn: u, in the tile's frame
+    var vx = -0.7071, vy = -0.7071;
+    var ux = vx * Math.cos(ang) + vy * Math.sin(ang), uy = -vx * Math.sin(ang) + vy * Math.cos(ang);
+    var s = SHADE * rich, tt = TINT * rich;
+    // each stroke: [colour, width, shift toward the light], in ribbons. nested, so the shadow shows along the
+    // far edge, the tint along the lit one, and the body lies flat between
+    var L = fx.mini ? [[rib.sh, 1, 0], [rib.bd, 1 - s, s / 2]] : [
+      [rib.sh, 1, 0],
+      [mix(rib.sh, rib.bd, 0.4), 1 - 0.45 * s, 0.225 * s],
+      [mix(rib.sh, rib.bd, 0.75), 1 - 0.78 * s, 0.39 * s],
+      [rib.lt, 1 - s, s / 2],
+      [mix(rib.bd, rib.lt, 0.6), 1 - s - 0.45 * tt, (s - 0.45 * tt) / 2],
+      [mix(rib.bd, rib.lt, 0.28), 1 - s - 0.75 * tt, (s - 0.75 * tt) / 2],
+      [rib.bd, 1 - s - tt, (s - tt) / 2]
+    ];
+    ctx.lineCap = 'butt';
+    for (var k = 0; k < L.length; k++) {
+      var q = L[k];
+      ctx.strokeStyle = q[0]; ctx.lineWidth = w * q[1];
+      if (q[2]) { ctx.save(); ctx.translate(ux * q[2] * w, uy * q[2] * w); if (dash) ctx.lineDashOffset = -ext; }
+      ctx.beginPath(); if (q[2]) path(ctx, ext); else path(ctx); ctx.stroke();
+      if (q[2]) ctx.restore();
+    }
+    if (dash) ctx.lineDashOffset = 0;
+    if (fx.mini || rich <= 0.02) return;
+    // the mottle of hand-laid paint, pinned to the page (not the tile) so it runs on across tile joins
+    var pat = grainPattern(ctx);
+    if (pat) {
+      if (pat.setTransform && ctx.getTransform) {
+        try { var tm = ctx.getTransform(); pat.setTransform(tm.inverse().scale(Math.hypot(tm.a, tm.b))); } catch (e) {}
+      }
+      ctx.globalAlpha = Math.min(1, 0.75 * rich * (rib.mo || 1)); ctx.strokeStyle = pat; ctx.lineWidth = w * 0.97;
+      ctx.beginPath(); path(ctx); ctx.stroke(); ctx.globalAlpha = 1;
+    }
+    if (fx.pen === false) return;
+    // lead-white penwork, a touch warm: a fine line on the lit side of the body that swells and thins, and
+    // here and there the pen lifts (fixed per piece, so it never flickers)
+    var po = 0.2 * w;
+    ctx.save(); ctx.translate(ux * po, uy * po); ctx.strokeStyle = '#fbf1da'; ctx.lineCap = 'round';
+    var pw = Math.max(0.7, S * 0.012), Lp = fx.len || 0;
+    if (PEN === 'dots') {
+      if (Lp > 0 && !dash) {
+        var st = Lp / Math.max(1, Math.round(Lp / Math.max(4, S * 0.17)));
+        ctx.setLineDash([0.01, st - 0.01]); ctx.lineDashOffset = -(ext + st / 2);
+        ctx.globalAlpha = 0.8 * rich; ctx.lineWidth = Math.max(1.1, S * 0.036);
+        ctx.beginPath(); path(ctx, ext); ctx.stroke();
+      }
+    } else if (dash || !Lp) {   // still flooding: one plain line under the flood's dash
+      ctx.lineCap = 'butt'; ctx.globalAlpha = 0.55 * rich; ctx.lineWidth = pw;
+      ctx.lineDashOffset = -ext; ctx.beginPath(); path(ctx, ext); ctx.stroke();
+    } else {
+      var R = rand(((fx.cell || 0) * 7 + (fx.piece || 0) * 3 + 1) * 2654435761), T = Lp + 2 * ext;
+      // where the pen lifts: mostly nowhere, now and then one short gap
+      var ds = [], gaps = R() < 0.7 ? 0 : 1;
+      if (gaps) ds.push(T * (0.25 + 0.5 * R()), Math.max(1.2, w * (0.05 + 0.07 * R())));
+      ds.push(T * 3, T);
+      ctx.setLineDash(ds); ctx.lineDashOffset = 0;
+      ctx.globalAlpha = 0.5 * rich; ctx.lineWidth = pw;
+      ctx.beginPath(); path(ctx, ext); ctx.stroke();
+      // where it was pressed harder: a fuller, softer stroke over part of the line
+      var a0 = T * (0.1 + 0.4 * R()), a1 = T * (0.2 + 0.3 * R());
+      ctx.setLineDash([0, a0, a1, T * 3]); ctx.lineDashOffset = 0;
+      ctx.globalAlpha = 0.22 * rich; ctx.lineWidth = pw * 1.7;
+      ctx.beginPath(); path(ctx, ext); ctx.stroke();
+    }
+    ctx.restore();
   }
 
   function plaitSide(ctx, x0, y0, x1, y1, band, body, phase) {
@@ -664,10 +1005,11 @@
         ctx.fillStyle = HAIR; ctx.beginPath(); ctx.arc(0, ky, KR + E + HL, 0, 6.283); ctx.fill();
         ctx.fillStyle = GILT; ctx.beginPath(); ctx.arc(0, ky, KR + E, 0, 6.283); ctx.fill();
         var rg = ctx.createRadialGradient(-KR * 0.25, ky - KR * 0.25, KR * 0.1, 0, ky, KR);
-        rg.addColorStop(0, rib.base); rg.addColorStop(0.65, rib.base); rg.addColorStop(1, rib.edge);
+        if (rib.sh) { rg.addColorStop(0, mix(rib.bd, rib.lt, 0.28)); rg.addColorStop(0.38, rib.bd); rg.addColorStop(0.8, rib.bd); rg.addColorStop(1, mix(rib.bd, rib.sh, 0.75)); }
+        else { rg.addColorStop(0, rib.base); rg.addColorStop(0.65, rib.base); rg.addColorStop(1, rib.edge); }
         ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(0, ky, KR, 0, 6.283); ctx.fill();
         // the stem runs on into the roundel without a seam
-        ribLayers(ctx, function (g) { g.moveTo(0, -U * 0.22); g.lineTo(0, ky - KR * 0.55); }, 2 * a, U, rib, false, null, 0);
+        ribLayers(ctx, function (g) { g.moveTo(0, -U * 0.22); g.lineTo(0, ky - KR * 0.55); }, 2 * a, U, rib, false, null, 0, { pen: false, mini: o.mini, ang: o.ang });
         // the ribbon's left edge coils inward as a gold spiral
         var th0 = Math.atan2(-Math.sqrt(Math.max(0, KR * KR - a * a)), -a), N = 44, pts = [];
         for (var i = 0; i <= N; i++) { var q = i / N, th = th0 - q * 6.283 * 1.45, rr = (KR + E * 0.5) * (1 - 0.84 * q); pts.push([Math.cos(th) * rr, ky + Math.sin(th) * rr]); }
@@ -688,6 +1030,7 @@
       ctx.fillStyle = INK; ctx.beginPath(); ctx.arc(0, r * 0.25, r * 0.14, 0, 6.283); ctx.fill();
     },
     beastHead: function (ctx, x, y, w, h, t, o) {
+      if (paintedBeast(ctx, 'head', x, y, w, h, t, o)) return;
       // Insular zoomorphic head in profile. The box is the tile: the neck ribbon arrives from the
       // top edge to the box centre and the head lies in the lower half, snout pointing +y.
       // opts: body (colour), snap 0..1 (jaw snaps shut and open), blink 0..1, angle
@@ -696,6 +1039,11 @@
       var U = Math.min(w, h), snap = o.snap || 0, blink = o.blink || 0, body = o.body || PIG.bare.base, gilt = !!o.gilt;
       ctx.translate(x + w / 2, y + h / 2); ctx.rotate(o.angle || 0); ctx.scale(U, U);
       if (gilt) ctx.scale(1.28, 1);
+      var skin = body, pt = o.paint;
+      if (pt && pt.sh) {   // modelled like its strand: pale on the brow, deep at the jaw's edges
+        skin = ctx.createRadialGradient(0.03, 0.06, 0.02, 0.04, 0.16, 0.36);
+        skin.addColorStop(0, mix(pt.bd, pt.lt, 0.55)); skin.addColorStop(0.42, pt.bd); skin.addColorStop(1, pt.sh);
+      }
       var lw = Math.max(1.1 / U, 0.022), GE = Math.max(1, U * 0.034) / U, GH = Math.max(0.7, U * 0.014) / U;
       function edge() {   // fill the current path, edged in gold (gilt) or ink
         if (!gilt) { ctx.fill(); ctx.stroke(); return; }
@@ -735,14 +1083,14 @@
       ctx.stroke(); ctx.strokeStyle = gilt ? HAIR : INK; ctx.lineWidth = lw;
       // lower jaw, hinged near the cheek
       ctx.save(); ctx.translate(hx, hy); ctx.rotate(open);
-      ctx.fillStyle = body;
+      ctx.fillStyle = pt && pt.sh ? mix(pt.sh, pt.bd, 0.45) : body;
       ctx.beginPath(); ctx.moveTo(-0.07, -0.04); ctx.bezierCurveTo(-0.08, 0.1, -0.02, 0.2, 0.05, 0.27);
       ctx.quadraticCurveTo(0.07, 0.2, 0.04, 0.06); ctx.closePath(); edge();
       ctx.fillStyle = '#fffbe8';
       for (var ti = 0; ti < 3; ti++) { var ty = 0.08 + ti * 0.055; ctx.beginPath(); ctx.moveTo(0.04 - ti * 0.004, ty); ctx.lineTo(0.08, ty + 0.012); ctx.lineTo(0.042, ty + 0.03); ctx.fill(); }
       ctx.restore();
       // skull and long upper jaw
-      ctx.fillStyle = body;
+      ctx.fillStyle = skin;
       ctx.beginPath(); ctx.moveTo(-0.145, -0.04); ctx.lineTo(0.145, -0.04);
       ctx.bezierCurveTo(0.25, 0.0, 0.25, 0.13, 0.19, 0.21);
       ctx.bezierCurveTo(0.16, 0.29, 0.15, 0.37, 0.13, 0.45);
@@ -768,6 +1116,7 @@
       ctx.beginPath(); ctx.arc(0.135, 0.39, 0.016, 0, 6.283); ctx.fillStyle = gilt ? HAIR : INK; ctx.fill();
     },
     beastTail: function (ctx, x, y, w, h, t, o) {
+      if (paintedBeast(ctx, 'tail', x, y, w, h, t, o)) return;
       // A tapering tail: the ribbon arrives from the top edge to the box centre, sweeps round and up
       // the -x side and ends in a little fishtail leaf. opts: body, wag 0..1, angle
       // opts.gilt: board style (gold edges, hairline); opts.rw: starting width as a fraction of the tile
@@ -782,10 +1131,14 @@
       var L = pts.length;
       ctx.lineCap = 'round'; ctx.lineJoin = 'round';
       var widthAt = function (j) { var s = j / (L - 1); return w0 * (1 - s) + 0.05 * s; };
-      for (var pass = gilt ? -1 : 0; pass < 2; pass++) {
-        ctx.strokeStyle = pass > 0 ? body : gilt ? (pass < 0 ? HAIR : GILT) : INK;
+      var pt = o.paint && o.paint.sh ? o.paint : null;
+      // painted: the body in three tones, deep edges to a pale centre, like the strand it ends
+      var tones = pt ? [[pt.sh, 1], [mix(pt.sh, pt.bd, 0.6), 0.82], [pt.bd, 0.6], [mix(pt.bd, pt.lt, 0.5), 0.26]] : [[body, 1]];
+      for (var pass = gilt ? -1 : 0; pass < 1 + tones.length; pass++) {
+        var tone = pass > 0 ? tones[pass - 1] : null;
+        ctx.strokeStyle = tone ? tone[0] : gilt ? (pass < 0 ? HAIR : GILT) : INK;
         for (i = 1; i < L; i++) {
-          ctx.lineWidth = widthAt(i) + (pass > 0 ? 0 : gilt ? (pass < 0 ? 2 * (GE + GH) : 2 * GE) : 2 * Math.max(lw, widthAt(i) * 0.15));
+          ctx.lineWidth = tone ? widthAt(i) * tone[1] : widthAt(i) + (gilt ? (pass < 0 ? 2 * (GE + GH) : 2 * GE) : 2 * Math.max(lw, widthAt(i) * 0.15));
           ctx.beginPath(); ctx.moveTo(pts[i - 1][0], pts[i - 1][1]); ctx.lineTo(pts[i][0], pts[i][1]); ctx.stroke();
         }
       }
@@ -799,7 +1152,7 @@
       // fishtail leaf
       var e = pts[L - 1], f = pts[L - 2], ang = Math.atan2(e[1] - f[1], e[0] - f[0]);
       ctx.save(); ctx.translate(e[0], e[1]); ctx.rotate(ang);
-      ctx.fillStyle = body; ctx.strokeStyle = gilt ? GILT : INK; ctx.lineWidth = gilt ? 2 * GE : lw;
+      ctx.fillStyle = pt ? pt.bd : body; ctx.strokeStyle = gilt ? GILT : INK; ctx.lineWidth = gilt ? 2 * GE : lw;
       ctx.beginPath(); ctx.moveTo(-0.01, 0);
       ctx.bezierCurveTo(0.04, -0.03, 0.09, -0.09, 0.13, -0.08);
       ctx.quadraticCurveTo(0.08, -0.02, 0.1, 0);
@@ -905,6 +1258,7 @@
     // the board's enamel look: RIB colours, the cached panel (ground, filigree, gilded frame, ivy) and
     // layered gold-edged ribbon strokes
     RIB: RIB, HAIR: HAIR, GILT: GILT, MADDER: MADDER, makePanel: makePanel, ribLayers: ribLayers, ribMix: ribMix,
+    setPen: function (m) { PEN = m; }, rampAt: function (rib, x) { return rampAt(rib, x); },
     // the page's panel ground (a GROUND name, from the level) and the jewels that contrast with it
     GROUND: GROUND, groundName: groundName, ground: function (name) { return GROUND[name] || GROUND.madder; }, jewelsFor: jewelsFor,
     rib: function (name) { return RIB[name] || RIB.gold; },
@@ -912,6 +1266,12 @@
     define: function (slot, fn) { DRAW[slot] = fn; },
     pigment: function (name) { return PIG[name] || PIG.gold; },
     has: function (slot) { return !!images[slot]; },
+    // where the board's ribbon stops on a painted beast's tile (tile frame, side 1, entry at -0.5), or null
+    beastStop: function (kind, band) {
+      var sl = kind === 'tail' ? 'beast.tail' : 'beast.headShut';
+      if (!beastReady(kind) || !prepBeast(sl)) return null;
+      return beastGeom(kind, band || BEAST_BAND).stop;
+    },
     // a loaded PNG's shape: aspect = width / height, stem = where its vine meets the bottom edge (0..1)
     meta: function (slot) { return images[slot] ? metas[slot] : null; },
     // the unpainted state of a PNG: a sepia ink underdrawing (dark lines kept, light fills thinned away)
@@ -960,14 +1320,15 @@
     load: function (base) {
       base = base || 'art/';
       if (typeof fetch === 'undefined') return Promise.resolve();
-      return fetch(base + 'manifest.json?v=3', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : {}; }).then(function (m) {
+      return fetch(base + 'manifest.json?v=4', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : {}; }).then(function (m) {
         return Promise.all(Object.keys(m).map(function (slot) {
           var e = typeof m[slot] === 'string' ? { file: m[slot] } : (m[slot] || {});
           if (!e.file) return null;
           return new Promise(function (res) {
             var img = new Image();
             img.onload = function () {
-              images[slot] = img; delete fadedCache[slot];
+              images[slot] = img; delete fadedCache[slot]; delete beastPrep[slot]; delete beastBad[slot];
+              if (BEAST[slot]) { beastCache = {}; beastCacheN = 0; }
               metas[slot] = { aspect: img.naturalWidth / img.naturalHeight, stem: e.stem != null ? e.stem : 0.5,
                 fit: e.fit != null ? !!e.fit : slot.indexOf('drollery.') === 0,
                 crisp: e.crisp != null ? !!e.crisp : slot.indexOf('mark.') === 0 };
