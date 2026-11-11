@@ -112,6 +112,7 @@ table.stats td.zero { color: var(--faint); }
 .menusheet button:active { background: rgba(120,80,40,.1); }
 .menusheet button:disabled { opacity: .4; }
 .menusheet .sep { height: 1px; background: var(--rule); margin: 4px 0; }
+.menusheet button[hidden] { display: none; }
 .menusheet .tog { padding-left: 46px; position: relative; }
 .menusheet .tog::before {
   content: ''; position: absolute; left: 16px; top: 50%; width: 18px; height: 18px; margin-top: -9px; border: 1.5px solid var(--ink2); border-radius: 3px;

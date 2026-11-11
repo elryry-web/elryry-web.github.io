@@ -95,6 +95,8 @@
       b.onclick = function () { tab(b.getAttribute('data-tab')); };
     });
     document.addEventListener('click', function (e) { var m = $('pz-menusheet'); if (m.classList.contains('on') && !m.contains(e.target)) m.classList.remove('on'); });
+    $('m-title').onclick = function () { closeMenu(); SAVE.write(); SCREENS.show('title'); };
+    $('m-again').onclick = function () { closeMenu(); replayOne(); };
     $('m-check').onclick = function () { closeMenu(); check(); };
     $('m-undo').onclick = function () { closeMenu(); undo(); };
     $('m-redo').onclick = function () { closeMenu(); redo(); };
@@ -125,6 +127,7 @@
   function closeMenu() { $('pz-menusheet').classList.remove('on'); }
   function syncMenu() {
     ['auto', 'sound', 'music', 'showWrong'].forEach(function (k) { $('m-' + k).classList.toggle('on', !!settings()[k]); $('m-' + k).setAttribute('aria-checked', String(!!settings()[k])); });
+    $('m-again').hidden = !(S && S.kind === 'story' && S.solved && S.o.onReplay);
     $('m-undo').disabled = !S || !S.undo.length; $('m-redo').disabled = !S || !S.redo.length;
   }
   function syncButtons() {
@@ -199,6 +202,12 @@
     if (!S.solved && LOGIC.isSolved(S.p, S.marks)) solvedNow();
   }
 
+  // story puzzles only: blank the page again, keep the seal (SAVE.data.solved); rec.replay lets the screen open it unsolved
+  function replayOne() {
+    if (!S || S.kind !== 'story' || !S.solved || !S.o.onReplay) return;
+    var o = S.o;
+    UI.confirm('Start this page again from blank? Your seal stays.', 'Start again', 'Keep it', function () { UI.closeAll(); o.onReplay(); });
+  }
   function reset() {
     UI.confirm('Rub out every mark on this page? (Undo will bring them back.)', 'Rub them out', 'Keep them', function () { change(null, 'erase', true); });
   }
@@ -326,7 +335,7 @@
   }
 
   function solvedNow() {
-    S.solved = true; S.rec.solved = true; SAVE.write();
+    S.solved = true; S.rec.solved = true; S.rec.replay = false; SAVE.write();
     clearHint(); syncButtons();
     if (S.o.onSolved) S.o.onSolved(S);
     grid.gild();
@@ -351,14 +360,18 @@
     box.appendChild(foot);
     var row = el('div', 'btnrow');
     var bBack = el('button', 'btn', o.backLabel || 'Back to the Chronicle'); row.appendChild(bBack);
-    var bNext = null;
+    var bNext = null, bAgain = null;
+    if (S.kind === 'story' && o.onReplay) { bAgain = el('button', 'btn', 'Play it again'); row.appendChild(bAgain); }
     if (o.onNext) { bNext = el('button', 'btn verm', o.nextLabel || 'Next'); row.appendChild(bNext); }
     box.appendChild(row);
     var close = UI.sheet(box, { cls: 'paper' });
     bBack.onclick = function () { close(); if (o.onBack) o.onBack(); };
     if (bNext) bNext.onclick = function () { close(); o.onNext(); };
+    if (bAgain) bAgain.onclick = function () { close(); replayOne(); };
     AUDIO.play('page');
   }
+  // blank a story record for replay (also used by the Chronicle's chapter replay)
+  PLAY.blank = function (rec) { rec.m = ''; rec.s = []; rec.h = 0; rec.solved = false; rec.replay = true; };
   PLAY.showEpilogue = function () { if (S && S.solved) showEpilogue(); };
 
   // ---------------------------------------------------------------- layout

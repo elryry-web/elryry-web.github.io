@@ -166,6 +166,17 @@
         }
         var solvedN = g.items.filter(function (p) { return SAVE.data.solved[p.id]; }).length;
         sec.appendChild(el('div', 'chsub', solvedN + ' of ' + g.items.length + ' solved'));
+        if (g.items.length && solvedN === g.items.length) {
+          var again = el('button', 'btn small chagain', 'Play the chapter again');
+          again.onclick = function () {
+            UI.confirm('Start every page of this chapter again from blank? Your seals stay.', 'Start again', 'Keep them', function () {
+              g.items.forEach(function (q) { PLAY.blank(SAVE.puz(q.id)); });
+              SAVE.write();
+              SCREENS.show('puzzle', { id: g.items[0].id });
+            });
+          };
+          sec.appendChild(again);
+        }
         var ul = el('ul', 'plist');
         g.items.forEach(function (p) {
           var ok = STORYC.isOpen(p), done = !!SAVE.data.solved[p.id];
@@ -178,7 +189,8 @@
             var m = el('span', 'pmeta');
             m.appendChild(document.createTextNode([p.place, p.size].filter(Boolean).join(' · ') + (p.grade ? ' · ' : '')));
             m.appendChild(gradeMark(p.grade));
-            if (SAVE.data.puz[p.id] && SAVE.data.puz[p.id].m && !done) m.appendChild(document.createTextNode(' · begun'));
+            if (SAVE.data.puz[p.id] && SAVE.data.puz[p.id].replay) m.appendChild(document.createTextNode(' · playing again'));
+            else if (SAVE.data.puz[p.id] && SAVE.data.puz[p.id].m && !done) m.appendChild(document.createTextNode(' · begun'));
             t.appendChild(m);
           }
           b.appendChild(t);
@@ -204,7 +216,7 @@
       var p = STORYC.byId[params.id];
       if (!p || !STORYC.isOpen(p)) { SCREENS.show('chronicle', {}, { replace: true }); return; }
       var rec = SAVE.puz(p.id);
-      rec.solved = !!SAVE.data.solved[p.id];
+      rec.solved = !!SAVE.data.solved[p.id] && !rec.replay;   // a replay opens blank; the seal (SAVE.data.solved) stays
       if (!p.sample) SAVE.data.last = { id: p.id };
       if (window.CAST) CAST.meet(p);
       SAVE.write();
@@ -214,7 +226,8 @@
         subtitle: (p.sample ? 'Sample' : 'Chapter ' + (C.num || p.chapter) + ' · ' + (p.number || '')) + ' · ' + p.size + ' · ' + p.grade,
         onBack: function () { SCREENS.show('chronicle'); },
         backLabel: 'Back to the Chronicle',
-        onSolved: function () { SAVE.data.solved[p.id] = true; SAVE.write(); },
+        onSolved: function () { SAVE.data.solved[p.id] = true; rec.replay = false; SAVE.write(); },
+        onReplay: function () { PLAY.blank(rec); SAVE.write(); SCREENS.show('puzzle', { id: p.id }, { replace: true }); },
         onNext: function () { var q = STORYC.next(p); if (q) SCREENS.show('puzzle', { id: q.id }); else SCREENS.show('chronicle'); },
         nextLabel: 'Next'
       });

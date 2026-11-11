@@ -15,12 +15,12 @@
     var L = SAVE.data.last || {}, D = SAVE.data.daybook.cur;
     if (L.id) {
       var p = STORYC.byId[L.id];
-      if (p && !SAVE.data.solved[p.id] && STORYC.isOpen(p)) return { label: p.title, go: ['puzzle', { id: p.id }] };
+      if (p && (!SAVE.data.solved[p.id] || (SAVE.data.puz[p.id] && SAVE.data.puz[p.id].replay)) && STORYC.isOpen(p)) return { label: p.title, go: ['puzzle', { id: p.id }] };
     }
     if (D && !D.solved && D.params && (L.daybook || D.m)) return { label: 'the open Day Book page', go: ['puzzle', { daybook: true }] };
     for (var i = 0; i < STORYC.list.length; i++) {
       var q = STORYC.list[i], r = SAVE.data.puz[q.id];
-      if (!q.sample && r && r.m && !SAVE.data.solved[q.id] && STORYC.isOpen(q)) return { label: q.title, go: ['puzzle', { id: q.id }] };
+      if (!q.sample && r && r.m && (!SAVE.data.solved[q.id] || r.replay) && STORYC.isOpen(q)) return { label: q.title, go: ['puzzle', { id: q.id }] };
     }
     return null;
   }
