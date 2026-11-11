@@ -1,0 +1,14 @@
+{
+  "titlecap": { "file": "titlecap.png", "v": 1 },
+  "dropcap-I": { "file": "dropcap-I.png", "v": 1 },
+  "dropcap-L": { "file": "dropcap-L.png", "v": 1 },
+  "dropcap-O": { "file": "dropcap-O.png", "v": 1 },
+  "dropcap-T": { "file": "dropcap-T.png", "v": 1 },
+  "corner": { "file": "corner.png", "v": 1 },
+  "seal": { "file": "seal.png", "v": 1 },
+  "flourish": { "file": "flourish.png", "v": 1 },
+  "map": { "file": "map.png", "v": 1 },
+  "portrait-hamo": { "file": "portrait-hamo.png", "v": 1 },
+  "portrait-gervase": { "file": "portrait-gervase.png", "v": 1 },
+  "portrait-wystan": { "file": "portrait-wystan.png", "v": 1 }
+}

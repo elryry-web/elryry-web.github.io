@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tithe &amp; Tattle</title>
+<meta name="theme-color" content="#efe2c4">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Ccircle cx=%278%27 cy=%278%27 r=%277%27 fill=%27%23a8321e%27/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=IM+Fell+English+SC&display=swap">
+<link rel="stylesheet" href="css/style.css?v=5">
+</head>
+<body>
+
+<main id="scr-title" class="screen scroll"></main>
+<main id="scr-chronicle" class="screen scroll"></main>
+<main id="scr-daybook" class="screen scroll"></main>
+<main id="scr-whoswho" class="screen scroll"></main>
+<main id="scr-map" class="screen scroll"></main>
+
+<main id="scr-puzzle" class="screen">
+  <header id="pz-head" class="pz-head">
+    <button id="pz-back" class="iconbtn" aria-label="Back">&#8592;</button>
+    <div class="pz-titles"><h1 id="pz-title"></h1><div id="pz-sub"></div></div>
+    <button id="pz-hint" class="btn hintbtn">Ask the Prior</button>
+    <button id="pz-menu" class="iconbtn" aria-label="More">&#8943;</button>
+    <div id="pz-menusheet" class="menusheet" role="menu">
+      <button id="m-check" role="menuitem">Check my work</button>
+      <button id="m-undo" role="menuitem">Undo</button>
+      <button id="m-redo" role="menuitem">Redo</button>
+      <button id="m-story" role="menuitem">Read the story again</button>
+      <button id="m-reset" role="menuitem">Rub out the page&hellip;</button>
+      <div class="sep"></div>
+      <button id="m-auto" class="tog" role="menuitemcheckbox">Cross out the rest when I mark &#9679;</button>
+      <button id="m-sound" class="tog" role="menuitemcheckbox">Sound</button>
+      <button id="m-music" class="tog" role="menuitemcheckbox">Music</button>
+      <button id="m-showWrong" class="tog" role="menuitemcheckbox">Ring mistakes when checking</button>
+    </div>
+  </header>
+  <div class="pz-body">
+    <div id="pz-gridwrap" class="pz-gridwrap">
+      <div id="pz-gridbox" class="pz-gridbox">
+        <canvas id="pz-grid" class="grid"></canvas>
+        <div id="zoombar" class="zoombar"><button id="zoom-out" aria-label="Zoom out">&minus;</button><button id="zoom-in" aria-label="Zoom in">+</button></div>
+      </div>
+      <div id="tally-under" class="tally-under"></div>
+      <div class="gridtip"></div>
+    </div>
+    <div class="pz-side">
+      <nav class="tabs" role="tablist">
+        <button data-tab="clues" role="tab">Clues</button>
+        <button data-tab="tally" role="tab" class="tallytab">Tally</button>
+        <button data-tab="story" role="tab">Story</button>
+        <span class="sp"></span>
+        <button id="pz-undo" class="iconbtn" aria-label="Undo">&#8630;</button>
+        <button id="pz-redo" class="iconbtn" aria-label="Redo">&#8631;</button>
+      </nav>
+      <div id="pz-note" class="note" aria-live="polite"></div>
+      <div id="pz-panel" class="panel">
+        <div class="pane" data-pane="clues"><ol id="clues" class="clues"></ol>
+          <p class="howto">Tap a square: &#10007;, then &#9679;, then blank. Hold (or right-click) for &#9679;. Tap a clue to strike it through.</p></div>
+        <div class="pane" data-pane="tally"><div id="tally"></div></div>
+        <div class="pane" data-pane="story"><div id="story" class="story"></div></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script src="js/logic.js?v=5"></script>
+<script src="js/daybook.js?v=5"></script>
+<script src="js/story/sample.js?v=5"></script>
+<script src="js/story/ch1.js?v=5"></script>
+<script src="js/story/ch2.js?v=5"></script>
+<script src="js/story/ch3.js?v=5"></script>
+<script src="js/story/ch4.js?v=5"></script>
+<script src="js/story/ch5.js?v=5"></script>
+<script src="js/story/ch6.js?v=5"></script>
+<script src="js/save.js?v=5"></script>
+<script src="js/art.js?v=5"></script>
+<script src="js/audio.js?v=5"></script>
+<script src="js/music.js?v=5"></script>
+<script src="js/grid.js?v=5"></script>
+<script src="js/play.js?v=5"></script>
+<script src="js/screens.js?v=5"></script>
+<script src="js/cast.js?v=5"></script>
+<script src="js/pages.js?v=5"></script>
+<script src="js/main.js?v=5"></script>
+</body>
+</html>
