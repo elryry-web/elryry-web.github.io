@@ -832,7 +832,21 @@ const Save = {
     const next = Math.min(LEVELS.length - 1, i + 1);
     if (next > this.indexOf(d.reach)) d.reach = this.idOf(next);
   },
+  // (v178) the sigils whose reveal (the sheet that brings a new sigil in) has been shown, by sigil id. A save from
+  // before v178 has no list: it counts as seen every sigil a lesson it has already won uses
+  seen() {
+    const d = this.data;
+    if (!Array.isArray(d.seenSigils)) d.seenSigils = [...new Set(LEVELS.flatMap(L => d.stars[lessonId(L)] ? L.sigils : []))];
+    return d.seenSigils;
+  },
+  see(ids) { const s = this.seen(); for (const id of ids) if (!s.includes(id)) s.push(id); this.save(); },
   load() {
+    this.read();
+    if (Array.isArray(this.data.seenSigils)) return;
+    this.seen();
+    try { if (localStorage.getItem('quillsigil.v1')) this.save(); } catch (e) { } // (a fresh game saves nothing until it must)
+  },
+  read() {
     try {
       const s = JSON.parse(localStorage.getItem('quillsigil.v1'));
       if (!s || (s.v >= 11 ? !s.stars : !s.unlocked)) return;
@@ -976,6 +990,7 @@ const Game = {
   start(i) {
     // a restart can come while the grimoire is open or a spell is being aimed (the R key, the button, a lost orb)
     if (Grim.open) Grim.hide();
+    Reveal.drop(); // (v178) a sheet left open by a lesson that is being replaced (a custom level opened over a resumed lesson)
     this.closeSatchel(); this.closeNotes();
     $('#aimbar').classList.remove('show'); $('#bGrimoire').classList.remove('hidden');
     // Restarting (or replaying) the same lesson keeps the last drawing for Recall.
@@ -998,6 +1013,7 @@ const Game = {
     this.state = 'play';
     this.renderSatchel();
     this.showScreen(null);
+    Reveal.maybe(i); // (v178) the first lesson to bring in a sigil opens on its sheet (never a custom level: i is -1)
   },
   note() {
     const L = this.level;
@@ -1199,15 +1215,24 @@ const Game = {
     // (the drop cap's capital is chiselled gold drawn on a canvas, as on the desktop page; its lapis field is 50px)
     if (illum) { const c = document.createElement('span'); c.className = 'cap'; c.append(goldCapCanvas(L.lesson[0], 50)); nt.prepend(c); }
     const box = $('#nSigils'); box.innerHTML = '';
+    let ahead = 0;
     for (const id of SIGIL_ORDER) {
       const S = SIGILS[id], known = L.sigils.includes(id);
+      // (v178) a sigil the player has not met yet is not shown or named: one row at the end counts them
+      if (!known && !sigilKnown(id, L)) { ahead++; continue; }
       const b = document.createElement('button');
       b.className = 'nsig' + (known ? '' : ' off') + (known && Grim.ringRefuses(id) ? ' no' : '') + (Grim.ghost === id ? ' on' : '');
       const im = `<img src="${glyphIcon(id)}" alt="" style="background:${known ? S.color : 'transparent'}">`;
       b.innerHTML = (illum ? `<span class="rd">${im}</span>` : im) + `<div><b>${S.name}</b><em>${S.en}</em>` +
-        `<span>${known ? (ringOnly(id) ? 'Ring only, this lesson. ' : '') + S.desc : LEVELS.slice(0, LEVELS.indexOf(L)).some(l => l.sigils.includes(id)) ? 'Unused this lesson.' : 'Not yet learned.'}</span></div>`;
+        `<span>${known ? (ringOnly(id) ? 'Ring only, this lesson. ' : '') + S.desc : 'Unused this lesson.'}</span></div>`;
       if (known) b.onclick = () => { Grim.ghost = Grim.ghost === id ? null : id; Sfx.play('tick'); this.closeNotes(); };
       else b.disabled = true;
+      box.appendChild(b);
+    }
+    if (ahead) {
+      const b = document.createElement('button'); b.className = 'nsig off'; b.disabled = true;
+      const im = `<img src="${blankIcon()}" alt="" style="background:transparent">`;
+      b.innerHTML = (illum ? `<span class="rd">${im}</span>` : im) + `<div><b>Not yet learned</b><span>${ahead === 1 ? 'One more sigil waits' : ['', '', 'Two', 'Three', 'Four', 'Five'][ahead] + ' more sigils wait'} in later lessons.</span></div>`;
       box.appendChild(b);
     }
     $('#nRings').innerHTML = ringLegendHTML(L); $('#nRingsH').style.display = R ? '' : 'none';
@@ -1298,6 +1323,12 @@ function renderTerms() {
 function openTerms() { renderTerms(); $('#terms').classList.add('show'); Sfx.play('page'); }
 function closeTerms() { $('#terms').classList.remove('show'); }
 const termsOpen = () => $('#terms').classList.contains('show');
+// (v178) the empty circle that stands for the sigils still to come
+function blankIcon() {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d'); g.strokeStyle = '#2a1830'; g.lineWidth = 2.5; g.beginPath(); g.arc(32, 32, 28, 0, TAU); g.stroke();
+  return c.toDataURL();
+}
 function glyphIcon(id) {
   const c = document.createElement('canvas'); c.width = c.height = 64;
   const g = c.getContext('2d');
@@ -1305,6 +1336,119 @@ function glyphIcon(id) {
   drawGlyph(g, id, 32, 32, 22, '#2a1830', 3);
   return c.toDataURL();
 }
+
+/* ---------------- (v178) The new-sigil sheet ----------------
+   The first time a player opens the lesson that first brings in a sigil (found from the order of the lessons), a sheet
+   of the satchel's paper shows it: the seal and the sigil draw themselves stroke by stroke in ink, then take the
+   sigil's colour, over its name and one plain line. Tap, Enter or Space finishes the drawing, then turns to the next
+   sigil or begins the lesson; Escape begins at once. Seen once per sigil (Save.seen), never in a custom level. */
+const REVEAL_LINES = {
+  gale: 'Wind that pushes everything inside its seal, the way its sign points.',
+  stone: 'Raises stone where you cast it, even out of empty air.',
+  flame: 'Wakes fire where you cast it. Fire spreads along whatever will burn.',
+  tide: 'Calls water. It fills the lowest place first, and light things rise with it.',
+  frost: 'Stills what moves. Frozen water bears weight, and the orb rolls fast on ice.',
+  luna: 'Lifts what rests. A floating orb waits in the air until wind moves it.',
+};
+const SHAPE_NAMES = { spiral: 'the spiral', square: 'the square', triangle: 'the triangle', wave: 'the wave', star: 'the star', moon: 'the crescent' };
+// the sigils lesson i is the first to use
+function newSigilsAt(i) {
+  const L = LEVELS[i]; if (!L || i < 0) return [];
+  return L.sigils.filter(id => !LEVELS.slice(0, i).some(l => l.sigils.includes(id)));
+}
+const Reveal = {
+  open: false, queue: [], k: 0, t0: 0, raf: 0, drawn: false,
+  SEAL: 0.55, INK: 1.25, GILD: 0.45, // seconds: the circle, then the sigil, then its colour (2.25 s in all)
+  maybe(i) {
+    if (!(i >= 0)) return;
+    const seen = Save.seen(), ids = newSigilsAt(i).filter(id => !seen.includes(id));
+    if (ids.length) this.show(ids);
+  },
+  show(ids) {
+    Tips.hide();
+    this.queue = ids; this.k = 0; this.open = true;
+    $('#reveal').classList.add('show');
+    this.page();
+  },
+  page() {
+    const id = this.queue[this.k], S = SIGILS[id], last = this.k === this.queue.length - 1;
+    $('#rvNum').textContent = this.queue.length > 1 ? `a new sigil · ${this.k + 1} of ${this.queue.length}` : 'a new sigil';
+    $('#rvName').textContent = S.name;
+    $('#rvEn').textContent = `${S.en} · ${SHAPE_NAMES[S.glyph] || ''}`;
+    $('#rvLine').textContent = REVEAL_LINES[id] || '';
+    $('#rvGo').textContent = last ? 'Begin' : 'Next';
+    const where = document.body.classList.contains('touch') ? 'Tap anywhere' : 'Click anywhere or press Enter';
+    $('#rvKeys').textContent = `${where} ${last ? 'to begin' : 'for the next sigil'}.`;
+    cancelAnimationFrame(this.raf); this.drawn = false;
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) { this.finish(); return; }
+    this.t0 = performance.now();
+    const step = now => {
+      const t = (now - this.t0) / 1000;
+      if (t >= this.SEAL + this.INK + this.GILD) { this.finish(); return; }
+      this.draw(t); this.raf = requestAnimationFrame(step);
+    };
+    this.draw(0); this.raf = requestAnimationFrame(step);
+  },
+  finish() { cancelAnimationFrame(this.raf); this.raf = 0; this.drawn = true; this.draw(99); },
+  // t seconds into the drawing: the seal's circle, the sigil's lines (each in turn, by length), then its colour
+  draw(t) {
+    const c = $('#rvGlyph'), dpr = Math.min(2, devicePixelRatio || 1), n = Math.round((c.clientWidth || 150) * dpr);
+    if (c.width !== n) c.width = c.height = n;
+    const g = c.getContext('2d'), S = SIGILS[this.queue[this.k]], R = n / 2 - 4 * dpr, r = R * 0.78, cx = n / 2, cy = n / 2;
+    g.clearRect(0, 0, n, n); g.lineCap = 'round'; g.lineJoin = 'round';
+    const u = v => Math.max(0, Math.min(1, v)), ease = v => 1 - (1 - v) * (1 - v);
+    const us = ease(u(t / this.SEAL)), ui = u((t - this.SEAL) / this.INK), ug = ease(u((t - this.SEAL - this.INK) / this.GILD));
+    const ink = '#2a1830';
+    g.strokeStyle = ink; g.lineWidth = 2.5 * dpr; // the seal: one circle, from the top, clockwise
+    g.beginPath(); g.arc(cx, cy, R, -Math.PI / 2, -Math.PI / 2 + TAU * us); g.stroke();
+    const ox = cx + (GLYPH_NUDGE[S.glyph] || 0) * r;
+    const lines = glyphLines(S.glyph).map(L => L.map(([x, y]) => [ox + x * r, cy + y * r]));
+    const segs = lines.map(L => L.map((p, i) => i ? Math.hypot(p[0] - L[i - 1][0], p[1] - L[i - 1][1]) : 0));
+    const lens = segs.map(d => d.reduce((a, b) => a + b, 0)), total = lens.reduce((a, b) => a + b, 0) || 1;
+    let head = null;
+    const strokeAll = (len, col, w) => { // the first len of the sigil's lines, end to end
+      g.strokeStyle = col; g.lineWidth = w; let left = len;
+      lines.forEach((L, i) => {
+        if (left <= 0) return;
+        g.beginPath(); g.moveTo(L[0][0], L[0][1]);
+        for (let j = 1; j < L.length && left > 0; j++) {
+          const d = segs[i][j];
+          if (d <= left) { g.lineTo(L[j][0], L[j][1]); left -= d; head = L[j]; }
+          else { const f = left / d; head = [L[j - 1][0] + (L[j][0] - L[j - 1][0]) * f, L[j - 1][1] + (L[j][1] - L[j - 1][1]) * f]; g.lineTo(head[0], head[1]); left = 0; }
+        }
+        g.stroke();
+      });
+    };
+    if (ug > 0) { g.globalAlpha = 0.55 * ug; strokeAll(total, S.color, 9 * dpr); g.globalAlpha = 1; }
+    if (ui > 0) {
+      strokeAll(total * ui, ink, 4 * dpr);
+      if (ui < 1 && head) { g.fillStyle = ink; g.beginPath(); g.arc(head[0], head[1], 3.4 * dpr, 0, TAU); g.fill(); } // the wet nib
+    }
+    if (ug > 0) { g.globalAlpha = ug; strokeAll(total, '#c9a24a', 1.3 * dpr); g.globalAlpha = 1; }
+  },
+  tap() { if (!this.drawn) { this.finish(); return; } this.next(); },
+  next() {
+    Save.see([this.queue[this.k]]);
+    if (this.k < this.queue.length - 1) { this.k++; this.page(); } else this.close();
+  },
+  close() { if (this.open) { Save.see(this.queue); this.drop(); } },
+  // put away without counting the sigils as seen
+  drop() {
+    if (!this.open) return;
+    cancelAnimationFrame(this.raf); this.raf = 0; this.open = false;
+    $('#reveal').classList.remove('show');
+  },
+};
+$('#reveal').addEventListener('click', e => { if (e.target.closest('#rvGo')) return; Sfx.init(); Reveal.tap(); });
+$('#rvGo').addEventListener('click', e => { Sfx.init(); Reveal.next(); e.currentTarget.blur(); });
+// while the sheet is open it takes every key, so nothing reaches the lesson beneath it
+window.addEventListener('keydown', e => {
+  if (!Reveal.open) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  if (e.repeat) return;
+  if (e.key === 'Escape') Reveal.close();
+  else if (e.key === 'Enter' || e.key === ' ') Reveal.tap();
+}, true);
 
 /* ---------------- Aim preview overlay ---------------- */
 function aimOverlay(g, t) {
@@ -1976,7 +2120,8 @@ bind('#bResume', () => Game.resumeLesson());
 bind('#bGrimoire', () => Game.openGrimoire());
 bind('#bRewind', () => Game.rewind());
 bind('#bReset', () => Game.reset());
-bind('#bTipsAgain', e => { Tips.reset(); Sfx.play('tick'); e.currentTarget.textContent = '✓ The tips will show again'; });
+bind('#bTipsAgain', e => { Tips.reset(); Save.data.seenSigils = []; Save.save(); // (v178) the new-sigil sheets show again too
+  Sfx.play('tick'); e.currentTarget.textContent = '✓ The tips will show again'; });
 bind('#bNote', () => { if (Game.state === 'play') Game.noteOpen() ? Game.closeNote() : Game.note(); });
 bind('#bLessons', () => { if (Grim.open) Grim.hide(); Game.lessons(); });
 bind('#bSound', () => { Sfx.setMuted(!Sfx.muted); $('#bSound').classList.toggle('off', Sfx.muted); });

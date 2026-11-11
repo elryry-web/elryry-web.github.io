@@ -546,6 +546,21 @@ function lessonRules() {
   const L = typeof Game !== 'undefined' && Game.level; if (!L) return null;
   return { centers: L.centers || L.sigils, sats: L.sats || L.sigils, combos: !!L.combos, ringOf: L.ringOf || null };
 }
+/* (v178) has the player met this sigil? Yes if a lesson up to the one in play brings it in, or a lesson they have won
+   does (back on an early lesson, they still know what they learned later). With no lesson in play, or in a custom
+   level (custom.js counts it as after every lesson), every sigil is known. A sigil not yet met is never named or shown. */
+function sigilKnown(id, L = typeof Game !== 'undefined' && Game.level) {
+  if (!L || typeof LEVELS === 'undefined') return true;
+  const at = LEVELS.indexOf(L); if (at < 0) return true;
+  const won = i => typeof Save !== 'undefined' && !!Save.starsAt && Save.starsAt(i) > 0;
+  return LEVELS.some((l, i) => l.sigils.includes(id) && (i <= at || won(i)));
+}
+const UNLEARNED = 'That mark isn’t one you’ve learned yet.';
+// the rules for a spell put in the satchel: any sigil the player has met, anywhere on the seal (null: all are known)
+function knownRules() {
+  const k = SIGIL_ORDER.filter(id => sigilKnown(id));
+  return k.length === SIGIL_ORDER.length ? null : { centers: k, sats: k, combos: true, ringOf: null };
+}
 /* (v177) the lesson's ring rules as the player is shown them, before drawing (the card, the Notes leaf, the codex):
    for each sigil that may stand in the centre, the ring-sigils it takes, checked as buildSpell checks them (the
    lesson's ring list, narrowed by ringOf), and the sigils that may only go on a ring. null when the lesson sets no
@@ -619,12 +634,12 @@ function buildSpell(draft, rules) {
   if (!A.sigil.ok) return { err: 'The sigil is unclear. Draw it again, closer to its shape.' };
   const id = A.sigil.id;
   if (rules && !rules.centers.includes(id)) {
-    return { err: rules.sats.includes(id) ? `${SIGILS[id].name} can only go on the ring in this lesson.` : `${SIGILS[id].name} is not yet written in this lesson's folio.` };
+    return { err: rules.sats.includes(id) ? `${SIGILS[id].name} can only go on the ring in this lesson.` : sigilKnown(id) ? `${SIGILS[id].name} is not used in this lesson.` : UNLEARNED };
   }
   if (rules && rules.combos === false && A.sats.length) return { err: 'Only signs may enter the small circles for now: draw your sign out from the seal into one. Sigils in the circles belong to the third folio.' };
   for (const s of A.sats) {
     if (!s.ok) return { err: 'A ring-sigil is unclear. Redraw it inside its slot.' };
-    if (rules && !rules.sats.includes(s.id)) return { err: `${SIGILS[s.id].name} cannot be set upon the ring in this lesson.` };
+    if (rules && !rules.sats.includes(s.id)) return { err: sigilKnown(s.id) ? `${SIGILS[s.id].name} cannot be set upon the ring in this lesson.` : 'A mark on the ring isn’t one you’ve learned yet.' };
     // a lesson may say which ring-sigils each centre may carry (v155, the sixth folio)
     const allow = rules && rules.ringOf && rules.ringOf[id];
     if (allow && !allow.includes(s.id)) return { err: allow.length ? `${SIGILS[s.id].name} cannot ride the ring of ${SIGILS[id].name} in this lesson.` : `${SIGILS[id].name} carries nothing upon its ring in this lesson: signs alone.` };
@@ -906,8 +921,10 @@ const Satchel = {
     const e = this.list[i];
     if (!e._info) {
       const sp = this.spell(i, null);
-      e._info = sp.err ? { label: 'Smudged spell', img: '' } : { label: shortSpell(sp), img: spellThumb(e.strokes, sp), sigil: sp.sigil, color: sp.color };
+      e._info = sp.err ? { label: 'Smudged spell', img: '' } : { label: shortSpell(sp), img: spellThumb(e.strokes, sp), sigil: sp.sigil, color: sp.color, ids: [sp.sigil, ...(sp.sats || []).map(q => q.id)] };
     }
+    // (v178) a kept spell holding a sigil the player has not met here is not named
+    if (e._info.ids && !e._info.ids.every(id => sigilKnown(id))) return { label: 'A mark not yet learned', img: e._info.img, sigil: null, color: null };
     return e._info;
   },
 };
@@ -1816,7 +1833,7 @@ const Grim = {
     this.inkDirty = true; this.updateStatus(); Sfx.play('page');
   },
   keep() {
-    const sp = buildSpell(this.draft, null);
+    const sp = buildSpell(this.draft, knownRules()); // (v178: a sigil not yet learned can't be kept, so the satchel never names it)
     if (sp.err) { this.status = 'Only a finished spell can be kept: ' + sp.err.charAt(0).toLowerCase() + sp.err.slice(1); this.statusCol = '#8a2a1a'; this.shake = 0.3; Sfx.play('fizzle'); return false; }
     const A = this.draft.a;
     const strokes = this.draft.strokes.filter((s, i) => A.roles[i] !== 'stray');
@@ -1833,14 +1850,15 @@ const Grim = {
     const A = this.draft.a, allowed = lessonRules();
     this.statusCol = '#4a3220';
     if (!this.draft.strokes.length) { this.status = 'Begin with the seal: draw one closed circle.'; return; }
-    if (!A.seal && A.loneSigil) { this.status = `${SIGILS[A.loneSigil].name} is written. Now draw the seal around it: one closed circle, on the dotted ring.`; return; }
+    if (!A.seal && A.loneSigil) { this.status = `${sigilKnown(A.loneSigil) ? SIGILS[A.loneSigil].name : 'Your mark'} is written. Now draw the seal around it: one closed circle, on the dotted ring.`; return; }
     if (!A.seal) { this.status = 'The seal must close upon itself: a round, unbroken circle.'; this.statusCol = '#8a2a1a'; return; }
     if (!A.sigil) { this.status = 'The seal is set. Now inscribe a sigil within it.'; return; }
     const sp = buildSpell(this.draft, allowed);
     if (sp.err) {
       this.status = sp.err; this.statusCol = '#8a2a1a';
-      if (!A.sigil.ok && A.sigil.id) this.status += `  (Closest: ${SIGILS[A.sigil.id].name}?)`;
-      else { const u = A.sats.find(s => !s.ok && s.id); if (A.sigil.ok && u) this.status += `  (Closest: ${SIGILS[u.id].name}?)`; }
+      // (v178: only a sigil the player has met is offered as the closest)
+      if (!A.sigil.ok && A.sigil.id) { if (sigilKnown(A.sigil.id)) this.status += `  (Closest: ${SIGILS[A.sigil.id].name}?)`; }
+      else { const u = A.sats.find(s => !s.ok && s.id); if (A.sigil.ok && u && sigilKnown(u.id)) this.status += `  (Closest: ${SIGILS[u.id].name}?)`; }
       return;
     }
     this.status = describeSpell(sp);
@@ -2154,7 +2172,8 @@ const Grim = {
       const r = 10 * s * k, cy = y + US * k / 2;
       // a sigil some earlier lesson taught is only unused here, not unlearned (the user: "not yet learned" was wrong for those)
       const at = typeof LEVELS === 'undefined' ? -1 : LEVELS.indexOf(lv);
-      const taught = id => at > 0 && LEVELS.slice(0, at).some(l => l.sigils.includes(id));
+      // (v178) one the player has not met yet is an empty circle: its shape and name wait for its lesson
+      const taught = id => at > 0 && sigilKnown(id, lv);
       const groups = [[unknown.filter(taught), 'unused this lesson'], [unknown.filter(id => !taught(id)), 'not yet learned']].filter(q => q[0].length);
       g.fillStyle = ink; g.font = `italic ${Math.round(12 * s * k)}px "IM Fell English", serif`; g.textAlign = 'left';
       let gx = x0;
@@ -2162,7 +2181,7 @@ const Grim = {
         ids.forEach((id, n) => {
           const cx = gx + r + 4 + n * (r * 2 + 10 * s);
           g.strokeStyle = ink; g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, r, 0, TAU); g.stroke();
-          drawGlyph(g, id, cx, cy, r * 0.8, ink, 1.2);
+          if (taught(id)) drawGlyph(g, id, cx, cy, r * 0.8, ink, 1.2);
         });
         const lx = gx + ids.length * (r * 2 + 10 * s) + 10 * s;
         g.fillText(label, lx, cy + 4 * s);
@@ -2466,11 +2485,12 @@ const Grim = {
       g.lineTo(cx + Math.cos(a) * r * (k % 3 ? 1.2 : 1.25), cy + Math.sin(a) * r * (k % 3 ? 1.2 : 1.25)); g.stroke();
     }
     g.fillStyle = hexA('#8a5a20', 0.55);
-    const words = D.sigil && D.sigil.ok ? SIGILS[D.sigil.id].words : 'SIGILLVM · SIGNVM · ';
+    const met = D.sigil && D.sigil.ok && sigilKnown(D.sigil.id); // (v178: a sigil not yet learned gets no name or gilding)
+    const words = met ? SIGILS[D.sigil.id].words : 'SIGILLVM · SIGNVM · ';
     const ring = this.gildRing(words, r);
     if (ring) { g.save(); g.translate(cx, cy); g.rotate(t * 0.08); g.drawImage(ring.c, -ring.R, -ring.R, ring.R * 2, ring.R * 2); g.restore(); }
     else textOnCircle(g, words, cx, cy, r * 1.08, t * 0.08, Math.max(7, r * 0.075));
-    if (D.sigil && D.sigil.ok) {
+    if (met) {
       g.globalAlpha = 0.5;
       drawGlyph(g, D.sigil.id, cx, cy, r * 0.62, hexA(col, 0.9), 6);
       drawGlyph(g, D.sigil.id, cx, cy, r * 0.62, hexA(gold, 0.8), 1.2);
@@ -2505,7 +2525,7 @@ const Grim = {
         g.beginPath(); g.arc(px, py, sr, 0, TAU); g.stroke(); g.setLineDash([]);
         // (a ring-sigil past the third of its kind is ignored: no glow, and the circle says so)
         const ignored = extra.has(k);
-        if (sat && sat.ok && !ignored) {
+        if (sat && sat.ok && !ignored && sigilKnown(sat.id)) {
           g.globalAlpha = 0.55; drawGlyph(g, sat.id, px, py, sr * 0.75, hexA(SIGILS[sat.id].color, 0.9), 4); drawGlyph(g, sat.id, px, py, sr * 0.75, hexA(gold, 0.9), 1); g.globalAlpha = 1;
         }
         if (ignored) { g.fillStyle = 'rgba(120,105,90,0.22)'; g.beginPath(); g.arc(px, py, sr, 0, TAU); g.fill(); }

@@ -261,7 +261,7 @@
   .bk-cast { z-index: 3; }
 
   .card { background: rgba(8,5,18,.55); }
-  .card .sheet, #satchel .sheet, #terms .sheet { position: relative; width: min(560px, 92vw); max-height: 90vh; overflow: auto; padding: 34px 40px 28px; color: #2e1f14; text-align: center;
+  .card .sheet, #satchel .sheet, #terms .sheet, #reveal .sheet { position: relative; width: min(560px, 92vw); max-height: 90vh; overflow: auto; padding: 34px 40px 28px; color: #2e1f14; text-align: center;
     background: radial-gradient(ellipse at 50% 35%, #fbf2da, #e7d3a6 70%, #d4b880); border-radius: 4px;
     box-shadow: inset 0 0 40px rgba(120,80,30,.45), inset 0 0 0 1px #8a6a3a, inset 0 0 0 6px rgba(255,255,255,.2), inset 0 0 0 7px rgba(138,106,58,.6), 0 20px 60px rgba(0,0,0,.7);
   }
@@ -271,8 +271,8 @@
   #satchel.show .sheet { transform: none; }
   /* (v173) the satchel's paper stays put and only its contents scroll inside it (a sheet that was itself the scroller,
      and transformed, could lose its parchment in patches on Firefox for Android while it scrolled) */
-  #satchel .sheet, #terms .sheet { display: flex; flex-direction: column; overflow: hidden; padding: 0; background: var(--paper-scroll); }
-  #satchel .sin, #terms .sin { flex: 0 1 auto; min-height: 0; overflow: auto; padding: 34px 40px 28px; border-radius: inherit; }
+  #satchel .sheet, #terms .sheet, #reveal .sheet { display: flex; flex-direction: column; overflow: hidden; padding: 0; background: var(--paper-scroll); }
+  #satchel .sin, #terms .sin, #reveal .sin { flex: 0 1 auto; min-height: 0; overflow: auto; padding: 34px 40px 28px; border-radius: inherit; }
   #win .sheet { overflow: visible; max-height: none; }
   .sheet .num { font-family: Cinzel, serif; letter-spacing: .3em; color: #8e2f22; font-size: 13px; }
   .sheet h3 { font-family: 'Cinzel Decorative', serif; font-weight: 700; font-size: 32px; margin: 4px 0 0; color: #2a1830; }
@@ -383,6 +383,16 @@
   #terms { position: fixed; inset: 0; z-index: 35; display: flex; align-items: center; justify-content: center; background: rgba(8,5,18,.55);
     opacity: 0; pointer-events: none; transition: opacity .3s; }
   #terms.show { opacity: 1; pointer-events: auto; }
+  /* (v178) the new-sigil sheet: the Terms sheet's paper, over the lesson as it opens; the sigil draws itself on a canvas */
+  #reveal { position: fixed; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; background: rgba(8,5,18,.6);
+    opacity: 0; pointer-events: none; transition: opacity .3s; cursor: pointer; }
+  #reveal.show { opacity: 1; pointer-events: auto; }
+  #reveal .sheet { width: min(440px, 92vw); }
+  #rvGlyph { position: static; display: block; width: 150px; height: 150px; margin: 8px auto 2px; touch-action: auto; }
+  #reveal .rven { font-family: Cinzel, serif; font-size: 14px; letter-spacing: .12em; color: #6a4a30; margin-top: 2px; }
+  #reveal .rvline { font-size: 19px; line-height: 1.45; font-style: italic; margin: 0 0 16px; }
+  #reveal .row { justify-content: center; }
+  @media (prefers-reduced-motion: reduce) { #reveal { transition: none; } }
   #termList { margin: 0 0 16px; text-align: left; }
   #termList dt { font-family: Cinzel, serif; font-size: 14px; letter-spacing: .06em; color: #8e2f22; margin-top: 8px; }
   #termList dd { margin: 0; padding: 0 0 6px; font-size: 16px; line-height: 1.4; font-style: italic; color: #2e1f14; border-bottom: 1px solid rgba(90,60,40,.14); }
@@ -590,7 +600,8 @@
     #title .sub { font-size: 22px; } #title .orn { height: 36px; margin: 2px 0 8px; }
     #title .btn { font-size: 15px; padding: 10px 22px; }
     #title .foot { display: none; }
-    .card .sheet, #satchel .sin, #terms .sin { padding: 18px 24px 16px; } .card .sheet, #satchel .sheet, #terms .sheet { max-height: 94vh; }
+    .card .sheet, #satchel .sin, #terms .sin, #reveal .sin { padding: 18px 24px 16px; } .card .sheet, #satchel .sheet, #terms .sheet, #reveal .sheet { max-height: 94vh; }
+    #rvGlyph { width: 120px; height: 120px; } #reveal .rvline { font-size: 17px; }
     #termList dd { font-size: 15px; }
     .sheet h3 { font-size: 24px; } .sheet .div { height: 24px; } .sheet p { font-size: 15px; line-height: 1.4; }
     #win .div { --stamp: 80px; height: calc(var(--stamp) * .84); } #win .div::before { top: calc(50% - 12px); height: 24px; }
@@ -695,6 +706,19 @@
     <dl id="termList"></dl>
     <div class="row"><button class="btn ghost light" id="tClose">Close</button></div>
     <div class="keys">New terms join the list as new lessons open.</div>
+  </div></div>
+</div>
+
+<div id="reveal">
+  <div class="sheet"><div class="sin">
+    <div class="num" id="rvNum">a new sigil</div>
+    <canvas id="rvGlyph" width="150" height="150"></canvas>
+    <h3 id="rvName"></h3>
+    <div class="rven" id="rvEn"></div>
+    <div class="div"></div>
+    <div class="rvline" id="rvLine"></div>
+    <div class="row"><button class="btn primary" id="rvGo">Begin</button></div>
+    <div class="keys" id="rvKeys">Tap anywhere to begin.</div>
   </div></div>
 </div>
 
@@ -803,10 +827,10 @@
   </div>
 </div>
 
-<script src="js/ink.js?v=177"></script>
-<script src="js/world.js?v=177"></script>
-<script src="js/tips.js?v=177"></script>
-<script src="js/main.js?v=177"></script>
-<script src="js/custom.js?v=177"></script>
+<script src="js/ink.js?v=178"></script>
+<script src="js/world.js?v=178"></script>
+<script src="js/tips.js?v=178"></script>
+<script src="js/main.js?v=178"></script>
+<script src="js/custom.js?v=178"></script>
 </body>
 </html>

@@ -106,7 +106,7 @@ const Tips = (() => {
 
   function update(dt) {
     if (!box) build();
-    if (off || !Game.level || Game.state === 'won' || Game.state === 'title' || Game.state === 'menu') { if (cur) hide(); return; }
+    if (off || (typeof Reveal !== 'undefined' && Reveal.open) || !Game.level || Game.state === 'won' || Game.state === 'title' || Game.state === 'menu') { if (cur) hide(); return; }
     if (cur) {
       if (cur.done && cur.done()) { finish(); waitT = 0; return; }
       const R = cur.when() ? cur.at() : null;
