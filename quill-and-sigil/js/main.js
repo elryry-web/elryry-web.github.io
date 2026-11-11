@@ -141,8 +141,8 @@ const LEVELS = [
     id: 'thornwall', name: 'Thornwall', sigils: ['gale', 'stone', 'flame'], par: 2,
     lesson: 'Ignis, the triangle, wakes fire. Bramble burns, and fire spreads along whatever will burn, so mind where it leads. The brazier must also be lit before this lesson is done.',
     hint: 'A single Ignis on the hedge: the flames crawl along it to the brazier by themselves. Then Ventus with a twice-barbed sign.',
-    t: ['  00000000  ', ' 0000000000 ', '000000000000', ' 0000000000 ', '  00000000  '],
-    o: ['.......#B...', '.......#....', '.O.....#..G.', '.......#....', '.......#....'],
+    t: ['  0  ', ' 000 ', '00000', '00000', '00000', '00000', '00000', '00000', '00000', '00000', ' 000 ', '  0  '],
+    o: ['.....', '..O..', '.....', '.....', '.....', '.....', '.....', '#####', 'B....', '.....', '..G..', '.....'],
   },
   {
     id: 'keystone', name: 'Keystone', sigils: ['gale', 'flame'], par: 3,
@@ -155,8 +155,8 @@ const LEVELS = [
     id: 'sunken-orb', name: 'The Sunken Orb', sigils: ['gale', 'tide'], par: 2,
     lesson: 'Unda, the wave, calls water: one tile of water, one step deep, for each tile of your spell. It fills the lowest place first, and whatever is light rises with it. Too little leaves the hollow part full.',
     hint: 'The hollow holds four tiles of water: Unda cast on it with two signs at right angles along the tiles (2 and 4 o’clock). When the orb floats level with the ground, Ventus with a sign and one barb.',
-    t: [' 00000000 ', '00__000000', '00__000000', '0000000000', ' 00000000 '],
-    o: ['..........', '..........', '...O....G.', '..........', '..........'],
+    t: [' 000 ', '00000', '00000', '00000', '00000', '00000', '00__0', '00__0', '00000', ' 000 '],
+    o: ['.....', '..G..', '.....', '.....', '.....', '.....', '..O..', '.....', '.....', '.....'],
   },
   {
     id: 'rushing-stream', name: 'The Rushing Stream', sigils: ['gale', 'tide', 'frost'], par: 2,
@@ -192,9 +192,9 @@ const LEVELS = [
   {
     id: 'featherfall', name: 'Featherfall', sigils: ['gale', 'luna'], par: 2, opens: 'The Second Folio',
     lesson: 'Luna, the crescent, lifts what rests, and only lifts. A floating orb hangs in the air until wind or water moves it, glides over low ground and open air alike, and settles once it has been carried ten tiles.',
-    hint: 'Luna on the orb. While it floats, Ventus on the orb with a barbed sign toward the island (lower right). A gentle gust leaves it hanging short in the air; push it again.',
-    t: [' 0000    111 ', '00000    1111', '00000    1111', '00000    1111', ' 0000    111 '],
-    o: ['.............', '.............', '.O........G..', '.............', '.............'],
+    hint: 'Luna on the orb. While it floats, Ventus on the orb with a barbed sign toward the island (lower left). A gentle gust leaves it hanging short in the air; push it again.',
+    t: [' 000 ', '00000', '00000', '00000', '00000', '     ', '     ', '     ', '     ', '11111', '11111', '11111', ' 111 '],
+    o: ['.....', '..O..', '.....', '.....', '.....', '.....', '.....', '.....', '.....', '.....', '..G..', '.....', '.....'],
   },
   {
     id: 'featherfall-ii', name: 'Featherfall II', sigils: ['gale', 'luna'], par: 3,
@@ -206,10 +206,10 @@ const LEVELS = [
   {
     id: 'rune-gate', name: 'The Rune Gate', sigils: ['gale', 'stone', 'flame', 'frost'], par: 3,
     lesson: 'The rune gate sinks only when every brazier burns. Until then nothing passes it, not even a floating orb. Fire melts ice.',
-    hint: 'Ignis on the ice beside the orb, sign toward the thorns (lower right): it melts the ice and lights the hedge, which burns to both braziers. Then Gelu on the stream, sign the same way, and Ventus with two barbs.',
-    t: ['00000~~00000', '00000~~00000', '00000~~00222', '00000~~00002', '00000~~00222', '00000~~00000', '00000~~00000'],
-    o: ['...B........', '...#........', '..I#........', '.OI#.....DG.', '..I#........', '...#........', '...B........'],
-    flows: [{ x0: 5, x1: 6, y0: 0, y1: 6, dx: 0, dy: 1, s: 3 }],
+    hint: 'Ignis on the ice beside the orb, sign toward the thorns (upper left): it melts the ice and lights the hedge, which burns to both braziers. Then Gelu on the stream, sign the same way, and Ventus with two barbs.',
+    t: ['00000~~00000', '00000~~00000', '22200~~00000', '20000~~00000', '22200~~00000', '00000~~00000', '00000~~00000'],
+    o: ['........B...', '........#...', '........#I..', '.GD.....#IO.', '........#I..', '........#...', '........B...'],
+    flows: [{ x0: 5, x1: 6, y0: 0, y1: 6, dx: 0, dy: -1, s: 3 }],
   },
   {
     id: 'broad-water', name: 'The Broad Water', sigils: ['gale', 'frost'], par: 4, ring: true,
