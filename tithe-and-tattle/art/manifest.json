@@ -7,7 +7,7 @@
   "corner": { "file": "corner.png", "v": 1 },
   "seal": { "file": "seal.png", "v": 1 },
   "flourish": { "file": "flourish.png", "v": 1 },
-  "map": { "file": "map.png", "v": 1 },
+  "map": { "file": "map.jpg", "v": 2 },
   "portrait-hamo": { "file": "portrait-hamo.png", "v": 1 },
   "portrait-gervase": { "file": "portrait-gervase.png", "v": 1 },
   "portrait-wystan": { "file": "portrait-wystan.png", "v": 1 }

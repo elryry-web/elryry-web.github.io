@@ -17,7 +17,7 @@
  *             Any slot 'portrait-<castId>' falls back to this when the manifest has no PNG for it.
  *   map       estate map of Mardle and the abbey, portrait, aspect 1 : ART.MAP_ASPECT (1.3).
  *             ART.MAP_PLACES = [{id, label, fx, fy, re}] marker positions in fractions; a PNG map must match them.
- *             The fractions are measured on the painted art/map.png (v5); the procedural map shares them only roughly.
+ *             The fractions are measured on the painted art/map.jpg (the fen map, manifest v2); the procedural map shares them only roughly.
  */
 (function () {
   'use strict';
@@ -309,24 +309,24 @@
   // ---------------------------------------------------------------- the map
   var MAP_PLACES = [
     // id, label, fx, fy, place-text pattern (tried in this order)
-    ['gate', 'the abbey gatehouse', 0.685, 0.44, /gate/i],
-    ['tower', 'the abbey church and bell tower', 0.765, 0.335, /bell|tower|abbey church|compline|choir/i],
-    ['cloister', 'the cloister', 0.83, 0.45, /cloister|chapter|scriptorium|kitchen|brewhouse|guest|infirmar|herb|refectory|dorter/i],
-    ['orchard', 'the orchard, ponds and barn', 0.875, 0.555, /orchard|pear|fishpond|barn|bee|skep/i],
-    ['hall', 'Mardle Hall', 0.165, 0.2, /hall|manor|dovecote|hallmote/i],
-    ['lynn', 'the Lynn road', 0.095, 0.072, /lynn/i],
-    ['church', 'St Mary’s', 0.23, 0.36, /st mary|parish church|churchyard/i],
-    ['bridge', 'the Long Bridge', 0.497, 0.462, /bridge|ferry|toll/i],
-    ['mill', 'Hob’s mill and weir', 0.405, 0.645, /mill|weir/i],
-    ['swan', 'the Swan', 0.375, 0.545, /swan|alehouse/i],
-    ['butts', 'the Butts', 0.085, 0.49, /butts/i],
-    ['meadow', 'the water meadow', 0.585, 0.56, /meadow|hay/i],
-    ['fen', 'the fen', 0.56, 0.14, /fen|eel|reed|trap/i],
-    ['common', 'the common', 0.2, 0.76, /common|pannage/i],
-    ['wood', 'Mardle Wood', 0.13, 0.89, /wood/i],
-    ['bounds', 'the parish bounds', 0.062, 0.62, /bound|rogation/i],
-    ['square', 'the market square', 0.3, 0.455, /market|square|cross|tolley/i],
-    ['abbey', 'the Abbey of St Alnoth', 0.82, 0.45, /abbey|alnoth/i]
+    ['gate', 'the abbey gatehouse', 0.669, 0.717, /gate/i],
+    ['tower', 'the abbey church and bell tower', 0.756, 0.59, /bell|tower|abbey church|compline|choir/i],
+    ['cloister', 'the cloister', 0.815, 0.733, /cloister|chapter|scriptorium|kitchen|brewhouse|guest|infirmar|herb|refectory|dorter/i],
+    ['orchard', 'the orchard, ponds and barn', 0.86, 0.87, /orchard|pear|fishpond|barn|bee|skep/i],
+    ['hall', 'Mardle Hall', 0.19, 0.342, /hall|manor|dovecote|hallmote/i],
+    ['lynn', 'the Lynn road', 0.08, 0.19, /lynn/i],
+    ['church', 'St Mary’s', 0.245, 0.551, /st mary|parish church|churchyard/i],
+    ['bridge', 'the Long Bridge', 0.519, 0.705, /bridge|ferry|toll/i],
+    ['mill', 'Hob’s mill and weir', 0.43, 0.72, /mill|weir/i],
+    ['swan', 'the Swan', 0.405, 0.645, /swan|alehouse/i],
+    ['butts', 'the Butts', 0.094, 0.606, /butts/i],
+    ['meadow', 'the water meadow', 0.62, 0.52, /meadow|hay/i],
+    ['fen', 'the fen', 0.38, 0.22, /fen|eel|reed|trap/i],
+    ['common', 'the common', 0.19, 0.81, /common|pannage/i],
+    ['wood', 'Mardle Wood', 0.125, 0.895, /wood/i],
+    ['bounds', 'the parish bounds', 0.081, 0.712, /bound|rogation/i],
+    ['square', 'the market square', 0.328, 0.611, /market|square|cross|tolley/i],
+    ['abbey', 'the Abbey of St Alnoth', 0.86, 0.63, /abbey|alnoth/i]
   ];
   var RIVER = [[0.74, 0.14], [0.68, 0.22], [0.6, 0.3], [0.53, 0.39], [0.5, 0.47], [0.49, 0.56], [0.46, 0.65], [0.42, 0.75], [0.36, 0.84], [0.3, 0.93], [0.27, 1.01]];
 
@@ -671,7 +671,7 @@
     load: function (base) {
       base = base || 'art/';
       if (typeof fetch === 'undefined') return Promise.resolve();
-      return fetch(base + 'manifest.json?v=18', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : {}; }).then(function (m) {
+      return fetch(base + 'manifest.json?v=19', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : {}; }).then(function (m) {
         return Promise.all(Object.keys(m || {}).map(function (slot) {
           var e = typeof m[slot] === 'string' ? { file: m[slot] } : (m[slot] || {});
           if (!e.file) return null;
