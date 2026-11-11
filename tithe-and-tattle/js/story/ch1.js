@@ -87,7 +87,7 @@ STORY.push({
   characters: ['Alys Pennock', 'Kit', 'Walter Crane', 'Piers Carter', 'Father Simon', 'Brother Odo'],
   size: '4×4',
   grade: 'Apprentice',
-  intro: "Four men ate at the Swan on Michaelmas night, in seats 1 to 4, seat 1 nearest the fire. Alys Pennock chalks what each man pays on the beam over the long bench. That takes in his ale and whatever he still owed her from before, so the man who paid the most need not be the one who had the goose. I went to copy the beam the next morning and found that Kit, her nephew, had wiped half of it with his sleeve. He told me what it had said. Alys says he made most of that up.",
+  intro: "Four men ate at the Swan on Michaelmas night, in seats 1 to 4, seat 1 nearest the fire. Alys Pennock chalks what each man pays on the beam over the long bench. That takes in his ale and any old debt, so the man who paid most need not have had the goose. I went to copy the beam next morning, and Kit, her nephew, had wiped half of it with his sleeve. He told me what it had said. Alys says he made most of that up.",
   task: 'Can you work out where each man sat, what he ate and what he paid?',
   categories: [
     { id: 'who', name: 'Diners', items: [
