@@ -195,11 +195,13 @@
   // the ribbon (only below fy across it, so a head's lappet stays), eye = [x, y, r] of the eye's white.
   // The cream is retinted to the strand's ramp once per colour and size and kept, ringed in gold.
   var BEAST = {
-    'beast.headShut': { a: [422.0, 149.3], phi: -0.0937, band: 130, len: 421, f0: -36, f1: -4, fy: -76, eye: [122, 88.5, 15], kind: 'head' },
-    'beast.headOpen': { a: [422.0, 149.1], phi: -0.0937, band: 130, len: 421, f0: -36, f1: -4, fy: -76, eye: [129.5, 84.5, 15], kind: 'head', mouth: true },
-    'beast.tail':     { a: [440.0, 78.0], phi: 0.085, band: 138, len: 438, f0: -44, f1: -6, fy: -999, kind: 'tail' }
+    'beast.headShut': { a: [422.0, 149.3], phi: -0.0937, band: 130, len: 421, f0: -36, f1: -4, fy: -76, eye: [122, 88.5, 15], kind: 'head', mod: [-245, -165], pen: [-235, -150] },
+    'beast.headOpen': { a: [422.0, 149.1], phi: -0.0937, band: 130, len: 421, f0: -36, f1: -4, fy: -76, eye: [129.5, 84.5, 15], kind: 'head', mouth: true, mod: [-245, -165], pen: [-235, -150] },
+    'beast.tail':     { a: [440.0, 78.0], phi: 0.085, band: 138, len: 438, f0: -44, f1: -6, fy: -999, kind: 'tail', mod: [-330, -230], pen: [-300, -200] }
   };
-  var BEAST_BAND = 0.34, BEAST_MARGIN = 0.02;   // the art band's share of a tile (the board's ribbon body is 0.36)
+  // mod: [x0, x1] along the axis, where the ribbon's modelling (shadow band, tint) eases off over the head or the
+  // tail's curl; pen: where the lead-white penwork tapers to a point. Both in source px from the cut (negative)
+  var BEAST_BAND = 0.36, BEAST_MARGIN = 0.02;   // the art band's share of a tile: the board's ribbon body, so the gilt meets
   var beastPrep = {}, beastCache = {}, beastCacheN = 0, beastBad = {};
   function sstep(a, b, x) { var t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); }
   // once per PNG: what each pixel is (cream body to retint, or ink, tongue, teeth and eye to keep),
@@ -239,16 +241,106 @@
       }
     }
     // w: how much of the pixel is cream to retint; x: its place on the ramp; f: the fade into the ribbon
-    var wt = new Float32Array(N), xr = new Float32Array(N), fade = new Float32Array(N), cp = Math.cos(B.phi), sp2 = Math.sin(B.phi);
+    var wt = new Float32Array(N), xr = new Float32Array(N), fade = new Float32Array(N), xaA = new Float32Array(N), cp = Math.cos(B.phi), sp2 = Math.sin(B.phi);
     for (i = 0; i < N; i++) {
       var R = d[i * 4], G = d[i * 4 + 1], Bb = d[i * 4 + 2], M2 = Math.max(R, G, Bb), m2 = Math.min(R, G, Bb), L = Lm[i];
       var sat = (M2 - m2) / Math.max(1, M2);
       wt[i] = keep[i] ? 0 : (1 - sstep(0.28, 0.4, sat)) * (1 - sstep(30, 50, R - G));
       xr[i] = L < 0.62 ? 0.1 : L < 0.8 ? 0.1 + (L - 0.62) / 0.18 * 0.32 : L < 0.91 ? 0.42 + (L - 0.8) / 0.11 * 0.2 : Math.min(1, 0.62 + (L - 0.91) / 0.06 * 0.3);
       var X = i % W - B.a[0], Y = ((i / W) | 0) - B.a[1];
-      fade[i] = beastFade(B, cp * X - sp2 * Y, sp2 * X + cp * Y);
+      xaA[i] = cp * X - sp2 * Y;
+      fade[i] = beastFade(B, xaA[i], sp2 * X + cp * Y);
     }
-    return (beastPrep[slot] = { W: W, H: H, d: d, L: Lm, w: wt, x: xr, fade: fade });
+    // for modelling the beast as the ribbon is modelled: the distance in from its outline as drawn (the art is
+    // squeezed along its axis by r to fit a tile), in source px across. Only transparent pixels count as
+    // outside, so the neck runs on past the image's right edge
+    var r = Math.min(1, (1 - BEAST_MARGIN) / B.len / (BEAST_BAND / B.band)), INF = 1e10, f2 = new Float64Array(N), x, y;
+    for (i = 0; i < N; i++) f2[i] = d[i * 4 + 3] < 128 ? 0 : INF;
+    var mxn = Math.max(W, H), fb = new Float64Array(mxn), db = new Float64Array(mxn), vb = new Int32Array(mxn), zb = new Float64Array(mxn + 1);
+    for (y = 0; y < H; y++) { for (x = 0; x < W; x++) fb[x] = f2[y * W + x]; edt1(fb, W, r, db, vb, zb); for (x = 0; x < W; x++) f2[y * W + x] = db[x]; }
+    for (x = 0; x < W; x++) { for (y = 0; y < H; y++) fb[y] = f2[y * W + x]; edt1(fb, H, 1, db, vb, zb); for (y = 0; y < H; y++) f2[y * W + x] = db[y]; }
+    var Dd = new Float32Array(N), cl = [];
+    for (i = 0; i < N; i++) {
+      Dd[i] = Math.max(0, Math.sqrt(f2[i]) - 0.5);   // to the outline itself, half a pixel short of the nearest clear pixel
+      if (wt[i] > 0.5 && fade[i] > 0 && i % 7 === 0) cl.push(Lm[i]);
+    }
+    cl.sort(function (a, b) { return a - b; });
+    var Lmed = cl.length ? cl[cl.length >> 1] : 0.85, Lsp = cl.length ? Math.max(0.03, (cl[Math.floor(cl.length * 0.9)] - cl[Math.floor(cl.length * 0.1)]) / 2) : 0.08;
+    return (beastPrep[slot] = { W: W, H: H, d: d, L: Lm, w: wt, x: xr, fade: fade, xa: xaA, D: Dd, r: r, Lmed: Lmed, Lsp: Lsp });
+  }
+  // one row of a squared Euclidean distance transform (Felzenszwalb), samples sp apart
+  function edt1(f, n, sp, out, v, z) {
+    var k = 0, q, s;
+    v[0] = 0; z[0] = -1e30; z[1] = 1e30;
+    function cut(q, p) { var a = q * sp, b = p * sp; return ((f[q] + a * a) - (f[p] + b * b)) / (2 * (a - b)); }
+    for (q = 1; q < n; q++) {
+      s = cut(q, v[k]);
+      while (s <= z[k]) { k--; s = cut(q, v[k]); }
+      k++; v[k] = q; z[k] = s; z[k + 1] = 1e30;
+    }
+    k = 0;
+    for (q = 0; q < n; q++) { var p = q * sp; while (z[k + 1] < p) k++; var dd = p - v[k] * sp; out[q] = dd * dd + f[v[k]]; }
+  }
+  function sampD(P, x, y) {
+    var W = P.W, H = P.H;
+    x = x < 0 ? 0 : x > W - 1.001 ? W - 1.001 : x; y = y < 0 ? 0 : y > H - 1.001 ? H - 1.001 : y;
+    var x0 = x | 0, y0 = y | 0, tx = x - x0, ty = y - y0, i = y0 * W + x0, D = P.D;
+    return (D[i] * (1 - tx) + D[i + 1] * tx) * (1 - ty) + (D[i + W] * (1 - tx) + D[i + W + 1] * tx) * ty;
+  }
+  // the ribbon's tempera laid over a beast for a quarter turn q of its tile: m, the shade in [-1, 1] (-1 the
+  // shadow colour, 0 the body, 1 the tint) from the same nested, light-shifted strokes as paintBody but measured
+  // from the beast's own outline; pen, the lead-white line's cover on the lit side, tapering out over the head
+  var beastMod = {}, beastWarmQ = [], beastWarmOn = false;
+  // build a beast's tempera model in idle time while it is still bare, so the flood doesn't stall on it
+  function warmBeast(slot, q) {
+    var key = slot + '|' + q;
+    if (beastMod[key] || beastWarmQ.indexOf(key) >= 0 || !images[slot] || beastBad[slot]) return;
+    beastWarmQ.push(key);
+    if (beastWarmOn) return;
+    beastWarmOn = true;
+    var idle = window.requestIdleCallback || function (f) { return setTimeout(f, 50); };
+    (function step() {
+      idle(function () {
+        var k = beastWarmQ.shift();
+        if (k) { var at = k.lastIndexOf('|'); try { beastModel(k.slice(0, at), +k.slice(at + 1)); } catch (e) {} }
+        if (beastWarmQ.length) step(); else beastWarmOn = false;
+      });
+    })();
+  }
+  function beastModel(slot, q) {
+    var key = slot + '|' + q;
+    if (beastMod[key]) return beastMod[key];
+    var P = prepBeast(slot), B = BEAST[slot];
+    if (!P) return null;
+    var W = P.W, H = P.H, N = W * H, w = B.band, r = P.r;
+    // the page's light (top-left) in the tile's frame, then in the beast's: the turn onto the entry edge and the
+    // mirror undone, the squeeze and the art's tilt. (ux, uy): one band px toward the light, in source px
+    var an = q * Math.PI / 2, tx = -0.7071 * Math.cos(an) - 0.7071 * Math.sin(an), ty = 0.7071 * Math.sin(an) - 0.7071 * Math.cos(an);
+    var ix = -ty, iy = tx;
+    if (q === 0 || q === 3) iy = -iy;
+    var ax = ix / r, cp = Math.cos(B.phi), sp = Math.sin(B.phi), ux = cp * ax + sp * iy, uy = -sp * ax + cp * iy;
+    var ul = Math.hypot(ux, uy), nx = ux / ul, ny = uy / ul, s = SHADE, t = TINT;
+    var L = [[-1, 1, 0], [-0.6, 1 - 0.45 * s, 0.225 * s], [-0.25, 1 - 0.78 * s, 0.39 * s], [1, 1 - s, s / 2],
+      [0.6, 1 - s - 0.45 * t, (s - 0.45 * t) / 2], [0.28, 1 - s - 0.75 * t, (s - 0.75 * t) / 2], [0, 1 - s - t, (s - t) / 2]];
+    var m = new Float32Array(N), pen = new Float32Array(N), pw = 0.034 * w, pd = w * (0.5 - 0.2 * 0.7071), AA = 1.4, D = P.D;
+    for (var y = 0; y < H; y++) for (var x = 0; x < W; x++) {
+      var i = y * W + x;
+      if (D[i] <= 0 || P.fade[i] <= 0) continue;
+      var v = 0;
+      for (var k = 0; k < L.length; k++) {
+        var sh = L[k][2] * w, Dk = sh ? sampD(P, x - ux * sh, y - uy * sh) : D[i];
+        var c = (Dk - w * (1 - L[k][1]) / 2) / AA + 0.5;
+        if (c > 0) v += (L[k][0] - v) * (c > 1 ? 1 : c);
+      }
+      m[i] = v;
+      var pf = sstep(B.pen[0], B.pen[1], P.xa[i]);
+      if (pf > 0 && Math.abs(D[i] - pd) < pw) {   // the pen keeps its distance in from the lit edge, as on the ribbon
+        var gx = sampD(P, x + 1, y) - sampD(P, x - 1, y), gy = sampD(P, x, y + 1) - sampD(P, x, y - 1), gl = Math.hypot(gx, gy);
+        var face = gl > 1e-3 ? -(gx * nx + gy * ny) / gl : 0, a = (pw * pf / 2 - Math.abs(D[i] - pd)) / AA + 0.5;
+        pen[i] = (a < 0 ? 0 : a > 1 ? 1 : a) * sstep(0.3, 0.6, face) * Math.min(1, pf * 1.6);
+      }
+    }
+    return (beastMod[key] = { m: m, pen: pen });
   }
   // how much of the art shows at (xa, ya), measured from the cut along and across the neck: none past the cut,
   // rising over the last stretch of the neck so the ribbon shows through there (the ears are never faded)
@@ -256,27 +348,68 @@
   // the ramp a beast is retinted to: a painted strand's own, the bare vellum's, or one made from a flat colour
   function beastRamp(o) {
     var r = o.fill;
-    if (r && r.sh) return { key: r.sh + r.bd + r.lt, sh: r.sh, bd: r.bd, lt: r.lt };
+    if (r && r.sh) return { key: r.sh + r.bd + r.lt, sh: r.sh, bd: r.bd, lt: r.lt, mo: r.mo || 1, paint: true };
     if (o.flat) return { key: 'flat' + o.flat, sh: mix(o.flat, '#120800', 0.45), bd: o.flat, lt: mix(o.flat, '#fffbe8', 0.5) };
     var b = RIB.bare;
     return { key: 'bare', sh: mix(b.edge, b.dark, 0.5), bd: b.base, lt: b.light };
   }
-  // one tinted, faded, downscaled and gilt-rimmed copy at kc device pixels per source pixel
-  function beastCanvas(slot, ramp, kc, rim) {
-    var key = slot + '|' + ramp.key + '|' + Math.round(kc * 4000) + '|' + (rim ? rim.join(',') : '');
+  // halve a canvas in steps, then to tw x th, for a clean small copy
+  function beastDown(src, W, H, tw, th) {
+    var cur = src, cw = W, ch = H;
+    while (cw / 2 >= tw && ch / 2 >= th) {
+      var hw = Math.round(cw / 2), hh = Math.round(ch / 2), hc = document.createElement('canvas'); hc.width = hw; hc.height = hh;
+      var hg = hc.getContext('2d'); hg.imageSmoothingEnabled = true; hg.imageSmoothingQuality = 'high';
+      hg.drawImage(cur, 0, 0, cw, ch, 0, 0, hw, hh); cur = hc; cw = hw; ch = hh;
+    }
+    var out = document.createElement('canvas'); out.width = tw; out.height = th;
+    var og = out.getContext('2d'); og.imageSmoothingEnabled = true; og.imageSmoothingQuality = 'high';
+    og.drawImage(cur, 0, 0, cw, ch, 0, 0, tw, th);
+    return out;
+  }
+  // one tinted, faded, downscaled and gilt-rimmed copy at kc device pixels per source pixel. A painted strand's
+  // beast (ramp.paint) is laid in the ribbon's own tempera for its tile's quarter turn q: the shadow band, tint
+  // and penwork run on up the neck from the ribbon and ease off over the head, the art's own shading is kept
+  // only faintly, and its ink outline takes the pigment's darkest shade (all its ink runs into the paint near
+  // the cut). It also keeps a mask of its paint, for the mottle laid over it where it lies on the page
+  function beastCanvas(slot, ramp, kc, rim, q) {
+    var painted = !!ramp.paint && q != null;
+    var key = slot + '|' + ramp.key + '|' + Math.round(kc * 4000) + '|' + (rim ? rim.join(',') : '') + (painted ? '|q' + q : '');
     if (beastCache[key]) return beastCache[key];
     var P = prepBeast(slot); if (!P) return null;
-    var W = P.W, H = P.H, N = W * H, lut = [], k, i;
+    var Mo = painted ? beastModel(slot, q) : null;
+    var W = P.W, H = P.H, N = W * H, lut = [], k, i, B = BEAST[slot];
     for (k = 0; k <= 64; k++) lut.push(rgbOf(beastAt(ramp, k / 64)));
     var low = lut[Math.round(0.1 * 64)], ref = [170, 154, 128];
     var src = document.createElement('canvas'); src.width = W; src.height = H;
     var sg = src.getContext('2d'), id = sg.createImageData(W, H), o = id.data, d = P.d;
+    var mk = painted ? sg.createImageData(W, H) : null, md = mk ? mk.data : null;
+    var S0, B0, L0, CT, PC = [251, 241, 218], pc = [0, 0, 0];
+    if (painted) { S0 = rgbOf(ramp.sh); B0 = rgbOf(ramp.bd); L0 = rgbOf(ramp.lt); CT = rgbOf(mix(ramp.sh, HAIR, 0.3)); }
     for (i = 0; i < N; i++) {
-      var q = i * 4, a = P.fade[i] > 0 ? d[q + 3] : 0;   // cut square at the neck; faded after the rim is on
-      if (a < 1) { o[q + 3] = 0; continue; }
-      var w = P.w[i], r = d[q], g = d[q + 1], b = d[q + 2];
-      if (w > 0) {
-        var L = P.L[i];
+      var qq = i * 4, a = P.fade[i] > 0 ? d[qq + 3] : 0;   // cut square at the neck; faded after the rim is on
+      if (a < 1) { o[qq + 3] = 0; continue; }
+      var w = P.w[i], r = d[qq], g = d[qq + 1], b = d[qq + 2], L = P.L[i];
+      if (painted) {
+        var px = i % W, py = (i / W) | 0, ya = Math.sin(B.phi) * (px - B.a[0]) + Math.cos(B.phi) * (py - B.a[1]);
+        var ob = sstep(B.band / 2 + 3, B.band / 2 + 15, Math.abs(ya));   // out of the band (an ear): part of the head
+        var xa = P.xa[i], hv = 1 - sstep(B.mod[0], B.mod[1], xa) * (1 - ob);   // 0 on the neck, 1 over the head
+        var dl = (L - P.Lmed) / P.Lsp; dl = dl < -1 ? -1 : dl > 1 ? 1 : dl; dl = dl < 0 ? -Math.pow(-dl, 1.6) : Math.pow(dl, 1.6);
+        var v = Mo.m[i] * (1 - 0.45 * hv) + dl * (0.1 + 0.3 * hv);
+        v = v < -1 ? -1 : v > 1 ? 1 : v;
+        var tg = v < 0 ? S0 : L0, av = v < 0 ? -v : v;
+        pc[0] = B0[0] + (tg[0] - B0[0]) * av; pc[1] = B0[1] + (tg[1] - B0[1]) * av; pc[2] = B0[2] + (tg[2] - B0[2]) * av;
+        var pa = Mo.pen[i] * 0.5 * (1 - ob);
+        if (pa > 0) { pc[0] += (PC[0] - pc[0]) * pa; pc[1] += (PC[1] - pc[1]) * pa; pc[2] += (PC[2] - pc[2]) * pa; }
+        var kw = L >= 0.62 ? w : w * sstep(0.22, 0.62, L);   // the pixel's share of cream (an outline's soft edge: part)
+        if (kw < 1) {
+          var cf = P.D[i] < 12 && L < 0.5 && !(B.mouth && px < 175 && py > 125) ? 0.85 : 0, nk = sstep(-110, -40, xa) * (1 - ob);
+          r += (CT[0] - r) * cf; g += (CT[1] - g) * cf; b += (CT[2] - b) * cf;
+          r += (pc[0] - r) * nk; g += (pc[1] - g) * nk; b += (pc[2] - b) * nk;
+          kw += (1 - kw) * nk;
+        }
+        r += (pc[0] - r) * kw; g += (pc[1] - g) * kw; b += (pc[2] - b) * kw;
+        md[qq + 3] = Math.round(a * kw);
+      } else if (w > 0) {
         if (L >= 0.62) {
           var c = lut[Math.round(P.x[i] * 64)];
           r += (c[0] - r) * w; g += (c[1] - g) * w; b += (c[2] - b) * w;
@@ -285,22 +418,15 @@
           r += (low[0] - ref[0]) * f; g += (low[1] - ref[1]) * f; b += (low[2] - ref[2]) * f;
         }
       }
-      o[q] = r < 0 ? 0 : r > 255 ? 255 : r; o[q + 1] = g < 0 ? 0 : g > 255 ? 255 : g; o[q + 2] = b < 0 ? 0 : b > 255 ? 255 : b; o[q + 3] = a;
+      o[qq] = r < 0 ? 0 : r > 255 ? 255 : r; o[qq + 1] = g < 0 ? 0 : g > 255 ? 255 : g; o[qq + 2] = b < 0 ? 0 : b > 255 ? 255 : b; o[qq + 3] = a;
     }
     sg.putImageData(id, 0, 0);
-    // halve in steps for a clean small copy
-    var tw = Math.max(2, Math.round(W * kc)), th = Math.max(2, Math.round(H * kc)), cur = src, cw = W, ch = H;
-    while (cw / 2 >= tw && ch / 2 >= th) {
-      var hw = Math.round(cw / 2), hh = Math.round(ch / 2), hc = document.createElement('canvas'); hc.width = hw; hc.height = hh;
-      var hg = hc.getContext('2d'); hg.imageSmoothingEnabled = true; hg.imageSmoothingQuality = 'high';
-      hg.drawImage(cur, 0, 0, cw, ch, 0, 0, hw, hh); cur = hc; cw = hw; ch = hh;
-    }
+    var tw = Math.max(2, Math.round(W * kc)), th = Math.max(2, Math.round(H * kc));
+    var art = beastDown(src, W, H, tw, th), mask = null;
+    if (painted) { sg.putImageData(mk, 0, 0); mask = beastDown(src, W, H, tw, th); }
     var pad = rim ? Math.ceil(rim[0]) + 2 : 1, cv = document.createElement('canvas');
     cv.width = tw + 2 * pad; cv.height = th + 2 * pad;
     var g2 = cv.getContext('2d'); g2.imageSmoothingEnabled = true; g2.imageSmoothingQuality = 'high';
-    var art = document.createElement('canvas'); art.width = tw; art.height = th;
-    var ag = art.getContext('2d'); ag.imageSmoothingEnabled = true; ag.imageSmoothingQuality = 'high';
-    ag.drawImage(cur, 0, 0, cw, ch, 0, 0, tw, th);
     if (rim) {   // the board's gilt edge: a dark hairline, the gold, a burnished lip, stamped round the silhouette
       var sil = document.createElement('canvas'); sil.width = tw; sil.height = th;
       var sl = sil.getContext('2d');
@@ -316,16 +442,38 @@
     }
     g2.drawImage(art, pad, pad);
     // then fade art and rim together where the neck runs into the ribbon, so no gilt edge crosses the band
-    var B = BEAST[slot], cp = Math.cos(B.phi), sp = Math.sin(B.phi), sx = W / tw, sy = H / th;
+    var cp = Math.cos(B.phi), sp = Math.sin(B.phi), sx = W / tw, sy = H / th;
     var fm = g2.createImageData(cv.width, cv.height), fd = fm.data;
-    for (var py = 0; py < cv.height; py++) for (var px = 0; px < cv.width; px++) {
-      var X = (px - pad + 0.5) * sx - B.a[0], Y = (py - pad + 0.5) * sy - B.a[1];
-      fd[(py * cv.width + px) * 4 + 3] = Math.round(255 * beastFade(B, cp * X - sp * Y, sp * X + cp * Y));
+    for (var py2 = 0; py2 < cv.height; py2++) for (var px2 = 0; px2 < cv.width; px2++) {
+      var X = (px2 - pad + 0.5) * sx - B.a[0], Y = (py2 - pad + 0.5) * sy - B.a[1];
+      fd[(py2 * cv.width + px2) * 4 + 3] = Math.round(255 * beastFade(B, cp * X - sp * Y, sp * X + cp * Y));
     }
     var fc = document.createElement('canvas'); fc.width = cv.width; fc.height = cv.height; fc.getContext('2d').putImageData(fm, 0, 0);
     g2.globalCompositeOperation = 'destination-in'; g2.drawImage(fc, 0, 0); g2.globalCompositeOperation = 'source-over';
-    if (++beastCacheN > 60) { beastCache = {}; beastCacheN = 1; }
-    return (beastCache[key] = { cv: cv, pad: pad, kc: kc });
+    var mcv = null;
+    if (mask) {
+      mcv = document.createElement('canvas'); mcv.width = cv.width; mcv.height = cv.height;
+      var mg = mcv.getContext('2d'); mg.drawImage(mask, pad, pad);
+      mg.globalCompositeOperation = 'destination-in'; mg.drawImage(fc, 0, 0);
+    }
+    if (++beastCacheN > 120) { beastCache = {}; beastCacheN = 1; beastMot = {}; }
+    return (beastCache[key] = { cv: cv, pad: pad, kc: kc, mask: mcv, key: key });
+  }
+  // the hand-laid mottle over a painted beast, pinned to the page as on the ribbon (M: the copy's pixels to the
+  // device's), so it runs on unbroken from the neck. Made once per place on the board while its tile is at rest
+  var beastMot = {}, beastMotN = 0;
+  function beastMottle(c, M, dev) {
+    if (!c.mask) return null;
+    var key = c.key + '|' + [M.a, M.b, M.c, M.d, M.e, M.f].map(function (v) { return Math.round(v * 256); }).join(',');
+    if (beastMot[key] !== undefined) return beastMot[key];
+    if (++beastMotN > 120) { beastMot = {}; beastMotN = 1; }
+    var cv = document.createElement('canvas'); cv.width = c.cv.width; cv.height = c.cv.height;
+    var g = cv.getContext('2d'), pat = g.createPattern(grainCanvas(), 'repeat');
+    if (!pat || !pat.setTransform) return (beastMot[key] = null);
+    try { pat.setTransform(M.inverse().scale(dev)); } catch (e) { return (beastMot[key] = null); }
+    g.fillStyle = pat; g.fillRect(0, 0, cv.width, cv.height);
+    g.globalCompositeOperation = 'destination-in'; g.drawImage(c.mask, 0, 0);
+    return (beastMot[key] = cv);
   }
   // the scale of a painted beast in a tile of side 1: along its axis (fitted to the tile) and across it
   // (its band matched to the ribbon); null when the painted beast isn't ready
@@ -354,14 +502,18 @@
       rim = [(E + HL + bandGap) * dev, (E + bandGap) * dev, (E * 0.45 + bandGap) * dev].map(function (v) { return Math.round(v * 4) / 4; });
     }
     var ramp = o.fill || o.flat ? beastRamp(o) : null, bare = beastRamp({}), amt = o.fill ? (o.amt == null ? 1 : o.amt) : o.flat ? 1 : 0;
-    var c0 = amt < 1 ? beastCanvas(slot, bare, kc, rim) : null, c1 = ramp && amt > 0 ? beastCanvas(slot, ramp, kc, rim) : null;
-    if (!c0 && !c1) { if (!prepBeast(slot)) return false; }
     var q = o.q;
     if (q == null) q = ((Math.round((o.angle || 0) / (Math.PI / 2)) % 4) + 4) % 4;
+    var c0 = amt < 1 ? beastCanvas(slot, bare, kc, rim) : null, c1 = ramp && amt > 0 ? beastCanvas(slot, ramp, kc, rim, q) : null;
+    if (!c0 && !c1) { if (!prepBeast(slot)) return false; }
+    if (!c1 && gilt && !o.mini) { warmBeast(slot, q); if (kind !== 'tail') warmBeast('beast.headOpen', q); }
     var mir = q === 3 || q === 0;
     ctx.translate(x + w / 2, y + h / 2);
     if (o.q == null) ctx.rotate(o.angle || 0);
     ctx.translate(0, -S / 2);
+    var Tn = ctx.getTransform ? ctx.getTransform() : null;
+    var still = !!(Tn && c1 && c1.mask && !o.mini && S >= 24 && !(kind === 'tail' && o.wag) &&
+      ((Math.abs(Tn.b) < 1e-6 && Math.abs(Tn.c) < 1e-6) || (Math.abs(Tn.a) < 1e-6 && Math.abs(Tn.d) < 1e-6)));
     if (kind === 'tail' && o.wag) {   // a flick about where the art takes over from the ribbon
       var wy = (Gm.stop + 0.5) * S;
       ctx.translate(0, wy); ctx.rotate(Math.sin(o.wag * Math.PI * 3) * (1 - o.wag) * 0.08); ctx.translate(0, -wy);
@@ -373,11 +525,18 @@
       if (!c) return;
       ctx.globalAlpha = i === 1 && c0 ? amt : 1;
       ctx.drawImage(c.cv, -c.pad / c.kc, -c.pad / c.kc, c.cv.width / c.kc, c.cv.height / c.kc);
+      if (i === 1 && still) {   // the strand's mottle, pinned to the page, runs on over the beast
+        var Mc = ctx.getTransform().translate(-c.pad / c.kc, -c.pad / c.kc).scale(1 / c.kc), mot = beastMottle(c, Mc, dev);
+        if (mot) {
+          ctx.globalAlpha = Math.min(1, 0.75 * (ramp.mo || 1)) * (c0 ? amt : 1);
+          ctx.drawImage(mot, -c.pad / c.kc, -c.pad / c.kc, c.cv.width / c.kc, c.cv.height / c.kc);
+        }
+      }
     });
     ctx.globalAlpha = 1;
     if (kind !== 'tail' && o.blink > 0.6 && B.eye) {   // the lid drops over the eye
       var lr = amt >= 0.5 && ramp ? ramp : bare, ex = B.eye[0], ey = B.eye[1], er = B.eye[2] + 1.5;
-      ctx.fillStyle = beastAt(lr, 0.62); ctx.strokeStyle = INK; ctx.lineWidth = 2.6; ctx.lineCap = 'round';
+      ctx.fillStyle = lr.paint ? mix(lr.bd, lr.sh, 0.1) : beastAt(lr, 0.62); ctx.strokeStyle = lr.paint ? mix(lr.sh, HAIR, 0.3) : INK; ctx.lineWidth = 2.6; ctx.lineCap = 'round';
       ctx.beginPath(); ctx.arc(ex, ey, er, 0, 6.2832); ctx.fill(); ctx.stroke();
       ctx.lineWidth = 3.4; ctx.beginPath(); ctx.moveTo(ex - er * 0.95, ey + 1); ctx.quadraticCurveTo(ex, ey + er * 0.6, ex + er * 0.95, ey + 1); ctx.stroke();
     }

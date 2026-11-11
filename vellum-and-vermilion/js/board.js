@@ -653,12 +653,12 @@
           if (sn && t >= sn) { var q2 = (t - sn) / 420; if (q2 < 1) snapK = q2; else delete this.snap[c]; }
           if (sn && t < sn) this.busy(sn - t + 450);
           if (this.blinkAt[c]) { var bq = (t - this.blinkAt[c]) / 220; if (bq < 1) blk = Math.sin(bq * Math.PI); else delete this.blinkAt[c]; }
-          ART.draw(g, 'beastHead', -h, -h, S, S, t, { body: body, paint: paint, snap: snapK, blink: blk, gilt: true, q: bq0, fill: bfill, amt: bamt });
+          ART.draw(g, 'beastHead', -h, -h, S, S, t, { body: body, paint: paint, snap: snapK, blink: blk, gilt: true, q: bq0, fill: bfill, amt: bamt, mini: this.mini || S < 24 });
         } else if (bs === 't') {
           var wa = this.wagAt[c], wagK = 0;
           if (wa !== undefined && t >= wa) { var q3 = (t - wa) / 700; if (q3 < 1) wagK = q3; else delete this.wagAt[c]; }
           if (wa !== undefined && t < wa) this.busy(wa - t + 750);
-          ART.draw(g, 'beastTail', -h, -h, S, S, t, { body: body, paint: paint, wag: wagK, gilt: true, rw: 0.36, q: bq0, fill: bfill, amt: bamt });
+          ART.draw(g, 'beastTail', -h, -h, S, S, t, { body: body, paint: paint, wag: wagK, gilt: true, rw: 0.36, q: bq0, fill: bfill, amt: bamt, mini: this.mini || S < 24 });
         } else ART.draw(g, 'knot', -h, -h, S, S, t, { body: body, rib: rb, rw: 0.36, mini: this.mini || S < 24, ang: ang });
       }
       if (M.mark[c]) {
