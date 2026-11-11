@@ -9,7 +9,12 @@
      cover.medallion the round knotwork medallion in the middle of the board
      cover.clasp    one brass clasp on the fore-edge (the box's right edge is the board's edge)
      cover.title    the gold title lettering (opts.text: lines joined by \n)
-     cover.endpaper the inside of the front board (the pastedown)
+     cover.endpaper the inside of the front board (the pastedown); a PNG is mirrored so its lacing sits at the hinge
+     cover.spine    (PNG only) the spine, stood behind the hinge: its edge and headbands show beside the cover / gutter
+     cover.pages    (PNG only) the page block, the thin edge of leaves showing below and right of the closed cover
+     cover.flyleaf  (PNG only) the blank leaf facing the pastedown as the cover opens; it lifts away with the endpaper
+   With a painted cover.leather the corners, clasps, medallion and title are laid out for its recessed panel
+   (PAINTED below) instead of the drawn board's frames.
      book.seal      the red wax seal on a locked page
      book.roundel   the gold ring round a drollery in the Bestiary */
 (function () {
@@ -206,14 +211,19 @@
 
   /* ================= parchment leaves ================= */
   var paperCache = {};
-  function paperCanvas(w, h, side) {
-    var dpr = Math.min(2, window.devicePixelRatio || 1), key = Math.round(w) + 'x' + Math.round(h) + side + dpr;
-    if (!paperCache[key]) paperCache[key] = ART.makePage(Math.round(w), Math.round(h), dpr, side === 'L' ? 'left' : 'right');
+  function paperCanvas(w, h, side, variant) {
+    var dpr = Math.min(2, window.devicePixelRatio || 1), pv = ART.has('page') ? (variant | 0) : 0;
+    var key = Math.round(w) + 'x' + Math.round(h) + side + dpr + ':' + pv + ART.has('page');
+    if (!paperCache[key]) paperCache[key] = ART.makePage(Math.round(w), Math.round(h), dpr, side === 'L' ? 'left' : 'right', pv);
     return paperCache[key];
   }
-  function paper(g, w, h, side) {
-    if (ART.has('page')) ART.draw(g, 'page', 0, 0, w, h, 0, {});
-    else g.drawImage(paperCanvas(w, h, side), 0, 0, w, h);
+  // variant: the face number (a painted page is flipped and shifted per leaf, so its stains and the
+  // stitched repair differ from leaf to leaf)
+  function paper(g, w, h, side, variant) {
+    g.drawImage(paperCanvas(w, h, side, variant), 0, 0, w, h);
+    gutter(g, w, h, side);
+  }
+  function gutter(g, w, h, side) {
     // the gutter: shade along the spine edge
     var sx = side === 'L' ? w : 0, gw = w * 0.13, sg = g.createLinearGradient(sx, 0, side === 'L' ? w - gw : gw, 0);
     sg.addColorStop(0, 'rgba(70,40,15,0.38)'); sg.addColorStop(0.35, 'rgba(70,40,15,0.12)'); sg.addColorStop(1, 'rgba(70,40,15,0)');
@@ -283,7 +293,7 @@
   var marker = null;      // {face, x, y, s} where the ☙ goes
   var best = { woke: {}, sel: null, selT: 0 };
   function renderFace(f, g, w, h, side, t) {
-    paper(g, w, h, side);
+    paper(g, w, h, side, f + 1);
     var H = hits[f] = [];
     var mx = Math.max(14, w * 0.09), top = Math.max(12, h * 0.05), cw = w - 2 * mx;
     g.textAlign = 'center'; g.textBaseline = 'alphabetic';
@@ -479,9 +489,45 @@
     y += ns * 1.6; g.textAlign = 'right'; g.fillStyle = RED; font(g, ns, FELL, 'italic');
     g.fillText('— the scribe', mx + cw, y); g.textAlign = 'center';
   }
+  // where things sit on the painted leather (fractions of the board): the spine strip down the left edge,
+  // and the plain recessed panel inside the tooled lattice
+  var PAINTED = { spine: 0.058, px0: 0.31, px1: 0.765, py0: 0.2, py1: 0.81 };
+  function renderPaintedCover(g, w, h) {
+    var P = PAINTED, cx = w * (P.px0 + P.px1) / 2, pw = w * (P.px1 - P.px0), y0 = h * P.py0, y1 = h * P.py1;
+    // brass corners on the board's corners (right of the spine strip); the PNG points top-left
+    var cs = Math.min(w, h) * 0.2, lx = w * P.spine;
+    [[lx, 0, 0], [w - cs, 0, 1], [w - cs, h - cs, 2], [lx, h - cs, 3]].forEach(function (c) {
+      ART.draw(g, 'cover.corner', c[0], c[1], cs, cs, 0, { angle: c[2] * Math.PI / 2 });
+    });
+    // two clasps: the strap comes over the fore-edge, the hook rests on the lattice border
+    if (ART.has('cover.clasp')) {
+      var ca = ART.meta('cover.clasp').aspect, cw = w * 0.22, ch = cw / ca;
+      [0.27, 0.73].forEach(function (f) { ART.draw(g, 'cover.clasp', w - cw, h * f - ch / 2, cw, ch, 0, {}); });
+    } else {
+      var dw = w * 0.13, dh = h * 0.085;
+      [0.26, 0.74].forEach(function (f) { ART.draw(g, 'cover.clasp', w - dw, h * f - dh / 2, dw, dh, 0, {}); });
+    }
+    // the title at the head of the panel, the medallion centred in what is left below it
+    var ty = y0 + (y1 - y0) * 0.05, tw = pw * 0.92, th;
+    if (ART.has('cover.title')) {
+      // the painted title fills the panel's plain field edge to edge (pw: 0.455 of the board; the
+      // field's own edges are at 0.30-0.77); any wider and the ampersand meets the upper clasp's hook.
+      // Its height is capped at 36% of the panel so the medallion keeps its room
+      tw = pw * 1.02;
+      th = tw / ART.meta('cover.title').aspect;
+      if (th > (y1 - y0) * 0.36) { th = (y1 - y0) * 0.36; tw = th * ART.meta('cover.title').aspect; }
+      ART.draw(g, 'cover.title', cx - tw / 2, ty, tw, th, 0, {});
+    } else {
+      th = (y1 - y0) * 0.3;
+      ART.draw(g, 'cover.title', cx - tw / 2, ty, tw, th, 0, { text: 'Vellum\n& Vermilion' });
+    }
+    var top = ty + th, my = (top + y1) / 2, R = Math.min(pw * 0.42, (y1 - top) * 0.4);
+    ART.draw(g, 'cover.medallion', cx - R, my - R, 2 * R, 2 * R, 0, {});
+  }
   function renderCover(cv, w, h) {
     var g = prep(cv, w, h);
     ART.draw(g, 'cover.leather', 0, 0, w, h, 0, {});
+    if (ART.has('cover.leather')) { renderPaintedCover(g, w, h); return; }
     var m = Math.min(w, h), b = m * 0.11, cs = m * 0.17;
     [[b, b, 0], [w - b - cs, b, 1], [w - b - cs, h - b - cs, 2], [b, h - b - cs, 3]].forEach(function (c) {
       ART.draw(g, 'cover.corner', c[0], c[1], cs, cs, 0, { angle: c[2] * Math.PI / 2 });
@@ -501,8 +547,11 @@
   }
   function drawFaceTo(cv, f, side, t) {
     var g = prep(cv, L.pw, L.ph);
-    if (f === 'verso') { paper(g, L.pw, L.ph, side); return; }
-    if (f === 'endpaper') { ART.draw(g, 'cover.endpaper', 0, 0, L.pw, L.ph, 0, {}); return; }
+    if (f === 'verso') { paper(g, L.pw, L.ph, side, 11); return; }
+    if (f === 'endpaper') {
+      if (ART.has('cover.endpaper')) { g.translate(L.pw, 0); g.scale(-1, 1); }   // the lacing goes to the hinge
+      ART.draw(g, 'cover.endpaper', 0, 0, L.pw, L.ph, 0, {}); return;
+    }
     if (f === 'cover') { renderCover(cv, L.pw, L.ph); return; }
     renderFace(f, g, L.pw, L.ph, side, t || now());
   }
@@ -536,7 +585,59 @@
     var cs = 46;
     el.cornL.style.cssText = 'left:0;top:' + (ph - cs) + 'px;width:' + cs + 'px;height:' + cs + 'px';
     el.cornR.style.cssText = 'left:' + (sw - cs) + 'px;top:' + (ph - cs) + 'px;width:' + cs + 'px;height:' + cs + 'px';
+    drawBinding();
   }
+
+  /* ================= the binding: spine behind the hinge, page block under the closed cover ================= */
+  function placeCanvas(cv, x, y, w, h) {
+    var st = cv.style; st.left = x + 'px'; st.top = y + 'px'; st.width = w + 'px'; st.height = h + 'px';
+    var dpr = Math.min(2, window.devicePixelRatio || 1), W = Math.max(1, Math.round(w * dpr)), H = Math.max(1, Math.round(h * dpr));
+    if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+    var g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
+    return g;
+  }
+  function drawBinding() {
+    var pw = L.pw, ph = L.ph, hinge = L.spread ? pw : 0;
+    // the spine stands behind the hinge; its headbands show above and below the leaves,
+    // and on a phone its rounded edge shows left of the page (or of the closed cover)
+    if (ART.has('cover.spine')) {
+      var sw = clamp(pw * (L.spread ? 0.07 : 0.05), 12, 38), ext = clamp(ph * 0.012, 4, 10);
+      var g = placeCanvas(el.spine, hinge - sw * (L.spread ? 0.5 : 0.8), -ext, sw, ph + 2 * ext);
+      ART.draw(g, 'cover.spine', 0, 0, sw, ph + 2 * ext, 0, {});
+      el.spine.style.display = '';
+    } else el.spine.style.display = 'none';
+    // the page block: the leaves' edge just proud of the closed cover, below and to the right
+    var on = ART.has('cover.pages');
+    el.leaf.classList.toggle('painted', on);
+    if (on) {
+      var t = clamp(ph * 0.014, 5, 11);
+      var bg = placeCanvas(el.block, hinge, 0, pw + t, ph + t);
+      bg.fillStyle = '#3e100b';   // the back board's leather edge, under the pages
+      bg.fillRect(t * 0.6, ph - t * 0.2, pw + t * 0.4, t * 1.2); bg.fillRect(pw - t * 0.2, t * 0.6, t * 1.2, ph + t * 0.4);
+      bg.save(); bg.beginPath(); bg.rect(t * 0.4, ph - 3, pw - 3 + t * 0.4, t * 0.85 + 3); bg.clip();
+      ART.draw(bg, 'cover.pages', t * 0.4, ph - 3, pw - 3 + t * 0.4, t * 0.85 + 3, 0, {});   // the foot of the block
+      bg.restore();
+      bg.save(); bg.beginPath(); bg.rect(pw - 3, t * 0.4, t * 0.85 + 3, ph - 3 + t * 0.4); bg.clip();
+      bg.translate(pw + t * 0.85, t * 0.4); bg.rotate(Math.PI / 2);   // the fore-edge: the same strip turned
+      ART.draw(bg, 'cover.pages', 0, 0, ph - 3 + t * 0.4, t * 0.85 + 3, 0, {});
+      bg.restore();
+      el.block.style.display = '';
+    } else el.block.style.display = 'none';
+  }
+  function blockAlpha(a) { el.block.style.opacity = String(a); }
+
+  /* the flyleaf: a blank leaf over the face beneath the cover while it opens, lifted away with the endpaper */
+  function flyOn() {
+    if (!ART.has('cover.flyleaf')) return false;
+    var host = L.spread ? el.fB : el.fA;
+    if (el.fly.parentNode !== host) host.insertBefore(el.fly, host.querySelector('.shade'));
+    var g = prep(el.fly, L.pw, L.ph);
+    ART.sheet(g, 'cover.flyleaf', 0, 0, L.pw, L.ph, 7);
+    gutter(g, L.pw, L.ph, 'R');
+    el.fly.style.display = 'block'; el.fly.style.opacity = '1';
+    return true;
+  }
+  function flyOff() { el.fly.style.display = 'none'; }
   function posCount() { return L.spread ? NFACES / 2 : NFACES; }
   function posOfFace(f) { return L.spread ? f >> 1 : f; }
   function facesOf(p) { return L.spread ? [2 * p, 2 * p + 1] : [p]; }
@@ -659,6 +760,7 @@
     el.shF.style.background = 'none'; el.shK.style.background = 'none';
     drawFaceTo(el.cF, 'cover'); drawFaceTo(el.cK, 'endpaper', 'L');
     spreadXf(L.closed.k, L.closed.dx, L.closed.dy);
+    blockAlpha(1); flyOff();
     el.mark.style.display = 'none';
     var n = nextUnsolved(), s = G.save(), any = solvedCount() > 0 || Object.keys(s.prog || {}).length > 0;
     var cn = (s.current && !s.solved[s.current] && G.unlocked(s.current)) ? s.current : n;
@@ -676,24 +778,27 @@
     if (L.spread) drawFaceTo(el.cA, fs[0], 'L');
     el.fB.style.visibility = ''; el.fA.style.visibility = L.spread ? 'hidden' : '';
     document.body.classList.remove('bkClosed');
+    var fly = flyOn();
     var t0 = now(), D = 900 * SLOW;
     tween = {};
     (function step() {
       var k = clamp((now() - t0) / D, 0, 1), e = ease(k);
       spreadXf(C.k + (1 - C.k) * e, C.dx * (1 - e), C.dy * (1 - e));
       setAngle(-180 * e);
+      blockAlpha(clamp(1 - e * 4, 0, 1));   // the block's edge sinks under the opened leaves
       var s = Math.abs(Math.sin(Math.PI * e));
       el.shF.style.background = 'linear-gradient(to right, rgba(20,5,2,' + (0.4 * s) + '), rgba(20,5,2,0))';
       (L.spread ? el.shB : el.shA).style.background = 'linear-gradient(to right, rgba(30,15,5,' + (0.5 * s) + '), rgba(30,15,5,0) 60%)';
       if (!L.spread) el.leaf.style.opacity = String(clamp((1 - k) / 0.2, 0, 1));
       if (k < 1) { requestAnimationFrame(step); return; }
       el.fA.style.visibility = '';
-      var f0 = now();
-      (function fade() {   // the endpaper lifts away to show the first leaf beneath it
-        var q = clamp((now() - f0) / 200, 0, 1);
+      var f0 = now(), FD = (fly ? 320 : 200) * SLOW;
+      (function fade() {   // the endpaper (and the flyleaf facing it) lifts away to show the first leaves beneath
+        var q = clamp((now() - f0) / FD, 0, 1);
         el.leaf.style.opacity = String(L.spread ? 1 - q : 0);
+        if (fly) el.fly.style.opacity = String(1 - q);
         if (q < 1) { requestAnimationFrame(fade); return; }
-        tween = null; leafShow(false); el.leaf.classList.remove('cover');
+        tween = null; leafShow(false); el.leaf.classList.remove('cover'); flyOff();
         mode = 'open'; document.body.classList.add('bkOpen');
         var sv = G.save(); sv.screen = 'book'; G.persist();
         setStatic(); startLive();
@@ -710,11 +815,14 @@
     el.leaf.classList.add('cover'); leafAt(L.spread ? L.pw : 0, 'left center');
     drawFaceTo(el.cF, 'cover'); drawFaceTo(el.cK, 'endpaper', 'L');
     setAngle(-180); leafShow(true); el.leaf.style.opacity = '0';
+    var fly = flyOn(); if (fly) el.fly.style.opacity = '0';
+    blockAlpha(0);
     var t0 = now(), D = 900 * SLOW;
     tween = {};
     (function fadeIn() {
       var q = clamp((now() - t0) / 180, 0, 1);
       el.leaf.style.opacity = String(L.spread ? q : 1);
+      if (fly) el.fly.style.opacity = String(q);
       if (q < 1) { requestAnimationFrame(fadeIn); return; }
       el.fA.style.visibility = L.spread ? 'hidden' : '';
       var t1 = now();
@@ -723,6 +831,7 @@
         setAngle(-180 * (1 - e));
         spreadXf(1 + (C.k - 1) * e, C.dx * e, C.dy * e);
         if (!L.spread) el.leaf.style.opacity = String(clamp(k / 0.2, 0, 1));
+        blockAlpha(clamp(e * 4 - 3, 0, 1));
         var s = Math.abs(Math.sin(Math.PI * e));
         el.shF.style.background = 'linear-gradient(to right, rgba(20,5,2,' + (0.4 * s) + '), rgba(20,5,2,0))';
         if (k < 1) { requestAnimationFrame(step); return; }
@@ -768,6 +877,7 @@
     mode = 'open'; show(true); computeLayout(); spreadXf(1, 0, 0);
     document.body.classList.remove('bkClosed'); document.body.classList.add('bkOpen');
     el.fA.style.visibility = ''; el.fB.style.visibility = ''; leafShow(false); el.leaf.classList.remove('cover');
+    blockAlpha(0); flyOff();
     pos = posOfFace(face); setStatic(); startLive();
   }
 
@@ -870,6 +980,8 @@
       G = game; beastsInit();
       ['scr', 'spread', 'fA', 'fB', 'cA', 'cB', 'shA', 'shB', 'leaf', 'cF', 'cK', 'shF', 'shK', 'mark', 'cornL', 'cornR', 'prev', 'next', 'pos', 'close', 'open', 'cont']
         .forEach(function (k) { el[k] = $('bk_' + k); });
+      el.spine = $('bk_spine'); el.block = $('bk_block');
+      el.fly = document.createElement('canvas'); el.fly.className = 'fly';
       bindInput();
     },
     // first screen: a reload within the same visit returns where the reader was; a fresh visit shows the cover

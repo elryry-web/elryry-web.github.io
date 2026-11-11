@@ -25,8 +25,10 @@
     var dpr = Math.min(2, window.devicePixelRatio || 1), w = window.innerWidth, h = window.innerHeight;
     pageCv.width = Math.round(w * dpr); pageCv.height = Math.round(h * dpr);
     pageCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ART.draw(pageCtx, 'page', 0, 0, w, h, 0, { scale: dpr, margin: 'right' });
+    ART.draw(pageCtx, 'page', 0, 0, w, h, 0, { scale: dpr, margin: 'right', variant: cur ? cur.n : 0 });
+    pageFor = cur ? cur.n : 0;
   }
+  var pageFor = 0;
 
   /* ---------- board ---------- */
   var cur = null, writing = 0, SFX = window.SFX;
@@ -78,6 +80,7 @@
     opts = opts || {};
     n = Math.max(1, Math.min(LEVELS.length, n | 0));
     cur = LEVELS[n - 1];
+    if (ART.has('page') && pageFor !== n) drawPage();   // each page lays the painted vellum a little differently
     save.current = n; persist();
     endSequence();
     var pr = save.prog[n], solved = !!save.solved[n];

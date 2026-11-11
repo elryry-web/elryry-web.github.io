@@ -6,7 +6,8 @@
    PNG keeps its own aspect: ART.draw fits it inside the box (opts.alignX/alignY, default bottom-centre),
    ART.meta(slot) gives {aspect, stem} (stem = x of the vine's foot on the bottom edge, 0..1 of width) and
    opts.faded draws the unpainted sepia underdrawing (ART.faded(slot)). Slots:
-     page        parchment leaf (cached offscreen; opts.margin = outer-margin side 'right'|'left')
+     page        parchment leaf (cached offscreen; opts.margin = outer-margin side 'right'|'left'; opts.variant flips
+                 and shifts a painted PNG per page). A page PNG is laid cover-fit under the ruling (ART.sheet).
      border      knotwork frame; the box is the outer edge, opts.band = band thickness, opts.lit 0..1
      pin         gold nail
      knot        plain ribbon terminal (opts.body = ribbon colour)
@@ -554,12 +555,39 @@
   }
 
   /* ---------- parchment ---------- */
-  function makePage(w, h, scale, margin) {
+  // a painted sheet (page, cover.flyleaf) laid over a box like CSS background-size: cover. The PNG's ragged
+  // painted edge is cut away by `inset` (fraction of each side, manifest "inset", default 0.045), so the box
+  // is filled edge to edge. A portrait sheet in a landscape box is turned a quarter so less is cropped.
+  // `variant` (an integer, e.g. the page or face number) flips the sheet and shifts the crop so the same
+  // stains and the stitched repair don't sit in the same place on every leaf.
+  function drawSheet(g, slot, x, y, w, h, variant) {
+    var img = images[slot]; if (!img) return false;
+    var m = metas[slot] || {}, ins = m.inset != null ? m.inset : 0.045, v = (variant | 0) & 0xffff;
+    var iw = img.naturalWidth, ih = img.naturalHeight;
+    var sx = iw * ins, sy = ih * ins, sw = iw - 2 * sx, sh = ih - 2 * sy;
+    var turn = (sw < sh) !== (w < h) && Math.abs(w / h - 1) > 0.12;
+    var bw = turn ? h : w, bh = turn ? w : h;   // the box in the sheet's own frame
+    var k = Math.max(bw / sw, bh / sh), cw = bw / k, ch = bh / k;
+    var R = rand(977 + v * 131), fx = (v & 1) ? -1 : 1, fy = (v & 2) ? -1 : 1;
+    sx += (sw - cw) * (cw < sw ? R() : 0.5); sy += (sh - ch) * (ch < sh ? R() : 0.5);
+    g.save();
+    g.translate(x + w / 2, y + h / 2);
+    if (turn) g.rotate(Math.PI / 2);
+    g.scale(fx, fy);
+    g.drawImage(img, sx, sy, cw, ch, -bw / 2, -bh / 2, bw, bh);
+    g.restore();
+    return true;
+  }
+  function makePage(w, h, scale, margin, variant) {
     var cv = document.createElement('canvas');
     cv.width = Math.max(1, Math.round(w * scale)); cv.height = Math.max(1, Math.round(h * scale));
     var g = cv.getContext('2d');
     g.scale(scale, scale);
     var R = rand(1234);
+    if (drawSheet(g, 'page', 0, 0, w, h, variant)) {   // the painted vellum, then only the ruling below
+      g.fillStyle = 'rgba(250,240,215,0.16)'; g.fillRect(0, 0, w, h);   // a touch of lead white so ink reads
+      return rulePage(g, cv, w, h, margin, R);
+    }
     var grd = g.createRadialGradient(w * 0.5, h * 0.45, Math.min(w, h) * 0.1, w * 0.5, h * 0.5, Math.max(w, h) * 0.75);
     grd.addColorStop(0, '#f1e3c1'); grd.addColorStop(0.6, '#e8d3a6'); grd.addColorStop(1, '#cfae76');
     g.fillStyle = grd; g.fillRect(0, 0, w, h);
@@ -596,7 +624,11 @@
       lg.addColorStop(0, 'rgba(110,70,25,0.32)'); lg.addColorStop(1, 'rgba(110,70,25,0)');
       g.fillStyle = lg; g.fillRect(0, 0, w, h);
     });
-    // margins, ruling and pricking
+    return rulePage(g, cv, w, h, margin, R);
+  }
+  // margins, ruling and pricking (over the drawn or the painted vellum)
+  function rulePage(g, cv, w, h, margin, R) {
+    var y;
     var outer = margin === 'left' ? 'left' : 'right';
     var mL = Math.max(14, w * 0.06), mR = w - Math.max(14, w * 0.06);
     g.strokeStyle = 'rgba(150,60,40,0.12)'; g.lineWidth = 0.8;
@@ -1103,8 +1135,8 @@
   /* ---------- slot drawings ---------- */
   var DRAW = {
     page: function (ctx, x, y, w, h, t, o) {
-      var sc = o.scale || 1, key = [Math.round(w), Math.round(h), sc, o.margin].join('x');
-      if (!cache.page || cache.pageKey !== key) { cache.page = makePage(Math.round(w), Math.round(h), sc, o.margin); cache.pageKey = key; }
+      var sc = o.scale || 1, key = [Math.round(w), Math.round(h), sc, o.margin, o.variant | 0, !!images.page].join('x');
+      if (!cache.page || cache.pageKey !== key) { cache.page = makePage(Math.round(w), Math.round(h), sc, o.margin, o.variant); cache.pageKey = key; }
       ctx.drawImage(cache.page, x, y, w, h);
     },
     border: function (ctx, x, y, w, h, t, o) {
@@ -1413,7 +1445,7 @@
   };
 
   var ART = {
-    INK: INK, PIG: PIG, ribbon: ribbon, mix: mix, rand: rand, maskShape: maskShape, makePage: makePage,
+    INK: INK, PIG: PIG, ribbon: ribbon, mix: mix, rand: rand, maskShape: maskShape, makePage: makePage, sheet: drawSheet,
     // the board's enamel look: RIB colours, the cached panel (ground, filigree, gilded frame, ivy) and
     // layered gold-edged ribbon strokes
     RIB: RIB, HAIR: HAIR, GILT: GILT, MADDER: MADDER, makePanel: makePanel, ribLayers: ribLayers, ribMix: ribMix,
@@ -1456,7 +1488,7 @@
       opts = opts || {};
       // a pigment mark draws its painted gem (mark.<pigment>) when that PNG is loaded
       if (slot === 'mark' && opts.pigment && images['mark.' + opts.pigment]) slot = 'mark.' + opts.pigment;
-      var img = images[slot], m = metas[slot];
+      var img = slot === 'page' ? null : images[slot], m = metas[slot];   // the page lays its PNG itself (makePage)
       ctx.save();
       if (img && m && m.crisp && !opts.angle) drawCrisp(ctx, slot, img, x, y, w, h);
       else if (img) {
@@ -1479,7 +1511,7 @@
     load: function (base) {
       base = base || 'art/';
       if (typeof fetch === 'undefined') return Promise.resolve();
-      return fetch(base + 'manifest.json?v=4', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : {}; }).then(function (m) {
+      return fetch(base + 'manifest.json?v=6', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : {}; }).then(function (m) {
         return Promise.all(Object.keys(m).map(function (slot) {
           var e = typeof m[slot] === 'string' ? { file: m[slot] } : (m[slot] || {});
           if (!e.file) return null;
@@ -1490,7 +1522,8 @@
               if (BEAST[slot]) { beastCache = {}; beastCacheN = 0; }
               metas[slot] = { aspect: img.naturalWidth / img.naturalHeight, stem: e.stem != null ? e.stem : 0.5,
                 fit: e.fit != null ? !!e.fit : slot.indexOf('drollery.') === 0,
-                crisp: e.crisp != null ? !!e.crisp : slot.indexOf('mark.') === 0 };
+                crisp: e.crisp != null ? !!e.crisp : slot.indexOf('mark.') === 0, inset: e.inset };
+              if (slot === 'page') cache.page = null;
               Object.keys(crispCache).forEach(function (k) { if (k.indexOf(slot + ':') === 0) delete crispCache[k]; });
               res();
             };

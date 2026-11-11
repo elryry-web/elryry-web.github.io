@@ -14,5 +14,15 @@
   "mark.orpiment":     { "file": "gem-orpiment.png",      "v": 1 },
   "beast.headShut":    { "file": "beast-head-shut.png",   "v": 1 },
   "beast.headOpen":    { "file": "beast-head-open.png",   "v": 1 },
-  "beast.tail":        { "file": "beast-tail.png",        "v": 1 }
+  "beast.tail":        { "file": "beast-tail.png",        "v": 1 },
+  "cover.leather":     { "file": "cover-leather.jpg",   "v": 1 },
+  "cover.spine":       { "file": "cover-spine.png",     "v": 1 },
+  "cover.medallion":   { "file": "cover-medallion.png", "v": 1 },
+  "cover.corner":      { "file": "cover-corner.png",    "v": 1 },
+  "cover.clasp":       { "file": "cover-clasp.png",     "v": 1 },
+  "cover.pages":       { "file": "cover-pages.png",     "v": 1 },
+  "cover.title":       { "file": "cover-title.png",     "v": 1 },
+  "cover.endpaper":    { "file": "cover-endpaper.png",  "v": 1 },
+  "page":              { "file": "vellum-leaf.png",     "v": 2 },
+  "cover.flyleaf":     { "file": "vellum-flyleaf.png",  "v": 1 }
 }
