@@ -36,7 +36,7 @@
     cv.width = Math.max(1, Math.round(w * sc)); cv.height = Math.max(1, Math.round(h * sc));
     var g = cv.getContext('2d'); g.scale(sc, sc);
     var R = ART.rand(77);
-    var gr = g.createRadialGradient(w * 0.45, h * 0.4, Math.min(w, h) * 0.1, w * 0.5, h * 0.5, Math.max(w, h) * 0.8);
+    var gr = g.createRadialGradient(w * 0.45, h * 0.4, Math.max(0, Math.min(w, h) * 0.1), w * 0.5, h * 0.5, Math.max(1, Math.max(w, h) * 0.8));
     gr.addColorStop(0, '#6e2219'); gr.addColorStop(0.6, '#561811'); gr.addColorStop(1, '#3a0f0a');
     g.fillStyle = gr; g.fillRect(0, 0, w, h);
     for (var i = 0; i < 60; i++) {   // mottling and wear
@@ -396,14 +396,23 @@
     });
   }
   var silCache = {};
-  function silhouette(id, s, t) {
-    var dpr = Math.min(2, window.devicePixelRatio || 1), key = id + Math.round(s) + dpr;
+  function silhouette(id, bw, bh) {
+    var dpr = Math.min(2, window.devicePixelRatio || 1), key = id + Math.round(bw) + 'x' + Math.round(bh) + dpr + ART.has('drollery.' + id);
     if (silCache[key]) return silCache[key];
-    var cv = document.createElement('canvas'); cv.width = cv.height = Math.max(1, Math.round(s * dpr));
+    var cv = document.createElement('canvas'); cv.width = Math.max(1, Math.round(bw * dpr)); cv.height = Math.max(1, Math.round(bh * dpr));
     var g = cv.getContext('2d'); g.scale(dpr, dpr);
-    ART.draw(g, 'drollery.' + id, 0, 0, s, s, 1000, { awake: 0 });
-    g.globalCompositeOperation = 'source-in'; g.fillStyle = 'rgb(70,45,25)'; g.fillRect(0, 0, s, s);
+    ART.draw(g, 'drollery.' + id, 0, 0, bw, bh, 1000, { awake: 0 });
+    g.globalCompositeOperation = 'source-in'; g.fillStyle = 'rgb(70,45,25)'; g.fillRect(0, 0, bw, bh);
     silCache[key] = cv; return cv;
+  }
+  // where a beast sits in its roundel: a square for a drawn one; a painted (PNG) one keeps its own aspect,
+  // the creature (the top of the picture) centred in the ring and its vine running out under the rim
+  function beastBox(id, cx, cy, r) {
+    var m = ART.meta('drollery.' + id);
+    if (!m) { var ds = r * 1.5; return [cx - ds / 2, cy - ds / 2, ds, ds]; }
+    var bh = r * 1.9, bw = bh * m.aspect;
+    if (bw > r * 1.75) { bw = r * 1.75; bh = bw / m.aspect; }
+    return [cx - bw / 2, cy - bh * 0.4, bw, bh];
   }
   function faceBestiary(g, w, h, mx, top, cw, H, t) {
     var y = rubricTitle(g, 'The Bestiary', w, top, cw, clamp(w * 0.062, 11, 28));
@@ -417,14 +426,14 @@
       var cx = gx + (i % 3 + 0.5) * cell, cy = gy + (Math.floor(i / 3) + 0.5) * cell, isF = found(id);
       g.fillStyle = isF ? 'rgba(255,250,232,0.55)' : 'rgba(255,250,232,0.25)';
       g.beginPath(); g.arc(cx, cy, r * 0.94, 0, 6.283); g.fill();
-      var ds = r * 1.5;
+      var bb = beastBox(id, cx, cy, r);
       if (isF) {
         var w0 = best.woke[id], awake = w0 === undefined ? 0 : clamp((t - w0) / 1100, 0, 1);
         g.save(); g.beginPath(); g.arc(cx, cy, r * 0.9, 0, 6.283); g.clip();
-        ART.draw(g, 'drollery.' + id, cx - ds / 2, cy - ds / 2, ds, ds, t, { awake: awake });
+        ART.draw(g, 'drollery.' + id, bb[0], bb[1], bb[2], bb[3], t, { awake: awake });
         g.restore();
       } else {
-        g.save(); g.globalAlpha = 0.2; g.drawImage(silhouette(id, ds), cx - ds / 2, cy - ds / 2, ds, ds); g.restore();
+        g.save(); g.globalAlpha = 0.2; g.drawImage(silhouette(id, bb[2], bb[3]), bb[0], bb[1], bb[2], bb[3]); g.restore();
         g.fillStyle = 'rgba(110,60,30,0.6)'; var qs = Math.floor(r * 0.7); font(g, qs, UNC); g.fillText('?', cx, cy + qs * 0.35);
       }
       ART.draw(g, 'book.roundel', cx - r, cy - r, 2 * r, 2 * r, t, {});

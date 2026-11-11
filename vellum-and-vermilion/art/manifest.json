@@ -1,1 +1,11 @@
-{}
+{
+  "drollery.fox":      { "file": "drollery-fox.png",      "stem": 0.281, "v": 1 },
+  "drollery.snail":    { "file": "drollery-snail.png",    "stem": 0.394, "v": 1 },
+  "drollery.rabbit":   { "file": "drollery-rabbit.png",   "stem": 0.228, "v": 1 },
+  "drollery.cat":      { "file": "drollery-cat.png",      "stem": 0.358, "v": 1 },
+  "drollery.owl":      { "file": "drollery-owl.png",      "stem": 0.225, "v": 1 },
+  "drollery.fishbird": { "file": "drollery-fishbird.png", "stem": 0.204, "v": 1 },
+  "drollery.monkey":   { "file": "drollery-monkey.png",   "stem": 0.225, "v": 1 },
+  "drollery.dragon":   { "file": "drollery-dragon.png",   "stem": 0.282, "v": 1 },
+  "drollery.monk":     { "file": "drollery-monk.png",     "stem": 0.226, "v": 1 }
+}

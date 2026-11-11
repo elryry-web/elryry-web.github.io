@@ -5,10 +5,14 @@
 
    Illumination timeline (ms after illuminate()):
      0     every strand floods, gold flecks burst over the page
-     150   border (or, on a great-initial page, the letter) starts to gild
+     150   the play grid fades out (a great-initial PNG, if supplied, starts to gild)
      450   the great initial's gold body sweeps in from the top-left
      650   twins' gilt brackets and emblems light
-     700   gold sheen sweeps across the board
+     700   gold sheen sweeps across the panel and its gilded frame
+   Look: a cached panel (ART.makePanel: madder ground, gold filigree, gilded frame tracing the mask,
+   ivy at the corners) under broad gold-edged enamel ribbons (ART.ribLayers). On pages without
+   pigment marks, whole strands take ultramarine / emerald / crimson by strand; s.color (passed to the
+   callbacks and the bells) stays the puzzle's own colour.
      ~2500 done (main.js writes the grumble, wakes the drollery and shows "Turn the page") */
 (function () {
   'use strict';
@@ -51,10 +55,46 @@
     }
     this.tr = P.trace(M, this.rots);
     var t0 = saved.solved ? -1e9 : now() - 1e6;   // whole strands from a reload show already flooded
-    this.tr.strands.forEach(function (s) { if (s.whole) this.flood[s.key] = { t0: t0, origin: 0, color: s.color }; }, this);
+    this._jewels();
+    this.tr.strands.forEach(function (s) { if (s.whole) this.flood[s.key] = { t0: t0, origin: 0, color: s.color, disp: this._disp(s) }; }, this);
     if (this.tr.solved) { this.solved = true; this.locked = true; this.illum = { t0: -1e9 }; }
     this.letter = null;
     this.fit(this.fitW || 300, this.fitH || 300);
+  };
+  // pages without pigment marks: colour the solution's strands ultramarine / emerald / crimson so that
+  // strands sharing a crossing (and, where easy, neighbouring strands) differ
+  B._jewels = function () {
+    var M = this.M, c; this.jewel = null;
+    for (c = 0; c < M.n; c++) if (M.mark[c]) return;
+    var st = P.trace(M, M.sol), cells = [], W = {}, JN = ['ultramarine', 'emerald', 'crimson'], rot = ((M.level && M.level.n) || 1) % 3;
+    JN = JN.slice(rot).concat(JN.slice(0, rot));   // pages start on different jewels
+    st.strands.forEach(function (s, si) { s.pieces.forEach(function (q) { (cells[q.c] = cells[q.c] || []).push(si); }); });
+    function add(a, b, w) { if (a === b) return; var k = a < b ? a + ',' + b : b + ',' + a; W[k] = (W[k] || 0) + w; }
+    for (c = 0; c < M.n; c++) {
+      var L = cells[c]; if (!L) continue;
+      for (var i = 0; i < L.length; i++) for (var j = i + 1; j < L.length; j++) add(L[i], L[j], 3);
+      for (var d = 1; d <= 2; d++) {
+        var nc = P.neighbor(M, c, d); if (nc < 0 || !cells[nc]) continue;
+        L.forEach(function (a) { cells[nc].forEach(function (b) { add(a, b, 1); }); });
+      }
+    }
+    var order = st.strands.map(function (s, si) { return si; }).sort(function (a, b) { return st.strands[b].pieces.length - st.strands[a].pieces.length || a - b; });
+    var col = [], used = [0, 0, 0];
+    order.forEach(function (si) {
+      var cost = [0, 0, 0];
+      col.forEach(function (ci, sj) { if (ci === undefined) return; var w = W[si < sj ? si + ',' + sj : sj + ',' + si]; if (w) cost[ci] += w; });
+      var best = 0;
+      for (var k = 1; k < 3; k++) if (cost[k] < cost[best] || (cost[k] === cost[best] && used[k] < used[best])) best = k;
+      col[si] = best; used[best]++;
+    });
+    this.jewel = { ps: st.pieceStrand, col: col.map(function (i) { return JN[i]; }) };
+  };
+  // the colour a whole strand is painted (a RIB name): its mark's pigment, else its jewel, else gold
+  B._disp = function (s) {
+    if (s.color !== 'gold' || !this.jewel) return s.color;
+    var J = this.jewel, n = {}, best = 'gold', bn = 0;
+    s.pieces.forEach(function (q) { var si = J.ps[q.c + ':' + q.p]; if (si === undefined) return; var nm = J.col[si]; n[nm] = (n[nm] || 0) + 1; if (n[nm] > bn) { bn = n[nm]; best = nm; } });
+    return best;
   };
   B.getState = function () {
     var pins = [];
@@ -67,17 +107,13 @@
   B.fit = function (maxW, maxH) {
     this.fitW = maxW; this.fitH = maxH;
     if (!this.M) return;
-    var w = this.M.w, h = this.M.h, S;
-    if (this.isInitial) {
-      // a great initial: no plait border; the letter's own vermilion outline and red dots are the frame
-      S = Math.floor(Math.min(maxW / (w + 0.9), maxH / (h + 0.9), 150));
-      this.S = Math.max(16, S); this.band = 0; this.pad = Math.ceil(this.S * 0.45);
-    } else {
-      var s0 = Math.min(maxW / (w + 1), maxH / (h + 1));
-      var band = clamp(Math.round(s0 * 0.42), 10, 40);
-      S = Math.floor(Math.min((maxW - 2 * band - 4) / w, (maxH - 2 * band - 4) / h, 150));
-      this.S = Math.max(16, S); this.band = band; this.pad = band + 2;
-    }
+    // the gilded frame (band) traces the mask, letters included; the ivy needs a little margin beyond it
+    var w = this.M.w, h = this.M.h, S, s0 = Math.min(maxW / (w + 1.3), maxH / (h + 1.3));
+    var band = this.isInitial ? clamp(Math.round(s0 * 0.3), 8, 28) : clamp(Math.round(s0 * 0.4), 10, 36);
+    this.band = band; this.ivy = Math.round(band * 0.65); this.pad = band + this.ivy;
+    S = Math.floor(Math.min((maxW - 2 * this.pad) / w, (maxH - 2 * this.pad) / h, 150));
+    this.S = Math.max(16, S);
+    this.panel = null;
     this.cssW = w * this.S + 2 * this.pad; this.cssH = h * this.S + 2 * this.pad;
     this.dpr = Math.min(3, window.devicePixelRatio || 1);
     this.cv.style.width = this.cssW + 'px'; this.cv.style.height = this.cssH + 'px';
@@ -87,7 +123,8 @@
   };
   B._buildLetter = function () {
     var M = this.M;
-    if (!this.isInitial) { this.letter = null; return; }
+    // the procedural letter is the panel itself; a supplied initial.<L> PNG still overlays and gilds
+    if (!this.isInitial || !ART.has('initial.' + M.level.initial)) { this.letter = null; return; }
     var inm = M.kinds.map(function (k) { return k !== ' '; });
     var shape = ART.maskShape(M.w, M.h, inm, this.S, this.pad, this.pad);
     var cv = document.createElement('canvas');
@@ -192,7 +229,7 @@
   B.illuminate = function () {
     var t = now(), self = this, M = this.M;
     this.illum = { t0: t };
-    this.tr.strands.forEach(function (s) { if (!self.flood[s.key]) self.flood[s.key] = { t0: t, origin: 0, color: s.color }; });
+    this.tr.strands.forEach(function (s) { if (!self.flood[s.key]) self.flood[s.key] = { t0: t, origin: 0, color: s.color, disp: self._disp(s) }; });
     // a scatter of gold flecks over the whole page
     var tiles = [];
     for (var c = 0; c < M.n; c++) if (P.isTile(M.kinds[c])) tiles.push(c);
@@ -215,12 +252,13 @@
         var oi = 0;
         if (origin >= 0) s.pieces.forEach(function (q, i) { if (q.c === origin) oi = i; });
         else oi = Math.floor(s.pieces.length / 2);
-        self.flood[s.key] = { t0: t, origin: oi, color: s.color };
+        var disp = self._disp(s);
+        self.flood[s.key] = { t0: t, origin: oi, color: s.color, disp: disp };
         s.pieces.forEach(function (q) { delete self.drain[q.c + ':' + q.p]; });
         var heads = s.pieces.filter(function (q) { return M.beast[q.c] === 'h'; });
         heads.forEach(function (q) { self.snap[q.c] = t + s.pieces.length * 30; });
         s.pieces.forEach(function (q) { if (M.beast[q.c] === 't') self.wagAt[q.c] = t + s.pieces.length * 30; });
-        if (bursts++ < 6) self._burst(s.pieces[oi].c, s.color, 12, 0);
+        if (bursts++ < 6) self._burst(s.pieces[oi].c, disp, 12, 0);
         self.busy(Math.min(1400, s.pieces.length * 70) + 900);
         if (self.cb.onStrandWhole) self.cb.onStrandWhole(s.color, s);
       }
@@ -228,7 +266,7 @@
     Object.keys(this.flood).forEach(function (k) {
       if (nowWhole[k]) return;
       var f = self.flood[k];
-      k.split(',').forEach(function (pk) { self.drain[pk] = { t0: t, color: f.color }; });
+      k.split(',').forEach(function (pk) { self.drain[pk] = { t0: t, color: f.color, disp: f.disp }; });
       delete self.flood[k];
       self.busy(DRAIN_MS + 50);
       if (self.cb.onStrandBroken) self.cb.onStrandBroken(f.color);
@@ -244,7 +282,7 @@
   B._burst = function (c, color, n, delay) {
     if (this.parts.length > 220) return;
     var M = this.M, S = this.S, cx = this.pad + (c % M.w + 0.5) * S, cy = this.pad + ((c / M.w | 0) + 0.5) * S, t = now() + (delay || 0);
-    var pig = color ? ART.pigment(color) : null;
+    var pig = color ? ART.rib(color) : null;
     for (var i = 0; i < n; i++) {
       var a = Math.random() * 6.283, sp = S * (0.35 + Math.random() * 0.75), gold = !pig || Math.random() < 0.55;
       this.parts.push({
@@ -306,20 +344,26 @@
 
   /* ---------- geometry ---------- */
   function mid(d, h) { return [P.DX[d] * h, P.DY[d] * h]; }
+  var EXT = 1;   // edge ends run a pixel past the tile edge (the tile clip keeps half of it) so tiles meet without seams
+  function outer(e, h) { var m = mid(e, h); return [m[0] + P.DX[e] * EXT, m[1] + P.DY[e] * EXT]; }
   function piecePath(g, a, b, h, rev) {
     // path of a piece from endpoint a to endpoint b (b<0: centre). rev: draw b→a
+    var oa, ob;
     if (b < 0) {
-      var m = mid(a, h);
-      if (rev) { g.moveTo(0, 0); g.lineTo(m[0], m[1]); } else { g.moveTo(m[0], m[1]); g.lineTo(0, 0); }
+      oa = outer(a, h);
+      if (rev) { g.moveTo(0, 0); g.lineTo(oa[0], oa[1]); } else { g.moveTo(oa[0], oa[1]); g.lineTo(0, 0); }
       return;
     }
     if (rev) { var tmp = a; a = b; b = tmp; }
     var ma = mid(a, h), mb = mid(b, h);
-    if (P.opp(a) === b) { g.moveTo(ma[0], ma[1]); g.lineTo(mb[0], mb[1]); return; }
+    oa = outer(a, h); ob = outer(b, h);
+    if (P.opp(a) === b) { g.moveTo(oa[0], oa[1]); g.lineTo(ob[0], ob[1]); return; }
     var cx = ma[0] + mb[0], cy = ma[1] + mb[1];
     var aa = Math.atan2(ma[1] - cy, ma[0] - cx), ab = Math.atan2(mb[1] - cy, mb[0] - cx);
     var d = ab - aa; while (d > Math.PI) d -= 2 * Math.PI; while (d <= -Math.PI) d += 2 * Math.PI;
+    g.moveTo(oa[0], oa[1]); g.lineTo(ma[0], ma[1]);
     g.arc(cx, cy, h, aa, ab, d < 0);
+    g.lineTo(ob[0], ob[1]);
   }
   function pieceLen(a, b, h) { return b < 0 ? h : (P.opp(a) === b ? 2 * h : Math.PI * h / 2); }
   function pieceMid(a, b, h) {
@@ -344,7 +388,7 @@
         var maxD = s.loop ? Math.ceil(L / 2) : Math.max(f.origin, L - 1 - f.origin);
         var per = Math.min(70, 1100 / Math.max(1, maxD + 1));
         res.frac = clamp((t - f.t0) / per - dist, 0, 1);
-        res.fill = ART.pigment(f.color);
+        res.fill = ART.rib(f.disp || f.color);
         var from = s.pieces[i].from;
         res.fromEnd = (forward || i === f.origin) ? from : 1 - from;
         if (i === f.origin) res.both = true;
@@ -354,70 +398,56 @@
     if (dr) {
       var k = (t - dr.t0) / DRAIN_MS;
       if (k >= 1) delete this.drain[c + ':' + p];
-      else if (!res.fill || res.frac < 1) res.drain = { pig: ART.pigment(dr.color), k: k };
+      else if (!res.fill || res.frac < 1) res.drain = { rib: ART.rib(dr.disp || dr.color), k: k };
     }
     return res;
   };
 
+  // a broad enamel ribbon: hairline, gold edges, cream gouache body; the strand's colour floods along it
   B._strokeRibbon = function (g, path, len, w, col) {
-    var bare = ART.PIG.bare.base, ol = Math.max(1.2, w * 0.17);
-    g.lineCap = 'butt'; g.lineJoin = 'round';
-    g.strokeStyle = ART.INK; g.lineWidth = w + 2 * ol;
-    g.beginPath(); path(g, false); g.stroke();
-    var body = bare;
-    if (col.drain) body = ART.mix(col.drain.pig.base, bare, col.drain.k);
-    g.strokeStyle = body; g.lineWidth = w;
-    g.beginPath(); path(g, false); g.stroke();
+    var bare = ART.RIB.bare, body = col.drain ? ART.ribMix(col.drain.rib, bare, col.drain.k) : bare;
+    ART.ribLayers(g, function (gg) { path(gg, false); }, w, this.S, body, true, null, 0.22);
     if (col.fill && col.frac > 0) {
-      g.strokeStyle = col.fill.base;
-      if (col.frac < 1) {
-        if (col.both) {
-          // the origin piece floods from its middle outwards
-          g.setLineDash([0, len * (1 - col.frac) / 2, len * col.frac, len]);
-        } else g.setLineDash([len * col.frac, len * 2]);
-      }
-      g.beginPath(); path(g, !col.both && col.fromEnd === 1); g.stroke();
-      g.setLineDash([]);
-      g.strokeStyle = col.fill.dark; g.lineWidth = Math.max(0.8, w * 0.14); g.globalAlpha = 0.35 * col.frac;
-      g.beginPath(); path(g, false); g.stroke(); g.globalAlpha = 1;
+      var dash = null;
+      if (col.frac < 1) dash = col.both ? [0, len * (1 - col.frac) / 2, len * col.frac, len] : [len * col.frac, len * 2];
+      ART.ribLayers(g, function (gg) { path(gg, !col.both && col.fromEnd === 1); }, w, this.S, col.fill, false, dash, 0.2);
     }
-    g.strokeStyle = col.fill && col.frac >= 1 ? 'rgba(255,250,225,0.55)' : 'rgba(255,253,240,0.6)';
-    g.lineWidth = Math.max(0.7, w * 0.1);
-    g.save(); g.translate(-w * 0.18, -w * 0.18);
-    g.beginPath(); path(g, false); g.stroke(); g.restore();
   };
+  B._edges = function () { var S = this.S; return { E: Math.max(1, S * 0.042), HL: Math.max(0.7, S * 0.012) }; };
 
-  // the under ribbon of a crossing dives into shadow on both sides of the over ribbon
+  // the under ribbon of a crossing is cut short by a sliver of dark ground at the over ribbon's edges
   B._weaveShade = function (g, underP, h, rw, S, overPath) {
-    var ol = Math.max(1.2, rw * 0.17), half = rw / 2 + ol, horiz = underP === 1;
+    var ed = this._edges(), half = rw / 2 + ed.E + ed.HL, horiz = underP === 1;
     g.save(); g.beginPath();
     if (horiz) g.rect(-h, -half, 2 * h, 2 * half); else g.rect(-half, -h, 2 * half, 2 * h);
     g.clip();
     var gr = horiz ? g.createLinearGradient(-h, 0, h, 0) : g.createLinearGradient(0, -h, 0, h);
-    var a = (half + S * 0.015) / S;
-    gr.addColorStop(0, 'rgba(42,27,16,0)'); gr.addColorStop(clamp(0.5 - a - 0.17, 0, 1), 'rgba(42,27,16,0)');
-    gr.addColorStop(0.5 - a, 'rgba(42,27,16,0.5)'); gr.addColorStop(0.5 + a, 'rgba(42,27,16,0.5)');
-    gr.addColorStop(clamp(0.5 + a + 0.17, 0, 1), 'rgba(42,27,16,0)'); gr.addColorStop(1, 'rgba(42,27,16,0)');
+    var a = (half + S * 0.03) / S, sh = 'rgba(40,8,4,';
+    gr.addColorStop(0, sh + '0)'); gr.addColorStop(clamp(0.5 - a - 0.14, 0, 1), sh + '0)');
+    gr.addColorStop(0.5 - a, sh + '0.22)'); gr.addColorStop(0.5 + a, sh + '0.22)');
+    gr.addColorStop(clamp(0.5 + a + 0.14, 0, 1), sh + '0)'); gr.addColorStop(1, sh + '0)');
     g.fillStyle = gr; g.fillRect(-h, -h, 2 * h, 2 * h);
-    // a dark hairline gap hugging the over ribbon
-    g.strokeStyle = 'rgba(42,27,16,0.55)'; g.lineWidth = rw + 2 * ol + Math.max(2, S * 0.07); g.lineCap = 'butt';
+    g.strokeStyle = '#3a0c08'; g.lineWidth = 2 * half + 2 * Math.max(1.2, S * 0.03); g.lineCap = 'butt';
     g.beginPath(); overPath(g); g.stroke();
     g.restore();
   };
 
   B.draw = function () {
     var M = this.M, g = this.ctx; if (!M) return;
-    var t = now(), S = this.S, h = S / 2, pad = this.pad, rw = S * 0.27, self = this;
+    var t = now(), S = this.S, h = S / 2, pad = this.pad, rw = S * 0.36, self = this;
     g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     g.clearRect(0, 0, this.cssW, this.cssH);
     var e = this.illum ? t - this.illum.t0 : -1;
     function K(a, d) { return e < 0 ? 0 : clamp((e - a) / d, 0, 1); }
     var borderK = K(150, 900), letterK = K(450, 1100), twinK = K(650, 600), sheenK = K(700, 1000);
-    // knotwork border (ordinary pages) — a great initial frames itself
-    if (!this.isInitial) {
-      ART.draw(g, 'border', pad - this.band, pad - this.band, M.w * S + 2 * this.band, M.h * S + 2 * this.band, t,
-        { band: this.band, lit: borderK });
+    // the panel: madder ground, filigree, gilded frame tracing the mask, ivy (drawn once, cached)
+    if (!this.panel) {
+      var inm = M.kinds.map(function (k) { return k !== ' '; }), rect = inm.every(Boolean);
+      this.panel = ART.makePanel({ w: M.w, h: M.h, inm: inm, S: S, pad: pad, band: this.band, ivy: this.ivy,
+        cssW: this.cssW, cssH: this.cssH, dpr: this.dpr, rect: rect, seed: (M.level.n || 7) * 31 + 7,
+        round: rect ? 0 : S * (this.isInitial ? 0.3 : 0.18) });
     }
+    g.drawImage(this.panel.cv, 0, 0, this.cssW, this.cssH);
     // the great initial's body: faint while the page is worked, gilded from the top-left on solving
     if (this.letter) {
       var L = this.letter;
@@ -434,11 +464,11 @@
         }
       }
     }
-    // silverpoint grid (fades out once solved)
+    // fine gold play grid (fades out once solved)
     var gridA = this.solved ? 1 - borderK : 1;
     if (this.solved && !this.illum) gridA = 1;
     if (gridA > 0.01) {
-      g.strokeStyle = 'rgba(110,105,100,' + ((this.isInitial ? 0.2 : 0.28) * gridA) + ')'; g.lineWidth = 0.7;
+      g.strokeStyle = 'rgba(222,178,88,' + (0.26 * gridA) + ')'; g.lineWidth = 0.6;
       for (var c = 0; c < M.n; c++) {
         if (M.kinds[c] === ' ') continue;
         g.strokeRect(pad + (c % M.w) * S + 0.5, pad + (c / M.w | 0) * S + 0.5, S - 1, S - 1);
@@ -451,15 +481,15 @@
       if (fx !== undefined) { var q = (t - fx) / 650; if (q < 1 && q >= 0) glow = Math.sin(q * Math.PI); else if (q >= 1) delete self.twinFx[gi]; }
       twinGlow[gi] = glow;
       grp.forEach(function (m) {
-        ART.draw(g, 'twinFrame', pad + (m % M.w) * S, pad + (m / M.w | 0) * S, S, S, t, { glow: glow, lit: twinK });
+        ART.draw(g, 'twinFrame', pad + (m % M.w) * S, pad + (m / M.w | 0) * S, S, S, t, { glow: glow, lit: twinK, dark: true });
       });
     });
     // tiles
     for (c = 0; c < M.n; c++) {
       var k = M.kinds[c];
       if (!P.isTile(k)) {
-        if (k === '.') {   // empty vellum cell: a tiny scribal dot-triangle
-          g.fillStyle = 'rgba(120,70,40,0.35)';
+        if (k === '.') {   // empty cell: a tiny gold dot-triangle on the ground
+          g.fillStyle = 'rgba(232,192,104,0.6)';
           var ex = pad + (c % M.w + 0.5) * S, ey = pad + ((c / M.w | 0) + 0.5) * S;
           [[0, -1], [-0.9, 0.6], [0.9, 0.6]].forEach(function (o) { g.beginPath(); g.arc(ex + o[0] * S * 0.07, ey + o[1] * S * 0.07, S * 0.03, 0, 6.283); g.fill(); });
         }
@@ -473,7 +503,7 @@
         if (wk >= 1) delete this.wig[c]; else ang += Math.sin(wk * Math.PI * 3) * 0.09 * (1 - wk);
       }
       g.save(); g.translate(cx, cy); g.rotate(ang);
-      g.beginPath(); g.rect(-h, -h, S, S); g.clip();
+      g.beginPath(); g.rect(-h - 0.5, -h - 0.5, S + 1, S + 1); g.clip();   // half a pixel of overlap hides tile seams
       var pieces = P.KINDS[k].pieces, order = [0, 1].slice(0, pieces.length);
       if (k === 'x') { var over = this.weave[c] === 0 ? 0 : 1; order = [1 - over, over]; }
       for (var oi = 0; oi < order.length; oi++) {
@@ -486,15 +516,19 @@
         (function (a, b) {
           self._strokeRibbon(g, function (gg, rev) { piecePath(gg, a, b, h, rev); }, len, rw, col);
         })(a, b);
-        // loose ends get an ink cap so they read as cut ribbon
+        // loose ends get a gold cap so they read as cut ribbon
         [a, b].forEach(function (en) {
           if (en < 0 || self.solved || self.tr.matched[c * 4 + P.rotDir(en, self.rots[c])]) return;
-          var m = mid(en, h), px = -P.DY[en], py = P.DX[en], hw = rw / 2 + Math.max(1.2, rw * 0.17);
-          g.strokeStyle = ART.INK; g.lineWidth = Math.max(1.4, rw * 0.16); g.lineCap = 'butt';
-          g.beginPath(); g.moveTo(m[0] - P.DX[en] * g.lineWidth / 2 + px * hw, m[1] - P.DY[en] * g.lineWidth / 2 + py * hw);
-          g.lineTo(m[0] - P.DX[en] * g.lineWidth / 2 - px * hw, m[1] - P.DY[en] * g.lineWidth / 2 - py * hw); g.stroke();
+          var ed = self._edges(), m = mid(en, h), px = -P.DY[en], py = P.DX[en], hw = rw / 2 + ed.E + ed.HL;
+          var cw = Math.max(1.4, S * 0.04), back = cw / 2 + ed.HL;
+          var x0 = m[0] - P.DX[en] * back, y0 = m[1] - P.DY[en] * back;
+          g.lineCap = 'butt';
+          g.strokeStyle = ART.HAIR; g.lineWidth = cw + 2 * ed.HL;
+          g.beginPath(); g.moveTo(x0 + px * hw, y0 + py * hw); g.lineTo(x0 - px * hw, y0 - py * hw); g.stroke();
+          g.strokeStyle = ART.GILT; g.lineWidth = cw;
+          g.beginPath(); g.moveTo(x0 + px * (hw - ed.HL), y0 + py * (hw - ed.HL)); g.lineTo(x0 - px * (hw - ed.HL), y0 - py * (hw - ed.HL)); g.stroke();
         });
-        var body = col.fill && col.frac >= 1 ? col.fill.base : (col.drain ? ART.mix(col.drain.pig.base, ART.PIG.bare.base, col.drain.k) : ART.PIG.bare.base);
+        var rb = col.fill && col.frac >= 1 ? col.fill : (col.drain ? ART.ribMix(col.drain.rib, ART.RIB.bare, col.drain.k) : ART.RIB.bare), body = rb.base;
         if (b < 0) {
           var bs = M.beast[c];
           if (bs === 'h') {
@@ -502,17 +536,17 @@
             if (sn && t >= sn) { var q2 = (t - sn) / 420; if (q2 < 1) snapK = q2; else delete this.snap[c]; }
             if (sn && t < sn) this.busy(sn - t + 450);
             if (this.blinkAt[c]) { var bq = (t - this.blinkAt[c]) / 220; if (bq < 1) blk = Math.sin(bq * Math.PI); else delete this.blinkAt[c]; }
-            ART.draw(g, 'beastHead', -h, -h, S, S, t, { body: body, snap: snapK, blink: blk });
+            ART.draw(g, 'beastHead', -h, -h, S, S, t, { body: body, snap: snapK, blink: blk, gilt: true });
           } else if (bs === 't') {
             var wa = this.wagAt[c], wagK = 0;
             if (wa !== undefined && t >= wa) { var q3 = (t - wa) / 700; if (q3 < 1) wagK = q3; else delete this.wagAt[c]; }
             if (wa !== undefined && t < wa) this.busy(wa - t + 750);
-            ART.draw(g, 'beastTail', -h, -h, S, S, t, { body: body, wag: wagK });
-          } else ART.draw(g, 'knot', -S * 0.4, -S * 0.4, S * 0.8, S * 0.8, t, { body: body });
+            ART.draw(g, 'beastTail', -h, -h, S, S, t, { body: body, wag: wagK, gilt: true, rw: 0.36 });
+          } else ART.draw(g, 'knot', -h, -h, S, S, t, { body: body, rib: rb, rw: 0.36 });
         }
         if (M.mark[c]) {
           var pm = pieceMid(a, b, h), ms = S * 0.3;
-          ART.draw(g, 'mark', pm[0] - ms / 2, pm[1] - ms / 2, ms, ms, t, { pigment: M.mark[c] });
+          ART.draw(g, 'mark', pm[0] - ms / 2, pm[1] - ms / 2, ms, ms, t, { pigment: M.mark[c], gilt: true });
         }
       }
       g.restore();
@@ -536,17 +570,22 @@
           if (si < 0 || tr.strands[si].whole) continue;
           var gx = pad + (c % M.w + 0.5 + P.DX[d] * 0.5) * S, gy = pad + ((c / M.w | 0) + 0.5 + P.DY[d] * 0.5) * S;
           var rg = g.createRadialGradient(gx, gy, 0, gx, gy, S * 0.3);
-          rg.addColorStop(0, 'rgba(255,214,120,0.38)'); rg.addColorStop(1, 'rgba(255,214,120,0)');
+          rg.addColorStop(0, 'rgba(255,224,140,0.5)'); rg.addColorStop(1, 'rgba(255,224,140,0)');
           g.fillStyle = rg; g.fillRect(gx - S * 0.3, gy - S * 0.3, S * 0.6, S * 0.6);
         }
       }
     }
-    // gold sheen sweep across the board during illumination
-    if (sheenK > 0 && sheenK < 1) {
-      var sx = -this.cssW * 0.4 + sheenK * this.cssW * 1.8, sw = Math.max(60, S * 1.6);
-      var sg = g.createLinearGradient(sx - sw, 0, sx + sw, this.cssH * 0.35);
-      sg.addColorStop(0, 'rgba(255,240,180,0)'); sg.addColorStop(0.5, 'rgba(255,240,180,0.32)'); sg.addColorStop(1, 'rgba(255,240,180,0)');
-      g.fillStyle = sg; g.fillRect(0, 0, this.cssW, this.cssH);
+    // gold sheen sweep across the panel during illumination, brightest as it crosses the gilded frame
+    if (sheenK > 0 && sheenK < 1 && this.panel) {
+      var sx = -this.cssW * 0.4 + sheenK * this.cssW * 1.8, sw = Math.max(60, S * 1.6), G = this.panel.geom;
+      var sheen = function (al) {
+        var sg = g.createLinearGradient(sx - sw, 0, sx + sw, self.cssH * 0.35);
+        sg.addColorStop(0, 'rgba(255,240,180,0)'); sg.addColorStop(0.5, 'rgba(255,240,180,' + al + ')'); sg.addColorStop(1, 'rgba(255,240,180,0)');
+        g.fillStyle = sg; g.fillRect(0, 0, self.cssW, self.cssH);
+      };
+      var outer = G.path(this.band), ring = new Path2D();
+      ring.addPath(outer); ring.addPath(G.path(0));
+      g.save(); g.clip(outer); sheen(0.24); g.clip(ring, 'evenodd'); sheen(0.5); g.restore();
     }
     if (this.parts.length) this._drawParts(g, t);
   };

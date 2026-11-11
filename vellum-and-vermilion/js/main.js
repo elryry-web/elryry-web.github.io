@@ -60,10 +60,12 @@
       var side = Math.round(Math.max(270, Math.min(360, W * 0.3))), gap = Math.round(Math.max(24, Math.min(48, W * 0.03)));
       app.style.setProperty('--side', side + 'px'); app.style.setProperty('--gap', gap + 'px');
       var ac = getComputedStyle(app);
+      boxDroll(true, app.clientHeight - parseFloat(ac.paddingTop) - parseFloat(ac.paddingBottom));
       w = app.clientWidth - parseFloat(ac.paddingLeft) - parseFloat(ac.paddingRight) - side - gap;
       h = app.clientHeight - parseFloat(ac.paddingTop) - parseFloat(ac.paddingBottom);
     } else {
       var cs = getComputedStyle(app);
+      boxDroll(false, window.innerHeight);
       w = app.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
       h = app.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) -
         $('hud').offsetHeight - $('head').offsetHeight - $('foot').offsetHeight - 8;
@@ -153,26 +155,94 @@
   document.addEventListener('pointerdown', function () { SFX.unlock(); if (seq) skipSequence(); }, true);
   document.addEventListener('keydown', function () { SFX.unlock(); }, true);
 
-  /* ---------- the drollery: asleep in the margin until the page is done, then wakes and idles ---------- */
-  var WAKE_MS = 1100, droll = { wakeT0: null, size: 72, last: 0, dpr: 1 };
+  /* ---------- the drollery: in the margin until the page is done, then it wakes and idles ----------
+     A painted PNG (art/manifest.json) stands on its ivy vine: the box is sized to the picture, the vine's foot
+     sits on the box's bottom edge and grows out of the page. Until the page is solved it is an unpainted sepia
+     underdrawing; on solving the colour rises up the vine from the foot with a gold glint, and it sways after.
+     A procedural drollery keeps its square box and does its own sleeping and waking (js/drolleries.js). */
+  var WAKE_MS = 1100, droll = { wakeT0: null, w: 72, h: 72, last: 0, dpr: 1, anchor: null, oc: null };
+  // size the drollery's box before the board is fitted. wide: the side column's width, as tall as the column
+  // has room for (up to 250px), the vine's foot at 42% across. portrait: beside the grumble, 17% of the height.
+  function boxDroll(wide, availH) {
+    var cv = $('droll'), m = cur && ART.meta('drollery.' + cur.drollery);
+    document.body.classList.toggle('pngDroll', !!m);
+    cv.style.width = cv.style.height = '';
+    droll.anchor = null;
+    if (!m) return;
+    if (wide) {
+      cv.style.height = '0px';
+      var col = $('grumbleRow').clientWidth || 300;
+      var room = availH - $('hud').offsetHeight - $('head').offsetHeight - $('foot').offsetHeight - 24;
+      var hh = Math.round(Math.max(70, Math.min(250, room)));
+      cv.style.width = col + 'px'; cv.style.height = hh + 'px';
+      droll.anchor = 0.42;
+    } else {
+      var rowW = $('grumbleRow').clientWidth || 360;
+      var ph = Math.max(96, Math.min(170, availH * 0.17)), pw = ph * m.aspect * 1.08;
+      if (pw > rowW * 0.46) { pw = rowW * 0.46; ph = pw / (m.aspect * 1.08); }
+      cv.style.width = Math.round(pw) + 'px'; cv.style.height = Math.round(ph) + 'px';
+    }
+  }
   function sizeDroll() {
-    var cv = $('droll'), dpr = Math.min(3, window.devicePixelRatio || 1), sz = cv.clientWidth || 72;
-    droll.size = sz; droll.dpr = dpr; cv.width = Math.round(sz * dpr); cv.height = Math.round(sz * dpr);
+    var cv = $('droll'), dpr = Math.min(3, window.devicePixelRatio || 1);
+    droll.w = cv.clientWidth || 72; droll.h = cv.clientHeight || 72; droll.dpr = dpr;
+    cv.width = Math.round(droll.w * dpr); cv.height = Math.round(droll.h * dpr);
     drawDroll(performance.now());
   }
+  function glint(g, x, y, r, k) {   // the gold star of waking (as in js/drolleries.js)
+    if (k <= 0 || k >= 1) return;
+    var rr = r * Math.sin(k * Math.PI);
+    g.save(); g.globalAlpha = Math.sin(k * Math.PI); g.fillStyle = '#d9ac45'; g.strokeStyle = ART.INK; g.lineWidth = 1;
+    g.beginPath();
+    for (var i = 0; i < 8; i++) { var a = i * Math.PI / 4 + k, q = i % 2 ? rr * 0.3 : rr; g.lineTo(x + Math.cos(a) * q, y + Math.sin(a) * q); }
+    g.closePath(); g.fill(); g.stroke(); g.restore();
+  }
   function drawDroll(t) {
-    var cv = $('droll'), g = cv.getContext('2d'), sz = droll.size;
-    g.setTransform(droll.dpr, 0, 0, droll.dpr, 0, 0); g.clearRect(0, 0, sz, sz);
+    var cv = $('droll'), g = cv.getContext('2d'), W = droll.w, H = droll.h, dpr = droll.dpr;
+    g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
     if (!cur) return;
-    var awake = droll.wakeT0 === null ? 0 : Math.max(0, Math.min(1, (t - droll.wakeT0) / WAKE_MS)), slot = 'drollery.' + cur.drollery;
-    if (ART.has(slot)) {   // a painted PNG: breathe while asleep, hop as it wakes, bob gently after
-      var hop = awake > 0 && awake < 1 ? Math.sin(awake * Math.PI) * sz * 0.12 : 0;
-      var br = awake <= 0 ? Math.sin(t / 700) * 0.025 : Math.sin(t / 900) * 0.012;
-      g.save(); g.globalAlpha = awake > 0 ? 1 : 0.8;
-      g.translate(sz / 2, sz - hop); g.scale(1, 1 + br); g.translate(-sz / 2, -sz);
-      ART.draw(g, slot, 0, 0, sz, sz, t, { awake: awake });
-      g.restore();
-    } else ART.draw(g, slot, 0, 0, sz, sz, t, { awake: awake });
+    var awake = droll.freeze != null ? droll.freeze : droll.wakeT0 === null ? 0 : Math.max(0, Math.min(1, (t - droll.wakeT0) / WAKE_MS)), slot = 'drollery.' + cur.drollery;
+    var m = ART.meta(slot);
+    if (!m) { var sz = Math.min(W, H); ART.draw(g, slot, (W - sz) / 2, H - sz, sz, sz, t, { awake: awake }); return; }
+    // the picture, its foot on the bottom edge (headroom for the stretch as it wakes)
+    var ih = Math.min(H * 0.95, W / m.aspect / 1.04), iw = ih * m.aspect;
+    var sx = droll.anchor === null ? W / 2 + (m.stem - 0.5) * iw :
+      Math.max(m.stem * iw + 2, Math.min(W - (1 - m.stem) * iw - 2, W * droll.anchor));
+    var x0 = sx - m.stem * iw, y0 = H - ih;
+    // all motion pivots on the vine's foot, so the stem stays rooted: a slow breath asleep, a springy
+    // stretch and wobble as it wakes, a gentle sway after
+    var rot, sy;
+    if (awake <= 0) { rot = 0; sy = 1 + Math.sin(t / 900) * 0.007; }
+    else if (awake < 1) { rot = Math.sin(awake * Math.PI * 3) * (1 - awake) * 0.035; sy = 1 + Math.sin(awake * Math.PI) * 0.04; }
+    else { rot = Math.sin(t / 1700) * 0.01; sy = 1 + Math.sin(t / 1150) * 0.005; }
+    function place(c) { c.translate(sx, H); c.rotate(rot); c.scale(1, sy); c.translate(-sx, -H); }
+    if (awake < 1) {   // the unpainted underdrawing
+      g.save(); g.globalAlpha = awake > 0 ? 1 - awake * awake : 1; place(g);
+      ART.draw(g, slot, x0, y0, iw, ih, t, { faded: true }); g.restore();
+    }
+    if (awake >= 1) { g.save(); place(g); ART.draw(g, slot, x0, y0, iw, ih, t); g.restore(); }
+    else if (awake > 0) {   // the colour rises from the foot: painted offscreen, then masked by a soft front
+      if (!droll.oc) droll.oc = document.createElement('canvas');
+      var oc = droll.oc, o = oc.getContext('2d');
+      if (oc.width !== cv.width || oc.height !== cv.height) { oc.width = cv.width; oc.height = cv.height; }
+      var e = awake < 0.5 ? 2 * awake * awake : 1 - 2 * (1 - awake) * (1 - awake), f = ih * 0.2;
+      var front = H + f - e * (ih + 2 * f);
+      o.setTransform(dpr, 0, 0, dpr, 0, 0); o.globalCompositeOperation = 'source-over'; o.clearRect(0, 0, W, H);
+      o.save(); place(o); ART.draw(o, slot, x0, y0, iw, ih, t); o.restore();
+      var gr = o.createLinearGradient(0, front - f, 0, front);
+      gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,1)');
+      o.globalCompositeOperation = 'destination-in'; o.fillStyle = gr; o.fillRect(0, 0, W, H);
+      o.globalCompositeOperation = 'source-over';
+      g.drawImage(oc, 0, 0, W, H);
+      var gr2 = Math.max(6, ih * 0.06);
+      glint(g, x0 + iw * (0.5 + 0.2 * Math.sin(awake * 9)), Math.max(y0 + gr2, front - f * 0.5), gr2 * 0.8, awake / 0.85);
+      glint(g, x0 + iw * 0.78, y0 + ih * 0.12, gr2 * 1.2, (awake - 0.5) / 0.5);
+    }
+    // the vine's foot fades into the vellum, as if it grew out of the page
+    var ff = g.createLinearGradient(0, H, 0, H - ih * 0.07);
+    ff.addColorStop(0, 'rgba(0,0,0,0.75)'); ff.addColorStop(1, 'rgba(0,0,0,0)');
+    g.globalCompositeOperation = 'destination-out'; g.fillStyle = ff; g.fillRect(0, H - ih * 0.07, W, ih * 0.07);
+    g.globalCompositeOperation = 'source-over';
   }
   (function tick(t) {
     if (t - droll.last > 33) { droll.last = t; drawDroll(t); }
@@ -251,6 +321,8 @@
         saved: JSON.parse(JSON.stringify(save))
       };
     },
+    // hold the drollery at a wake fraction 0..1 (null lets it run again), for checking the wake frame by frame
+    drollery: function (a) { droll.freeze = a == null ? null : +a; drawDroll(performance.now()); return droll.freeze; },
     board: board, save: function () { return save; }, book: window.Book
   };
 

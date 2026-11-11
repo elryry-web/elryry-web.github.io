@@ -53,6 +53,10 @@
   #lines .hid { color: transparent; }
   #droll { width: 86px; height: 86px; flex: none; }
   body.wide #droll { order: -1; width: min(120px, 24vh); height: min(120px, 24vh); }
+  /* a painted (PNG) drollery: main.js sizes the box to the picture; its vine's foot stands on the box's bottom edge,
+     level with the grumble's last line in portrait and just above the grumble in wide */
+  body.pngDroll:not(.wide) #grumbleRow { align-items: flex-end; }
+  body.pngDroll.wide #grumbleRow { gap: 0; }
   #next { font-family: "Uncial Antiqua", serif; font-size: 19px; color: #fff4dc; background: var(--red); border-color: #5a140c;
     padding: 6px 18px; visibility: hidden; opacity: 0; transition: opacity .5s; }
   #next.show { visibility: visible; opacity: 1; }
@@ -159,13 +163,13 @@
   <div id="coverUI"><button id="bk_open">Open the book</button><button id="bk_cont"></button></div>
 </div>
 
-<script src="js/levels.js?v=4"></script>
+<script src="js/levels.js?v=5"></script>
 <script src="js/puzzle.js?v=3"></script>
-<script src="js/art.js?v=3"></script>
+<script src="js/art.js?v=5"></script>
 <script src="js/drolleries.js?v=3"></script>
 <script src="js/audio.js?v=3"></script>
-<script src="js/board.js?v=3"></script>
-<script src="js/book.js?v=6"></script>
-<script src="js/main.js?v=5"></script>
+<script src="js/board.js?v=4"></script>
+<script src="js/book.js?v=7"></script>
+<script src="js/main.js?v=6"></script>
 </body>
 </html>
