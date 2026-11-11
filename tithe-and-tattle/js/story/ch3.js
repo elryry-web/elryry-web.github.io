@@ -144,7 +144,7 @@ STORY.push({
   characters: ['Brother Wystan', 'Dame Isabel', 'the Abbot', 'the Prior', 'Father Simon', 'Walter Crane', 'Alys Pennock'],
   size: '4×5',
   grade: 'Journeyman',
-  intro: "Dame Isabel keeps Christmas at Mardle Hall with a dinner for the abbey and the town. She gives her gifts at the table, though gifts are for New Year, because she says that at New Year everyone gives at once and nobody remembers who gave what. Five guests sat at her table. Her steward writes the seating in French, and I read French slowly, so I have the places counted outward from her chair and the rest only roughly.",
+  intro: "Dame Isabel keeps Christmas at Mardle Hall with a dinner for the abbey and the town. She gives her gifts at the table, though gifts are usually for New Year, because she likes to see them opened. Five guests sat at her table. Her steward writes the seating in French, and I read French slowly, so I have the places counted outward from her chair and the rest only roughly.",
   task: 'Can you work out where each guest sat, which dish was set before each, and what Dame Isabel gave them?',
   categories: [
     { id: 'who', name: 'Guests', items: [
