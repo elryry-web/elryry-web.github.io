@@ -36,6 +36,113 @@
   };
   UI.closeTop = function () { var c = sheets[sheets.length - 1]; if (c && c.dismissable) { c(); return true; } return false; };
   UI.closeAll = function () { sheets.slice().forEach(function (c) { c(); }); };
+  // A full-screen viewer. o: {img: loaded Image | null, canvas: fn(w,h) -> canvas (fallback), caption: [name, desc],
+  // zoom: true for pinch/wheel/pan/double-tap, trigger: element to refocus}. Joins the sheet stack, so Esc, Back and
+  // every screen change close it. Returns close().
+  UI.lightbox = function (o) {
+    var back = el('div', 'lightbox' + (o.zoom ? ' zoomable' : ''));
+    back.setAttribute('role', 'dialog'); back.setAttribute('aria-modal', 'true');
+    back.setAttribute('aria-label', (o.caption && o.caption[0]) || 'Larger view');
+    var x = el('button', 'lbclose', '\u00d7'); x.setAttribute('aria-label', 'Close');
+    var fig = el('figure', 'lbfig'), media = null, cap = null;
+    var prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    if (o.caption && o.caption[0]) {
+      cap = el('figcaption', 'lbcap'); cap.appendChild(el('div', 'lbname', o.caption[0]));
+      if (o.caption[1]) cap.appendChild(el('div', 'lbdesc', o.caption[1]));
+    }
+    var closed = false, s = 1, tx = 0, ty = 0, W0 = 0, H0 = 0, bx = 0, by = 0, vw = 0, vh = 0, nw = 0, nh = 0;
+    function close() {
+      if (closed) return; closed = true;
+      document.removeEventListener('keydown', onKey, true);
+      window.removeEventListener('resize', layout);
+      document.body.style.overflow = prevOverflow;
+      back.classList.remove('on');
+      sheets = sheets.filter(function (c) { return c !== close; });
+      setTimeout(function () { if (back.parentNode) back.parentNode.removeChild(back); }, 200);
+      try { if (o.trigger && o.trigger.focus) o.trigger.focus(); } catch (e) { /* ignore */ }
+    }
+    close.dismissable = true;
+    function onKey(e) { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); } }
+    document.addEventListener('keydown', onKey, true);
+
+    function apply() {
+      // keep the image on screen: centred when smaller than the view, edge to edge when larger
+      var w = W0 * s, h = H0 * s;
+      tx = w <= vw ? (vw - w) / 2 - bx : Math.min(-bx, Math.max(vw - w - bx, tx));
+      ty = h <= vh ? (vh - h) / 2 - by : Math.min(-by, Math.max(vh - h - by, ty));
+      media.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + s + ')';
+    }
+    function zoomAt(ns, px, py) {
+      ns = Math.max(1, Math.min(4, ns));
+      var u = (px - bx - tx) / s, v = (py - by - ty) / s;
+      s = ns; tx = px - bx - u * s; ty = py - by - v * s; apply();
+    }
+    function layout() {
+      vw = back.clientWidth; vh = back.clientHeight;
+      var f = Math.min(vw * 0.96 / nw, vh * 0.96 / nh);
+      W0 = Math.round(nw * f); H0 = Math.round(nh * f); bx = (vw - W0) / 2; by = (vh - H0) / 2;
+      media.style.width = W0 + 'px'; media.style.height = H0 + 'px'; media.style.left = bx + 'px'; media.style.top = by + 'px';
+      apply();
+    }
+
+    if (o.zoom) {
+      back.appendChild(x);
+      document.body.appendChild(back);
+      if (o.img) { media = el('img', 'lbmedia'); media.src = o.img.src; media.alt = 'The map of Mardle and the abbey'; nw = o.img.naturalWidth; nh = o.img.naturalHeight; }
+      else {   // no PNG: draw the procedural map large, then scale it with CSS
+        var a = ART.MAP_ASPECT || 1.3; nw = 1000; nh = Math.round(1000 * a);
+        media = o.canvas(1200, Math.round(1200 * a)); media.className = 'lbmedia';
+      }
+      media.draggable = false; back.appendChild(media); layout();
+      window.addEventListener('resize', layout);
+      var ptrs = {}, start = null, moved = 0, lastTap = null, pinch = null;
+      back.addEventListener('wheel', function (e) { e.preventDefault(); zoomAt(s * Math.exp(-e.deltaY * 0.0015), e.clientX, e.clientY); }, { passive: false });
+      back.addEventListener('pointerdown', function (e) {
+        if (e.target === x) return;
+        ptrs[e.pointerId] = { x: e.clientX, y: e.clientY }; try { back.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
+        var ids = Object.keys(ptrs);
+        if (ids.length === 1) { moved = 0; start = { onImg: e.target === media }; }
+        else { start = null; var p = ptrs[ids[0]], q = ptrs[ids[1]]; pinch = { d: Math.hypot(p.x - q.x, p.y - q.y) || 1, s: s }; moved = 99; }
+      });
+      back.addEventListener('pointermove', function (e) {
+        var p = ptrs[e.pointerId]; if (!p) return;
+        var ids = Object.keys(ptrs), dx = e.clientX - p.x, dy = e.clientY - p.y;
+        p.x = e.clientX; p.y = e.clientY;
+        if (ids.length >= 2 && pinch) {
+          var q = ptrs[ids[0] === String(e.pointerId) ? ids[1] : ids[0]];
+          zoomAt(pinch.s * (Math.hypot(p.x - q.x, p.y - q.y) || 1) / pinch.d, (p.x + q.x) / 2, (p.y + q.y) / 2);
+        } else {
+          moved += Math.abs(dx) + Math.abs(dy);
+          if (moved > 6) { tx += dx; ty += dy; apply(); }
+        }
+      });
+      function up(e) {
+        if (!ptrs[e.pointerId]) return;
+        delete ptrs[e.pointerId];
+        if (Object.keys(ptrs).length) { pinch = null; start = null; moved = 99; return; }
+        pinch = null;
+        if (e.type !== 'pointerup' || !start || moved > 8) { start = null; return; }
+        var now = Date.now(), onImg = start.onImg; start = null;
+        if (!onImg) { close(); return; }   // a tap on the backdrop
+        if (lastTap && now - lastTap.t < 320 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 30) {
+          lastTap = null; zoomAt(s > 1.05 ? 1 : 2.5, e.clientX, e.clientY);
+        } else lastTap = { t: now, x: e.clientX, y: e.clientY };
+      }
+      back.addEventListener('pointerup', up); back.addEventListener('pointercancel', up);
+    } else {
+      if (o.img) { media = el('img', 'lbmedia'); media.src = o.img.src; media.alt = (o.caption && o.caption[0]) || ''; fig.appendChild(media); }
+      if (cap) fig.appendChild(cap);
+      back.appendChild(fig); back.appendChild(x);
+      back.addEventListener('click', close);
+      document.body.appendChild(back);
+    }
+    x.onclick = function (e) { e.stopPropagation(); close(); };
+    requestAnimationFrame(function () { back.classList.add('on'); });
+    sheets.push(close);
+    x.focus();
+    return close;
+  };
   UI.confirm = function (text, yes, no, onYes) {
     var box = el('div', 'confirm');
     box.appendChild(el('p', null, text));

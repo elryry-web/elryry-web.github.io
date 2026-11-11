@@ -667,10 +667,11 @@
     },
     repaintAll: function () { Array.prototype.forEach.call(document.querySelectorAll('canvas.art'), ART.paint); },
     has: function (slot) { return !!images[slot]; },
+    image: function (slot) { return images[slot] || null; },   // the loaded PNG (.src carries the manifest ?v=), for full-size views
     load: function (base) {
       base = base || 'art/';
       if (typeof fetch === 'undefined') return Promise.resolve();
-      return fetch(base + 'manifest.json?v=17', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : {}; }).then(function (m) {
+      return fetch(base + 'manifest.json?v=18', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : {}; }).then(function (m) {
         return Promise.all(Object.keys(m || {}).map(function (slot) {
           var e = typeof m[slot] === 'string' ? { file: m[slot] } : (m[slot] || {});
           if (!e.file) return null;

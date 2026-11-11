@@ -82,7 +82,12 @@
           var known = !!met[c.id], li = el('li', 'person' + (known ? '' : ' unmet'));
           var letter = c.name.replace(HONOUR, '').charAt(0);
           var pc = ART.canvas('portrait-' + c.id, 54, 54, { letter: letter, ground: GROUNDS[c.group], blank: !known, id: c.id });
-          li.appendChild(pc);
+          if (known && ART.image('portrait-' + c.id)) {   // only a painted portrait can be enlarged
+            var pb = el('button', 'portbtn'); pb.type = 'button';
+            pb.setAttribute('aria-label', 'View larger portrait of ' + c.name);
+            pb.appendChild(pc); li.appendChild(pb);
+            pb.onclick = function () { UI.lightbox({ img: ART.image('portrait-' + c.id), caption: [c.name, c.desc], trigger: pb }); };
+          } else li.appendChild(pc);
           var info = el('div', 'pinfo');
           if (known) {
             info.appendChild(el('h3', null, c.name));
@@ -186,10 +191,14 @@
       inner.appendChild(h);
       var groups = placesWithPuzzles();
       var tools = el('div', 'maptools');
+      var vb = el('button', 'iconbtn', '⤢'); vb.setAttribute('aria-label', 'View the whole map full screen'); vb.title = 'View the whole map';
+      vb.onclick = function () {
+        UI.lightbox({ img: ART.image('map'), zoom: true, trigger: vb, caption: null, canvas: function (w, h) { return ART.canvas('map', w, h, {}); } });
+      };
       var zo = el('button', 'iconbtn', '−'), zi = el('button', 'iconbtn', '+');
       zo.setAttribute('aria-label', 'Zoom out'); zi.setAttribute('aria-label', 'Zoom in');
       var zl = el('span', 'zlabel');
-      tools.appendChild(zo); tools.appendChild(zl); tools.appendChild(zi);
+      tools.appendChild(zo); tools.appendChild(zl); tools.appendChild(zi); tools.appendChild(vb);
       inner.appendChild(tools);
       var wrap = el('div', 'mapwrap'); inner.appendChild(wrap);
       function syncZ() { zo.disabled = mapState.zoom === 0; zi.disabled = mapState.zoom === ZOOMS.length - 1; zl.textContent = ZOOMS[mapState.zoom] === 1 ? 'whole map' : '×' + ZOOMS[mapState.zoom]; }
