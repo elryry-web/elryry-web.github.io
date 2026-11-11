@@ -124,7 +124,7 @@ STORY.push({
     { text: 'The man who ate the roast goose paid more than Father Simon.', logic: ['cmp', 'goose', 'simon', 'paid', '>'] }
   ],
   solution: { odo: ['seat1', 'goose', 'd4'], walter: ['seat2', 'pottage', 'd1'], piers: ['seat3', 'giblet', 'd3'], simon: ['seat4', 'eelpie', 'd2'] },
-  epilogue: "Brother Odo had the roast goose by the fire for fourpence and said the Swan's ale was thin. Walter Crane had pottage for a penny and drank two more cups of the ale, which he said was his duty as ale-conner. Father Simon, from the door end, asked who had given the abbey leave to sell ale, and they argued till Alys put the shutters up."
+  epilogue: "Brother Odo had the roast goose by the fire for fourpence and said the Swan's ale was thin. Walter Crane had pottage for a penny and two more cups of ale, to test it, he said. Father Simon asked who had given the abbey leave to sell ale, and they argued till Alys put the shutters up."
 });
 
 STORY.push({
