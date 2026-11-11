@@ -111,7 +111,7 @@ window.STORY = window.STORY || [];
     characters: ['Abbot Gervase', 'Joan Fletcher', 'Tom Webbe', 'Widow Tolley', 'Agnes Sutor', 'Brother Anselm'],
     size: '4×4',
     grade: 'Journeyman',
-    intro: "The people whose houses were wet came over to the abbey guest house, which has four beds, and the Abbot gave out the beds. Everyone wanted the bed by the fire, and he promised it to each of them as they asked, so it was promised four times. The beds are numbered from the door, so bed 1 has the draught and bed 4 has the fire.",
+    intro: "The people whose houses were wet came over to the abbey guest house, which has four beds, and the Abbot gave out the beds. Everyone wanted the bed by the fire, and he promised it to each of them as they asked, so it was promised four times. The beds are numbered from the door, so bed 4 is the one by the fire.",
     task: 'Can you work out who slept in each bed, what each brought and what each complained about?',
     categories: [
       { id: 'who', name: 'Guests', items: [it('agnes', 'Agnes Sutor'), it('tom', 'Tom Webbe'), it('joan', 'Joan Fletcher'), it('tolley', 'Widow Tolley')] },
@@ -146,7 +146,7 @@ window.STORY = window.STORY || [];
     characters: ['Hob', 'Kit', 'Will Hayward', 'Brother Anselm', 'Roger Thatcher', 'Walter Crane'],
     size: '4×5',
     grade: 'Journeyman',
-    intro: "Hob's wheel jammed every day from Monday to Friday, and each day somebody had to go down into the race and pull something out of it. I have the whole week from Hob, who told it in his doorway with the water round his boots, and there were otters in every day of it, including the day of the sheep. The Prior wants a plain account because the abbey says the flood came over the meadow at Hob's weir, and Hob blames a different thing every time he is asked.",
+    intro: "Hob's wheel jammed every day from Monday to Friday, and each day somebody had to go down into the race and pull something out of it. I have the whole week from Hob, who told it in his doorway with the water round his boots. The Prior wants a plain account because the abbey says the flood came over the meadow at Hob's weir, and Hob blames a different thing every time he is asked.",
     task: 'Can you work out who cleared the wheel on each day, what was caught in it, and what Hob blamed?',
     categories: [
       { id: 'who', name: 'Cleared by', items: [it('will', 'Will Hayward'), it('hob', 'Hob'), it('kit', 'Kit'), it('anselm', 'Brother Anselm'), it('roger', 'Roger Thatcher')] },

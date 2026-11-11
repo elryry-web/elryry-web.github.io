@@ -15,7 +15,7 @@ window.STORY = window.STORY || [];
     size: '3×4',
     grade: 'Apprentice',
     chapterIntro: "The bell came back from Lynn in Whit week on Piers Carter's cart, and Piers had the receipt this time, in his hat. It is on the same trestles in the tithe barn until the frame is ready, with a cloth over it so that nobody knocks on it. The hay in the abbey meadow is a month late after the flood, and the mill case comes back at Midsummer.",
-    intro: "On St John's Eve every end of Mardle makes a fire, and the Prior had me count them from the top of the gatehouse, since a fire near the tithe barn is the abbey's business. There were four. I wrote down how high each was by how far up the sparks went, which Brother Clement says is no measure at all. In the morning I went round the ashes and asked who had built which, and every builder told me his own had been the highest.",
+    intro: "On St John's Eve every end of Mardle makes a fire, and the Prior had me count them from the top of the gatehouse, since a fire near the tithe barn is the abbey's business. There were four. I wrote down how high each was by how far up the sparks went, which Brother Clement says is no measure at all. In the morning I went round the ashes and asked who had built which.",
     task: 'Can you work out where each man built his fire and how high it was?',
     categories: [
       { id: 'who', name: 'Builders', items: [it('tom', 'Tom Webbe'), it('ralph', 'Ralph Smith'), it('roger', 'Roger Thatcher'), it('will', 'Will Hayward')] },
@@ -183,7 +183,7 @@ window.STORY = window.STORY || [];
     characters: ['Hob', 'Ralph Smith', 'Agnes Sutor', 'Joan Fletcher', 'Margery Baxter', 'Brother Anselm', 'Prior Hamo'],
     size: '4×5',
     grade: 'Master',
-    intro: "The Prior had my gatherings bound in the week before Lammas, and the things for the binding came from the town, one a day from Monday to Friday, each brought by somebody who wanted one thing in the chronicle put right in return. I wrote each thing on a slip. Brother Anselm, who does the binding, used the slips to pack the spine, humming, so this is from memory. Margery Baxter baked the Lammas loaf for St Mary's that week, and the crust had her thumbprint in it.",
+    intro: "The Prior had my gatherings bound in the week before Lammas, and the things for the binding came from the town, one a day from Monday to Friday, each brought by somebody who wanted one thing in the chronicle put right in return. I wrote each thing on a slip. Brother Anselm, who does the binding, used the slips to pack the spine, humming, so this is from memory.",
     task: 'Can you work out what each person brought, on which day, and what each wanted put right?',
     categories: [
       { id: 'who', name: 'Givers', items: [it('hob', 'Hob'), it('ralph', 'Ralph Smith'), it('agnes', 'Agnes Sutor'), it('joan', 'Joan Fletcher'), it('margery', 'Margery Baxter')] },

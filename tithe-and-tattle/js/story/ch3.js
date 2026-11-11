@@ -51,7 +51,7 @@ STORY.push({
   characters: ['Brother Wystan', 'Kit', 'the Prior', 'Brother Odo', 'Walter Crane', 'Father Simon'],
   size: '4×4',
   grade: 'Journeyman',
-  intro: "A boy bishop may give orders to his elders while he reigns, within reason. Kit gave four orders to four grown men on four feasts, St Nicholas, St Lucy, St Thomas and Holy Innocents, which come in that order through December, and each in a different place. He asked me to copy them out fair, but he can't write, so he drew them for me, and his drawing of Walter looks very like his drawing of the mule.",
+  intro: "A boy bishop may give orders to his elders while he reigns, within reason. Kit gave four orders to four grown men on four feasts, St Nicholas, St Lucy, St Thomas and Holy Innocents, which come in that order through December, and each in a different place. He asked me to copy them out fair, but he can't write, so he drew them for me. His drawings of the four men all look much the same.",
   task: 'Can you work out what Kit ordered each man to do, on which feast, and where?',
   categories: [
     { id: 'who', name: 'Men', items: [
@@ -98,7 +98,7 @@ STORY.push({
   characters: ['Brother Wystan', 'Alys Pennock', 'Joan Fletcher', 'Tom Webbe', 'Piers Carter', 'Roger Thatcher'],
   size: '4×4',
   grade: 'Journeyman',
-  intro: "Mummers come into a house at Christmas in disguise and play at dice with whoever keeps it, without speaking a word, and the dice are made to fall so that the house wins, which Alys says is the whole courtesy of it. Four came into the Swan in Christmas week, each in a costume borrowed from somebody in the town. Since they never spoke and nobody saw a face, Alys asked them all the next morning which one each had been, and all four said the bear.",
+  intro: "Mummers come into a house at Christmas in disguise and play at dice with whoever keeps it, without speaking a word, and the dice are made to fall so that the house wins, which Alys says is the whole courtesy of it. Four came into the Swan in Christmas week, each in a costume borrowed from somebody in the town. Since they never spoke and nobody saw a face, Alys worked it out the next morning from what each of them would admit to.",
   task: 'Can you work out which part each mummer played, what the costume was, and who lent it?',
   categories: [
     { id: 'who', name: 'Mummers', items: [
@@ -197,7 +197,7 @@ STORY.push({
   characters: ['Brother Wystan', 'Walter Crane', 'Joan Fletcher', 'Tom Webbe', 'Kit', 'the Abbot'],
   size: '4×4',
   grade: 'Journeyman',
-  intro: "Walter says Mardle has always carried the wassail bowl round at Christmas, and he has carried it since he was a boy, so I suppose that is always. At each door the bearer says 'wassail', the house answers 'drinkhail' and drinks, and the bowl is filled again. This year it went to four doors on four nights, St Stephen's, St John's, Holy Innocents' and St Thomas's, in that order, with a different song at each. Joan Fletcher and Tom Webbe each told me separately that they had led all four.",
+  intro: "Walter says Mardle has always carried the wassail bowl round at Christmas. He has carried it himself since he was a boy. At each door the bearer says 'wassail', the house answers 'drinkhail' and drinks, and the bowl is filled again. This year it went to four doors on four nights, St Stephen's, St John's, Holy Innocents' and St Thomas's, in that order, with a different song at each. I asked Joan Fletcher and Tom Webbe about it separately and wrote down only what they both said.",
   task: 'Can you work out which night the bowl went to each door, who led the singing, and what was sung?',
   categories: [
     { id: 'who', name: 'Doors', items: [
@@ -244,7 +244,7 @@ STORY.push({
   characters: ['Brother Wystan', 'the Abbot', 'the Prior', 'Brother Odo', 'Hob', 'Kit'],
   size: '4×5',
   grade: 'Master',
-  intro: "Dame Isabel sent a Twelfth Night cake to the abbey guest house with a bean baked inside, and whoever finds the bean is king of the feast until morning. Her cakes have a pea in as well, for a queen, which is her own idea. Five sat along the bench, counted from the fire, and each cut his own slice in turn while I poured. Kit, who has liked giving orders since December, says he found the bean and the pea both.",
+  intro: "Dame Isabel sent a Twelfth Night cake to the abbey guest house with a bean baked inside, and whoever finds the bean is king of the feast until morning. Her cakes have a pea in as well, for a queen, which is her own idea. Five sat along the bench, counted from the fire, and each cut his own slice in turn while I poured. Kit has liked giving orders since December and badly wanted the bean.",
   task: 'Can you work out where each guest sat, in which turn he cut his slice, and what he found in it?',
   categories: [
     { id: 'who', name: 'Guests', items: [
