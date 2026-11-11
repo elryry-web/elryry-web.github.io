@@ -130,13 +130,13 @@ STORY.push({
 STORY.push({
   id: 'ch1-04-empty-traps',
   chapter: 1, number: 4,
-  title: 'The Empty Traps',
+  title: 'The Traps on the Bank',
   place: 'the fen',
   characters: ['Brother Anselm', 'Will Hayward', 'Kit', 'Hob'],
   size: '3×4',
   grade: 'Journeyman',
-  intro: "Four of the abbey's eel traps were found empty on the same morning, all in the drain that runs from the sluice by the abbey wall, out past the willow and then the reed bed, to the black pool, which is furthest from the abbey and nearest to Hob's mill. Four people found one trap each. I wrote it all down and then left my tablet on the gatehouse step in the sun, and the gatehouse cat slept on it, and the wax went soft under her.",
-  task: 'Can you work out who found the trap at each place, and how many eels were missing from it?',
+  intro: "Someone pulled four of the abbey's eel traps out of the drain in the night and left them on the bank with the eels still in. The drain runs from the sluice by the abbey wall, out past the willow and then the reed bed, to the black pool by Hob's mill. Four people found one trap each, and I counted the eels at the gatehouse. Then I left my tablet on the step in the sun. The gatehouse cat slept on it until the wax smudged under her.",
+  task: 'Can you work out who found the trap at each place, and how many eels were in it?',
   categories: [
     { id: 'who', name: 'Finders', items: [
       { id: 'anselm', name: 'Brother Anselm', short: 'Anselm' },
@@ -149,7 +149,7 @@ STORY.push({
       { id: 'willow', name: 'the willow', short: 'willow' },
       { id: 'reeds', name: 'the reed bed', short: 'reed bed' },
       { id: 'pool', name: 'the black pool', short: 'blk pool' }] },
-    { id: 'eels', name: 'Eels missing', who: 'whoever found {x} missing', is: 'found {x} missing', isnt: "didn't find {x} missing",
+    { id: 'eels', name: 'Eels', who: 'whoever found {x}', is: 'found {x}', isnt: "didn't find {x}",
       ordered: { values: [10, 15, 20, 25] }, items: [
       { id: 'e10', name: 'ten eels', short: '10' },
       { id: 'e15', name: 'fifteen eels', short: '15' },
@@ -157,17 +157,17 @@ STORY.push({
       { id: 'e25', name: 'twenty-five eels', short: '25' }] }
   ],
   clues: [
-    { text: 'Of Hob and Brother Anselm, one found the trap at the sluice and the other found fifteen eels missing.',
+    { text: 'Of Hob and Brother Anselm, one found the trap at the sluice and the other found fifteen eels.',
       logic: ['pairOr', 'hob', 'anselm', 'sluice', 'e15'] },
     { text: 'The trap Will Hayward found was the next one along the drain from the trap at the sluice.',
       logic: ['cmp', 'will', 'sluice', 'trap', 'adj'] },
-    { text: 'Kit found more eels missing than Will Hayward did.', logic: ['cmp', 'kit', 'will', 'eels', '>'] },
+    { text: 'Kit found more eels than Will Hayward did.', logic: ['cmp', 'kit', 'will', 'eels', '>'] },
     { text: "Hob's trap was further from the abbey than the one Kit found.", logic: ['cmp', 'hob', 'kit', 'trap', '>'] },
-    { text: 'Five more eels were missing from the trap at the black pool than from the trap at the sluice.',
+    { text: 'The trap at the black pool held five more eels than the trap at the sluice.',
       logic: ['cmp', 'pool', 'sluice', 'eels', '=+', 5] }
   ],
   solution: { anselm: ['sluice', 'e10'], will: ['willow', 'e20'], kit: ['reeds', 'e25'], hob: ['pool', 'e15'] },
-  epilogue: "It was Kit who found the reed-bed trap with a whole stick of eels gone, before anyone in Mardle was up. Hob found the black pool trap fifteen short and said that was otters. The Prior asked Kit what he had been doing in the abbey's water at dawn, and Kit said he had heard the eels were going missing."
+  epilogue: "Kit found the reed-bed trap with a whole stick of eels in it, twenty-five. Hob found fifteen at the black pool and said he had gone out to see to his own traps. The Prior asked Kit what he had been doing on the abbey's drain at dawn. Kit said he had heard the eels were going missing."
 });
 
 STORY.push({
