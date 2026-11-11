@@ -187,6 +187,9 @@
   #levels .orn { display: none; }
   #levels.roomy .orn { display: block; }
   #levelsFoot { margin-top: 12px; padding: 0 8px 8px; text-align: center; flex-shrink: 0; }
+  /* (v177) the level editor is for a desktop: its link shows only on a wide screen with a mouse */
+  #bEditor { display: none; text-decoration: none; }
+  @media (min-width: 1000px) and (hover: hover) and (pointer: fine) { body:not(.touch) #bEditor { display: inline-block; } }
   #bookRow { position: relative; width: 100%; display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
   #folioNav { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: min(540px, 100%); padding: 0 10px; margin-bottom: 6px; flex-shrink: 0; }
   #folioNav .fnav { min-width: 56px; min-height: 48px; padding: 0 0 4px; font-size: 30px; line-height: 1; }
@@ -258,7 +261,7 @@
   .bk-cast { z-index: 3; }
 
   .card { background: rgba(8,5,18,.55); }
-  .card .sheet, #satchel .sheet { position: relative; width: min(560px, 92vw); max-height: 90vh; overflow: auto; padding: 34px 40px 28px; color: #2e1f14; text-align: center;
+  .card .sheet, #satchel .sheet, #terms .sheet { position: relative; width: min(560px, 92vw); max-height: 90vh; overflow: auto; padding: 34px 40px 28px; color: #2e1f14; text-align: center;
     background: radial-gradient(ellipse at 50% 35%, #fbf2da, #e7d3a6 70%, #d4b880); border-radius: 4px;
     box-shadow: inset 0 0 40px rgba(120,80,30,.45), inset 0 0 0 1px #8a6a3a, inset 0 0 0 6px rgba(255,255,255,.2), inset 0 0 0 7px rgba(138,106,58,.6), 0 20px 60px rgba(0,0,0,.7);
   }
@@ -268,8 +271,8 @@
   #satchel.show .sheet { transform: none; }
   /* (v173) the satchel's paper stays put and only its contents scroll inside it (a sheet that was itself the scroller,
      and transformed, could lose its parchment in patches on Firefox for Android while it scrolled) */
-  #satchel .sheet { display: flex; flex-direction: column; overflow: hidden; padding: 0; background: var(--paper-scroll); }
-  #satchel .sin { flex: 0 1 auto; min-height: 0; overflow: auto; padding: 34px 40px 28px; border-radius: inherit; }
+  #satchel .sheet, #terms .sheet { display: flex; flex-direction: column; overflow: hidden; padding: 0; background: var(--paper-scroll); }
+  #satchel .sin, #terms .sin { flex: 0 1 auto; min-height: 0; overflow: auto; padding: 34px 40px 28px; border-radius: inherit; }
   #win .sheet { overflow: visible; max-height: none; }
   .sheet .num { font-family: Cinzel, serif; letter-spacing: .3em; color: #8e2f22; font-size: 13px; }
   .sheet h3 { font-family: 'Cinzel Decorative', serif; font-weight: 700; font-size: 32px; margin: 4px 0 0; color: #2a1830; }
@@ -376,6 +379,13 @@
     opacity: 0; pointer-events: none; transition: opacity .3s; }
   #satchel.show { opacity: 1; pointer-events: auto; }
   #satchel .sheet { width: min(620px, 94vw); }
+  /* (v177) the Terms sheet, over the folio screen: the satchel's paper, one short line per word the lessons use */
+  #terms { position: fixed; inset: 0; z-index: 35; display: flex; align-items: center; justify-content: center; background: rgba(8,5,18,.55);
+    opacity: 0; pointer-events: none; transition: opacity .3s; }
+  #terms.show { opacity: 1; pointer-events: auto; }
+  #termList { margin: 0 0 16px; text-align: left; }
+  #termList dt { font-family: Cinzel, serif; font-size: 14px; letter-spacing: .06em; color: #8e2f22; margin-top: 8px; }
+  #termList dd { margin: 0; padding: 0 0 6px; font-size: 16px; line-height: 1.4; font-style: italic; color: #2e1f14; border-bottom: 1px solid rgba(90,60,40,.14); }
   #satList { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 14px 10px; margin: 6px 0 18px; min-height: 60px; }
   #satList .empty { grid-column: 1 / -1; font-style: italic; color: #6a4a30; font-size: 16px; padding: 10px; }
   .sat { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; }
@@ -440,6 +450,17 @@
   .nsig span { display: block; font-style: italic; font-size: 14px; line-height: 1.3; }
   .nsig.off { opacity: .32; }
   .nsig.on { background: rgba(255,240,200,.55); box-shadow: inset 0 0 0 1px rgba(184,137,62,.6); }
+  /* (v177) the ring-rules legend: centre icon, then a dashed ring of what it takes; greyed sigils the drawn centre refuses */
+  .rings { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 0 0 8px; text-align: left; }
+  .rings:empty { display: none; }
+  .rings .rl { font: 600 10px Cinzel, serif; letter-spacing: .12em; text-transform: uppercase; color: #8e2f22; }
+  .rings .rg { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+  .rings .rc { width: 20px; height: 20px; border-radius: 50%; }
+  .rings .rp { display: inline-flex; align-items: center; gap: 2px; min-height: 18px; padding: 1px 5px; border: 1px dashed rgba(90,58,26,.6); border-radius: 11px; }
+  .rings .rs { width: 15px; height: 15px; border-radius: 50%; }
+  .rings i { font: italic 13px 'IM Fell English', serif; color: #5a3a1a; }
+  #nRingsH + .rings .rl { display: none; }
+  .chip.no, .nsig.no { opacity: .35; }
   #nSigns { font-style: italic; font-size: 15px; line-height: 1.45; text-align: left; margin-bottom: 12px; }
   #nHint { display: none; font-size: 15px; padding: 10px 14px; border: 1px dashed rgba(90,60,40,.5); background: rgba(255,255,255,.25); text-align: left; margin-bottom: 12px; font-style: italic; }
   #nHint.show { display: block; }
@@ -569,7 +590,8 @@
     #title .sub { font-size: 22px; } #title .orn { height: 36px; margin: 2px 0 8px; }
     #title .btn { font-size: 15px; padding: 10px 22px; }
     #title .foot { display: none; }
-    .card .sheet, #satchel .sin { padding: 18px 24px 16px; } .card .sheet, #satchel .sheet { max-height: 94vh; }
+    .card .sheet, #satchel .sin, #terms .sin { padding: 18px 24px 16px; } .card .sheet, #satchel .sheet, #terms .sheet { max-height: 94vh; }
+    #termList dd { font-size: 15px; }
     .sheet h3 { font-size: 24px; } .sheet .div { height: 24px; } .sheet p { font-size: 15px; line-height: 1.4; }
     #win .div { --stamp: 80px; height: calc(var(--stamp) * .84); } #win .div::before { top: calc(50% - 12px); height: 24px; }
     #levels { padding: 2vh 0; } #levels .orn { height: 30px; margin-bottom: 6px; }
@@ -651,6 +673,8 @@
       <div class="nhead"><span>Sigils of this folio</span></div>
       <div class="nsub">tap one to trace it</div>
       <div id="nSigils"></div>
+      <div class="nhead" id="nRingsH"><span>On each ring</span></div>
+      <div class="rings" id="nRings"></div>
       <div class="nhead"><span>Signs &amp; barbs</span></div>
       <div id="nSigns"></div>
       <div id="nHint"></div>
@@ -663,6 +687,17 @@
   </div>
 </div>
 
+<div id="terms">
+  <div class="sheet"><div class="sin">
+    <div class="num">the words of the craft</div>
+    <h3>Terms</h3>
+    <div class="div"></div>
+    <dl id="termList"></dl>
+    <div class="row"><button class="btn ghost light" id="tClose">Close</button></div>
+    <div class="keys">New terms join the list as new lessons open.</div>
+  </div></div>
+</div>
+
 <div id="satchel">
   <div class="sheet"><div class="sin">
     <div class="num">kept spells</div>
@@ -673,7 +708,7 @@
       <button class="btn primary" id="sKeep">✚ Keep the spell on the page</button>
       <button class="btn ghost light" id="sClose">Close</button>
     </div>
-    <div class="keys">Tap a kept spell to lay it on the page · in the world, <span class="mouse-only">press <b>1–9</b> or </span>tap a slot beside the grimoire button to cast it at once.</div>
+    <div class="keys">Tap a kept spell to lay it on the page · in the world, <span class="mouse-only">press <b>1–9</b> or </span>tap a slot beside the grimoire button to cast it right away.</div>
   </div></div>
 </div>
 
@@ -741,13 +776,14 @@
   <button class="btn primary" id="bResume" style="margin-bottom:16px">.</button>
   <div id="bookRow"><div id="folioNav"><button class="btn ghost fnav" id="fPrev" title="The leaf before (←)" aria-label="The leaf before">‹</button><div id="folioAt"><div id="folioNum" aria-live="polite"></div></div><button class="btn ghost fnav" id="fNext" title="The next leaf (→)" aria-label="The next leaf">›</button></div>
   <div id="book"></div></div>
-  <div id="levelsFoot"><button class="edition">A new edition is ready. Tap to open it.</button><button class="btn ghost" id="bBackTitle">← Title</button> <button class="btn ghost" id="bTipsAgain" title="Show every tip again, as if for the first time">↺ Show the tips again</button> <button class="btn ghost" id="bLook" title="Old look / painted look (G)">◐ Old look</button> <button class="btn ghost touch-only" id="bFull">⛶ Full screen</button> <button class="btn ghost" id="bLessonsT" style="display:none">.</button></div>
+  <div id="levelsFoot"><button class="edition">A new edition is ready. Tap to open it.</button><button class="btn ghost" id="bBackTitle">← Title</button> <button class="btn ghost" id="bTerms" title="What the words in the lessons mean">❧ Terms</button> <button class="btn ghost" id="bTipsAgain" title="Show every tip again, as if for the first time">↺ Show the tips again</button> <button class="btn ghost" id="bLook" title="Old look / painted look (G)">◐ Old look</button> <a class="btn ghost" id="bEditor" href="editor.html" title="Build your own level and share it (desktop)">✎ Level editor</a> <button class="btn ghost touch-only" id="bFull">⛶ Full screen</button> <button class="btn ghost" id="bLessonsT" style="display:none">.</button></div>
 </div>
 
 <div id="note" class="leaf"><div class="lin" id="noteIn">
   <button class="leafx" id="bStart" title="Put the lesson away (Esc)">×</button>
   <p id="noteText"></p>
   <div class="chips" id="noteSigils"></div>
+  <div class="rings" id="noteRings"></div>
   <div id="noteHint"></div>
   <div class="row"><button class="btn ghost" id="bHint">The Master’s Hint</button></div>
   <div class="keys mouse-only" id="noteKeys">Space opens the grimoire · Enter inscribes · K keeps a spell · 1–9 casts a kept spell · H a hint · Z rewinds · R restarts</div>
@@ -767,9 +803,10 @@
   </div>
 </div>
 
-<script src="js/ink.js?v=176"></script>
-<script src="js/world.js?v=176"></script>
-<script src="js/tips.js?v=176"></script>
-<script src="js/main.js?v=176"></script>
+<script src="js/ink.js?v=177"></script>
+<script src="js/world.js?v=177"></script>
+<script src="js/tips.js?v=177"></script>
+<script src="js/main.js?v=177"></script>
+<script src="js/custom.js?v=177"></script>
 </body>
 </html>

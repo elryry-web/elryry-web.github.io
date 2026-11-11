@@ -106,134 +106,185 @@ const Sfx = {
 };
 
 /* ---------------- Lessons ---------------- */
-const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV', 'XV', 'XVI', 'XVII', 'XVIII', 'XIX', 'XX', 'XXI', 'XXII', 'XXIII', 'XXIV', 'XXV', 'XXVI', 'XXVII', 'XXVIII', 'XXIX', 'XXX', 'XXXI', 'XXXII', 'XXXIII', 'XXXIV', 'XXXV', 'XXXVI', 'XXXVII', 'XXXVIII', 'XXXIX', 'XL', 'XLI', 'XLII', 'XLIII', 'XLIV', 'XLV'];
+const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV', 'XV', 'XVI', 'XVII', 'XVIII', 'XIX', 'XX', 'XXI', 'XXII', 'XXIII', 'XXIV', 'XXV', 'XXVI', 'XXVII', 'XXVIII', 'XXIX', 'XXX', 'XXXI', 'XXXII', 'XXXIII', 'XXXIV', 'XXXV', 'XXXVI', 'XXXVII', 'XXXVIII', 'XXXIX', 'XL', 'XLI', 'XLII', 'XLIII', 'XLIV', 'XLV', 'XLVI', 'XLVII', 'XLVIII', 'XLIX', 'L', 'LI', 'LII', 'LIII', 'LIV', 'LV'];
 const LEVELS = [
   {
-    name: 'First Breath', sigils: ['gale'], par: 1, opens: 'The First Folio',
-    lesson: 'Every spell begins with a seal: one circle, drawn closed. Within it goes the sigil. Ventus, the spiral, calls the wind. Draw a stroke leading out from the ring, through one of the eight small circles around it, and the wind will blow that way. Inscribe the page, then cast it on the orb.',
+    id: 'first-breath', name: 'First Breath', sigils: ['gale'], par: 1, opens: 'The First Folio',
+    lesson: 'A seal is one closed circle with a sigil inside: Ventus, the spiral, calls the wind. A sign, one stroke out from the ring through a small circle, points it. Inscribe the page, then cast it on the orb.',
     hint: 'Circle, a spiral inside, then one stroke out from the ring toward the lower right, the way the font lies from the orb. Cast it right on the orb.',
     t: [' 000000 ', '00000000', '00000000', '00000000', ' 000000 '],
     o: ['........', '........', '.O....G.', '........', '........'],
   },
   // II and III teach barbs on Ventus alone: a plain gust rolls the orb about 5 tiles, one barb about 8, two about 12
   {
-    name: 'The Long Meadow', sigils: ['gale'], par: 1,
-    lesson: 'The font lies farther off now, and the other way: draw your sign toward it. A plain gust dies in the grass before the orb arrives, so cross your sign with one short stroke, a barb, and the wind blows firmer. If a cast falls short, Rewind takes it back, and Recall lays your last spell on the page again.',
+    id: 'long-meadow', name: 'The Long Meadow', sigils: ['gale'], par: 1,
+    lesson: 'The font lies farther off, the other way. A plain gust dies in the grass, so cross your sign with one short stroke, a barb: the wind blows firmer. Rewind takes back a cast; Recall brings back your last spell.',
     hint: 'Circle, spiral, and a sign toward the upper left (about 10 o’clock, through the small circle there), then one short stroke across the sign, near its tip. Cast it right on the orb.',
     t: [' 00000000 ', '0000000000', '0000000000', '0000000000', ' 00000000 '],
     o: ['..........', '..........', '.G......O.', '..........', '..........'],
   },
   {
-    name: 'The Rift', sigils: ['gale'], par: 1,
-    lesson: 'A crack splits the meadow. A gentle gust stops short of it and a firm one rolls the orb in; only a strong wind carries it across in one bound. A sign bears two barbs at most, the strongest wind Ventus can make.',
+    id: 'rift', name: 'The Rift', sigils: ['gale'], par: 1,
+    lesson: 'A crack splits the meadow. A firm gust rolls the orb into it; only the strongest wind carries it across in one bound. A sign bears two barbs at most.',
     hint: 'Ventus with a sign toward the upper right (about 2 o’clock, through the small circle there), crossed by two short barbs. Cast it right on the orb.',
     t: [' 000 ', '00000', '00000', '00000', '     ', '00000', '00000', '00000', '00000', '00000', '00000', ' 000 '],
     o: ['.....', '..G..', '.....', '.....', '.....', '.....', '.....', '.....', '.....', '.....', '..O..', '.....'],
   },
   {
-    name: 'From the Abyss', sigils: ['gale', 'stone'], par: 2,
-    lesson: 'Petra, the square, raises stone, even out of empty air. Unadorned, it sets one pillar on your mark. Here a sign is no push, as it was for the wind: it is an arm of stone, running out from your mark the way it points, and each barb adds a stone. Opposite signs raise one wall through your mark; signs at right angles, the block between them. Fire, ice and water are placed the same way.',
+    id: 'from-the-abyss', name: 'From the Abyss', sigils: ['gale', 'stone'], par: 2,
+    lesson: 'Petra, the square, raises stone, even out of empty air: unadorned, one pillar on your mark. Here a sign is an arm of stone running out the way it points; each barb adds a stone.',
     hint: 'Petra with one sign toward the lower right, cast on the near side of the gap. Then Ventus on the orb, its sign crossed by one barb.',
     t: [' 000  0000 ', '0000  00000', '0000  00000', '0000  00000', ' 000  0000 '],
     o: ['...........', '...........', '.O.......G.', '...........', '...........'],
   },
   {
-    name: 'Thornwall', sigils: ['gale', 'stone', 'flame'], par: 2,
+    id: 'thornwall', name: 'Thornwall', sigils: ['gale', 'stone', 'flame'], par: 2,
     lesson: 'Ignis, the triangle, wakes fire. Bramble burns, and fire spreads along whatever will burn, so mind where it leads. The brazier must also be lit before this lesson is done.',
     hint: 'A single Ignis on the hedge: the flames crawl along it to the brazier by themselves. Then Ventus with a twice-barbed sign.',
     t: ['  00000000  ', ' 0000000000 ', '000000000000', ' 0000000000 ', '  00000000  '],
     o: ['.......#B...', '.......#....', '.O.....#..G.', '.......#....', '.......#....'],
   },
   {
-    name: 'Keystone', sigils: ['gale', 'flame'], par: 3,
+    id: 'keystone', name: 'Keystone', sigils: ['gale', 'flame'], par: 3,
     lesson: 'A crate fits a trench as a keystone fits an arch, and Ventus moves heavy things as well as light ones, though only gently. The crate is wood, and wood burns.',
     hint: 'One sign of Ventus nudges the crate into the trench. Burn the hedge (away from the crate!), then a sign with two barbs carries the orb across.',
     t: [' 00000_0000 ', '000000_00000', '000000_00000', '000000_00000', ' 00000_0000 '],
     o: ['........#...', '........#...', '.O...C..#.G.', '........#...', '........#...'],
   },
   {
-    name: 'The Sunken Orb', sigils: ['gale', 'tide'], par: 2,
-    lesson: 'Unda, the wave, calls water, as much as the shape you give it: each tile of your spell brings one tile of water, one step deep. It runs to the lowest place and spreads across the whole hollow, and whatever is light enough rises with it. Pour too little and the hollow is only part full; too much and the rest spills away.',
-    hint: 'The hollow is four tiles wide and one step deep, so it wants four tiles of water: Unda with two signs at right angles along the tiles (2 and 4 o’clock), cast on the hollow. When the orb floats level with the ground, Ventus with a sign and one barb.',
+    id: 'sunken-orb', name: 'The Sunken Orb', sigils: ['gale', 'tide'], par: 2,
+    lesson: 'Unda, the wave, calls water: one tile of water, one step deep, for each tile of your spell. It fills the lowest place first, and whatever is light rises with it. Too little leaves the hollow part full.',
+    hint: 'The hollow holds four tiles of water: Unda cast on it with two signs at right angles along the tiles (2 and 4 o’clock). When the orb floats level with the ground, Ventus with a sign and one barb.',
     t: [' 00000000 ', '00__000000', '00__000000', '0000000000', ' 00000000 '],
     o: ['..........', '..........', '...O....G.', '..........', '..........'],
   },
   {
-    name: 'The Rushing Stream', sigils: ['gale', 'tide', 'frost'], par: 2,
+    id: 'rushing-stream', name: 'The Rushing Stream', sigils: ['gale', 'tide', 'frost'], par: 2,
     lesson: 'Gelu, the star, stills what moves. Frozen water bears weight, and ice runs swift beneath a rolling orb.',
-    hint: 'Gelu cast on the middle of the stream with two opposite signs along the orb’s way (lower right and upper left): a path of ice three tiles long, bank to bank. Then Ventus with a sign and one or two barbs.',
+    hint: 'Gelu on the middle of the stream, two opposite signs along the orb’s way (lower right and upper left): ice three tiles long, bank to bank. Then Ventus with a sign and one or two barbs.',
     t: ['0000~~~00000', '0000~~~00000', '0000~~~00000', '0000~~~00000', '0000~~~00000'],
     o: ['............', '............', '.O........G.', '............', '............'],
     flows: [{ x0: 4, x1: 6, y0: 0, y1: 4, dx: 0, dy: 1, s: 3 }],
   },
+  // IX, the First Folio's capstone (v177): the road home, every sigil of the folio once, in the order the land asks.
+  // The orb sits in a 2x2 hollow (x1-2, rows 2-3); a stream (x4-6) flows across the way; a void gap (x8-9); a hedge (x11)
+  // with its brazier at the top (11,0); a crate beside the hedge (12,3); a one-wide trench (x13) just before the font (14,3).
+  // Intended (par 6): Unda 2x2 on the hollow (signs at 2 and 4 o'clock), the orb floats level; a plain Ventus (lower right)
+  // on the crate nudges it into the trench; Ignis on the hedge away from the crate, the fire runs to the brazier; Gelu
+  // across the stream (lower right + upper left, no barbs); Petra, one sign lower right, on the gap's near side: two
+  // stones; Ventus with two barbs on the orb. Sim (scratchpad v177s2/cap2.mjs, map b): 9/9 cast offsets.
+  // Fails: a one-barb last gust stops short (~x11.3); fire before the crate burns the crate and the orb drops into the
+  // trench; leaving out any one step fails with a last gust of 0, 1 or 2 barbs, and with two 2-barb gusts; Petra on the
+  // stream instead of Gelu is too slow (stone does not run like ice). No single seal both moves the orb and lights the
+  // brazier (no ring here). Creative alternates, same par: Petra lifts the hollow floor instead of Unda; burn first and
+  // fill the trench with Petra where the crate stood.
+  // Taught in: The Sunken Orb VII (Unda), Keystone VI (crate, wood burns), Thornwall V (brazier), The Rushing Stream VIII
+  // (Gelu), From the Abyss IV (Petra over air), The Rift III (two barbs).
   {
-    name: 'Featherfall', sigils: ['gale', 'luna'], par: 2,
-    lesson: 'Luna, the crescent, lifts what rests, and only lifts. A floating thing hangs a little above where it rose until wind or water moves it, then glides on at that height, over low ground and open air alike, and settles once it has been carried ten tiles.',
+    id: 'homeward', name: 'Homeward', sigils: ['gale', 'stone', 'flame', 'tide', 'frost'], par: 6,
+    folioEnd: { title: 'The First Folio is Complete', text: 'Water, wind, fire, ice and stone, each in its turn, and the light is home. The master turns to a second folio, where the orb leaves the ground.' },
+    lesson: 'The last page of the first folio: every sigil you know, each in its turn. Read the whole road before you draw.',
+    hint: 'Unda fills the hollow (signs at 2 and 4 o’clock). A plain gust nudges the crate into the trench, then Ignis on the hedge, away from it. Gelu across the stream, Petra over the gap, then Ventus with two barbs.',
+    t: [' 000~~~0  000_0 ', '0000~~~0  000_00', '0__0~~~0  000_00', '0__0~~~0  000_00', '0000~~~0  000_00', '0000~~~0  000_00', ' 000~~~0  000_0 '],
+    o: ['...........B....', '...........#....', '...........#....', '..O........#C.G.', '...........#....', '...........#....', '...........#....'],
+    flows: [{ x0: 4, x1: 6, y0: 0, y1: 6, dx: 0, dy: 1, s: 3 }],
+  },
+  {
+    id: 'featherfall', name: 'Featherfall', sigils: ['gale', 'luna'], par: 2, opens: 'The Second Folio',
+    lesson: 'Luna, the crescent, lifts what rests, and only lifts. A floating orb hangs in the air until wind or water moves it, glides over low ground and open air alike, and settles once it has been carried ten tiles.',
     hint: 'Luna on the orb. While it floats, Ventus on the orb with a barbed sign toward the island (lower right). A gentle gust leaves it hanging short in the air; push it again.',
     t: [' 0000    111 ', '00000    1111', '00000    1111', '00000    1111', ' 0000    111 '],
     o: ['.............', '.............', '.O........G..', '.............', '.............'],
   },
   {
-    name: 'Featherfall II', sigils: ['gale', 'luna'], par: 3,
-    lesson: 'What Luna lifts hangs where the wind leaves it, and settles only once it has been carried ten tiles. The far island lies farther off than that. Draw a second, larger circle around Luna’s seal and the float carries twice as far. Then push the orb as often as you need; it waits in the air for you.',
-    hint: 'Luna on the orb, with a second, larger circle around the seal. Then Ventus on the floating orb toward the far island (lower right), with a barbed sign, and again when it stops short.',
+    id: 'featherfall-ii', name: 'Featherfall II', sigils: ['gale', 'luna'], par: 3,
+    lesson: 'The far island lies more than ten tiles off. Draw an outer circle around the whole seal and Luna’s float carries twice as far. Push the orb as often as you need; it waits in the air.',
+    hint: 'Luna on the orb, with an outer circle around the seal. Then Ventus on the floating orb toward the far island (lower right), with a barbed sign, and again when it stops short.',
     t: ['000           000 ', '000           0000', '000           0000', '000           0000', '000           000 '],
     o: ['..................', '..................', '.O.............G..', '..................', '..................'],
   },
   {
-    name: 'The Rune Gate', sigils: ['gale', 'stone', 'flame', 'frost'], par: 3,
+    id: 'rune-gate', name: 'The Rune Gate', sigils: ['gale', 'stone', 'flame', 'frost'], par: 3,
     lesson: 'The rune gate sinks only when every brazier burns. Until then nothing passes it, not even a floating orb. Fire melts ice.',
-    hint: 'Ignis cast on the ice beside the orb, with a sign toward the thorns (lower right): it melts the ice and kindles the hedge at once, and the fire runs to both braziers. Gelu on the stream with a sign the same way, then Ventus with a twice-barbed sign.',
+    hint: 'Ignis on the ice beside the orb, sign toward the thorns (lower right): it melts the ice and lights the hedge, which burns to both braziers. Then Gelu on the stream, sign the same way, and Ventus with two barbs.',
     t: ['00000~~00000', '00000~~00000', '00000~~00222', '00000~~00002', '00000~~00222', '00000~~00000', '00000~~00000'],
     o: ['...B........', '...#........', '..I#........', '.OI#.....DG.', '..I#........', '...#........', '...B........'],
     flows: [{ x0: 5, x1: 6, y0: 0, y1: 6, dx: 0, dy: 1, s: 3 }],
   },
   {
-    name: 'The Broad Water', sigils: ['gale', 'frost'], par: 2, ring: true,
-    lesson: 'Around Luna the second circle made the float carry farther; around other seals it spreads the spell wider: a broader gust, a path of frost three tiles wide, a wall three stones thick. It adds breadth, not strength. An unadorned Gelu stills a single tile, or three by three with the ring, and this river is broader still.',
-    hint: 'Gelu cast in the middle of the river with two opposite signs across it (lower right and upper left), each crossed by one barb, and a second, larger circle around the whole seal: a path of ice from bank to bank, three wide. Then Ventus with a twice-barbed sign.',
-    t: ['0000~~~~~0000', '0000~~~~~0000', '0000~~~~~0000', '0000~~~~~0000', '0000~~~~~0000'],
-    o: ['.............', '.............', '.O.........G.', '.............', '.............'],
+    id: 'broad-water', name: 'The Broad Water', sigils: ['gale', 'frost'], par: 4, ring: true,
+    lesson: 'An outer circle makes any spell broader, not stronger: a path of ice three tiles wide, a wall three stones thick. The font lies on this bank, past the rocks: the orb must cross the river and come back.',
+    hint: 'Gelu on the middle of the river, signs lower right and upper left with a barb each, inside an outer circle. Then three gusts: lower right across, upper right up the ledge, upper left back to the font.',
+    // v177: there and back. The orb (1,3) and the font (1,1) share the near bank, but a rock ridge (row 2) parts them
+    // (the orb sits in front of the ridge: behind it, at row 1, the camera lost it); the far bank is a walled ledge
+    // (x9-10, rows 1-3). Intended: Gelu with the outer circle, signs 1 and 5 one barb, on (6,2): ice x4-8, rows 1-3;
+    // Ventus east (it stops at the ledge wall), north (stops at the ledge's end), west home.
+    // Sim (scratchpad v177s2/bw2f.mjs): 9/9 offsets, gust barbs 0/0/0 to 2/0/2. A plain Gelu (one or two signs, any barbs,
+    // cast anywhere on the river) + three gusts: 0/6925, since one line carries the orb over or back, never both.
+    // Creative alternate (bw3f.mjs, 23/375): a plain Gelu with three or four signs is the same block. Two plain lines: par + 1.
+    t: ['0000~~~~~222', '0000~~~~~002', '2222~~~~~002', '0000~~~~~002', '0000~~~~~222'],
+    o: ['............', '.G..........', '............', '.O..........', '............'],
     flows: [{ x0: 4, x1: 8, y0: 0, y1: 4, dx: 0, dy: 1, s: 3.5 }],
   },
   {
-    name: 'Skyward', sigils: ['gale', 'stone', 'flame', 'tide', 'frost', 'luna'], par: 7,
-    folioEnd: { title: 'The First Folio is Complete', text: 'The light is home. The master turns to a second folio, where small sigils wait in the margins.' },
-    lesson: 'The last page of the first folio. It takes everything you have learned, in the order the land needs it. Read the land before you draw.',
-    hint: 'Unda with a 2×2 pool (signs at 2 and 4 o’clock) floats the orb from its four-tile hollow. Burn the hedge, freeze the stream (Gelu with a sign along the orb’s way), and roll the orb gently (one barb, no more) to the low wall. Light the island brazier, then lift the orb with Luna and let a gentle Ventus carry it through the gate.',
+    id: 'skyward', name: 'Skyward', sigils: ['gale', 'stone', 'flame', 'tide', 'frost', 'luna'], par: 7,
+    folioEnd: { title: 'The Second Folio is Complete', text: 'The light is home. The master turns to a third folio, where small sigils wait in the margins.' },
+    lesson: 'The last page of the second folio. It takes everything you have learned, in the order the land needs it. Read the land before you draw.',
+    hint: 'Unda (a 2×2 pool) floats the orb out. Burn the hedge, freeze the stream, and roll the orb to the low wall (one barb, no more). Light the island brazier, then Luna and a gentle gust through the gate.',
     t: [' 000000~~001    ', '2222000~~001 111', '2112000~~001 333', '2112000~~001 113', '2222000~~001 333', '0000000~~001 111', '0000000~~001 111', ' 000000~~001    '],
     o: ['.....#..........', '.....#..........', '.....#..........', '..O..#.......DG.', '.....#..........', '.....#........B.', '.....#..........', '.....#..........'],
     flows: [{ x0: 7, x1: 8, y0: 0, y1: 7, dx: 0, dy: 1, s: 3 }],
   },
   {
-    name: 'Torchbearer', sigils: ['gale', 'flame'], par: 1, ink: 1, combos: true, opens: 'The Second Folio',
-    lesson: 'The second folio: ring-sigils. Draw a small sigil inside one of the eight slots around your seal and it infuses the spell: the centre acts first, then the ring. Each circle is written with when its sigil acts. Beside the sign (blue) it acts along the way: Ventus carrying Ignis there sends a burning orb that sets alight whatever it touches on its way, once it has left its place, until it comes to rest. From now on your inkwell is measured, and each cast spends a seal’s worth: here you have ink for one seal only.',
-    hint: 'Ventus in the centre with a sign toward the font crossed by two barbs, and a small Ignis in one of the two blue slots beside the sign (along the way).',
+    id: 'torchbearer', name: 'Torchbearer', sigils: ['gale', 'flame'], par: 1, ink: 1, combos: true, opens: 'The Third Folio',
+    lesson: 'A ring-sigil, a small sigil in one of the eight slots, rides with the spell. Beside the sign (blue) it acts along the way: Ignis there makes a burning orb that lights what it passes. Your ink holds one seal.',
+    hint: 'Ventus in the centre, its sign toward the font crossed by two barbs, and a small Ignis in a blue slot beside the sign.',
     t: [' 000000000000 ', '01111011111110', '00000000000000', '01111111111110', ' 000000000000 '],
     o: ['..............', '.....B........', '.O.#..#.#.G...', '..............', '..............'],
   },
+  // Rime Road (v177): the river bends into the road itself. It comes up from the bottom (x10-11), turns and runs west down
+  // the orb's row against it (x2-11, rows 2-3), then turns up and off the top beside the orb (x2-3). A plain gust drops
+  // the orb in and the current sweeps it back and away. Gelu beside the sign (along the way) freezes each tile under the
+  // orb as it rolls, an ice road the whole length of the river: gust 0/1/2 barbs with Gelu along x1-3 all win 9/9 cast
+  // offsets. Fails 0/9: plain gust 1/2 (and with the outer circle), Gelu at once x1/x3 (its burst round the start never
+  // reaches past the first bank), Gelu on arrival x1/x3, Ventus x3 on the ring, Gelu at once x3 + Ventus. Brute (single
+  // signs, outer circle or not, up to two ring groups, Ventus or Gelu centre): 180 wins, every one Ventus + Gelu along.
   {
-    name: 'Rime Road', sigils: ['gale', 'frost'], par: 1, ink: 1, combos: true,
-    lesson: 'Whatever Ventus moves carries its ring-sigils along the way, from the moment it leaves its place until it comes to rest. An orb that carries Gelu freezes the water beneath it as it rolls.',
-    hint: 'Ventus in the centre, a twice-barbed sign toward the font, and Gelu on the ring in a blue slot beside the sign (along the way).',
-    t: ['0000~~~~~000', '0000~~~~~000', '0000~~~~~000', '0000~~~~~000', '0000~~~~~000'],
-    o: ['............', '............', '.O........G.', '............', '............'],
-    flows: [{ x0: 4, x1: 8, y0: 0, y1: 4, dx: 0, dy: 1, s: 3.5 }],
+    id: 'rime-road', name: 'Rime Road', sigils: ['gale', 'frost'], par: 1, ink: 1, combos: true,
+    lesson: 'Gelu beside the sign rides with the orb, along the way, and freezes the water under it as it rolls. Here the river runs down the road itself.',
+    hint: 'Ventus in the centre, its sign toward the font, and a small Gelu in a blue slot beside the sign. The orb freezes its own road as it goes.',
+    t: ['00~~0000000000', '00~~0000000000', '00~~~~~~~~~~00', '00~~~~~~~~~~00', '0000000000~~00', '0000000000~~00'],
+    o: ['..............', '..............', '.O..........G.', '..............', '..............', '..............'],
+    flows: [{ x0: 10, x1: 11, y0: 4, y1: 5, dx: 0, dy: -1, s: 3.5 }, { x0: 4, x1: 11, y0: 2, y1: 3, dx: -1, dy: 0, s: 3.5 }, { x0: 2, x1: 3, y0: 0, y1: 3, dx: 0, dy: -1, s: 3.5 }],
   },
   {
-    name: 'The Ferry', sigils: ['gale', 'stone', 'luna'], centers: ['gale'], sats: ['stone', 'luna'], par: 1, ink: 1, combos: true,
-    lesson: 'Ventus with Luna and Petra both on its ring, behind the sign where they act at once, raises a slab of floating stone beneath what you touch, and the wind sails it the way of your sign, rider and all. A slab sails on at an even pace for a set distance, where a floating orb soon slows in the air. In this lesson Petra and Luna can only go on the ring, and Ventus only in the centre.',
+    id: 'ferry', name: 'The Ferry', sigils: ['gale', 'stone', 'luna'], centers: ['gale'], sats: ['stone', 'luna'], par: 1, ink: 1, combos: true,
+    lesson: 'Ventus with Luna and Petra behind the sign (at once) raises a floating slab of stone under what you touch, and the wind sails it the way of your sign, rider and all, at an even pace.',
     hint: 'Ventus in the centre, cast right on the orb, its sign toward the far island crossed by two barbs. On the ring, in two of the red circles behind the sign: a small Luna and a small Petra.',
     t: ['000             000', '000             0000', '000             0000', '000             0000', '000             000 '],
     o: ['...................', '...................', '.O...............G.', '...................', '...................'],
   },
   {
-    name: 'The Lantern', sigils: ['gale', 'flame'], par: 1, ink: 1, combos: true,
-    lesson: 'Where a ring-sigil sits matters. Behind your sign it acts at once, where the orb stands as the spell takes hold; beside it, along the way, once the orb has left its place; ahead of it, on arrival, where the orb comes to rest. Each acts only in its own part of the journey. Each place on the ring holds only one mark. Fire lit too soon will melt the ice road beneath you.',
+    id: 'lantern', name: 'The Lantern', sigils: ['gale', 'flame'], par: 1, ink: 1, combos: true,
+    lesson: 'Where a ring-sigil sits sets its time: behind the sign, at once; beside it, along the way; ahead of it, on arrival, where the orb comes to rest. Fire lit too soon melts the ice road beneath you.',
     hint: 'Ventus with a twice-barbed sign toward the font, and Ignis in a slot just beside the sign on its forward side (AHEAD): it bursts into flame only when the orb arrives.',
     t: ['0000***0000000', '0000***0000000', '0000***0000000', '0000***0000000', '0000***0000000'],
     o: ['..............', '...........B..', '.O.........G..', '..............', '..............'],
     flows: [{ x0: 4, x1: 6, y0: 0, y1: 4, dx: 0, dy: 1, s: 3 }],
+  },
+  // The Hearth (v177, a burst at once that is not Luna): the brazier stands right behind the orb. Ignis behind the sign
+  // (at once) flares where the orb stands as it sets off and kindles it; along the way never touches the tile the orb
+  // started on, and on arrival bursts at the far end. Gust 1/2 barbs + Ignis at once x1-3 win 9/9 cast offsets (also with
+  // the outer circle); no barbs stops short. Fails 0/9: plain gust, Ignis along x1/x3, Ignis on arrival x1/x3, a gust
+  // into the brazier with Ignis along or at once. Brute (single signs, outer circle or not, two ring groups): the only
+  // other wins are a bank shot, a sign into the brazier with Ventus x2-3 on arrival throwing the orb back toward the font
+  // and Ignis bursting by the brazier (kept as a creative alternate). No Ignis-centre seal wins.
+  {
+    id: 'hearth', name: 'The Hearth', sigils: ['gale', 'flame'], par: 1, ink: 1, combos: true,
+    lesson: 'Behind the sign (red), a ring-sigil acts at once: one burst where the orb stands, before it has moved. The brazier is at the orb’s back; kindle it as the orb sets off.',
+    hint: 'Ventus in the centre, its sign toward the font crossed by two barbs, and a small Ignis in a red slot behind the sign: it flares where the orb starts.',
+    t: [' 0000000000 ', '000000000000', '000000000000', '000000000000', ' 0000000000 '],
+    o: ['............', '............', '.BO.......G.', '............', '............'],
   },
   // Confluence (v165): Luna on a ring floats ten tiles per Luna, so the orb starts at x4 (the river now x5-8) and the font
   // (x14) is ten tiles on. Ventus 2 barbs + Luna behind + Ignis ahead (on arrival) wins 9/9 cast offsets (Luna along also
@@ -241,12 +292,27 @@ const LEVELS = [
   // to rest, and the glide stops short of the brazier; Ignis at once won 9/9 while it lasted ten tiles), a plain gust. Creative: two Luna
   // (20 tiles, passes over the font) 9/9; Luna in the centre with the outer circle, Ventus and Ignis on arrival 9/9.
   {
-    name: 'Confluence', sigils: ['gale', 'stone', 'flame', 'tide', 'frost', 'luna'], par: 1, ink: 2, combos: true,
+    id: 'confluence', name: 'Confluence', sigils: ['gale', 'stone', 'flame', 'tide', 'frost', 'luna'], par: 1, ink: 2, combos: true,
     lesson: 'One seal can carry several sigils. Write a single spell that carries the orb over thorn, water and sky, and kindles the brazier the moment it arrives.',
     hint: 'Ventus in the centre with a twice-barbed sign toward the font. On the ring: Luna behind the sign (float at once) and Ignis in a slot beside the sign on its forward side (burn on arrival).',
     t: ['00000~~~~0   000', '00000~~~~0   000', '00000~~~~0   000', '00000~~~~0   000', '00000~~~~0   000'],
     o: ['.........#......', '.........#....B.', '....O....#....G.', '.........#......', '.........#......'],
     flows: [{ x0: 5, x1: 8, y0: 0, y1: 4, dx: 0, dy: 1, s: 3 }],
+  },
+  // The Steady Wind (v177): the drift, the glide turned round. Luna in the centre lifts the orb and Ventus on its ring
+  // bears it at a steady pace with no air to slow it, for Luna's ten tiles, twenty with the outer circle. The font is 18
+  // tiles off over open air, with an islet (x11-15) where the shorter tries come down. Luna + the outer circle, any barbs,
+  // Ventus behind or beside the sign (x1-3) wins 9/9 cast offsets. Fails 0/9: no outer circle (ten tiles, down on the
+  // islet), Ventus on arrival, every glide (Ventus centre, 0-2 barbs, outer circle or not, Luna x1-3 at once or along:
+  // at most 13.4 tiles; the air fades it). Bans, each proved by a sim: Ventus on a gust's ring pushes a glide 18-22 tiles
+  // (2 barbs, Luna x2, Ventus x2 wins 9/9), and Luna on Luna's ring floats twenty tiles with no outer circle (wins 9/9).
+  // Brute with the bans (single signs, outer circle or not, two ring groups): 45 wins, all Luna + outer circle + Ventus.
+  {
+    id: 'steady-wind', name: 'The Steady Wind', sigils: ['gale', 'luna'], par: 1, ink: 1, combos: true, ringOf: { gale: ['luna'], luna: ['gale'] },
+    lesson: 'A glide fades, slowed by the air. For a drift, Luna in the centre lifts the orb and Ventus on its ring bears it at a steady pace for the whole float, twenty tiles with the outer circle.',
+    hint: 'Luna in the centre, cast on the orb, with the outer circle. Its sign toward the font, and a small Ventus in a red slot behind the sign.',
+    t: ['000               0000', '000        00000  0000', '000        00000  0000', '000        00000  0000', '000               0000'],
+    o: ['......................', '......................', '.O.................G..', '......................', '......................'],
   },
   // Skyward's land again, solved by one compound seal. The hollow's rim throws back a plain Ventus gust, so Luna must
   // lift first (Luna in the centre, Ventus on its ring); the font is 12 tiles off (outer circle); the brazier on the near
@@ -257,46 +323,56 @@ const LEVELS = [
   // behind the sign (one runs out short of the 12-tile font). A shut gate can no longer be floated over.
   // v165 (one float-height rule: a float keeps the height it rose from): the float now crosses at the rim's height, so
   // the brazier stands on a two-high plinth (9,4) where the burning orb passes close enough to kindle it.
+  // v177: the drift is taught just before (The Steady Wind), so Luna may no longer go on Ventus's ring here: the glide
+  // (two barbs, Luna x2 or x3 behind, Ignis beside) won 9/9 and skipped it. The drift still wins 9/9 at 0/1/2 barbs, Ventus
+  // at once or along. Two seals still win off par (Featherfall's way: Luna alone with the outer circle, then a gust of two
+  // barbs with Ignis along; or Luna alone, then a gust with Ventus x2 on its ring): kept, they cost the star.
   {
-    name: 'Skyward Redux', sigils: ['gale', 'stone', 'flame', 'tide', 'frost', 'luna'], par: 1, ink: 2, combos: true,
-    folioEnd: { title: 'The Second Folio is Complete', text: 'The same land, in a single seal. The master sets the second folio aside and opens a third, whose lands take stranger shapes.' },
-    lesson: 'The last page of the first folio, written once more. Seven seals carried the orb home then; your inkwell holds two. Any gust only throws the orb against the rim of its hollow, so whatever lifts it must act first, and the rune gate will not wait for a fire that comes on arrival.',
-    hint: 'Luna in the centre, cast on the orb, with a second, larger circle around the seal: the font is more than 10 tiles off. Its sign toward the font (lower right), crossed by one or two barbs. On the ring: a small Ventus behind the sign (red: it bears the orb at once) and a small Ignis beside it (blue: the orb burns along the way and kindles the brazier as it passes).',
+    id: 'skyward-redux', name: 'Skyward Redux', sigils: ['gale', 'stone', 'flame', 'tide', 'frost', 'luna'], par: 1, ink: 2, combos: true, ringOf: { gale: ['stone', 'flame', 'tide', 'frost', 'gale'] },
+    folioEnd: { title: 'The Third Folio is Complete', text: 'The same land, in a single seal. The master sets the third folio aside and opens a fourth, whose lands take stranger shapes.' },
+    lesson: 'The second folio’s last page, written once more. A gust only throws the orb against the rim of its hollow, so the lift must come first, and the rune gate will not wait for fire on arrival.',
+    hint: 'Luna in the centre, cast on the orb, with the outer circle (the font is over ten tiles off), sign toward the font. On its ring: Ventus behind the sign, Ignis beside it to light the brazier in passing.',
     t: [' 000000~~001    ', '2222000~~001 111', '2112000~~001 333', '2112000~~001 113', '2222000~~201 333', '0000000~~001 111', '0000000~~001 111', ' 000000~~001    '],
     o: ['.....#..........', '.....#..........', '.....#..........', '..O..#.......DG.', '.....#...B......', '.....#..........', '.....#..........', '.....#..........'],
     flows: [{ x0: 7, x1: 8, y0: 0, y1: 7, dx: 0, dy: 1, s: 3 }],
   },
-  /* ---------- The Third Folio: lands of strange shape ----------
+  /* ---------- The Fourth Folio: lands of strange shape ----------
      Each lesson was simulated (world.js in Node) with its intended seals at nine cast offsets: all win 9/9.
      The notes say which shortcuts were checked and fail. */
   // Beads touching only at their corners, along the land's diagonal (a sign straight across the page). Two beads are
   // missing: Petra with one plain sign to the right, cast on the nearer gap, sets both. The gust needs two barbs (9.9 tiles);
   // Petra cast on a standing bead raises it into a bump the orb cannot climb.
   {
-    name: 'The Bead Chain', sigils: ['gale', 'stone'], par: 2, ink: 2, combos: true, opens: 'The Third Folio',
-    lesson: 'The third folio, and the land grows strange. Here it is strung like beads, each touching the next only at a corner, and two beads have fallen from the string. A sign drawn straight across the page runs along the land’s diagonal, from corner to corner, for stone as well as wind.',
+    id: 'bead-chain', name: 'The Bead Chain', sigils: ['gale', 'stone'], par: 2, ink: 2, combos: true, opens: 'The Fourth Folio',
+    lesson: 'The land is strung like beads, each touching the next only at a corner, and two beads have fallen. A sign straight across the page runs along the land’s diagonal, corner to corner, for stone as well as wind.',
     hint: 'Petra with one plain sign straight to the right (3 o’clock), cast on the nearer empty place: it sets two beads, corner to corner. Then Ventus on the orb with a sign to the right, crossed by two barbs.',
     t: ['        00', '        00', '       0  ', '      0   ', '          ', '          ', '   0      ', '  0       ', '00        ', '00        '],
     o: ['..........', '........G.', '..........', '..........', '..........', '..........', '..........', '..........', '.O........', '..........'],
   },
-  // A crescent shore around still water; the font on the far horn, a brazier beside it. One seal: Ventus down the page with
-  // Gelu along the way (an ice road; any strength wins) and Ignis on arrival. Ignis along the way melts the road; without Ignis,
-  // no fire. (v176: Gelu at once freezes only round the orb's start and fails 0/9 at every strength; Gelu at once and along
-  // together still wins.)
+  // A crescent shore around still water. v177: its own twist, the three timings sharing one trip. The brazier stands at the
+  // orb's back (diagonal, 1.4 tiles), and a rune gate guards the font on the far horn. One seal: Ventus with a plain sign
+  // down the diagonal (6 o'clock), Ignis behind the sign (at once: the burst at the start kindles the brazier as the orb
+  // sets off) and Gelu beside it (along the way: an ice road). The gate takes 1.6s to sink once the brazier burns (lit at
+  // 0.42s, clear at 1.77s): a plain sign reaches it at ~2.2s and wins 9/9 (Ignis x1-3, Gelu x1-2, outer circle too); one or
+  // two barbs reach it at 1.3-1.5s, glance off the still-sinking gate and slide into the void (0/9). That is the second
+  // aha: no "more power". Fails 0/9 at 0-2 barbs: plain; Gelu alone; Ignis along (melts the road, never reaches behind the
+  // start); Ignis on arrival (burst far from the brazier, the orb stopped at the gate); Gelu at once or on arrival (no road).
+  // Brute (gust on the orb, every sign, 0-2 barbs, outer circle or not, up to two Ignis/Gelu/Ventus groups): only the
+  // intended seal wins (18/14304, all Ventus 6 o'clock, plain sign, Ignis at once + Gelu along).
   {
-    name: 'The Crescent Lagoon', sigils: ['gale', 'frost', 'flame'], par: 1, ink: 1, combos: true,
-    lesson: 'A crescent of shore curls around still water, and the font waits on the far horn beside a cold brazier. Your ink holds a single seal: let it freeze the way as the orb goes, and kindle the fire only once it has come.',
-    hint: 'Ventus on the orb with a sign straight down the page (6 o’clock), toward the far horn. On the ring: a small Gelu beside the sign (blue: along the way, so the orb freezes the water beneath it as it rolls) and a small Ignis just beside the sign on its forward side (green: on arrival).',
-    t: ['     ~~~     ', '   0~~~~~~   ', '  00~~~~~~~  ', ' 000~~~~~~~~ ', ' 000~~~~~~~~ ', '0000~~~~~~~~~', '00000~~~~~~~~', '00000~~~~~~~~', ' 000000~~~~~ ', ' 00000000000 ', '  000000000  ', '   0000000   ', '     000     '],
-    o: ['.............', '...O.........', '.............', '.............', '.............', '.............', '.............', '.............', '.............', '...........G.', '..........B..', '.............', '.............'],
+    id: 'crescent-lagoon', name: 'The Crescent Lagoon', sigils: ['gale', 'frost', 'flame'], par: 1, ink: 1, combos: true,
+    lesson: 'The brazier stands at the orb’s back; a rune gate guards the font across the water. One seal: fire as the orb sets off, ice along the way. A gate sinks slowly, so do not hurry.',
+    hint: 'Ventus on the orb with a plain sign down the page (6 o’clock), no barbs. On the ring: Ignis behind the sign (red: at once, lights the brazier) and Gelu beside it (blue: along the way, the ice road).',
+    t: ['  0  ~~~     ', '  00~~~~~~   ', '  00~~~~~~~  ', ' 000~~~~~~~~ ', ' 000~~~~~~~~ ', '0000~~~~~~~~~', '00000~~~~~~~~', '00000~~~~~~~~', ' 000000~~~0~ ', ' 00000000000 ', '  000000000  ', '   0000000   ', '     000     '],
+    o: ['..B..........', '...O.........', '.............', '.............', '.............', '.............', '.............', '.............', '..........D..', '...........G.', '.............', '.............', '.............'],
   },
   // Two round isles and a one-tile bridge with its last stone missing, right before the font. Ventus with two barbs and
   // Petra on arrival: as the orb rolls off the broken edge, stone rises beneath it. Measured: no plain gust leaps the gap
   // (0/15 offsets), one barb never reaches it, and Petra behind or beside the sign does not help.
   {
-    name: 'The Broken Causeway', sigils: ['gale', 'stone'], par: 1, ink: 1, combos: true,
-    lesson: 'One stone is missing from the causeway, just short of the font, too near the end for any wind to leap, for the orb has slowed by then. On arrival means when the orb comes to rest; it also means the moment the ground runs out beneath it.',
-    hint: 'Ventus on the orb, its sign toward the font (lower right) crossed by two barbs, and a small Petra just beside the sign on its forward side (green: on arrival). As the orb rolls off the broken edge, stone rises beneath it.',
+    id: 'broken-causeway', name: 'The Broken Causeway', sigils: ['gale', 'stone'], par: 1, ink: 1, combos: true,
+    lesson: 'One stone is missing just short of the font, where the orb has slowed too much to leap. On arrival means where the orb comes to rest, and also the moment the ground runs out beneath it.',
+    hint: 'Ventus on the orb, its sign toward the font (lower right) crossed by two barbs, and a small Petra in a green slot ahead of the sign (on arrival). As the orb rolls off the edge, stone rises beneath it.',
     t: ['                ', ' 00             ', '0000        00  ', '0000000000 0000 ', '0000       0000 ', ' 00         00  ', '                '],
     o: ['................', '................', '................', '.O.........G....', '................', '................', '................'],
   },
@@ -304,9 +380,9 @@ const LEVELS = [
   // from the font. Ignis with opposite two-barbed signs reaches 3 tiles each way, 5 with a Ventus on its ring. Then any
   // float or the ferry carries the orb in.
   {
-    name: 'The Eye', sigils: ['gale', 'stone', 'flame', 'luna'], par: 2, ink: 2, combos: true,
-    lesson: 'A ring of land around an empty eye, and in the eye a sealed font. Its gates open when both braziers on opposite sides of the ring burn, and your ink holds two seals. Ventus set upon the ring of stone, fire, ice or water carries every arm of it two tiles farther.',
-    hint: 'Ignis cast on the font itself, with two opposite signs along the tile rows toward the braziers (lower right and upper left), each crossed by two barbs, and a small Ventus in any slot: one line of fire from brazier to brazier. Then the ferry: Ventus on the orb with a sign toward the font (upper right), and a small Luna and a small Petra behind the sign.',
+    id: 'eye', name: 'The Eye', sigils: ['gale', 'stone', 'flame', 'luna'], par: 2, ink: 2, combos: true,
+    lesson: 'A sealed font sits in an empty eye; its gates open when both braziers burn. Ventus on the ring of stone, fire, ice or water carries every arm two tiles farther.',
+    hint: 'Ignis on the font, two-barbed signs toward both braziers (lower right and upper left), a small Ventus in any slot. Then the ferry: Ventus on the orb toward the font (upper right), Luna and Petra behind the sign.',
     t: ['    00000    ', '   0000000   ', '  00     00  ', ' 00       00 ', '00         00', '00   202   00', '00   000   00', '00   202   00', '00         00', ' 00       00 ', '  00     00  ', '   0000000   ', '    00000    '],
     o: ['.............', '.............', '.............', '.............', '.............', '......D......', '.B...DGD...B.', '......D......', '.............', '.............', '.............', '......O......', '.............'],
   },
@@ -314,10 +390,12 @@ const LEVELS = [
   // circle and Ventus on its ring wins: the float rides 1.3 above the height it rose from and climbs each step (v165: it never sinks). A bare float runs out,
   // the Ventus + Luna glide falls short, and the ferry's slab cannot climb. (Since v138 the Ventus + Luna glide with two
   // barbs also won: Luna behind the sign lifts before the gust; since v165 it needs two Luna, as one carries only ten tiles.)
+  // v177: closed the same way as Skyward Redux: Ventus's ring takes no Luna, so the glide and the ferry cannot be drawn and
+  // the drift taught in The Steady Wind is needed.
   {
-    name: 'The Stair of Isles', sigils: ['gale', 'stone', 'luna'], par: 1, ink: 1, combos: true,
-    lesson: 'Isles climb into the sky like steps, each a stone higher than the last, too far apart to roll and too high to leap. What Luna lifts keeps the height it rose from and never sinks while it floats, but where the ground beneath rises to meet it, it rises too. A slab of stone floats level with the ground it rose from, so a step stops it.',
-    hint: 'Luna in the centre, cast on the orb, with a second, larger circle around the seal: the font is more than 10 tiles off. Its sign toward the high isles (upper right), and a small Ventus behind the sign: the wind bears the orb up the stair.',
+    id: 'stair-of-isles', name: 'The Stair of Isles', sigils: ['gale', 'stone', 'luna'], par: 1, ink: 1, combos: true, ringOf: { gale: ['stone', 'gale'] },
+    lesson: 'Isles climb like steps, each one higher, too far apart to roll and too high to leap. A floating orb never sinks, but where the ground rises beneath it, it rises too; a floating slab does not.',
+    hint: 'Luna in the centre, cast on the orb, with the outer circle (the font is over ten tiles off). Its sign toward the high isles (upper right), and a small Ventus behind the sign: a drift up the stair.',
     t: ['       ', '   3   ', '  333  ', '   3   ', '       ', '   2   ', '  222  ', '   2   ', '       ', '   1   ', '  111  ', '   1   ', '  000  ', ' 00000 ', ' 00000 ', ' 00000 ', '  000  '],
     o: ['.......', '.......', '...G...', '.......', '.......', '.......', '.......', '.......', '.......', '.......', '.......', '.......', '.......', '.......', '...O...', '.......', '.......'],
   },
@@ -326,14 +404,14 @@ const LEVELS = [
   // bead arm with one bead missing: Ventus with two barbs and Petra on arrival. Order matters: an orb sent first stops at the
   // shut gate. (A Luna float or the Ventus + Luna glide also carry it in once the gates are open.)
   {
-    name: 'The Compass Rose', sigils: ['gale', 'stone', 'flame', 'tide', 'frost', 'luna'], par: 2, ink: 2, combos: true,
-    lesson: 'The last page of the third folio: a rose of eight points, four of solid ground and four of beads. Its font is sealed at the heart, and the gates open when the braziers at the two farthest points burn. Mind the order of your seals: an orb that reaches a shut gate only waits there.',
-    hint: 'First the fire: Ignis on the font with two-barbed signs toward both braziers (lower right and upper left) and two small Ventus on its ring, so each arm reaches seven tiles. Then Ventus on the orb with a sign straight down the page (6 o’clock), crossed by two barbs, and a small Petra just beside it on its forward side (green): stone fills the missing bead as the orb rolls over the gap.',
+    id: 'compass-rose', name: 'The Compass Rose', sigils: ['gale', 'stone', 'flame', 'tide', 'frost', 'luna'], par: 2, ink: 2, combos: true,
+    lesson: 'The fourth folio’s last page: a rose of eight points, its font sealed at the heart until the braziers at the two farthest points burn. Mind the order of your seals: an orb at a shut gate only waits.',
+    hint: 'First Ignis on the font: two-barbed signs toward both braziers, two small Ventus on its ring. Then Ventus on the orb down the page (6 o’clock), two barbs, and Petra in a green slot: stone fills the missing bead.',
     t: ['0      0      0', ' 0     0     0 ', '  0    0    0  ', '   0   0   0   ', '    0  0  0    ', '      0000     ', '     00000     ', '000000000000000', '     00000     ', '     00000     ', '    0  0  0    ', '   0   0   0   ', '  0    0    0  ', ' 0     0     0 ', '0      0      0'],
     o: ['O..............', '...............', '...............', '...............', '...............', '...............', '.......D.......', 'B.....DGD.....B', '.......D.......', '...............', '...............', '...............', '...............', '...............', '...............'],
-    folioEnd: { title: 'The Third Folio is Complete', text: 'The light rests at the heart of the rose. The master sets the third folio aside and opens a fourth, where water runs and ice moves.' },
+    folioEnd: { title: 'The Fourth Folio is Complete', text: 'The light rests at the heart of the rose. The master sets the fourth folio aside and opens a fifth, where water runs and ice moves.' },
   },
-  /* ---------- The Fourth Folio: water and ice in motion ---------- */
+  /* ---------- The Fifth Folio: water and ice in motion ---------- */
   // A dry millrace, its floor rimed, 12 tiles long; the orb lies at its head and the font on the bank just past its end.
   // One seal: Unda with the outer circle and a two-barbed sign down the race (a run 3 wide, 4 long: 12 tiles of water, the
   // race exactly brimful), Ventus anywhere on its ring (any timing, 1-3 of them): the whole race flows at 3.9 tiles/s and
@@ -345,11 +423,25 @@ const LEVELS = [
   // (without the rime, one barb + Unda ahead + three Ventus ahead won). All 672 Ventus-centre seals with Unda/Ventus on the
   // ring fail. Unda without Ventus is still water; right-angle signs make a slanting current that pushes the orb out over the side bank.
   {
-    name: 'The Millrace', sigils: ['gale', 'tide'], par: 1, ink: 1, combos: true, opens: 'The Fourth Folio',
-    lesson: 'A millrace runs dry from the orb to the font, its floor white with rime, too deep to roll out of and too long for any gust. Unda alone pours still water, and a gust soon dies in it. With Ventus on its ring the water flows the way of its sign through the whole channel it fills, and carries whatever floats there. The orb can float out at the far end only if the race is full to the brim.',
-    hint: 'Unda in the centre, cast on the orb, with a second, larger circle around the seal: the race is twelve tiles long and wants twelve tiles of water. Its sign down the race toward the font (lower right), crossed by two barbs: a run three wide and four long. A small Ventus in any slot of the ring makes it flow.',
+    id: 'millrace', name: 'The Millrace', sigils: ['gale', 'tide'], par: 1, ink: 1, combos: true, opens: 'The Fifth Folio',
+    lesson: 'A dry millrace, too deep to roll out of, runs from the orb to the font. Unda with Ventus on its ring flows the way of its sign, carrying what floats; fill the race to the brim.',
+    hint: 'Unda cast on the orb with the outer circle: the race wants twelve tiles of water. Its sign down the race (lower right), two barbs: a run three wide and four long. Ventus in any slot makes it flow.',
     t: [' 000       0000 ', '0000000000000000', '00____________00', '0000000000000000', ' 000       0000 '],
     o: ['................', '................', '..OfffffffffffG.', '................', '................'],
+  },
+  // v177 (plan call 8): Unda on a gust's ring. The orb lies in a dry well one tile wide (floor -1); the font is 10 tiles
+  // east on the meadow. On a gust's ring Unda behind the sign pours at once, before the wind blows (the lift beat, as Luna
+  // does in the glide): the well fills, the orb floats to the brim, and the gust carries it out. Intended: Ventus toward the
+  // font (lower right), two barbs, Unda at once x1-3: 9/9. Fails 0/9: a plain, one-barb or two-barb gust (thrown against the
+  // wall), the outer circle on a two-barb gust; one barb + Unda at once (out of the well, but short of the font); Unda along
+  // the way (never on the start tile, so the well never fills); Ventus x3 on the ring; Unda in the centre with Ventus on its
+  // ring (a current; the orb floats but the water stays in the well). A wider well (3x3) never brims: it must be one tile.
+  {
+    id: 'dry-well', name: 'The Dry Well', sigils: ['gale', 'tide'], par: 1, ink: 1, combos: true,
+    lesson: 'The orb lies at the bottom of a dry well, and a gust only throws it against the wall. On a gust’s ring, Unda behind the sign pours at once, before the wind blows: what floats rises with the water.',
+    hint: 'Ventus on the orb, its sign toward the font (lower right) crossed by two barbs, and a small Unda behind the sign (red: at once). The well fills, the orb floats to the brim, and the gust carries it out.',
+    t: [' 0000000000000', '00000000000000', '00000000000000', '00_00000000000', '00000000000000', '00000000000000', ' 0000000000000'],
+    o: ['..............', '..............', '..............', '..O.........G.', '..............', '..............', '..............'],
   },
   // A fast millrace (current 10, three tiles wide) between the meadow and the mill wall; the font sits in a gap in the wall
   // at the level of the channel bed. Intended: Ventus toward the font with two barbs and a small Petra beside the sign
@@ -364,9 +456,9 @@ const LEVELS = [
   // 10–20° upstream even at current 10, so the ring takes only Petra. Gelu along the way (the Rime Road ice road) crosses any
   // current (9/9 even with one barb), and Luna would float over, so neither is in this lesson's sigils (no ferry either).
   {
-    name: 'The Mill Wall', sigils: ['gale', 'stone'], sats: ['stone'], par: 1, ink: 1, combos: true,
-    lesson: 'A millrace of fast water sweeps anything floating over the edge. The font sits in a gap in the far wall, level with the channel bed. Petra beside the sign on the ring of a gust (along the way) turns the orb to stone until it comes to rest. A stone orb sinks instead of floating, and the current cannot take it, though the water still slows it as it rolls along the bed. In this lesson only Petra can go on the ring.',
-    hint: 'Ventus in the centre, cast on the orb, its sign toward the font (lower right) crossed by two barbs. On the ring, in a blue circle beside the sign (along the way): a small Petra. The heavy orb sinks and rolls straight across the bed into the font; with fewer barbs the water stops it short.',
+    id: 'mill-wall', name: 'The Mill Wall', sigils: ['gale', 'stone'], sats: ['stone'], par: 1, ink: 1, combos: true,
+    lesson: 'Fast water sweeps anything floating over the edge; the font sits level with the channel bed. Petra along the way on a gust’s ring turns the orb to stone until it rests: it sinks, and the current cannot take it.',
+    hint: 'Ventus on the orb, its sign toward the font (lower right) crossed by two barbs, and a small Petra in a blue slot beside the sign. The heavy orb sinks and rolls across the bed. Fewer barbs stop short.',
     t: ['  000~~~11 ', ' 0000~~~111', '00000~~~111', '00000~~~111', '00000~~~_11', '00000~~~111', '00000~~~111', ' 0000~~~111', '  000~~~11 ', '     ~~~   ', '     ~~~   '],
     o: ['...........', '...........', '...........', '...........', '...O....G..', '...........', '...........', '...........', '...........', '...........', '...........'],
     flows: [{ x0: 5, x1: 7, y0: 0, y1: 10, dx: 0, dy: 1, s: 10 }],
@@ -384,9 +476,9 @@ const LEVELS = [
   // climb out. A diagonal current jams the crates on the pond corner. A current toward the font leaves them in the pond.
   // No Petra, Luna or Gelu here (Petra on the race, or a Luna float, would cross it).
   {
-    name: 'The Timber Run', sigils: ['gale', 'tide'], par: 2, ink: 2, combos: true,
-    lesson: 'A dry millpond, and a race cut from it down across the road, two tiles wide: too broad for any gust to leap. Two crates of timber wait in the pond, too far off for the wind to shove them all that way. Timber floats, and flowing water carries what floats until the race ends.',
-    hint: 'Unda cast on the dry pond (or anywhere in the race) with one sign toward the lower left (7:30), down the race, and a small Ventus in any slot of its ring: the water flows and carries both crates to the foot of the race, side by side. When they rest against the sill, Ventus on the orb with a sign toward the font (lower right), crossed by two barbs.',
+    id: 'timber-run', name: 'The Timber Run', sigils: ['gale', 'tide'], par: 2, ink: 2, combos: true,
+    lesson: 'A dry race, two tiles wide, cuts the road: too broad for any gust to leap. Two timber crates wait in the pond, beyond the wind’s reach. Timber floats, and flowing water carries it to the race’s end.',
+    hint: 'Unda on the dry pond, one sign down the race (lower left, 7:30), a small Ventus in any slot: the crates float to the race’s foot. When they rest, Ventus on the orb toward the font (lower right), two barbs.',
     t: ['     0000000  ', '     0_____0  ', '     0_____0  ', '     0_____0  ', '     0_____0  ', '     000__00  ', '       0__0   ', '       0__0   ', '       0__0   ', '       0__0   ', '00000000__0000', '00000000__0000', '        11    '],
     o: ['..............', '..............', '........CC....', '..............', '..............', '..............', '..............', '..............', '..............', '..............', '..............', '..O.........G.', '..............'],
   },
@@ -398,11 +490,13 @@ const LEVELS = [
   // Ignis or Petra on arrival plus Ventus on arrival; three Ventus on the ring; Petra along plus Ignis along (the heavy
   // orb sinks in the thawed race); Ignis or Petra placed east from the orb with 1–3 Ventus on the ring.
   // Two seals (Ignis on the islet, then a gust) win, but ink is 1. No Luna here, so no float or ferry.
+  // v177 alternate, kept: two barbs, Ignis along + Petra on arrival (9/9): the fire melts the blocks and the arrival stone
+  // stops the orb before the thawed race sweeps it past. Ignis along alone 0/9; with one barb or none 0/9; Petra at once 1/9.
   // The ice blocks stand on the rock. (An ice block on frozen water ('*') blocks from the ice's top; since v144 it is drawn there too.)
   {
-    name: 'The Icebound Font', sigils: ['gale', 'stone', 'flame'], par: 1, ink: 1, combos: true,
-    lesson: 'The millrace has frozen hard, and its font stands on a rock in the middle, walled in by blocks of ice. Fire melts ice, and not only the ice you aim it at: the frozen race thaws too. Petra on the ring of a gust turns the orb to stone, and a stone orb smashes the ice in its way.',
-    hint: 'Ventus on the orb with a sign toward the font (lower right), crossed by one barb, and a small Petra in a slot beside the sign (blue: along the way). The heavy orb rolls over the frozen race and smashes through the ice around the font.',
+    id: 'icebound-font', name: 'The Icebound Font', sigils: ['gale', 'stone', 'flame'], par: 1, ink: 1, combos: true,
+    lesson: 'The font stands on a rock in the frozen race, walled in by ice. Fire would thaw the race too. A stone orb (Petra along the way, on a gust’s ring) smashes ice in its way.',
+    hint: 'Ventus on the orb toward the font (lower right), one barb, and a small Petra in a blue slot beside the sign. The heavy orb rolls over the frozen race and smashes the ice around the font.',
     t: ['  00000000   ', ' 000******0  ', '0000******00 ', '0000**000*000', '0000**000*000', '0000**000*000', ' 000******00 ', '  00******0  ', '   0******   ', '    ******   '],
     o: ['.............', '.............', '.............', '......III....', '.O....IGI....', '......III....', '.............', '.............', '.............', '.............'],
     flows: [{ x0: 4, x1: 9, y0: 1, y1: 9, dx: 0, dy: 1, s: 2.5 }],
@@ -422,14 +516,14 @@ const LEVELS = [
   // block. Luna, Gelu and Unda are left out: fire then a Luna glide or ferry, fire then Ventus + Gelu (refreezes the race),
   // and fire then an Unda current all win. The dam keeps a heavy orb from rolling along the race bed into the leat.
   {
-    name: 'The Thaw', sigils: ['gale', 'stone', 'flame'], par: 2, ink: 2, combos: true,
-    lesson: 'A millrace lies frozen between the meadow and the mill, and the mill leat runs to a shut gate. Fire thaws ice, and a thawed race sweeps anything over the falls. An orb that reaches a shut gate only waits there, and an orb turned to stone is light again once it comes to rest. Mind the order of your seals.',
-    hint: 'First, Ventus on the orb toward the font (lower right), with a small Petra on the ring beside the sign (blue: along the way). The heavy orb breaks the ice block, crosses the frozen race and waits in the leat at the gate, light again once it comes to rest. Then Ignis on the dam between the race and the leat, with two signs of two barbs each, toward the lower right and the upper left, and two small Ventus on its ring. Each arm reaches seven tiles, to both braziers. The fire thaws the race behind the orb and the leat carries it through the opening gate.',
+    id: 'thaw', name: 'The Thaw', sigils: ['gale', 'stone', 'flame'], par: 2, ink: 2, combos: true,
+    lesson: 'A frozen race lies between the meadow and the mill; thawed, it sweeps anything over the falls. A stone orb is light again once it rests; an orb at a shut gate only waits. Mind the order of your seals.',
+    hint: 'Ventus on the orb toward the font (lower right), Petra beside the sign: the heavy orb crosses and waits at the gate. Then Ignis on the dam, two-barbed signs lower right and upper left, two Ventus on its ring.',
     t: ['    ****        ', '    ****        ', '   1****1       ', ' 001****1000    ', '0001****100001  ', '0000****0~~~~000', '0001****100001  ', ' 001****1000    ', '   1****1       ', '    ****        ', '    ****        '],
     o: ['................', '................', '................', '................', '................', '.BOI.........DGB', '................', '................', '................', '................', '................'],
     flows: [{ x0: 4, x1: 7, y0: 0, y1: 10, dx: 0, dy: 1, s: 12 }, { x0: 9, x1: 12, y0: 5, y1: 5, dx: 1, dy: 0, s: 5 }],
   },
-  // The fourth folio's capstone: fire, water, a crate bridge and a heavy orb. A dry millpond (x 5–11, rows 1–4, floor -1)
+  // The fifth folio's capstone: fire, water, a crate bridge and a heavy orb. A dry millpond (x 5–11, rows 1–4, floor -1)
   // holds four crates (8–11, 2); four ice blocks (8–11, 5) dam its mouth, and a brazier stands on the wall just east of
   // them (12,5). Below them a dry channel four wide (x 8–11) runs down to a sill at the road (row 12), cutting the road
   // between the orb (6,11) and a race two wide (x 13–14, current 20 south over the falls). The font sits in the race's far
@@ -456,9 +550,9 @@ const LEVELS = [
   // Three seals that skip the water (allowed as creative routes): any Ignis that lights the brazier, then Petra across
   // the channel at the road, then the heavy gust (9/9).
   {
-    name: 'The Mill Pond', sigils: ['gale', 'tide', 'flame', 'stone'], par: 3, ink: 3, combos: true,
-    lesson: 'Ice dams the millpond, where four crates wait. The dry channel below cuts the road, too wide for any gust to leap. The race beyond runs fast to the falls, and the font sits in its far bank, level with the bed. The gate before the font opens when the brazier by the dam burns.',
-    hint: 'First, Ignis on the left ice block with a sign of two barbs toward the lower right and a small Ventus on its ring: all four blocks melt, the fire reaches the brazier beyond them, and the gate opens. Then Unda in the pond with one sign toward the lower left, down the channel, and a small Ventus on its ring: the current carries the crates down to the road, where they lie side by side across the channel. Last, Ventus on the orb toward the font (lower right), two barbs, with a small Petra in a blue slot beside the sign (along the way). The heavy orb rolls over the crates and along the bed of the race, through the open gate, into the font.',
+    id: 'mill-pond', name: 'The Mill Pond', sigils: ['gale', 'tide', 'flame', 'stone'], par: 3, ink: 3, combos: true,
+    lesson: 'Ice dams the millpond, where four crates wait, and a dry channel below cuts the road, too wide to leap. The font lies in the fast race beyond, level with its bed; its gate opens when the dam’s brazier burns.',
+    hint: 'Ignis on the left ice block: sign lower right, two barbs, Ventus on its ring. Unda in the pond: one sign lower left, Ventus on its ring. Last, Ventus on the orb: two barbs, Petra beside the sign.',
     t: [
       '    000000000~~111', '    0_______0~~111', '    0_______0~~111', '    0_______0~~111', '    0_______0~~111', '    0000____0~~111',
       '       0____0~~111', '       0____0~~111', '       0____0~~111', '       0____0~~111', '00000000____0~~111', '00000000____0~~_11',
@@ -467,36 +561,29 @@ const LEVELS = [
       '..................', '..................', '..................', '..................', '..................', '......O.......DG..',
       '..................'],
     flows: [{ x0: 13, x1: 14, y0: 0, y1: 12, dx: 0, dy: 1, s: 20 }],
-    folioEnd: { title: 'The Fourth Folio is Complete', text: 'The millwheel turns again. The master sets the fourth folio aside and opens a fifth, where small sigils ride on stone and water.' },
+    folioEnd: { title: 'The Fifth Folio is Complete', text: 'The millwheel turns again. The master sets the fifth folio aside and opens a sixth, where small sigils ride on stone and water.' },
   },
-  /* ---------- The Fifth Folio: sigils upon the placing rings ---------- */
+  /* ---------- The Sixth Folio: sigils upon the placing rings ---------- */
   // Each lesson here says which ring-sigils each centre may carry (ringOf): Ventus carries nothing, so no glide, ferry or
   // heavy orb, and each lesson keeps to the one pairing it teaches.
-  // A chasm seven tiles wide (x 7–13) between two plateaus at height 2; the orb (0,3) rests on a one-tile ledge at 3 along
-  // the near plateau's back edge (x 0, rows 1–5), with a ditch at 1 before the plateau (x 1–3, rows 1–5); font (14,3) on
-  // the far side's first tile. Seal 1: Petra cast on the last
-  // tile of ground (6.5,3.5), its sign toward the font, Luna and Ventus on its ring: the slabs rise out over the void and hang
-  // there for good, level with the ground. Seal 2: Ventus on the orb toward the font, two barbs. (v165 rework, 2026-11-08:
-  // with no ring shove the old map, chasm six wide and the orb at x1 on the flat, won only at the dead-centre cast, 1/9.
-  // The orb now leaps the ditch from the ledge, and the time in the air costs it no ground friction, so the gust carries it
-  // farther; the chasm grew a tile so a plain Petra road still cannot reach.) Wins 9/9 cast offsets with one or two barbs on
-  // Petra's sign and two or three Ventus (P2 V2 still 9/9 at offsets of 0.45). Fails: one Ventus (the arm stops short of the
-  // far side); every plain Petra line cast from x0.5 to x6.5 (1–2 barbs, 0/2/3 Ventus, with or without Luna on the orb's
-  // tile), and every plain two-sign Petra line (opposite signs, 1–2 barbs, 2–3 Ventus), 0/9 each, 76 swept: a plain line
-  // raises its cast tile a step, and a two-sign line that raises the plateau level with the ledge also raises the ditch only
-  // to 2, so the orb rolls down into it and cannot climb out (without the ditch that line won 5/9). Also fails: a one-barb
-  // gust over the bridge; a plain gust of any strength; the gust before the bridge. Ledge and ditch are plain ground, so the
-  // lesson needs no new rule; its text names them. v175: stone raised from empty air now comes up level with the nearest
-  // ground (Ryan, The Moon Road), which let a plain Petra line cast a tile into the chasm bridge it (20 combos 9/9), so the chasm
-  // has a stepping stone at 2 (10,3): a plain line over it raises it a step, a wall. 160 plain void casts (x 6-13, one sign
-  // or two, 0-3 Ventus) 0/9; plain gusts hopping onto the stone, 39 chains of one to three, 0/9; the intended seals 9/9.
+  // v177 (call 3: a hanging stone's top sits one step above the ground beneath it, over empty air the ground nearest the
+  // mark). The orb's land is high (3, x 0-2, orb at 1,3); then a low bank (1, x 3-4), a chasm of void (x 5-7), a low bank
+  // (1, x 8-9) and the far land (2, x 10-13, font at 11,3), every row. Seal 1: Petra cast on the near bank, its sign toward
+  // the font, Luna and Ventus on its ring (an arm of six covers the bank, the chasm and the far bank): its stones hang
+  // with their tops at 2, level with the far land, and the orb drops a step onto them. Seal 2: Ventus on the orb toward the
+  // font, two barbs (one barb also carries it). Plain Petra cannot level the way. Stone raised over the chasm comes up level
+  // with the mark: cast on a bank or the chasm (mark 1) the chasm sits at 1, below the raised banks; cast on the orb's land
+  // (mark 3) the chasm is at 3 and the banks only rise to 2, so the orb drops into them and meets the chasm as a wall; cast
+  // back from the far land, the tile before the font rises to 3, a wall. Luna's stones cast from the high land hang at 4
+  // over the chasm, and the orb drops beneath them. The stepping stone of v175 is gone. Checker routes in scratchpad
+  // checker/solutions.json (hanging-stones).
   {
-    name: 'The Hanging Stones', sigils: ['gale', 'stone', 'luna'], centers: ['gale', 'stone'], ringOf: { gale: [], stone: ['luna', 'gale'] },
-    par: 2, ink: 2, combos: true, opens: 'The Fifth Folio',
-    lesson: 'No gust can leap the chasm. From its ledge, a firm gust carries the orb over the ditch. Petra on the edge, or over the stone in the chasm, raises it a step, too high to climb. Luna on Petra’s ring hangs the stones level with the nearest ground instead, and Ventus on its ring stretches the arm. Here Ventus takes no ring-sigil, and Petra only Luna and Ventus.',
-    hint: 'Petra in the centre, cast on the last tile of ground before the chasm, its sign toward the font (lower right) crossed by two barbs. On its ring a small Luna and two small Ventus, in any slots. Then Ventus on the orb toward the font, crossed by two barbs.',
-    t: [' 222222       2222 ', '3111222       22222', '3111222       22222', '3111222   2   22222', '3111222       22222', '3111222       22222', ' 222222       2222 '],
-    o: ['...................', '...................', '...................', 'O.............G....', '...................', '...................', '...................'],
+    id: 'hanging-stones', name: 'The Hanging Stones', sigils: ['gale', 'stone', 'luna'], centers: ['gale', 'stone'], ringOf: { gale: [], stone: ['luna', 'gale'] },
+    par: 2, ink: 2, combos: true, opens: 'The Sixth Folio',
+    lesson: 'Stone raised over empty air comes up level with the ground you aim at: from the low banks, a step below the far land. Luna on Petra’s ring hangs it a step higher; Ventus stretches the arm.',
+    hint: 'Petra on the near low bank, its sign toward the font (lower right), one barb, with a small Luna and two small Ventus on its ring. Then Ventus on the orb toward the font, two barbs.',
+    t: [' 3311   11222 ', '33311   112222', '33311   112222', '33311   112222', '33311   112222', '33311   112222', ' 3311   11222 '],
+    o: ['..............', '..............', '..............', '.O.........G..', '..............', '..............', '..............'],
   },
   // The orb sits in a sunken pool (3×3 at -1) on an upper isle; the font lies on a lower-left isle across eight rows of void
   // (v165: Luna floats ten tiles per Luna, so the font is 14 tiles off). One seal: Unda on the orb, its sign toward the font
@@ -505,10 +592,10 @@ const LEVELS = [
   // Fails: one Luna (the bubble ends at ten tiles over the void, 0/9); a sign any other way; any gust (cannot leave the pool); Unda alone or with the outer
   // circle (still water); Unda + one Luna. Ventus on Unda's ring with Luna gave shortcuts, so Unda takes only Luna here.
   {
-    name: 'The Moon Pool', sigils: ['gale', 'tide', 'luna'], centers: ['gale', 'tide'], ringOf: { gale: [], tide: ['luna'] },
+    id: 'moon-pool', name: 'The Moon Pool', sigils: ['gale', 'tide', 'luna'], centers: ['gale', 'tide'], ringOf: { gale: [], tide: ['luna'] },
     par: 1, ink: 1, combos: true,
-    lesson: 'The orb rests in a sunken pool, too deep for any wind to lift it out. Luna on the ring of Unda blows a bubble: the water lifts what floats in it up into the air, and the bubble drifts the way of Unda’s sign. Each Luna carries it ten tiles. Here Ventus carries nothing on its ring, and Unda carries only Luna.',
-    hint: 'Unda on the orb, its sign toward the font (lower left), with two small Luna on its ring. The bubble lifts the orb out of the pool and drifts it over the gap to the font. With one Luna it falls short.',
+    lesson: 'The orb rests in a sunken pool, too deep for any wind. Luna on Unda’s ring blows a bubble: it lifts what floats into the air and drifts the way of Unda’s sign, ten tiles for each Luna.',
+    hint: 'Unda on the orb, its sign toward the font (lower left), with two small Luna on its ring. The bubble lifts the orb out and drifts it over the gap to the font. One Luna falls short.',
     t: [' 00000 ', '0000000', '00___00', '00___00', '00___00', '0000000', ' 00000 ', '       ', '       ', '       ', '       ', '       ', '       ', '       ', '       ', ' 00000 ', '0000000', '0000000', '0000000', ' 00000 '],
     o: ['.......', '.......', '.......', '...O...', '.......', '.......', '.......', '.......', '.......', '.......', '.......', '.......', '.......', '.......', '.......', '.......', '.......', '...G...', '.......', '.......'],
   },
@@ -521,10 +608,10 @@ const LEVELS = [
   // sometimes). Fails: plain gust (stuck in the trench); Unda without Gelu (the orb floats and stops in still water);
   // the gust first; an unbarbed pour (ice at -0.75 or -0.5, too low to climb out of).
   {
-    name: 'The Glass Floor', sigils: ['gale', 'tide', 'frost'], centers: ['gale', 'tide'], ringOf: { gale: [], tide: ['frost'] },
+    id: 'glass-floor', name: 'The Glass Floor', sigils: ['gale', 'tide', 'frost'], centers: ['gale', 'tide'], ringOf: { gale: [], tide: ['frost'] },
     par: 2, ink: 2, combos: true,
-    lesson: 'A narrow trench cuts across the only way to the font. An orb that rolls into it cannot climb out. Gelu on the ring of Unda freezes the water as it pours, leaving a floor of ice, level and slick, at whatever height the water reached. Here Ventus carries nothing on its ring, and Unda carries only Gelu.',
-    hint: 'First Unda cast in the trench, with a small Gelu on its ring and a sign crossed by a barb or two (any direction): the trench fills and freezes nearly to the brim. Then Ventus on the orb toward the font (lower right), crossed by two barbs.',
+    lesson: 'A narrow trench cuts the only way to the font, and an orb that rolls in cannot climb out. Gelu on Unda’s ring freezes the water as it pours: a floor of ice at the height the water reached.',
+    hint: 'Unda cast in the trench, a small Gelu on its ring, its sign (any way) crossed by a barb or two: the trench fills and freezes nearly to the brim. Then Ventus toward the font (lower right), two barbs.',
     t: [' 0000      00000  ', '000000000000000000', '00000____000000000', '000000000000000000', ' 0000      00000  '],
     o: ['..................', '..................', '..O............G..', '..................', '..................'],
   },
@@ -538,67 +625,42 @@ const LEVELS = [
   // gust; two Petras cast on the orb; a gust, then Petra cast on the rolling orb. 221 such cases tried, none wins (the orb
   // slows on stone and stops short). An overshooting bridge only raises the low isle's tiles to 0.
   {
-    name: 'The Glass Bridge', sigils: ['gale', 'stone', 'frost'], centers: ['gale', 'stone'], ringOf: { gale: [], stone: ['frost', 'gale'] },
+    id: 'glass-bridge', name: 'The Glass Bridge', sigils: ['gale', 'stone', 'frost'], centers: ['gale', 'stone'], ringOf: { gale: [], stone: ['frost', 'gale'] },
     par: 2, ink: 2, combos: true,
-    lesson: 'A bridge of stone could reach the far isle, but the way is long, and the orb slows on stone and stops before it arrives. Gelu on the ring of Petra raises the stone as ice, slick underfoot: on it the orb keeps its speed far beyond where it would stop on stone. Here Ventus carries nothing on its ring, and Petra carries only Gelu and Ventus.',
-    hint: 'Petra cast on the first empty tile past the orb’s isle, its sign toward the font (lower left) crossed by one barb, with a small Gelu and two small Ventus on its ring. When the bridge has risen, Ventus on the orb toward the font, crossed by two barbs.',
+    lesson: 'A stone bridge could reach the far isle, but the orb slows on stone and stops short. Gelu on Petra’s ring raises the stone as ice, and on ice the orb keeps its speed.',
+    hint: 'Petra on the first empty tile past the orb’s isle, its sign toward the font (lower left), one barb, with a small Gelu and two small Ventus on its ring. Then Ventus on the orb toward the font, two barbs.',
     t: [' 000 ', '00000', '00000', '00000', '00000', '00000', '00000', '00000', '     ', '     ', '     ', '     ', '     ', '     ', '     ', '     ', ' ___ ', '_____', '_____', '_____', '_____', '_____', '_____', ' ___ '],
     o: ['.....', '..O..', '.....', '.....', '.....', '.....', '.....', '.....', '.....', '.....', '.....', '.....', '.....', '.....', '.....', '.....', '.....', '.....', '.....', '.....', '..G..', '.....', '.....', '.....'],
   },
-  // The orb (1,2) faces a pit two steps deep (x 5–7 on row 2, floor -2, drawn as a pit since v165), a short bank (x 8–9),
-  // a chasm of eight tiles (x 10–17) and a low isle (-1) with the font (21,2). v165, one stone-height rule: stone fills a
-  // pit one step per Petra; water fills it in one pour. Par 3, the water way: Unda with the outer circle and Gelu on its
-  // ring cast in the pit (a glass floor), Petra with Gelu and 1–3 Ventus on its ring at 10.5 or 11.5, its sign toward the
-  // font (an ice bridge; the first two in either order), then Ventus on the orb toward the font, two barbs: 9/9.
-  // Ink 3 (v165, Ryan's call) leaves room only for the water way. Sim: the ice bridge at 11.5 wins 9/9 with 1-3 Ventus,
-  // at 10.5 with 2-3 (one Ventus there is too short, 0/9); bridge first, then water, then the gust: 9/9. The stone way
-  // (Petra twice in the pit, the ice bridge, the gust) and the second-gust ways (water, a plain stone bridge, two gusts;
-  // water without Gelu, the ice bridge, two gusts) all need four seals and no longer fit. Three-seal fails: one Petra in
-  // the pit with the ice bridge and the gust; one ice bridge over pit and chasm and two gusts; water, a stone bridge (at
-  // 10.5 or 11.5, or cast on the resting orb) and one gust; water with no Gelu or no outer circle, the ice bridge, the
-  // gust; water and two gusts.
-  // OPEN, for Ryan: water, gust 2, then a plain Petra (one or two barbs, two or three Ventus) cast on the orb as it rolls
-  // toward the bank end (0.3-2 tiles short of x 10) wins: the stone bridge rises under a moving orb. v165: it still wins
-  // now that Ventus on Petra's ring no longer shoves the orb (with a two-barb gust; with the shove it was the one-barb
-  // gust that won), so it is momentum on stone.
-  {
-    name: 'The Glass Road', sigils: ['gale', 'stone', 'tide', 'frost'], centers: ['gale', 'stone', 'tide'], ringOf: { gale: [], stone: ['frost', 'gale'], tide: ['frost'] },
-    par: 3, ink: 3, combos: true,
-    lesson: 'A pit two steps deep, then a chasm 8 tiles wide, then the font on a low isle. Stone fills a pit one step per Petra; water fills it in one pour. On a bridge of stone the orb slows and stops, so the chasm wants glass. Here Ventus carries nothing on its ring, Petra carries only Gelu and Ventus, and Unda carries only Gelu.',
-    hint: 'Unda in the pit with a second, larger circle around the seal and a small Gelu on its ring: a glass floor in one pour. (Two Petras would fill the pit too, one step each, but the ink does not stretch to four seals.) Petra on the first empty tile past the pit’s far bank, its sign toward the font (lower right) crossed by one barb, with a small Gelu and three small Ventus on its ring: a glass bridge. Then Ventus on the orb toward the font, crossed by two barbs.',
-    t: [' 0000              ____ ', '0000000000        ______', '00000===00        ______', '0000000000        ______', ' 0000              ____ '],
-    o: ['........................', '........................', '.O...................G..', '........................', '........................'],
-  },
+  // v177 (call 9): The Glass Road is gone. Its point (water fills a pit in one pour where stone takes a Petra a step) was
+  // told in its text rather than found, its glass floor is The Glass Floor's and its ice bridge The Glass Bridge's, and The
+  // Moon Road already joins this folio's sigils. Saves that reached it open The Moon Road (Save.load, GONE).
   // The orb (2,2) sits in a sunken pool (x 1-3, rows 1-3, floor 1) in a block at 2 above a road (x 0-7, rows 11-13, height 2);
   // a chasm of void seven tiles wide (x 8-14), then a far bank at 2 (x 15-21) with the font (19,12) in a one-tile hollow at 0.
-  // (v165: Luna floats ten tiles per Luna, so the block is four rows longer and the one-Luna bubble lands on the road at
-  // 2.5,12.6.) Three seals, the first two in either order: Unda on the orb, its sign toward the road (lower left), one Luna on
-  // its ring; Petra on the last road tile (7.5,12.5), its sign toward the font, Luna, Gelu and Ventus on its ring (slabs of ice
-  // hanging at the road's height, x 7-15); Ventus on the orb toward the font, two barbs. 9/9 cast offsets in each order
-  // (bridge b2 V2 and b1 V3). Bridges b0V3, b1V2, b1V3, b2V2, b2V3 win; a one-barb gust also carries it, an unbarbed one stops.
-  // The hollow font closes the brute shortcut (a bubble of two or three Luna from the road across the void): a float rides at
-  // 3.3 and the font in its hollow catches only up to 2.4, so the bubble passes over it and is lost, while the orb rolling off
-  // the bridge at 2 drops in. Fails: any single seal and any pair of seals on the orb (728 and ~19,000 swept, 0 wins); a
-  // hanging stone bridge (the orb stops at 14.3); Petra and Gelu without Luna cast on the road's end (it rises to 3, a wall); bubbles of
-  // two or three Luna from the pool (into the void). Creative route: after the bubble, the ferry (Ventus toward the font,
-  // two barbs, Petra and Luna behind the sign) carries the orb over from the road (taught in The Ferry). v175 creative route, Ryan's: after the bubble, Petra and Gelu
-  // (and Ventus) without Luna cast on the void, sign toward the font: stone from empty air comes up level with the nearest
-  // ground, so the ice bridges level with the road; then the gust (9/9 cast at x8 b1 V2 or b2 V1, x9 b1 or b2 V1, x11 two signs
-  // V0-1). Until v175 that ice came up at level 0.
-  // Taught in: the bubble, The Moon Pool; hanging slabs and Ventus lengthening Petra's arm, The Hanging Stones; ice on Petra's
-  // ring, The Glass Bridge; barbs and signed gusts, the first folios. Luna and Gelu together on Petra's ring has no lesson of
-  // its own (each is taught alone, and the lesson text says each sigil on the ring does its own work).
+  // v177 (step 5): Ryan's solve is the intended one. Three seals, the first two in either order: Unda on the orb, its sign
+  // toward the road (lower left), one Luna on its ring (the bubble sets the orb down on the road, 2.5,12.6); Petra cast on
+  // the empty air past the road's end (8.5,12.5), its sign toward the font, one barb, Gelu and two Ventus on its ring:
+  // stone from empty air comes up level with the nearest ground (the road, 2), so the ice lies level with the road, x 8-14;
+  // then Ventus on the orb toward the font, two barbs (one barb also carries it). Also 9/9: b2 V1 or b2 V2 at x8, b2 V1 at
+  // x9, Ryan's two signs at x11. The hollow font closes the bubble shortcut (two or three Luna from the pool or the road): a
+  // float rides at 3.3 and the font in its hollow catches only up to 2.4, so the bubble passes over it. Fails: the ice cast
+  // on the road's end (it rises to 3, a wall); a plain stone bridge (the orb slows and stops); Luna on Petra's ring (since
+  // v177 a hanging stone sits a step above the road, at 3, and the orb rolls beneath it into the void; the old hanging-ice
+  // answer is gone); any single seal or pair on the orb. Creative route: the ferry (taught in The Ferry). Checker routes in
+  // scratchpad checker/solutions.json (moon-road).
+  // Taught in: the bubble, The Moon Pool; Ventus lengthening Petra's arm, The Hanging Stones; ice on Petra's ring and stone
+  // from empty air, The Glass Bridge; barbs and signed gusts, the first folios.
   {
-    name: 'The Moon Road', sigils: ['gale', 'stone', 'tide', 'frost', 'luna'], centers: ['gale', 'stone', 'tide'],
+    id: 'moon-road', name: 'The Moon Road', sigils: ['gale', 'stone', 'tide', 'frost', 'luna'], centers: ['gale', 'stone', 'tide'],
     ringOf: { gale: [], stone: ['luna', 'frost', 'gale'], tide: ['luna'] },
     par: 3, ink: 3, combos: true,
-    lesson: 'The font sits low in a hollow, below anything that floats. A stone bridge stops the orb short. Without Luna, Petra on the road’s end raises it too high to climb. Luna and Gelu can share Petra’s ring. Ventus takes no ring-sigil, Petra only Luna, Gelu and Ventus, Unda only Luna.',
-    hint: 'Unda on the orb, its sign toward the road (lower left), with one small Luna on its ring: the bubble sets the orb down on the road. Petra on the last tile of the road, its sign toward the font (lower right) crossed by two barbs, with a small Luna, a small Gelu and two small Ventus on its ring: a bridge of ice that hangs. Then Ventus on the orb toward the font, crossed by two barbs.',
+    lesson: 'The font sits low in a hollow, below anything that floats. Stone raised on the road’s end sits a step too high; over empty air it comes up level.',
+    hint: 'Unda on the orb toward the road (lower left), one Luna on its ring. Petra past the road’s end, toward the font (lower right), one barb, Gelu and two Ventus on its ring. Ventus toward the font, two barbs.',
     t: [' 222                  ', '21112                 ', '21112                 ', '21112                 ', '22222                 ', '22222                 ', '22222                 ', '22222                 ', '22222                 ', '22222                 ', '22222                 ', '22222222       2222222', '22222222       2222022', ' 2222222       222222 '],
     o: ['......................', '......................', '..O...................', '......................', '......................', '......................', '......................', '......................', '......................', '......................', '......................', '......................', '...................G..', '......................'],
-    folioEnd: { title: 'The Fifth Folio is Complete', text: 'A bubble out of the pool, a bridge of hanging ice, and the light is home. The master sets the fifth folio aside and opens a sixth, where one gust carries several sigils, each in its own time.' },
+    folioEnd: { title: 'The Sixth Folio is Complete', text: 'A bubble out of the pool, a road of ice over the gap, and the light is home. The master sets the sixth folio aside and opens a seventh, where one gust carries several sigils, each in its own time.' },
   },
-  /* ---------- The Sixth Folio: several sigils, several timings, one seal ---------- */
+  /* ---------- The Seventh Folio: several sigils, several timings, one seal ---------- */
   // The road runs east from the orb (1,2), past a brazier beside its start (1,1) and a brazier by the road (6,1), and breaks
   // one tile short of the font (gap x10, font x11). One seal teaches all three timings: Ventus toward the font (lower right),
   // two barbs, Ignis behind the sign (at once: flares where the orb lies and lights the start brazier), Ignis beside it
@@ -608,27 +670,26 @@ const LEVELS = [
   // Ignis at once + Petra ahead (the road brazier stays dark); Ignis at once and along without Petra; three Ignis at once or
   // three along; Ignis on arrival instead of along; Petra along or at once instead of ahead; one barb.
   {
-    name: 'The Lamplighter’s Road', sigils: ['gale', 'flame', 'stone'], centers: ['gale'], ringOf: { gale: ['flame', 'stone'] },
-    par: 1, ink: 1, combos: true, opens: 'The Sixth Folio',
-    lesson: 'Two braziers must burn, one beside the orb where it lies and one beside the road, and the road ends one stone short of the font. Each place on the ring keeps its own time: behind the sign at once, where the orb lies; beside it along the way, only once the orb has rolled off; ahead of it on arrival, where it comes to rest. One ring can carry more than one sigil. Ventus takes only Ignis and Petra on its ring.',
-    hint: 'Ventus on the orb, its sign toward the font (lower right) crossed by two barbs. On its ring a small Ignis behind the sign (red: at once, the fire flares where the orb lies and lights the brazier beside it), another small Ignis beside the sign (blue: the orb burns along the way and lights the road brazier as it passes) and a small Petra just beside the sign on its forward side (green: on arrival, stone rises beneath the orb as the road runs out).',
+    id: 'lamplighters-road', name: 'The Lamplighter’s Road', sigils: ['gale', 'flame', 'stone'], centers: ['gale'], ringOf: { gale: ['flame', 'stone'] },
+    par: 1, ink: 1, combos: true, opens: 'The Seventh Folio',
+    lesson: 'One brazier stands by the orb, one by the road, and the road ends a stone short of the font. One ring can carry several sigils, even the same sigil twice, each in its own place and time.',
+    hint: 'Ventus toward the font (lower right), two barbs. On its ring: Ignis behind the sign (at once, the brazier by the orb), Ignis beside it (along the way, the road brazier) and Petra ahead (on arrival, the gap).',
     t: ['             ', '000  000     ', '0000000000 00', '000          ', '             '],
     o: ['.............', '.B....B......', '.O.........G.', '.............', '.............'] },
-  // A mere between two shores; one brazier on an islet (6,1), one on a plinth two steps high (12,2) just past the font (11,2).
-  // (v176: was three steps at (11,1); at two steps a floating flame would reach it from beside the font, so it moved past it)
-  // One seal: Ventus toward the font (lower right), two barbs, Luna behind, Ignis beside and Ignis ahead 9/9. A passing flame
-  // lights the islet brazier but not the plinth; fire on arrival flares wide enough for the plinth but not back to the islet.
-  // Fails 0/9: either Ignis alone, three Ignis on arrival, Luna along with Ignis at once and on arrival (v176: the fire at
-  // once flares on the start shore, far from the islet; in v175 it rode with the orb and won 9/9), the swap (Ignis behind,
-  // Luna ahead: the orb rolls into the mere). v176 alternate 9/9: Luna along the way (it rises as it leaves its tile and
-  // floats its own ten tiles from there), Ignis along and Ignis on arrival.
+  // v177 step 6: the fire height rule's lesson. A mere between two shores; the orb floats along row 2 past two braziers
+  // in row 1: one on an islet one step up (6,1), one on a plinth two steps up (10,1) beside the font (11,2). Passing fire
+  // lights the islet but not the plinth; the burst on arrival at the font reaches the plinth. One seal: Ventus toward
+  // the font (lower right), two barbs, Luna behind, Ignis beside and Ignis ahead 9/9 (Luna along also 9/9). Fails 0/9:
+  // Ignis along alone or twice (with the plinth one step up instead, that wins 9/9: the height is what stops it), Ignis on
+  // arrival alone or twice, Ignis at once + arrival, the swap, Ventus on the ring in place of Luna. No ringOf: Ventus on
+  // its own ring wins nothing here (checked). A falling orb counts from the ground it last rolled on (world.js fireReaches).
   {
-    name: 'The Brazier on the Isle', sigils: ['gale', 'flame', 'luna'], centers: ['gale'], ringOf: { gale: ['luna', 'flame'] },
+    id: 'brazier-on-the-isle', name: 'The Brazier on the Isle', sigils: ['gale', 'flame', 'luna'], centers: ['gale'],
     par: 1, ink: 1, combos: true,
-    lesson: 'One brazier stands on an islet in the mere, the other high on a plinth just past the font, out of reach of any passing flame. A sigil may sit on the ring twice, in two places. Ventus takes only Luna and Ignis on its ring.',
-    hint: 'Ventus on the orb, its sign toward the font (lower right) crossed by two barbs. On its ring a small Luna behind the sign (red: the orb rises at once), a small Ignis beside it (blue: it lights the islet brazier as it passes) and another small Ignis just beside the sign on its forward side (green: on arrival the fire flares up to the high brazier).',
-    t: ['000~~~~~~~~000', '000~~~0~~~~000', '000~~~~~~~~020', '000~~~~~~~~000', '000~~~~~~~~000'],
-    o: ['..............', '......B.......', '.O.........GB.', '..............', '..............'] },
+    lesson: 'Passing fire (along the way) lights a brazier on the ground or one step up. A burst (at once or on arrival) reaches one up to two steps high. The islet is one step up, the plinth two.',
+    hint: 'Ventus toward the font (lower right), two barbs. On its ring: Luna behind the sign (the orb rises at once), Ignis beside it (passing fire lights the islet) and Ignis ahead (the burst on arrival reaches the plinth).',
+    t: ['000~~~~~~~~000', '000~~~1~~~2000', '000~~~~~~~~000', '000~~~~~~~~000', '000~~~~~~~~000'],
+    o: ['..............', '......B...B...', '.O.........G..', '..............', '..............'] },
   // The orb's shore (x0-2) faces a far shore (x11-13) across a mere; the brazier is on a plinth two steps high (12,0), the font
   // four rows down that shore (11,5). Ventus toward the far shore (lower right), two barbs, Luna behind and Ignis ahead: the
   // float runs out at x11.6-11.9 and the fire on arrival lights the plinth. Then Ventus toward the font (lower left), any
@@ -638,26 +699,24 @@ const LEVELS = [
   // v176 creative route (taught timings only): Luna behind alone on the first gust, then the gust toward the font with Ignis
   // behind its sign: the fire flares at once where the orb stands, beside the plinth, and lights it (9/9).
   {
-    name: 'The Far Shore', sigils: ['gale', 'flame', 'luna'], centers: ['gale'], ringOf: { gale: ['luna', 'flame'] },
+    id: 'far-shore', name: 'The Far Shore', sigils: ['gale', 'flame', 'luna'], centers: ['gale'],
     par: 2, ink: 2, combos: true,
-    lesson: 'The brazier stands high on the far shore, out of reach of any passing flame, and the font lies farther down that shore. A floating orb settles once it has been carried ten tiles. Ventus takes only Luna and Ignis on its ring.',
-    hint: 'Ventus on the orb toward the far shore (lower right) crossed by two barbs, with a small Luna behind the sign (red: the orb rises at once) and a small Ignis just beside the sign on its forward side (green: where the float sets it down, the fire flares up to the high brazier). Then Ventus on the orb toward the font (lower left).',
+    lesson: 'The brazier stands high on the far shore, out of reach of any passing flame, and the font lies farther down that shore. A floating orb settles once it has been carried ten tiles.',
+    hint: 'Ventus toward the far shore (lower right), two barbs, with Luna behind the sign (at once) and Ignis ahead (where the float sets it down, the burst reaches the high brazier). Then Ventus toward the font (lower left).',
     t: ['000~~~~~~~~020', '000~~~~~~~~000', '000~~~~~~~~000', '~~~~~~~~~~~000', '~~~~~~~~~~~000', '~~~~~~~~~~~000', '~~~~~~~~~~~000'],
     o: ['............B.', '.O............', '..............', '..............', '..............', '...........G..', '..............'] },
-  // A ledge (x0-3) with a brazier sunk two steps in a hollow (3,1); a chasm nine tiles wide; a far side with a channel of water
-  // and, beyond it, the font (14,9) beside a brazier on a plinth two steps high (15,9). Ventus toward the chasm (lower right),
-  // two barbs, Ignis beside and Luna ahead: the rolling orb lights the hollow brazier, floats from the edge and lands at x14.2.
-  // Then Ventus toward the font (lower left), one barb, Luna beside and Ignis ahead: 9/9 (two barbs or Luna behind on the
-  // second seal also 9/9; no barb on the second seal 5/9). The order flips between the seals. Fails 0/9: both swaps, the
-  // same ring twice, two or three Luna at once with Ignis (a floating orb passes over the hollow brazier), one barb first,
-  // Ignis behind on the first seal (v176: it flares only at the start, away from the hollow; v175 9/9). No single seal wins (3384).
+  // v177 step 6: one seal (the channel and plinth went: that second leg repeated The Far Shore). A ledge (x0-3) with a
+  // brazier sunk two steps in a hollow (3,1), a chasm nine tiles wide, the font on the far side (14,2). Ventus toward the
+  // chasm (lower right), two barbs, Ignis beside and Luna ahead: the rolling orb lights the hollow brazier, floats from the
+  // edge and comes down in the font 9/9 (two Luna ahead also 9/9). Fails 0/9: the swap, Luna at once (a floating orb passes
+  // over the hollow brazier), Ignis at once, either sigil alone, one barb, Ventus on the ring in place of Luna. No ringOf.
   {
-    name: 'The Leap', sigils: ['gale', 'flame', 'luna'], centers: ['gale'], ringOf: { gale: ['flame', 'luna'] },
-    par: 2, ink: 2, combos: true,
-    lesson: 'No gust can leap this chasm. The first brazier sits low in a hollow by the edge, below anything that floats. The second stands high beside the font, across a channel of water. Ventus takes only Ignis and Luna on its ring.',
-    hint: 'Ventus on the orb toward the chasm (lower right) crossed by two barbs, with a small Ignis beside the sign (blue: the orb rolls past the low brazier, burning) and a small Luna just beside the sign on its forward side (green: the orb floats from the edge). Then Ventus toward the font (lower left) crossed by one barb, with a small Luna beside the sign and a small Ignis just beside it on its forward side (green: on arrival the fire reaches the high brazier).',
-    t: ['0000         0000', '000=         0000', '0000         0000', '0000         0000', '             ~~~~', '             ~~~~', '             ~~~~', '             ~~~~', '             0000', '             0020'],
-    o: ['.................', '...B.............', '.O...............', '.................', '.................', '.................', '.................', '.................', '.................', '..............GB.'] },
+    id: 'leap', name: 'The Leap', sigils: ['gale', 'flame', 'luna'], centers: ['gale'],
+    par: 1, ink: 1, combos: true,
+    lesson: 'No gust can leap this chasm. The brazier sits low in a hollow by the edge, below anything that floats.',
+    hint: 'Ventus toward the chasm (lower right), two barbs. On its ring: Ignis beside the sign (along the way, the rolling orb lights the low brazier) and Luna ahead (on arrival, the orb floats from the edge).',
+    t: ['0000         0000', '000=         0000', '0000         0000', '0000         0000'],
+    o: ['.................', '...B.............', '.O............G..', '.................'] },
   // The Leap's ledge and chasm, then a longer channel and a road home along the bottom: a brazier on a plinth (15,12), a brazier
   // sunk in the road (9,13), a missing stone (x5) and the font in a pit at the road's end (3,12). Three seals, three orders:
   // Ventus lower right, two barbs, Ignis beside + Luna ahead (leap); Ventus lower left, two barbs, Luna behind + Ignis ahead
@@ -668,13 +727,13 @@ const LEVELS = [
   // the road brazier), both 9/9 in v175.
   // Creative: on the last leg a ferry (Luna and Petra behind, Ignis beside) wins whenever the tap lands on the orb's tile.
   {
-    name: 'The Long Round', sigils: ['gale', 'flame', 'luna', 'stone'], centers: ['gale'], ringOf: { gale: ['flame', 'luna', 'stone'] },
+    id: 'long-round', name: 'The Long Round', sigils: ['gale', 'flame', 'luna', 'stone'], centers: ['gale'], ringOf: { gale: ['flame', 'luna', 'stone'] },
     par: 3, ink: 3, combos: true,
-    lesson: 'The long way round: over the chasm, down across the water, and home along the road. Three braziers must burn, two low in hollows and one high on a plinth, and the road home is missing a stone. Each crossing wants its own sigils, in its own order. Ventus takes only Ignis, Luna and Petra on its ring.',
-    hint: 'Ventus on the orb toward the chasm (lower right), two barbs, with a small Ignis beside the sign (blue) and a small Luna just beside it on its forward side (green). Then Ventus toward the water (lower left), two barbs, with a small Luna behind the sign (red) and a small Ignis on its forward side (green: it lights the high brazier where the orb lands). Last, Ventus toward the font (upper left), two barbs, with a small Ignis beside the sign (blue) and a small Petra on its forward side (green: stone fills the missing step).',
+    lesson: 'Over the chasm, down across the water, and home along the road. Three braziers must burn, two low in hollows and one high on a plinth, and the road home is missing a stone. Each crossing wants its own sigils.',
+    hint: 'Ventus, two barbs, three times. Toward the chasm (lower right): Ignis beside the sign, Luna ahead. Toward the water (lower left): Luna behind, Ignis ahead. Toward the font (upper left): Ignis beside, Petra ahead.',
     t: ['0000         0000', '000=         0000', '0000         0000', '0000         0000', '             ~~~~', '             ~~~~', '             ~~~~', '             ~~~~', '             ~~~~', '             ~~~~', '             ~~~~', '             ~~~~', '   =0 00000000020', '   00 000=0000000'],
     o: ['.................', '...B.............', '.O...............', '.................', '.................', '.................', '.................', '.................', '.................', '.................', '.................', '.................', '...G...........B.', '.........B.......'],
-    folioEnd: { title: 'The Sixth Folio is Complete', text: 'Fire on the way, moonlight at the edge, stone at the last step, and the light is home. The master sets the sixth folio aside.' } },
+    folioEnd: { title: 'The Seventh Folio is Complete', text: 'Fire on the way, moonlight at the edge, stone at the last step, and the light is home. The master sets the seventh folio aside.' } },
 ];
 LEVELS.forEach((l, i) => l.roman = ROMAN[i]);
 // The Hint button's first step: a nudge toward the idea, short of the answer (the master's hint, `hint`, is the second step)
@@ -687,37 +746,40 @@ const NUDGES = {
   'Keystone': 'The trench must be filled before the orb can cross it. What here is heavy enough to fill it, and what must the fire not touch?',
   'The Sunken Orb': 'No wind lifts the orb out of that hollow. Fill the hollow and the orb rises with the water: count how many tiles it needs.',
   'The Rushing Stream': 'The stream carries off whatever falls in. Make it something the orb can roll across.',
+  'Homeward': 'Out of the hollow first, and the crate before the fire: a burning hedge takes the crate with it.',
   'Featherfall': 'Lift first, then push. A floating orb waits in the air for your next gust.',
   'Featherfall II': 'The island lies beyond what an unadorned float can carry. Something drawn around the whole seal carries it farther.',
-  'The Rune Gate': 'The gate wants both braziers, and the ice is in the way. One fire, set in the right place, can do several things at once.',
-  'The Broad Water': 'One tile of ice will not span this river. The second circle makes a spell broader; barbs make each arm longer.',
+  'The Rune Gate': 'The gate wants both braziers, and the ice is in the way. One fire, set in the right place, can do several things together.',
+  'The Broad Water': 'One line of ice carries the orb over or back, never both. The outer circle makes a spell broader.',
   'Skyward': 'One step at a time, in the order the land asks: out of the hollow, past the hedge, over the stream, then up to the gate.',
-  'Torchbearer': 'Let the orb carry the fire to what it touches. What sits on Ventus’s ring travels with the orb.',
-  'Rime Road': 'Water lies across the way and you have one seal. What if the orb froze the water as it rolled?',
+  'Torchbearer': 'Let the orb carry the fire to what it touches. A sigil beside the sign travels with the orb.',
+  'Rime Road': 'The river runs down the road, against you, and you have one seal. What if the orb froze the water as it rolled?',
   'The Ferry': 'A floating orb soon slows in the air, but a slab of stone sails on at an even pace. Raise one beneath the orb.',
   'The Lantern': 'Fire lit too soon melts the ice road. Where on the ring does a sigil wait until the orb arrives?',
+  'The Hearth': 'The brazier is behind the orb, and the orb only goes forward. What flares before it has left?',
   'Confluence': 'The orb must float over thorn and water, then kindle the brazier once it is there. Two ring-sigils, each with its own timing.',
+  'The Steady Wind': 'A glide fades, and the font lies far. What if the float came first, and the wind only bore it?',
   'Skyward Redux': 'The orb must rise out of its hollow before anything carries it, and the brazier is passed on the way, not at the end. Mind how far the font lies.',
   'The Bead Chain': 'The beads touch only at their corners. A sign straight across the page runs corner to corner, for stone as well as wind.',
-  'The Crescent Lagoon': 'Freeze the water as the orb goes, and kindle the fire only once it has come: two ring-sigils, two timings.',
+  'The Crescent Lagoon': 'The brazier is behind the orb and the water ahead: two ring-sigils, two timings. If the orb meets the gate still standing, it came too fast.',
   'The Broken Causeway': 'No wind leaps the gap that late. What if the missing stone rose beneath the orb just as the ground ran out?',
   'The Eye': 'Light both braziers first: a shut gate stops even a floating orb. One line of fire can reach them both, if something makes it longer.',
   'The Stair of Isles': 'A Luna float rises when the ground rises. But the font is farther than an unadorned float can carry.',
   'The Compass Rose': 'Fire first: the gates must be open before the orb arrives. Then mind the missing bead on the orb’s arm.',
   'The Millrace': 'Still water only lifts the orb, and a gust soon dies in it. Make the water itself move, and pour enough to fill the race to the brim: count its tiles.',
+  'The Dry Well': 'No gust lifts the orb out of the well, but water would. What on a gust’s ring acts before the wind blows?',
   'The Mill Wall': 'Whatever floats here is swept away, and no angle of wind beats the current. What would the orb need to be for the water to leave it where it is?',
   'The Timber Run': 'No wind carries the crates that far, but moving water will. Where does the race end, and what would lie there?',
   'The Icebound Font': 'Fire would melt the wall, and the frozen race under the orb with it. Something heavy breaks ice without melting it.',
   'The Thaw': 'The fire must cross the race to reach both braziers, and a thawed race carries everything over the falls. Cross while it is still frozen.',
   'The Mill Pond': 'The channel is too wide to leap, and the ice holds back anything the water could carry. What could lie across the gap, and what has to go first?',
-  'The Hanging Stones': 'Plain stone lifts the edge a step the orb cannot climb. Something on its ring could hang it level instead.',
+  'The Hanging Stones': 'Plain stone over the chasm sits level with the low banks, a step below the far land. Something on Petra’s ring could hang it a step higher. Then a gust with two barbs.',
   'The Moon Pool': 'No wind lifts the orb out of its pool, but water would. What could carry the water’s float on across the gap?',
   'The Glass Floor': 'Once in the trench, the orb never climbs out. Fill the trench, and make what fills it hold still.',
   'The Glass Bridge': 'A long enough bridge is not enough: the orb slows on stone and stops before it arrives. What would keep it from slowing?',
-  'The Glass Road': 'Stone fills a pit one step per Petra; water fills it in one pour. Then glass across the chasm, and one gust.',
-  'The Moon Road': 'A bubble out of the pool, a bridge, then a gust. The bridge must hang at the height of the road, and the orb must not slow on it.',
+  'The Moon Road': 'A bubble out of the pool, a bridge, then a gust. The bridge must lie level with the road, and the orb must not slow on it. Aim it at the empty air.',
   'The Lamplighter’s Road': 'One brazier stands by the orb where it lies, one is passed on the road, and the broken stone is met last. One ring can hold all three, each in its own place.',
-  'The Brazier on the Isle': 'Fire that rides with the orb lights the islet brazier, but the high one is out of its reach. Fire on arrival flares wider.',
+  'The Brazier on the Isle': 'The orb passes both braziers, but passing fire only reaches one step up. Which fire reaches two?',
   'The Far Shore': 'Fire that rides with a floating orb stops short of the high brazier. Where does the float set the orb down, and what could flare there?',
   'The Leap': 'A floating orb passes over the low brazier. What if it rolls past the brazier first, and only takes to the air where the ground runs out?',
   'The Long Round': 'Take it one crossing at a time. Whether a brazier sits low or high decides when the fire must burn, and whether the orb may float past it.',
@@ -741,12 +803,39 @@ const TITLE_LEVEL = {
 };
 
 /* ---------------- Progress ---------------- */
+// (v177) progress is kept by lesson id, not by place in the book, so a lesson put in between never shifts anyone's
+// stars. A lesson is open when it comes no later than one past the furthest lesson won, or than the furthest lesson
+// the player had reached (reach), so adding a lesson never locks a player out of one already open.
+const lessonId = L => L.id || L.name;
+// the lessons in their v176 order: the place-keyed saves (v10 and older) are read through this list once
+const V10_ORDER = ['first-breath', 'long-meadow', 'rift', 'from-the-abyss', 'thornwall', 'keystone', 'sunken-orb', 'rushing-stream',
+  'featherfall', 'featherfall-ii', 'rune-gate', 'broad-water', 'skyward', 'torchbearer', 'rime-road', 'ferry', 'lantern', 'confluence',
+  'skyward-redux', 'bead-chain', 'crescent-lagoon', 'broken-causeway', 'eye', 'stair-of-isles', 'compass-rose', 'millrace', 'mill-wall',
+  'timber-run', 'icebound-font', 'thaw', 'mill-pond', 'hanging-stones', 'moon-pool', 'glass-floor', 'glass-bridge', 'glass-road',
+  'moon-road', 'lamplighters-road', 'brazier-on-the-isle', 'far-shore', 'leap', 'long-round'];
+// lessons taken out of the book, and the lesson a save that had reached one now opens on
+const GONE = { 'glass-road': 'moon-road' };
 const Save = {
-  data: { unlocked: 1, stars: {}, v: 10 },
+  data: { stars: {}, v: 11 },
+  idOf(i) { return LEVELS[i] ? lessonId(LEVELS[i]) : undefined; },
+  indexOf(id) { return id == null ? -1 : LEVELS.findIndex(L => lessonId(L) === id); },
+  starsAt(i) { return (this.data.stars && this.data.stars[this.idOf(i)]) || 0; },
+  // how many lessons, from the first, are open
+  unlocked() {
+    let far = Math.max(0, this.indexOf(this.data.reach));
+    LEVELS.forEach((L, i) => { if (this.data.stars[lessonId(L)]) far = Math.max(far, i + 1); });
+    return Math.min(LEVELS.length, far + 1);
+  },
+  won(i, stars) {
+    const d = this.data, id = this.idOf(i);
+    d.stars[id] = Math.max(d.stars[id] || 0, stars);
+    const next = Math.min(LEVELS.length - 1, i + 1);
+    if (next > this.indexOf(d.reach)) d.reach = this.idOf(next);
+  },
   load() {
     try {
       const s = JSON.parse(localStorage.getItem('quillsigil.v1'));
-      if (!s || !s.unlocked) return;
+      if (!s || (s.v >= 11 ? !s.stars : !s.unlocked)) return;
       // v50 added The Long Meadow and The Rift after the first lesson: older saves move up two places
       if (!s.v) {
         const stars = {};
@@ -798,6 +887,19 @@ const Save = {
         if (s.stars[36]) s.unlocked = Math.max(s.unlocked, 38);
         s.v = 10; this.data = s; this.save();
       }
+      // v11 (v177): stars, the furthest lesson open and the lesson last opened are kept by lesson id
+      if (s.v === 10) {
+        const stars = {}, n = Math.min(V10_ORDER.length, Math.max(1, +s.unlocked || 1));
+        for (const k in s.stars) if (V10_ORDER[+k] && s.stars[k]) stars[V10_ORDER[+k]] = s.stars[k];
+        const t = { v: 11, stars, reach: V10_ORDER[n - 1] };
+        if (Number.isInteger(s.at) && V10_ORDER[s.at]) t.at = V10_ORDER[s.at];
+        if (GONE[t.reach]) t.reach = GONE[t.reach];
+        if (GONE[t.at]) t.at = GONE[t.at];
+        this.data = t; this.save(); return;
+      }
+      if (!s.stars || typeof s.stars !== 'object') s.stars = {};
+      if (GONE[s.reach]) s.reach = GONE[s.reach];
+      if (GONE[s.at]) s.at = GONE[s.at];
       this.data = s;
     } catch (e) { }
   },
@@ -828,22 +930,23 @@ const Game = {
     // Safari does when it runs short of memory or has put the tab away, lands here and would otherwise start at I)
     const at = this.resumeAt();
     $('#bBegin').textContent = at > 0 ? `Continue: Lesson ${LEVELS[at].roman}` : 'Begin the Lessons';
-    $('#bContinue').style.display = Save.data.unlocked > 1 ? '' : 'none';
+    $('#bContinue').style.display = Save.unlocked() > 1 ? '' : 'none';
   },
   // (v175) the lesson last opened (or the one after the last won), if it is still open; else the furthest one open
   resumeAt() {
-    const far = Math.max(0, Math.min(LEVELS.length, Save.data.unlocked || 1) - 1), at = Save.data.at;
+    const far = Save.unlocked() - 1, at = Save.indexOf(Save.data.at);
     return Number.isInteger(at) && at >= 0 && at <= far ? at : far;
   },
   // (v175) the lesson in play, kept for this tab only: a reload of the page (the browser putting a heavy tab away and
   // bringing it back, or a refresh) opens that lesson again rather than the title. null: none in play.
   playing(i) {
-    try { if (i == null) sessionStorage.removeItem('quillsigil.playing'); else sessionStorage.setItem('quillsigil.playing', String(i)); } catch (e) { }
+    try { if (i == null) sessionStorage.removeItem('quillsigil.playing'); else sessionStorage.setItem('quillsigil.playing', Save.idOf(i)); } catch (e) { }
   },
   wasPlaying() {
     try {
-      const s = sessionStorage.getItem('quillsigil.playing'), i = s == null ? NaN : +s;
-      return Number.isInteger(i) && i >= 0 && i < Math.min(LEVELS.length, Save.data.unlocked || 1) ? i : -1;
+      // (kept by lesson id since v177; a number is a place from before, in the v176 order)
+      const s = sessionStorage.getItem('quillsigil.playing'), i = s == null ? -1 : Save.indexOf(/^\d+$/.test(s) ? V10_ORDER[+s] : s);
+      return i >= 0 && i < Save.unlocked() ? i : -1;
     } catch (e) { return -1; }
   },
   lessons() {
@@ -880,7 +983,7 @@ const Game = {
     this.tapped = false;
     this.idx = i; this.level = LEVELS[i]; this.casts = 0; this.history = []; this.winT = 0; this.held = null;
     // (v175) remembered at once, so the title's Continue and a reload of the page both come back to this lesson
-    if (Save.data.at !== i) { Save.data.at = i; Save.save(); }
+    if (Save.data.at !== Save.idOf(i)) { Save.data.at = Save.idOf(i); Save.save(); }
     this.playing(i);
     Grim.draft.clear(); Grim.ghost = null; Grim.bookDirty = true; Grim.inkDirty = true;
     parts.length = 0;
@@ -901,8 +1004,11 @@ const Game = {
     $('#noteText').textContent = L.lesson;
     this.leafHint();
     $('#noteKeys').style.display = this.idx === 0 ? '' : 'none';
-    const ringOnly = id => L.centers && !L.centers.includes(id);
-    $('#noteSigils').innerHTML = L.sigils.map(id => `<span class="chip" style="--c:${SIGILS[id].color}"><img src="${glyphIcon(id)}" alt="">${SIGILS[id].name}${ringOnly(id) ? ' <small>(ring only)</small>' : ''}</span>`).join('') + (L.ink ? `<span class="chip ink">ink for ${L.ink} seal${L.ink > 1 ? 's' : ''}</span>` : '');
+    // (v177) a lesson with ring rules shows them as a legend under the chips, so the chips no longer say "(ring only)";
+    // sigils the drawn centre won't take on its ring are greyed
+    const R = ringRules(L), ringOnly = id => !R && L.centers && !L.centers.includes(id);
+    $('#noteSigils').innerHTML = L.sigils.map(id => `<span class="chip${Grim.ringRefuses(id) ? ' no' : ''}" style="--c:${SIGILS[id].color}"><img src="${glyphIcon(id)}" alt="">${SIGILS[id].name}${ringOnly(id) ? ' <small>(ring only)</small>' : ''}</span>`).join('') + (L.ink ? `<span class="chip ink">ink for ${L.ink} seal${L.ink > 1 ? 's' : ''}</span>` : '');
+    $('#noteRings').innerHTML = ringLegendHTML(L);
     $('#noteIn').scrollTop = 0;
     $('#note').classList.add('show');
     fitLand(true);
@@ -1028,10 +1134,9 @@ const Game = {
     }
     const L = this.level, par = L.par;
     const stars = this.casts <= par ? 3 : this.casts <= par + 2 ? 2 : 1;
-    Save.data.stars[this.idx] = Math.max(Save.data.stars[this.idx] || 0, stars);
-    Save.data.unlocked = Math.max(Save.data.unlocked, Math.min(LEVELS.length, this.idx + 2));
+    Save.won(this.idx, stars);
     // (v175) where the player left off is now the lesson after this one; a reload on the win card goes to the title
-    Save.data.at = Math.min(LEVELS.length - 1, this.idx + 1); Game.playing(null);
+    Save.data.at = Save.idOf(Math.min(LEVELS.length - 1, this.idx + 1)); Game.playing(null);
     Save.save();
     const last = this.idx === LEVELS.length - 1, wonIdx = this.idx;
     // (the lesson's wax seal, as its folio entry shows it, fetched now so it is ready when the card stamps it)
@@ -1075,7 +1180,7 @@ const Game = {
       list.appendChild(item);
       const s = document.createElement('button');
       s.className = 'slot' + (ok ? '' : ' off'); s.style.setProperty('--c', inf.color || '#e8c27a');
-      s.title = ok ? `${inf.label}: cast at once (${i + 1})` : `${inf.label}: not used in this lesson`;
+      s.title = ok ? `${inf.label}: cast right away (${i + 1})` : `${inf.label}: not used in this lesson`;
       s.innerHTML = `<img src="${inf.img}" alt=""><span class="k">${i + 1}</span>`;
       s.onclick = e => { Sfx.init(); this.quick(i); e.currentTarget.blur(); };
       bar.appendChild(s);
@@ -1084,7 +1189,7 @@ const Game = {
   /* ----- the Notes leaf (phones): the lesson, the sigils and how signs work ----- */
   openNotes() {
     if (this.state !== 'draw' || !this.level) return;
-    const L = this.level, ringOnly = id => L.centers && !L.centers.includes(id);
+    const L = this.level, R = ringRules(L), ringOnly = id => !R && L.centers && !L.centers.includes(id);
     // the painted look dresses the leaf as the codex page (the old look ◐ keeps the plain sheet)
     const illum = !(typeof CLASSIC !== 'undefined' && CLASSIC.on) && !!GART.page;
     $('#notes').classList.toggle('illum', illum);
@@ -1097,7 +1202,7 @@ const Game = {
     for (const id of SIGIL_ORDER) {
       const S = SIGILS[id], known = L.sigils.includes(id);
       const b = document.createElement('button');
-      b.className = 'nsig' + (known ? '' : ' off') + (Grim.ghost === id ? ' on' : '');
+      b.className = 'nsig' + (known ? '' : ' off') + (known && Grim.ringRefuses(id) ? ' no' : '') + (Grim.ghost === id ? ' on' : '');
       const im = `<img src="${glyphIcon(id)}" alt="" style="background:${known ? S.color : 'transparent'}">`;
       b.innerHTML = (illum ? `<span class="rd">${im}</span>` : im) + `<div><b>${S.name}</b><em>${S.en}</em>` +
         `<span>${known ? (ringOnly(id) ? 'Ring only, this lesson. ' : '') + S.desc : LEVELS.slice(0, LEVELS.indexOf(L)).some(l => l.sigils.includes(id)) ? 'Unused this lesson.' : 'Not yet learned.'}</span></div>`;
@@ -1105,6 +1210,7 @@ const Game = {
       else b.disabled = true;
       box.appendChild(b);
     }
+    $('#nRings').innerHTML = ringLegendHTML(L); $('#nRingsH').style.display = R ? '' : 'none';
     $('#nSigns').textContent = signNotes(L);
     renderHint($('#nHint'), $('#nHintB'), L, this.hint || 0);
     $('#notes .sheet').scrollTop = 0; $('#notes .nin').scrollTop = 0;
@@ -1152,6 +1258,46 @@ const Game = {
   },
 };
 
+// (v177) the lesson's ring rules as HTML: each centre's icon, then a dashed ring holding the small icons it takes on its
+// ring ("none" when it takes nothing), and last the sigils that may only go on a ring. Empty when the lesson has no rules.
+// The groups wrap, so a long combos list stays readable at phone width
+function ringLegendHTML(L) {
+  const R = ringRules(L); if (!R) return '';
+  const ic = (id, cls) => `<img class="${cls}" src="${glyphIcon(id)}" alt="${SIGILS[id].name}" title="${SIGILS[id].name}" style="background:${SIGILS[id].color}">`;
+  const groups = R.rows.map(r => `<span class="rg">${ic(r.id, 'rc')}<span class="rp">${r.takes.length ? r.takes.map(id => ic(id, 'rs')).join('') : '<i>none</i>'}</span></span>`);
+  if (R.ringOnly.length) groups.push(`<span class="rg">${R.ringOnly.map(id => ic(id, 'rc')).join('')}<i>ring only</i></span>`);
+  return `<span class="rl">On each ring</span>${groups.join('')}`;
+}
+// (v177) the Terms sheet, opened from the folio screen: one short line for each word the lessons lean on. A term shows
+// once the lesson that teaches it is open (at); a clause with its own lesson (more) joins it once that lesson is open
+const TERMS = [
+  { at: 'first-breath', t: 'Seal', d: 'One closed circle with a sigil inside. Inscribe it on the page, then cast it.' },
+  { at: 'first-breath', t: 'Sign', d: 'A stroke out from the seal through a small circle. It points the spell.' },
+  { at: 'long-meadow', t: 'Barb', d: 'A short stroke across a sign. Each barb makes the spell stronger.', more: ['rift', ' A sign takes two at most.'] },
+  { at: 'long-meadow', t: 'Rewind and Recall', d: 'Rewind takes back your last cast. Recall lays your last spell on the page again.' },
+  { at: 'from-the-abyss', t: 'Arm', d: 'With stone, ice or water, a sign raises a line running out the way it points; each barb adds a tile. Unadorned, with no sign, one tile.' },
+  { at: 'featherfall', t: 'Float', d: 'What Luna gives: the orb hangs in the air, glides over low ground and open air, and settles after ten tiles.' },
+  { at: 'featherfall-ii', t: 'Outer circle', d: 'A circle drawn around the whole seal. Around Luna, the float carries twice as far.', more: ['broad-water', ' Around anything else, the spell grows broader, not stronger.'] },
+  { at: 'torchbearer', t: 'Ring and slots', d: 'The eight small circles around a seal. A small sigil in a slot, a ring-sigil, rides with the spell.' },
+  { at: 'torchbearer', t: 'Ink', d: 'How many seals a lesson lets you cast.' },
+  { at: 'torchbearer', t: 'Along the way', d: 'A ring-sigil beside the sign (blue slot) acts all through the journey.' },
+  { at: 'ferry', t: 'At once', d: 'A ring-sigil behind the sign (red slot) acts as the spell sets off, before the orb moves.' },
+  { at: 'ferry', t: 'On each ring', d: 'The list on a lesson card: what each centre sigil takes on its ring. Anything else is greyed out.' },
+  { at: 'lantern', t: 'On arrival', d: 'A ring-sigil ahead of the sign (green slot) acts where the orb comes to rest.', more: ['broken-causeway', ' It also acts the moment the ground runs out beneath it.'] },
+  { at: 'hearth', t: 'Burst', d: 'Fire at once or on arrival: one flare where the orb is. Along the way, fire lights what the orb passes instead.' },
+  { at: 'steady-wind', t: 'Glide', d: 'A floating orb pushed by wind. It fades, slowed by the air.' },
+  { at: 'steady-wind', t: 'Drift', d: 'Luna in the centre with Ventus on its ring: the orb goes at a steady pace for the whole float.' },
+  { at: 'eye', t: 'Gold slots', d: 'Only a Ventus or Luna seal keeps time. Around any other sigil the slots stay gold, and any slot will do.' },
+  { at: 'brazier-on-the-isle', t: 'Brazier height', d: 'Passing fire lights a brazier on the ground or one step up. A burst reaches two steps up.' },
+];
+function renderTerms() {
+  const open = id => { const i = Save.indexOf(id); return i >= 0 && i < Save.unlocked(); };
+  $('#termList').innerHTML = TERMS.filter(T => open(T.at))
+    .map(T => `<dt>${T.t}</dt><dd>${T.d}${T.more && open(T.more[0]) ? T.more[1] : ''}</dd>`).join('');
+}
+function openTerms() { renderTerms(); $('#terms').classList.add('show'); Sfx.play('page'); }
+function closeTerms() { $('#terms').classList.remove('show'); }
+const termsOpen = () => $('#terms').classList.contains('show');
 function glyphIcon(id) {
   const c = document.createElement('canvas'); c.width = c.height = 64;
   const g = c.getContext('2d');
@@ -1173,7 +1319,8 @@ function aimOverlay(g, t) {
   // stone out of the void comes up or hangs level with the mark, plain or hanging (Luna on Petra's ring), on ground or from
   // empty air (voidStoneZ, world.js; until v175 plain stone from empty air came up at level 0)
   const hangs = sp.sigil === 'stone' && (sp.sats || []).some(s => s.id === 'luna');
-  const zVoid = sp.sigil !== 'stone' || hangs ? A.z : Math.round(voidStoneZ({ air: A.air }, A.z));
+  // (v177: a hanging stone's top sits one step above the ground, raiseSlab)
+  const zVoid = hangs ? A.z + 1 : sp.sigil !== 'stone' ? A.z : Math.round(voidStoneZ({ air: A.air }, A.z));
   // the whole shape is drawn flat at the seal's height, over the land, so a line or a rectangle reads as one piece:
   // drawn each at its own height, it stepped up onto ice blocks, braziers and gates and down onto ice, and looked
   // broken (v175). Where what a tile's square would stand on (its ground or what stands there, standTop, the way pick
@@ -1184,7 +1331,7 @@ function aimOverlay(g, t) {
   for (const [x, y] of cells) {
     const c = cellI(x, y);
     if (sp.sigil === 'stone' && c.feat && (hangs ? c.feat !== 'font' : c.feat === 'brazier' || c.feat === 'gate' || c.feat === 'font')) continue;
-    shown.push([x, y, c, c.void ? zVoid : standTop(c)]);
+    shown.push([x, y, c, c.void ? zVoid : hangs ? surfaceTop(c) + 1 : standTop(c)]);
   }
   if (!tide) {
     g.strokeStyle = hexA(sp.color, 0.5); g.fillStyle = hexA(sp.color, 0.85); g.lineWidth = 1.2;
@@ -1478,6 +1625,7 @@ wc.addEventListener('contextmenu', e => e.preventDefault());
 
 window.addEventListener('keydown', e => {
   const k = e.key;
+  if (termsOpen()) { if (k === 'Escape') { e.preventDefault(); closeTerms(); } return; }
   if (Game.state === 'play' && Game.noteOpen() && k === 'Escape') { e.preventDefault(); Game.closeNote(); return; }
   const digit = /^[1-9]$/.test(k) ? +k - 1 : -1;
   if (Game.state === 'draw' && Game.notesOpen()) {
@@ -1589,7 +1737,7 @@ const Folio = {
   x(px) { const g = this.g; return px <= g.b[3] ? px * this.s : px >= g.w - g.b[1] ? this.W - (g.w - px) * this.s : this.bl + (px - g.b[3]) * this.mx; },
   y(py) { const g = this.g; return py <= g.b[0] ? py * this.s : py >= BOOK.h - g.b[2] ? this.H - (BOOK.h - py) * this.s : this.bt + (py - g.b[0]) * this.my; },
   entryHTML(i) {
-    const L = LEVELS[i], locked = i >= Save.data.unlocked, done = !!Save.data.stars[i];
+    const L = LEVELS[i], locked = i >= Save.unlocked(), done = !!Save.starsAt(i);
     const label = `Lesson ${L.roman}: ${locked ? 'locked' : L.name}${done ? ', finished' : ''}`;
     return `<button class="lentry${locked ? ' locked' : ''}${done ? ' done' : ''}${i === this.resumeTo ? ' here' : ''}" data-i="${i}" aria-label="${label}"${locked ? ' aria-disabled="true"' : ''}>`
       + `<span class="ltext"><span class="lnum">${numHTML(L.roman)}</span><span class="lname">${locked ? '· locked ·' : L.name}</span></span>`
@@ -1855,6 +2003,9 @@ bind('#pKeep', () => Game.keep());
 bind('#pSatchel', () => Game.openSatchel());
 bind('#sKeep', () => Game.keep());
 bind('#sClose', () => Game.closeSatchel());
+bind('#bTerms', () => openTerms());
+bind('#tClose', () => closeTerms());
+$('#terms').addEventListener('pointerdown', e => { if (e.target.id === 'terms') closeTerms(); });
 $('#satchel').addEventListener('pointerdown', e => { if (e.target.id === 'satchel') Game.closeSatchel(); });
 bind('#pNotes', () => Game.openNotes());
 bind('#nBack', () => Game.closeNotes());

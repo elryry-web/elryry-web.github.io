@@ -24,6 +24,7 @@ function floorTop(c) {
   if (!c || c.void) return -Infinity;
   return (c.water != null && c.ice) ? Math.max(c.h, c.water) : c.h;
 }
+const SLAB_HGT = 0.25; // a floating slab's thickness
 function featH(c) {
   switch (c.feat) {
     case 'bramble': return 0.85 * (1 - (c.burn ? clamp((c.burnT - 0.45) / 0.55, 0, 1) : 0));
@@ -102,7 +103,7 @@ function indexFeatures() {
 function makeBody(kind, x, y, z) {
   const b = { kind, x, y, z, vx: 0, vy: 0, vz: 0, alive: true, lev: 0, drift: null, burn: 0, spread: false, spin: 0, rx: 0, ry: 1, home: { x, y, z }, cap: 0, captured: false, hover: z, id: (World.bodies.length * 0.618034) % 1 };
   if (kind === 'orb') Object.assign(b, { r: 0.27, hgt: 0.54, mass: 1, floats: true, burnable: false });
-  else if (kind === 'slab') Object.assign(b, { r: 0.47, hgt: 0.25, mass: 4, floats: true, burnable: false });
+  else if (kind === 'slab') Object.assign(b, { r: 0.47, hgt: SLAB_HGT, mass: 4, floats: true, burnable: false });
   else Object.assign(b, { r: 0.4, hgt: 0.86, mass: 2, floats: true, burnable: true });
   return b;
 }
@@ -170,6 +171,19 @@ function douseCell(c) {
   if (c.burn) { c.burn = 0; steam(c.x + .5, c.y + .5, c.h + .5, 8); }
   c.frost = 0; c.wet = 1;
 }
+/* v177 (call 4), one fire height rule: passing fire (Ignis along the way) reaches a brazier on the ground or one step up;
+   a burst (at once or on arrival) reaches one up to 2 high. Heights count from the ground the body rolls on, or for a
+   float the ground it floats over (b.hover). Rolling fire also reaches down into a hollow (two steps, as before); a
+   floating orb's passing fire does not reach below its ground (The Long Round's hollow brazier sits "below anything
+   that floats"). A burst reaches down as far as it always did. (Until v176 passing fire used a distance from the body's
+   own height, so a floating orb lit braziers 2 high.) v177 step 6: a body in the air that is not floating (falling as a
+   float ends, or bouncing) counts from the ground it last rolled on, never from its height in the air, so an orb
+   dropping out of a float beside a plinth two high does not light it with passing fire (The Brazier on the Isle). */
+function fireReaches(b, c, up) {
+  const float = b.lev > 0, d = surfaceTop(c) - (float ? b.hover : Math.min(b.z, b.hover ?? b.z));
+  if (d > up + 0.2) return false;
+  return up > 1 || d >= (float ? -0.2 : -2.2);
+}
 const TOUCH = [[0, 0], [0.55, 0], [-0.55, 0], [0, 0.55], [0, -0.55]];
 function imbueTick(b, dt) {
   const sp = Math.hypot(b.vx, b.vy);
@@ -188,7 +202,7 @@ function imbueTick(b, dt) {
     }
     const away = c => c && !(c.x === e.sx && c.y === e.sy);
     if (id === 'flame') {
-      for (const [dx, dy] of TOUCH) { const c = cellAt(b.x + dx, b.y + dy); if (c && !c.void && away(c) && Math.abs(surfaceTop(c) + featH(c) * 0.5 - b.z) < 1.7) ignite(c, true); }
+      for (const [dx, dy] of TOUCH) { const c = cellAt(b.x + dx, b.y + dy); if (c && !c.void && away(c) && fireReaches(b, c, 1)) ignite(c, true); }
       if (Math.random() < dt * 30) flameP(b.x + (Math.random() - .5) * 0.4, b.y + (Math.random() - .5) * 0.4, b.z + b.hgt * 0.6, 0.8);
     } else if (id === 'frost') {
       const c = cellAt(b.x, b.y);
@@ -240,7 +254,7 @@ function arriveEffect(b, id, n, dir = null) {
   switch (id) {
     case 'gale': if (!b.captured) { const dv = (3 + 3 * n) / Math.pow(effMass(b), 0.7), dx = dir ? dir.x : b.ldx || 0, dy = dir ? dir.y : b.ldy || 0; b.vx += dx * dv; b.vy += dy * dv; b.vz += 1.2; } break;
     case 'luna': if (!b.captured) { b.lev = 1e6; b.levRange = RING_TILES * n; b.levAge = 0; b.levUntilStop = false; b.drift = null; b.vz += 2.5; } break;
-    case 'flame': for (const c of cellsNear(x, y, 1.3 + 0.3 * n)) { ignite(c, true); for (let i = 0; i < 5; i++) flameP(c.x + Math.random(), c.y + Math.random(), surfaceTop(c) + 0.2, 1.4); } break;
+    case 'flame': for (const c of cellsNear(x, y, 1.3 + 0.3 * n)) { if (!fireReaches(b, c, 2)) continue; ignite(c, true); for (let i = 0; i < 5; i++) flameP(c.x + Math.random(), c.y + Math.random(), surfaceTop(c) + 0.2, 1.4); } break;
     case 'frost': for (const c of cellsNear(x, y, 1.4 + 0.3 * n)) freezeCell(c); for (let i = 0; i < 30; i++) emit({ x: x + (Math.random() - .5) * 3, y: y + (Math.random() - .5) * 3, z: z + Math.random(), vz: -0.4, life: 1.6, size: 3, color: '#ffffff', kind: 'flake', vr: 3 }); break;
     case 'tide': { const cs = cellsNear(x, y, 1.2 + 0.3 * n); floodAt(cs, null, 0); cs.forEach(douseCell); splash(x, y, z, 20); break; }
     case 'stone': {
@@ -264,8 +278,8 @@ function arriveEffect(b, id, n, dir = null) {
    it, plain or hanging (Luna with Petra: hanging slabs and ferries), so a bridge cast over a gap comes up level with the
    bank nearest the mark, where the aim preview draws it. v175 (Ryan, The Moon Road: "Petra gelu shouldn't snap to the
    bottom here"); from v171b plain stone from empty air came up at level 0, to keep a plain Petra cast a tile into The
-   Hanging Stones' chasm from bridging it. That lesson now has a stepping stone in the chasm that plain Petra raises a
-   step, so it still needs Luna. */
+   Hanging Stones' chasm from bridging it. v177: that lesson was rebuilt round the hanging stone's
+   step (Luna's stones sit a step above the ground), and its v175 stepping stone is gone. */
 function voidStoneZ(sp, tz) { return tz; }
 function raiseStone(c, n, markZ) {
   if (c.void) { c.void = false; c.h = -4; c.th = Math.max(-2, Math.min(3, Math.round(markZ || 0) + n - 1)); c.ice = false; c.water = null; c.flow = null; }
@@ -732,7 +746,9 @@ function applySpell(sp, tx, ty, tz) {
   baseSpell(sp, tx, ty, tz, out);
   const cells = [...new Set([...spellCells(sp, tx, ty).map(([x, y]) => cellI(x, y)), ...out.cells])].filter(Boolean);
   for (const s of inf) {
-    if (mover && out.bodies.length) { for (const b of out.bodies) infuseBody(b, s, sp); continue; }
+    // v177: only Ventus or Luna in the centre keep time (their ring rides on what they move). Flowing Unda's ring acts on its
+    // cells like any placing sigil's: its slot means nothing (Ventus there only sets it flowing; it never pushed on arrival)
+    if ((sp.sigil === 'gale' || sp.sigil === 'luna') && out.bodies.length) { for (const b of out.bodies) infuseBody(b, s, sp); continue; }
     infuseCells(s, cells, sp, tx, ty, tz, out);
   }
 }
@@ -817,10 +833,12 @@ function infuseCells(s, cells, sp, tx, ty, tz, out) {
   }
 }
 /* a floating stone slab on one tile (drift: how it sails, or null to hang in place) */
-function raiseSlab(x, y, tz, tiles, drift) { // tiles: how far it sails before it settles (null: it hangs for good)
+// step: true for a hanging stone (Petra with Luna on its ring): its top sits one step above the ground (v177, call 3)
+function raiseSlab(x, y, tz, tiles, drift, step = false) { // tiles: how far it sails before it settles (null: it hangs for good)
   const c = cellI(x, y);
   if (!c || (c.feat && c.feat !== 'font')) return;
-  const z = c.void ? tz : surfaceTop(c);
+  const ground = c.void ? tz : surfaceTop(c);
+  const z = step ? ground + 1 - SLAB_HGT : ground;
   const b = makeBody('slab', x + 0.5, y + 0.5, z);
   Object.assign(b, { lev: 1e6, levRange: tiles, levAge: 0, hover: z, drift });
   World.bodies.push(b);
@@ -831,8 +849,11 @@ function raiseSlab(x, y, tz, tiles, drift) { // tiles: how far it sails before i
    (2s more per Luna) and fell, and a player who looked away came back to find the bridge sunk a level below the land,
    with nothing to say time had anything to do with it. (1e6, not Infinity: rewind snapshots are JSON) */
 /* with Gelu on the ring too, the slabs hang as ice: an orb on one runs as on ice (stepBody reads b.onBody.icy) */
+/* v177 (call 3): a hanging stone's top sits one step above the surrounding ground (over empty air, the ground nearest the
+   mark), the height a floating orb rides at, so it can be a step up onto a ledge one higher, or a bridge a floating orb
+   comes down onto. Plain Petra over empty air still comes up level with the land (voidStoneZ). */
 function spawnSlabs(sp, tx, ty, tz, n, icy) {
-  for (const [x, y] of spellCells(sp, tx, ty)) { const b = raiseSlab(x, y, tz, null, null); if (b && icy) b.icy = true; }
+  for (const [x, y] of spellCells(sp, tx, ty)) { const b = raiseSlab(x, y, tz, null, null, true); if (b && icy) b.icy = true; }
   ring(tx, ty, tz, '#cdb0ff', 1.1); cam.shake = Math.max(cam.shake, 0.15);
 }
 /* Luna + Petra on the ring: a floating slab beneath the target, riders and all — and with Ventus on the ring too, it sails the way of the sign */
@@ -4586,13 +4607,29 @@ function boxHit(x0, y0, x1, y1, zlo, zhi, sx, sy) {
    (v171b; until then a click on any cliff fell through to the empty-air case at level 0, and could come back as a point
    over ground at the wrong height: on The Hanging Stones a click on the last ground tile's cliff put a slab on that
    tile yet hung the slabs over the chasm two levels low, while a click on the back of the tile hung them level.) */
+/* Except the back wall of a narrow hollow (a trench, a pit): there the land in front hides the middle of the lower
+   tile's floor, the wall is all the player sees of that tile, and so the wall aims into the hollow, at its floor, just
+   inside the foot of the wall. Where the floor shows, the old rule stands (a ledge, a broad pool).
+   (v177, Ryan: Unda + Gelu aimed at The Glass Road's pit "keeps snapping to either side of the trench": the wall went
+   to the bank behind, the rest to the bank in front.) */
+function hollowBelow(n) {
+  // from the middle of the floor toward the camera (x and y up one tile each per TZ / TH of height): any ground above?
+  const z = surfaceTop(n), k = TH / TZ;
+  for (let s = 0.05; s < 6; s += 0.05) {
+    const m = cellAt(n.x + 0.5 + s, n.y + 0.5 + s);
+    if (m && !m.void && surfaceTop(m) > z + s * k) return true;
+  }
+  return false;
+}
 function pickFace(c, sx, sy, top) {
   for (const R of [true, false]) {
     const n = R ? cellI(c.x + 1, c.y) : cellI(c.x, c.y + 1);
     if (!n || n.void || surfaceTop(n) >= top - 0.01) continue;
     // this one face, from the lower neighbour's top up to this tile's
     const h = boxHit(c.x, c.y, c.x + 1, c.y + 1, surfaceTop(n), top, sx, sy);
-    if (h && h.face === (R ? 1 : 2)) return { x: h.x, y: h.y, z: top, c };
+    if (!h || h.face !== (R ? 1 : 2)) continue;
+    if (hollowBelow(n)) return { x: R ? n.x + 0.02 : h.x, y: R ? h.y : n.y + 0.02, z: surfaceTop(n), c: n, hollow: true };
+    return { x: h.x, y: h.y, z: top, c };
   }
   return null;
 }
@@ -4622,7 +4659,7 @@ function pickLandFront(sx, sy) {
       // a thing standing on the tile: its top and front faces aim at the tile, at the tile's own height
       if (top > z + 0.05) { const h = boxHit(x, y, x + 1, y + 1, floorTop(c), top, sx, sy); if (h) return { x: h.x, y: h.y, z, c, top }; }
       const f = pickFace(c, sx, sy, z);
-      if (f) return { ...f, top };
+      if (f) return { ...f, top: f.hollow ? standTop(f.c) : top };
     }
   }
   return null;

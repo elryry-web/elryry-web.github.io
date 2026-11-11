@@ -17,8 +17,8 @@ const tideCurrent = sp => sp.sigil === 'tide' && !!sp.dir && (sp.sats || []).som
 const SIGN_NOTES = {
   plain: 'A sign is a stroke drawn outward through one of the eight small circles: it points the spell as the world lies. A short barb across it adds strength, two at most. Unadorned, stone, fire, ice and water set one tile; each sign is its own arm: opposite signs make one line through your mark; signs at right angles fill the ground between.',
   // added to the plain notes only once Featherfall II has taught the outer circle (ringTaught)
-  ring: ' A second ring around the seal widens the spell; around Luna, it doubles how far the float carries.',
-  combos: 'A sign points the spell as the world lies; each barb across it adds strength. On Luna, the sign and barbs aim and strengthen only what rides on its ring. Each place on the ring holds one mark. A small sigil in a slot infuses the spell: behind the sign (red) it acts at once, where what the spell moves stands as the spell takes hold; beside it (blue), along the way, once it has left that spot and until it comes to rest; ahead of it (green), on arrival, where it comes to rest. Fire, frost, water or stone at once or on arrival flares once, round that spot; along the way it rides with what the spell moves and touches what it passes. On the ring of a gust, Petra along the way turns what the wind moves to stone; at once or on arrival, stone rises under it. Luna on a ring floats what the spell holds ten tiles for each Luna. On the ring of fire, stone, ice or water, each Ventus carries every arm two tiles farther.',
+  ring: ' An outer circle around the seal widens the spell; around Luna, it doubles how far the float carries.',
+  combos: 'A sign points the spell as the world lies; each barb across it adds strength. On Luna, the sign and barbs aim and strengthen only what rides on its ring. Each place on the ring holds one mark. A small sigil in a slot infuses the spell: behind the sign (red) it acts at once, where what the spell moves stands as the spell takes hold; beside it (blue), along the way, once it has left that spot and until it comes to rest; ahead of it (green), on arrival, where it comes to rest. Fire, frost, water or stone at once or on arrival flares once, round that spot; along the way it rides with what the spell moves and touches what it passes. On the ring of a gust, Petra along the way turns what the wind moves to stone; at once or on arrival, stone rises under it. Luna on a ring floats what the spell holds ten tiles for each Luna. On the ring of fire, stone, ice or water, each Ventus carries every arm two tiles farther. Only Ventus and Luna in the centre keep time: around stone, fire, ice or water the slots stay gold.',
 };
 // has the outer circle been taught yet? (Featherfall II teaches it; before that nothing mentions or shows it)
 function ringTaught(L = Game.level) {
@@ -546,8 +546,42 @@ function lessonRules() {
   const L = typeof Game !== 'undefined' && Game.level; if (!L) return null;
   return { centers: L.centers || L.sigils, sats: L.sats || L.sigils, combos: !!L.combos, ringOf: L.ringOf || null };
 }
+/* (v177) the lesson's ring rules as the player is shown them, before drawing (the card, the Notes leaf, the codex):
+   for each sigil that may stand in the centre, the ring-sigils it takes, checked as buildSpell checks them (the
+   lesson's ring list, narrowed by ringOf), and the sigils that may only go on a ring. null when the lesson sets no
+   rules (every centre takes every sigil of the lesson). */
+function ringRules(L = typeof Game !== 'undefined' && Game.level) {
+  if (!L || !L.combos) return null;
+  const cen = L.centers || L.sigils, sats = L.sats || L.sigils, of = L.ringOf || {};
+  const rows = L.sigils.filter(c => cen.includes(c)).map(c => ({ id: c, takes: L.sigils.filter(s => sats.includes(s) && (!of[c] || of[c].includes(s))) }));
+  const ringOnly = L.sigils.filter(s => !cen.includes(s));
+  if (!ringOnly.length && rows.every(r => r.takes.length === L.sigils.length)) return null;
+  return { rows, ringOnly, takes: c => { const r = rows.find(q => q.id === c); return r ? r.takes : null; } };
+}
+// a small sigil for the ring legends: its coloured disc, a hairline rim and the glyph in ink
+function miniGlyph(g, id, cx, cy, r) {
+  g.fillStyle = SIGILS[id].color; g.beginPath(); g.arc(cx, cy, r, 0, TAU); g.fill();
+  g.strokeStyle = 'rgba(42,24,48,0.75)'; g.lineWidth = 0.7; g.stroke();
+  drawGlyph(g, id, cx, cy, r * 0.78, '#2a1830', Math.max(0.7, r * 0.16));
+}
+// a centre's ring in the legends: a dashed pill (the ring's small circles are dashed too) holding the sigils it takes,
+// or "none"; a ring-only sigil gets "ring only" instead (takes === 'only'). Centred on x (or starting there, if left),
+// at most maxW wide; returns its width
+function ringTag(g, takes, x, cy, maxW, h, left) {
+  g.save(); g.textAlign = 'center'; g.textBaseline = 'middle';
+  const ink = '#5a3a1a', fs = Math.max(8, Math.round(h * 0.78));
+  g.font = `italic ${fs}px "IM Fell English", serif`;
+  if (takes === 'only') { const w = g.measureText('ring only').width; g.fillStyle = hexA(ink, 0.85); g.fillText('ring only', left ? x + w / 2 : x, cy + 0.5); g.restore(); return w; }
+  const n = takes.length, r0 = h * 0.42, pitch = n ? Math.min(2 * r0 + 2.5, (maxW - h * 0.7) / n) : 0, r = Math.max(2.5, (pitch - 2) / 2);
+  const inner = n ? n * pitch : g.measureText('none').width + 2, w = Math.min(maxW, inner + h * 0.7), cx = left ? x + w / 2 : x;
+  g.strokeStyle = hexA(ink, 0.55); g.lineWidth = 0.9; g.setLineDash([2.5, 2.5]);
+  roundRect(g, cx - w / 2, cy - h / 2, w, h, h / 2); g.stroke(); g.setLineDash([]);
+  if (!n) { g.fillStyle = hexA(ink, 0.8); g.fillText('none', cx, cy + 0.5); }
+  else takes.forEach((id, k) => miniGlyph(g, id, cx - inner / 2 + pitch * (k + 0.5), cy, r));
+  g.restore(); return w;
+}
 const REL_NAME = { now: 'at once', along: 'along the way', arrive: 'on arrival' };
-// the small circles' colours in the second folio: when a ring-sigil there would act
+// the small circles' colours from the third folio on: when a ring-sigil there would act
 // (softened in v142: muted inks that sit on the parchment rather than over it)
 const REL_COL = { now: '#b0614f', along: '#5a80a8', arrive: '#5d8a63' };
 
@@ -587,11 +621,11 @@ function buildSpell(draft, rules) {
   if (rules && !rules.centers.includes(id)) {
     return { err: rules.sats.includes(id) ? `${SIGILS[id].name} can only go on the ring in this lesson.` : `${SIGILS[id].name} is not yet written in this lesson's folio.` };
   }
-  if (rules && rules.combos === false && A.sats.length) return { err: 'Only signs may enter the small circles for now: draw your sign out from the seal into one. Sigils in the circles belong to the second folio.' };
+  if (rules && rules.combos === false && A.sats.length) return { err: 'Only signs may enter the small circles for now: draw your sign out from the seal into one. Sigils in the circles belong to the third folio.' };
   for (const s of A.sats) {
     if (!s.ok) return { err: 'A ring-sigil is unclear. Redraw it inside its slot.' };
     if (rules && !rules.sats.includes(s.id)) return { err: `${SIGILS[s.id].name} cannot be set upon the ring in this lesson.` };
-    // a lesson may say which ring-sigils each centre may carry (v155, the fifth folio)
+    // a lesson may say which ring-sigils each centre may carry (v155, the sixth folio)
     const allow = rules && rules.ringOf && rules.ringOf[id];
     if (allow && !allow.includes(s.id)) return { err: allow.length ? `${SIGILS[s.id].name} cannot ride the ring of ${SIGILS[id].name} in this lesson.` : `${SIGILS[id].name} carries nothing upon its ring in this lesson: signs alone.` };
   }
@@ -811,16 +845,27 @@ function describeSpell(sp, short = false) {
     const far = ` ${RING_TILES * s.n} tiles${s.rel === 'along' ? ' once it has left its tile' : ''}`, rest = ' until it comes to rest';
     const start = ' where it stands as the spell takes hold', road = ' from the tile it leaves' + rest;
     const what = !gust ? (short ? '' : placedWhat(sp, s)) : s.id === 'stone' ? (s.rel === 'arrive' ? ': stone rises under it where it comes to rest' : s.rel === 'now' ? ': stone rises under it' + start : ': turns it to stone' + road)
-      : s.rel === 'arrive' ? (s.id === 'luna' ? `: where it comes to rest it floats ${RING_TILES * s.n} tiles` : ': where it comes to rest')
-      : s.id === 'luna' ? ': floats it' + far : s.id === 'gale' ? '' : s.rel === 'now' ? ':' + start : ': it carries the element' + road;
-    t += ` · + ${SIGILS[s.id].name}${s.n > 1 ? ' ×' + s.n : ''} ${REL_NAME[s.rel]}${what}`;
+      : s.rel === 'arrive' ? (s.id === 'luna' ? `: where it comes to rest it floats ${RING_TILES * s.n} tiles` : s.id === 'gale' ? ': a push where it comes to rest' : ': where it comes to rest')
+      : s.id === 'luna' ? ': floats it' + far : s.id === 'gale' ? ': a harder push' : s.rel === 'now' ? ':' + start : ': it carries the element' + road;
+    t += ` · + ${SIGILS[s.id].name}${s.n > 1 ? ' ×' + s.n : ''}${relMatters(sp, s) ? ' ' + REL_NAME[s.rel] : ''}${what}`;
   }
   return t;
 }
 
-/* what a ring-sigil does to a placed spell (the fifth folio's pairings), for the aim preview */
+// v177 (call 2): does this ring-sigil's slot (its time) change what it does? Only a mover keeps time (Ventus or Luna in the
+// centre: applySpell sends their ring to infuseBody). A placing centre (Petra, Ignis, Gelu, Unda, flowing or still) uses
+// infuseCells, which ignores the slot. On a mover, Ventus at once and along the way are the same push (or Luna's drift);
+// only on arrival differs. On Luna with Petra (the ferry) Petra and Ventus only build and sail it.
+function timedCentre(id) { return id === 'gale' || id === 'luna'; }
+function relMatters(sp, s) {
+  if (!timedCentre(sp.sigil) || !s.rel) return false;
+  if (s.id === 'gale' && s.rel !== 'arrive') return false;
+  if (sp.sigil === 'luna' && (s.id === 'stone' || s.id === 'gale') && (sp.sats || []).some(q => q.id === 'stone')) return false;
+  return true;
+}
+/* what a ring-sigil does to a placed spell (the sixth folio's pairings), for the aim preview */
 function placedWhat(sp, s) {
-  if (sp.sigil === 'stone' && s.id === 'luna') return ': the stone hangs level with the ground nearest your mark';
+  if (sp.sigil === 'stone' && s.id === 'luna') return ': the stone hangs one step above the ground';
   if (sp.sigil === 'stone' && s.id === 'frost') return ': raised as ice, slick underfoot';
   if (sp.sigil === 'tide' && s.id === 'frost') return ': the water freezes as it pours';
   if (sp.sigil === 'tide' && s.id === 'luna') return `: a bubble lifts what the water holds${sp.dir ? ' and drifts ' + RING_TILES * s.n + ' tiles ' + worldDirArrow(sp.dir) : ' and floats it ' + RING_TILES * s.n + ' tiles'}`;
@@ -1487,6 +1532,7 @@ const Grim = {
     // (the ring round the drawing circle, in half-widths: snug on one page, and snugger upright, where the width
     // is all there is — so the circle, and its slots drawn larger, get what the ring gives up)
     const L = { single, side: null, fr: side ? 0.99 : single ? 0.97 : 1.04 };
+    L.legend = !!ringRules(); // (v177) the codex strip's line of ring rules under the sigils' names
     SLOT_SIZE = single ? 0.32 : 0.27;
     if (side) {
       // the height is all a sideways phone has: the book runs nearly edge to edge (leaving the painted cover room at
@@ -1525,7 +1571,7 @@ const Grim = {
       // upright: the circle takes nearly the page's full width (the width is what limits it) and the book grows
       // as tall as it needs — header, circle, then the status, the buttons' two rows (as tall as they measured)
       // and the bottom border: the last row sits between the bottom corner bosses, just above the vine
-      const HEAD = 128, pad = 4;
+      const HEAD = 128 + (L.legend ? 14 : 0), pad = 4;
       const bw = Math.min(vw - 4, 640), pw = bw - pad * 2;
       // (the status: the name clear of the ring and two lines of read-back, as statusAt places them — more on wider pages)
       const FOOT = Math.max(64, 78 * pw / 520 + 15) + (this.btnH || 88) + pw * 0.035 + Math.max(9, pw * 0.03) + 6;
@@ -1556,7 +1602,7 @@ const Grim = {
   // script capitals (about 0.8 of its size) kept clear of the ring, which on the spread is drawn 4% outside the box
   statusAt() {
     const L = this.L, A = L.area, SD = L.side, P = SD || L.right, s = SD ? Math.min(0.9, P.w / 380) : Math.min(P.w, P.h) / 520;
-    if (SD) return { SD, P, s, sy: SD.y + 134 };
+    if (SD) return { SD, P, s, sy: SD.y + 134 + (L.legend ? 14 : 0) };
     const ring = A.cy + A.half * L.fr + 4;
     const sy = Math.max(A.y + A.size + (L.single ? 26 : 22 * s), ring + 6 * s + 0.8 * (30 * s + 4) - 2);
     // (end: below the read-back's second line, with a little air before the buttons)
@@ -1659,6 +1705,13 @@ const Grim = {
     if (name.startsWith('codex:')) { const c = this.codexRects.find(c => c.id === name.slice(6)); return c ? { x: c.x, y: c.y, w: c.w, h: c.h } : null; }
     return null;
   },
+  // (v177) the ring-sigils the drawn centre takes in this lesson, or null (no ring rules, or no centre a ring here can have)
+  ringTakes() {
+    const R = ringRules(), S = this.draft.a.sigil;
+    return R && S && S.ok ? R.takes(S.id) : null;
+  },
+  // (v177) is this sigil one the drawn centre won't take on its ring? (the centre itself stays bright)
+  ringRefuses(id) { const t = this.ringTakes(); return !!t && !t.includes(id) && id !== this.draft.a.sigil.id; },
   slotRel(k) {
     const D = this.draft.a; let sx = 0, sy = 0;
     for (const s of D.signs) { sx += Math.cos(s.pos * TAU / 8); sy += Math.sin(s.pos * TAU / 8); }
@@ -2053,6 +2106,7 @@ const Grim = {
     const avail = P.y + P.h * 0.93 - notesH - 8 * s - y;
     // learned sigils get a full row each (name, then its line beneath); unlearned ones wait faded in one short row
     const known = SIGIL_ORDER.filter(id => lv.sigils.includes(id)), unknown = SIGIL_ORDER.filter(id => !lv.sigils.includes(id));
+    const R = ringRules(lv);
     const FR = 44 * s, US = unknown.length ? 30 * s : 0;
     const twoCol = known.length * FR + US > avail; // a crowded page: two columns, names only
     // (a gold medallion needs a taller row than a drawn ring, or the medallions stack into one another)
@@ -2062,6 +2116,7 @@ const Grim = {
     let textR = x0; // (how far the codex's writing reaches: the room beside it may take the map)
     known.forEach((id, n) => {
       const S = SIGILS[id], col = twoCol ? n % 2 : 0, row = twoCol ? Math.floor(n / 2) : n;
+      g.globalAlpha = this.ringRefuses(id) ? 0.3 : 1; // (v177) not on the drawn centre's ring
       // (in its medallion the sigil is drawn smaller, so the gold rim fits the row)
       // (a roundel's outer edge is (r + 3) / 0.6: kept to 84% of the row, so neighbours never touch)
       const r = MD ? Math.min(12.5 * s * k, rowH * 0.42 * 0.6 - 3) : 15 * s * k;
@@ -2079,14 +2134,18 @@ const Grim = {
       const nw = g.measureText(S.name).width;
       g.fillStyle = red; g.font = `${Math.round(10 * s * k)}px Cinzel, serif`;
       const ex = tx + Math.max(nw + 10 * s, twoCol ? 0 : 96 * s * k);
-      g.fillText(S.en.toUpperCase(), ex, nameY - 2 * s);
-      textR = Math.max(textR, ex + g.measureText(S.en.toUpperCase()).width);
+      // (v177) a lesson with ring rules writes beside each name what its ring takes; on a crowded page the rules take
+      // the place of the English name
+      const tagW = 110 * s, tagX = twoCol && R ? tx + nw + 8 * s : ex + g.measureText(S.en.toUpperCase()).width + 12 * s;
+      if (!(twoCol && R)) { g.fillText(S.en.toUpperCase(), ex, nameY - 2 * s); textR = Math.max(textR, ex + g.measureText(S.en.toUpperCase()).width); }
+      if (R) textR = Math.max(textR, tagX + ringTag(g, R.ringOnly.includes(id) ? 'only' : R.takes(id), tagX, nameY - 6 * s * k, Math.min(tagW, rx + colW - tagX - 4), 13 * s * k, true));
       if (!twoCol) {
         g.fillStyle = ink; g.font = `italic ${Math.round(12 * s * k)}px "IM Fell English", serif`;
-        const ringOnly = lv.centers && !lv.centers.includes(id), d = (ringOnly ? 'Ring only, this lesson. ' : '') + S.desc;
+        const ringOnly = !R && lv.centers && !lv.centers.includes(id), d = (ringOnly ? 'Ring only, this lesson. ' : '') + S.desc;
         g.fillText(d, tx, ry + 36 * s * k);
         textR = Math.max(textR, tx + g.measureText(d).width);
       }
+      g.globalAlpha = 1;
       this.codexRects.push({ id, x: rx, y: ry, w: colW, h: rowH });
     });
     y += rows * rowH;
@@ -2192,12 +2251,19 @@ const Grim = {
     const B = this.borderSize(P), inner = MD ? P.w - 2 * (B.m + B.vh) - 14 : P.w - 20;
     const ids = lv.sigils, cw = Math.min(70, inner / ids.length);
     const x0 = P.x + P.w / 2 - cw * ids.length / 2;
+    // (v177) the lesson's ring rules under each name: what that centre takes on its ring, or "ring only"; once a
+    // centre is drawn, the sigils its ring will not take are greyed
+    const R = ringRules(lv);
     ids.forEach((id, k) => {
       const cx = x0 + cw * (k + 0.5), cy = top + (side ? 30 : 36), r = MD ? Math.min(11, cw * 0.27 - 3) : Math.min(16, cw * 0.36);
+      g.globalAlpha = this.ringRefuses(id) ? 0.3 : 1;
       if (MD) medalGlyph(g, id, cx, cy, r, 1.4, true); // in the sigil's colour, as in the wide codex
       else { g.strokeStyle = ink; g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, r, 0, TAU); g.stroke(); drawGlyph(g, id, cx, cy, r * 0.8, '#2a1830', 1.4); }
-      g.fillStyle = red; g.font = `${cw < 54 ? 8 : 10}px Cinzel, serif`; g.fillText(SIGILS[id].name.toUpperCase(), cx, cy + (MD ? (r + 3) / 0.6 + 9 : r + 12)); // clear of the roundel's knotwork
-      this.codexRects.push({ id, x: cx - cw / 2, y: cy - r, w: cw, h: r * 2 + 16 });
+      const ny = cy + (MD ? (r + 3) / 0.6 + 9 : r + 12);
+      g.fillStyle = red; g.font = `${cw < 54 ? 8 : 10}px Cinzel, serif`; g.fillText(SIGILS[id].name.toUpperCase(), cx, ny); // clear of the roundel's knotwork
+      if (R) ringTag(g, R.ringOnly.includes(id) ? 'only' : R.takes(id), cx, ny + 11, cw - 6, 12);
+      g.globalAlpha = 1;
+      this.codexRects.push({ id, x: cx - cw / 2, y: cy - r, w: cw, h: r * 2 + 16 + (R ? 14 : 0) });
     });
   },
   drawingFrame(g) {
@@ -2278,6 +2344,11 @@ const Grim = {
       return;
     }
     if (typeof CLASSIC !== 'undefined' && CLASSIC.on !== this._classic) this.bookDirty = true; // the look was switched (◐)
+    // (v177) the codex greys what the drawn centre's ring will not take, and a lesson with ring rules gives the upright
+    // page's header a line more for them
+    if (this.L && this.L.legend !== !!ringRules()) { this.layout(); this.bookDirty = true; this.inkDirty = true; }
+    const rk = String(this.ringTakes());
+    if (rk !== this._ringKey) { this._ringKey = rk; this.bookDirty = true; }
     if (this.bookDirty) this.renderBook();
     if (this.inkDirty) this.renderInk();
     const g = this.g, dpr = this.dpr, e = ease(this.anim), A = this.L.area;
@@ -2418,14 +2489,14 @@ const Grim = {
       for (let k = 0; k < 24; k++) { const a = k * TAU / 24 - t * 0.1; g.beginPath(); g.arc(cx + Math.cos(a) * r * 1.85, cy + Math.sin(a) * r * 1.85, 2, 0, TAU); g.fill(); }
     }
     // the eight ring-sigil slots
-    // always drawn: in the first folio they are plain gold marks for the eight places a sign may go;
-    // from the second folio (ring-sigils), once a sign gives the spell a way, each takes the colour of when a sigil there would act
+    // always drawn: in the first two folios they are plain gold marks for the eight places a sign may go;
+    // from the third folio (ring-sigils), once a sign gives the spell a way, each takes the colour of when a sigil there would act
     {
-      const ringSigils = !!(Game.level && Game.level.combos), extra = ringExtras(D);
+      const ringSigils = !!(Game.level && Game.level.combos), extra = ringExtras(D), takes = ringSigils ? this.ringTakes() : null;
       for (let k = 0; k < 8; k++) {
         const a = k * TAU / 8, px = cx + Math.cos(a) * r * SLOT_R, py = cy + Math.sin(a) * r * SLOT_R, sr = r * SLOT_SIZE;
         const sat = D.sats.find(s => s.slot === k), signHere = D.signs.some(s => s.pos === k);
-        const rel = this.slotRel(k), coloured = ringSigils && rel;
+        const rel = this.slotRel(k), coloured = ringSigils && rel && D.sigil && D.sigil.ok && timedCentre(D.sigil.id); // v177: only a centre that keeps time
         const col = coloured ? REL_COL[rel] : gold;
         if (coloured && !signHere) { g.fillStyle = hexA(col, sat ? 0.05 : 0.08); g.beginPath(); g.arc(px, py, sr, 0, TAU); g.fill(); }
         g.setLineDash(coloured ? [] : [3, 4]);
@@ -2438,9 +2509,17 @@ const Grim = {
           g.globalAlpha = 0.55; drawGlyph(g, sat.id, px, py, sr * 0.75, hexA(SIGILS[sat.id].color, 0.9), 4); drawGlyph(g, sat.id, px, py, sr * 0.75, hexA(gold, 0.9), 1); g.globalAlpha = 1;
         }
         if (ignored) { g.fillStyle = 'rgba(120,105,90,0.22)'; g.beginPath(); g.arc(px, py, sr, 0, TAU); g.fill(); }
+        // (v177) a centre whose ring takes nothing here: a faint stroke through each empty circle; a ring-sigil this
+        // centre will not take: struck through in red
+        const refused = takes && sat && sat.ok && !takes.includes(sat.id);
+        if (takes && (refused || (!takes.length && !sat && !signHere))) {
+          const d = sr * 0.62;
+          g.strokeStyle = refused ? 'rgba(160,42,26,0.75)' : 'rgba(110,80,50,0.4)'; g.lineWidth = refused ? 1.8 : 1.2;
+          g.beginPath(); g.moveTo(px - d, py + d); g.lineTo(px + d, py - d); g.stroke();
+        }
         // its time, written on the circle's outer side (above the upper three, beneath the rest, so it never
         // lies on the seal's rune ring): for every coloured circle, and for any ring-sigil
-        if ((coloured && !signHere) || (sat && sat.ok)) {
+        if (ignored || (coloured && (!signHere || (sat && sat.ok)))) {
           g.fillStyle = ignored ? 'rgba(110,95,80,0.85)' : hexA(coloured ? col : '#5a3a1a', sat ? 0.95 : 0.75); g.font = `italic ${Math.max(9, Math.round(r * 0.075))}px "IM Fell English", serif`; g.textAlign = 'center';
           const up = Math.sin(a) < -0.5;
           g.fillText(ignored ? 'ignored' : REL_NAME[rel || 'now'], px, up ? py - sr - Math.max(5, r * 0.035) : py + sr + Math.max(10, r * 0.09));

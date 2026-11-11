@@ -2,7 +2,7 @@
    The game's own files are fetched fresh when there is a connection (so updates arrive at once)
    and served from the cache when there is not. Fonts are cached on first use.
    Bump VERSION together with the ?v=N script versions in index.html. */
-const VERSION = 176;
+const VERSION = 177;
 const CACHE = 'quill-sigil-v' + VERSION;
 const CORE = [
   './',
@@ -12,6 +12,9 @@ const CORE = [
   './js/world.js?v=' + VERSION,
   './js/tips.js?v=' + VERSION,
   './js/main.js?v=' + VERSION,
+  './js/custom.js?v=' + VERSION,
+  './editor.html',
+  './js/editor.js?v=' + VERSION,
   './icons/icon-192.png',
   './icons/icon-512.png',
   './art/grim-seal.png?v=1',
