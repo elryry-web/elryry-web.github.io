@@ -26,7 +26,26 @@
     pageCv.width = Math.round(w * dpr); pageCv.height = Math.round(h * dpr);
     pageCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ART.draw(pageCtx, 'page', 0, 0, w, h, 0, { scale: dpr, margin: 'right', variant: cur ? cur.n : 0 });
+    // the painted ivy grows on the vellum round everything laid out on it (drawn once per page and size)
+    if (cur) ART.ivyPage(pageCtx, w, h, cur.n * 977 + 13, ivyAvoid());
     pageFor = cur ? cur.n : 0;
+  }
+  // the boxes the ivy keeps clear of: the board's cells and gilded frame, the text (its own extent), the drollery, buttons
+  function ivyAvoid() {
+    var out = [];
+    function box(r) { if (r && r.width > 0 && r.height > 0) out.push([r.left, r.top, r.width, r.height]); }
+    // the board: each of its cells grown by the gilded frame, so the notches of a shaped page stay open
+    var br = $('board').getBoundingClientRect(), M = board.M, S = board.S, pad = board.pad, bd = board.band;
+    if (M && S && br.width > 0) M.kinds.forEach(function (k, c) {
+      if (k !== ' ') out.push([br.left + pad + (c % M.w) * S - bd, br.top + pad + (c / M.w | 0) * S - bd, S + 2 * bd, S + 2 * bd]);
+    });
+    ['rubric', 'pname', 'lines'].forEach(function (id) {
+      var el = $(id), rg = document.createRange(); rg.selectNodeContents(el);
+      var r = rg.getBoundingClientRect(); box(r.width > 0 ? r : el.getBoundingClientRect());
+    });
+    box($('droll').getBoundingClientRect()); box($('next').getBoundingClientRect());
+    Array.prototype.forEach.call(document.querySelectorAll('#hud button'), function (b) { box(b.getBoundingClientRect()); });
+    return out;
   }
   var pageFor = 0;
 
@@ -55,7 +74,6 @@
   function layout() {
     var W = window.innerWidth, wide = W > window.innerHeight * 1.15;
     document.body.classList.toggle('wide', wide);
-    drawPage();
     var cv = $('board'); cv.style.width = '0px'; cv.style.height = '0px';
     var w, h, app = $('app');
     if (wide) {
@@ -74,13 +92,13 @@
     }
     board.fit(Math.max(120, w), Math.max(120, h));
     sizeDroll();
+    drawPage();   // last, so the ivy can keep clear of where everything now sits
   }
 
   function load(n, opts) {
     opts = opts || {};
     n = Math.max(1, Math.min(LEVELS.length, n | 0));
     cur = LEVELS[n - 1];
-    if (ART.has('page') && pageFor !== n) drawPage();   // each page lays the painted vellum a little differently
     save.current = n; persist();
     endSequence();
     var pr = save.prog[n], solved = !!save.solved[n];

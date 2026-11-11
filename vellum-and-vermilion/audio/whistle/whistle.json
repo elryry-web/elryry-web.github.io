@@ -1,0 +1,79 @@
+{
+ "source": "VCSL Baroque Soprano Recorder (Sam Gossner), CC0, https://github.com/sgossner/VCSL",
+ "sr": 24000,
+ "oneshot": false,
+ "notes": {
+  "C5": {
+   "file": "C5.wav",
+   "m": 72,
+   "hz": 523.905,
+   "gain": 0.29,
+   "from": "SopRecorder_Sus_C4_rr1_Main.wav",
+   "loopStart": 0.22,
+   "loopEnd": 1.418667
+  },
+  "D5": {
+   "file": "D5.wav",
+   "m": 74,
+   "hz": 585.942,
+   "gain": 0.5192,
+   "from": "SopRecorder_Sus_D4_rr1_Main.wav",
+   "loopStart": 0.22,
+   "loopEnd": 1.421208
+  },
+  "E5": {
+   "file": "E5.wav",
+   "m": 76,
+   "hz": 660.142,
+   "gain": 0.3299,
+   "from": "SopRecorder_Sus_E4_rr1_Main.wav",
+   "loopStart": 0.22,
+   "loopEnd": 1.421292
+  },
+  "F#5": {
+   "file": "Fs5.wav",
+   "m": 78,
+   "hz": 738.479,
+   "gain": 0.4254,
+   "from": "SopRecorder_Sus_F#4_rr1_Main.wav",
+   "loopStart": 0.22,
+   "loopEnd": 1.420917
+  },
+  "G#5": {
+   "file": "Gs5.wav",
+   "m": 80,
+   "hz": 830.535,
+   "gain": 0.4012,
+   "from": "SopRecorder_Sus_G#4_rr1_Main.wav",
+   "loopStart": 0.22,
+   "loopEnd": 1.419125
+  },
+  "A#5": {
+   "file": "As5.wav",
+   "m": 82,
+   "hz": 932.828,
+   "gain": 0.3276,
+   "from": "SopRecorder_Sus_A#4_rr1_Main.wav",
+   "loopStart": 0.22,
+   "loopEnd": 1.419625
+  },
+  "C6": {
+   "file": "C6.wav",
+   "m": 84,
+   "hz": 1046.686,
+   "gain": 0.3079,
+   "from": "SopRecorder_Sus_C5_rr1_Main.wav",
+   "loopStart": 0.22,
+   "loopEnd": 1.419958
+  },
+  "D6": {
+   "file": "D6.wav",
+   "m": 86,
+   "hz": 1176.073,
+   "gain": 0.3659,
+   "from": "SopRecorder_Sus_D5_rr1_Main.wav",
+   "loopStart": 0.22,
+   "loopEnd": 1.420583
+  }
+ }
+}

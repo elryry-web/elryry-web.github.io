@@ -446,7 +446,9 @@
         g.save(); g.globalAlpha = 0.2; g.drawImage(silhouette(id, bb[2], bb[3]), bb[0], bb[1], bb[2], bb[3]); g.restore();
         g.fillStyle = 'rgba(110,60,30,0.6)'; var qs = Math.floor(r * 0.7); font(g, qs, UNC); g.fillText('?', cx, cy + qs * 0.35);
       }
-      ART.draw(g, 'book.roundel', cx - r, cy - r, 2 * r, 2 * r, t, {});
+      // the painted ring is broad (its opening is 0.69 of it): drawn a little larger so it doesn't crowd the creature
+      var rr = ART.has('book.roundel') ? r * 1.15 : r;
+      ART.draw(g, 'book.roundel', cx - rr, cy - rr, 2 * rr, 2 * rr, t, {});
       H.push({ x: cx - r, y: cy - r, w: 2 * r, h: 2 * r, act: { beast: id, found: isF } });
     });
     var ny = gy + cell * 3 + nameH * 0.62;
@@ -479,7 +481,14 @@
     y += h * 0.04;
     // the five gilded initials, L U M E N, in a row
     var bw = cw / 5, bs = Math.min(bw * 0.92, h * 0.2);
-    LETTERS.forEach(function (n, i) { drawThumbInBox(g, thumb(n, true), mx + i * bw + (bw - bs) / 2, y, bs); });
+    // the painted capitals (capital.<L>) when loaded, fitted by height and centred in each box; else the boards
+    LETTERS.forEach(function (n, i) {
+      var sl = 'capital.' + G.LEVELS[n - 1].initial, me = ART.meta(sl);
+      if (!me) { drawThumbInBox(g, thumb(n, true), mx + i * bw + (bw - bs) / 2, y, bs); return; }
+      var lh = bs, lw = lh * me.aspect;
+      if (lw > bw * 0.94) { lw = bw * 0.94; lh = lw / me.aspect; }
+      ART.draw(g, sl, mx + i * bw + (bw - lw) / 2, y + (bs - lh) / 2, lw, lh, 0, {});
+    });
     y += bs + h * 0.07;
     g.fillStyle = RED; var ls = fitFont(g, 'LUMEN — light', UNC, clamp(w * 0.085, 14, 40), cw);
     g.fillText('LUMEN — light', w / 2, y); y += ls * 0.9;

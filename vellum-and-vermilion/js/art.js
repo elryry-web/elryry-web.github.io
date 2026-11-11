@@ -144,6 +144,52 @@
     return JEWELS.filter(function (j) { return c.indexOf(j) < 0; }).slice(0, 3);
   }
   var images = {}, metas = {}, fadedCache = {}, crispCache = {};
+  // slots whose drawing function lays its own PNG (placement, cells or tint), so ART.draw doesn't stretch it
+  var SELF = { knot: 1, twinFrame: 1, twinEmblem: 1 };
+  // the painted knot (knot.png, ribbon entering from the top): where it sits in the tile, in tiles from the
+  // centre, and where the board's ribbon gives way to it; its cream band is tinted to the strand
+  var KNOT = { y0: -0.30, y1: 0.48, w: 0.40, stop: -0.26, cream: [243, 233, 208] }, knotCache = {}, knotCacheN = 0;
+  function knotCanvas(w, h, body) {
+    var key = Math.round(w) + 'x' + Math.round(h) + body;
+    if (knotCache[key]) return knotCache[key];
+    if (knotCacheN++ > 80) { knotCache = {}; knotCacheN = 0; }
+    var cv = document.createElement('canvas'); cv.width = Math.max(1, Math.round(w)); cv.height = Math.max(1, Math.round(h));
+    var g = cv.getContext('2d'), c = hexRgb(body);
+    g.drawImage(images.knot, 0, 0, cv.width, cv.height);
+    // multiply by body / cream, so the painted cream becomes the strand's colour and the ink stays dark
+    g.globalCompositeOperation = 'multiply';
+    g.fillStyle = 'rgb(' + c.map(function (v, i) { return Math.min(255, Math.round(v * 255 / KNOT.cream[i])); }).join(',') + ')';
+    g.fillRect(0, 0, cv.width, cv.height);
+    g.globalCompositeOperation = 'destination-in'; g.drawImage(images.knot, 0, 0, cv.width, cv.height);
+    knotCache[key] = cv; return cv;
+  }
+  function hexRgb(s) {
+    if (s && s[0] === '#') { var n = parseInt(s.length === 4 ? s.replace(/#(.)(.)(.)/, '$1$1$2$2$3$3') : s.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+    var m = /(\d+)\D+(\d+)\D+(\d+)/.exec(s || ''); return m ? [+m[1], +m[2], +m[3]] : [246, 235, 207];
+  }
+  // the painted plait (border-plait.png, one seamless repeat) laid round a rectangular panel: each side
+  // between the corners holds a whole number of repeats, stretched a little to fit; red corner bosses
+  function paintBorder(g, box, b) {
+    var img = images.border, rep = b * img.naturalWidth / img.naturalHeight;
+    var x = box[0], y = box[1], w = box[2], h = box[3];
+    function side(len) {   // drawn along +x from (0,0), the band's outer edge at y=0
+      var n = Math.max(1, Math.round(len / rep)), L = len / n;
+      for (var i = 0; i < n; i++) g.drawImage(img, i * L - 0.4, 0, L + 0.8, b);
+    }
+    [[x + b, y, 0, w - 2 * b], [x + w, y + b, Math.PI / 2, h - 2 * b], [x + w - b, y + h, Math.PI, w - 2 * b], [x, y + h - b, -Math.PI / 2, h - 2 * b]].forEach(function (s) {
+      g.save(); g.translate(s[0], s[1]); g.rotate(s[2]); side(s[3]); g.restore();
+    });
+    [[x, y], [x + w - b, y], [x, y + h - b], [x + w - b, y + h - b]].forEach(function (c, i) {
+      var cx = c[0] + b / 2, cy = c[1] + b / 2, r = b * 0.44, gd = g.createRadialGradient(cx - r * 0.3, cy - r * 0.3, r * 0.1, cx, cy, r);
+      gd.addColorStop(0, '#f8e3a0'); gd.addColorStop(0.6, '#d2a646'); gd.addColorStop(1, '#8a611c');
+      g.fillStyle = HAIR; g.beginPath(); g.arc(cx, cy, r + Math.max(1, b * 0.05), 0, 6.283); g.fill();
+      g.fillStyle = gd; g.beginPath(); g.arc(cx, cy, r, 0, 6.283); g.fill();
+      g.fillStyle = PIG.vermilion.base; g.beginPath(); g.arc(cx, cy, r * 0.62, 0, 6.283); g.fill();
+      g.fillStyle = i % 3 === 0 ? PIG.lapis.base : PIG.verdigris.base;
+      for (var k = 0; k < 4; k++) { var a = k * Math.PI / 2 + Math.PI / 4; g.beginPath(); g.arc(cx + Math.cos(a) * r * 0.3, cy + Math.sin(a) * r * 0.3, r * 0.15, 0, 6.283); g.fill(); }
+      g.fillStyle = '#f2d27a'; g.beginPath(); g.arc(cx, cy, r * 0.13, 0, 6.283); g.fill();
+    });
+  }
   var cache = {};
 
   // a small PNG (a crisp slot: the mark.* gems) is pre-rendered once per device-pixel size, halving the
@@ -860,7 +906,8 @@
     g.setTransform(o.dpr, 0, 0, o.dpr, 0, 0);
     var b = o.band, S = o.S, G = frameGeom(o.w, o.h, o.inm, S, o.pad, o.pad, o.round || 0), R = rand(o.seed || 7);
     var box = [o.pad - b, o.pad - b, o.w * S + 2 * b, o.h * S + 2 * b];
-    if (o.ivy > 3) G.corners(b).forEach(function (c) { ivyCorner(g, c, o.ivy, R); });
+    // the drawn ivy round the frame is the fallback: with the painted ivy loaded it grows on the page's vellum instead
+    if (o.ivy > 3 && !images['ivy.corner.1']) G.corners(b).forEach(function (c) { ivyCorner(g, c, o.ivy, R); });
     var gp = G.path(b * 0.3), GR = GROUND[o.ground] || GROUND.madder;
     g.fillStyle = GR.base; g.fill(gp);
     g.save(); g.clip(gp);
@@ -876,7 +923,7 @@
     // a soft shadow under the frame's inner edge
     g.strokeStyle = 'rgba(' + GR.deep + ',0.45)'; g.lineWidth = b * 0.6; g.stroke(G.path(b * 0.1));
     g.restore();
-    if (images.border && o.rect) g.drawImage(images.border, box[0], box[1], box[2], box[3]);
+    if (images.border && o.rect) paintBorder(g, box, b);
     else drawFrame(g, G, b, box, GR);
     return { cv: cv, geom: G };
   }
@@ -1187,6 +1234,14 @@
       ctx.beginPath(); ctx.arc(cx, cy, r * 0.55, Math.PI * 1.05, Math.PI * 1.55); ctx.stroke();
     },
     knot: function (ctx, x, y, w, h, t, o) {
+      if (images.knot) {
+        // the painted knot, tinted to the strand: the band comes in from the top and gathers into the knot
+        var KU = Math.min(w, h), kw = KU * KNOT.w, kh = KU * (KNOT.y1 - KNOT.y0);
+        ctx.translate(x + w / 2, y + h / 2); ctx.rotate(o.angle || 0);
+        var dpr = Math.min(3, window.devicePixelRatio || 1);
+        ctx.drawImage(knotCanvas(kw * dpr, kh * dpr, o.body || PIG.bare.base), -kw / 2, KU * KNOT.y0, kw, kh);
+        return;
+      }
       if (o.rib) {
         // board terminal (box = the tile): the ribbon (width opts.rw x tile) arrives from the top edge to
         // the centre and ends in a gold-edged roundel holding a gold spiral
@@ -1370,6 +1425,18 @@
       // gilt corner brackets for a gilded-twin tile (clear of the ribbons, which cross mid-edges)
       // light touch: three short brackets (the top-left corner holds the group's emblem instead)
       var L = w * 0.17, i = w * 0.05, glow = o.glow || 0, lit = o.lit || 0;
+      if (images.twinFrame) {
+        // the painted brackets: a 2x2 sheet, one bracket pushed into each cell's outer corner
+        var im = images.twinFrame, cs = im.naturalWidth / 2, bs = w * 0.27, ins = w * 0.025;
+        var put = function () {
+          [[1, 0], [0, 1], [1, 1]].forEach(function (q) {
+            ctx.drawImage(im, q[0] * cs, q[1] * cs, cs, cs, q[0] ? x + w - ins - bs : x + ins, q[1] ? y + h - ins - bs : y + ins, bs, bs);
+          });
+        };
+        put();
+        var shine = Math.max(glow, lit * 0.35);
+        if (shine > 0.01) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha *= 0.55 * shine; put(); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1; }
+      } else {
       ctx.lineCap = 'square';
       [[x + w - i, y + i, -1, 1], [x + i, y + h - i, 1, -1], [x + w - i, y + h - i, -1, -1]].forEach(function (c) {
         for (var pass = 0; pass < 2; pass++) {
@@ -1379,6 +1446,7 @@
           ctx.beginPath(); ctx.moveTo(c[0] + c[2] * L, c[1]); ctx.lineTo(c[0], c[1]); ctx.lineTo(c[0], c[1] + c[3] * L); ctx.stroke();
         }
       });
+      }
       if (glow > 0) {
         var g = ctx.createRadialGradient(x + w / 2, y + h / 2, w * 0.2, x + w / 2, y + h / 2, w * 0.75);
         g.addColorStop(0, 'rgba(255,225,130,0)'); g.addColorStop(1, 'rgba(255,225,130,' + (0.45 * glow) + ')');
@@ -1390,6 +1458,13 @@
       var cx = x + w / 2, cy = y + h / 2, r = Math.min(w, h) / 2, k = (o.kind || 0) % 4, glow = o.glow || 0;
       var gold = mix('#e2b443', '#fff3c0', glow);
       ctx.translate(cx, cy); ctx.scale(1 + 0.25 * glow, 1 + 0.25 * glow);
+      if (images.twinEmblem) {
+        // the painted signs: one 1:1 cell each in a row, star, quatrefoil, trefoil, cross (kinds 0..3)
+        var em = images.twinEmblem, es = em.naturalHeight, er = r * 1.1;
+        ctx.drawImage(em, k * es, 0, es, es, -er, -er, 2 * er, 2 * er);
+        if (glow > 0) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha *= 0.6 * glow; ctx.drawImage(em, k * es, 0, es, es, -er, -er, 2 * er, 2 * er); }
+        return;
+      }
       ctx.fillStyle = gold; ctx.strokeStyle = '#4e330b'; ctx.lineWidth = Math.max(0.9, r * 0.16); ctx.lineJoin = 'round';
       ctx.beginPath();
       if (k === 0) {
@@ -1444,7 +1519,109 @@
     }
   };
 
+  /* ---------- painted ivy on the page's vellum: ivy.corner.1-6, ivy.run.1-4, ivy.sprig.1-16 ----------
+     All the pieces share one scale (the cut keeps the sheets' proportions), so one k sizes them alike. */
+  var IVY_N = { corner: 6, run: 4, sprig: 16 }, ivyOcc = {};
+  function ivyList(kind) {
+    var out = [];
+    for (var i = 1; i <= IVY_N[kind]; i++) if (images['ivy.' + kind + '.' + i]) out.push('ivy.' + kind + '.' + i);
+    return out;
+  }
+  // where a piece is painted: grid points (image px) whose cell holds paint; the whole box when unreadable
+  function ivyPoints(slot) {
+    if (ivyOcc[slot]) return ivyOcc[slot];
+    var img = images[slot], iw = img.naturalWidth, ih = img.naturalHeight, st = Math.max(4, Math.min(iw, ih, 360) / 16), pts = [], i, j;
+    try {
+      var cw = Math.ceil(iw / st), chh = Math.ceil(ih / st), cv = document.createElement('canvas');
+      cv.width = cw; cv.height = chh;
+      var g = cv.getContext('2d'); g.drawImage(img, 0, 0, cw, chh);
+      var d = g.getImageData(0, 0, cw, chh).data;
+      for (j = 0; j < chh; j++) for (i = 0; i < cw; i++) if (d[(j * cw + i) * 4 + 3] > 24) pts.push([(i + 0.5) * iw / cw, (j + 0.5) * ih / chh]);
+    } catch (e) { pts = []; for (j = 0; j <= 10; j++) for (i = 0; i <= 10; i++) pts.push([iw * i / 10, ih * j / 10]); }
+    return (ivyOcc[slot] = { pts: pts, st: st });
+  }
+  // lays the painted ivy for one page into ctx (the cached page background): a spray in each corner that has
+  // room, a run along some sides, a few loose sprigs near the edges. avoid: [x, y, w, h] boxes kept clear
+  // (board, text, drollery, buttons). The same seed and layout always give the same ivy. False when not loaded.
+  function ivyPage(ctx, W, H, seed, avoid) {
+    var C = ivyList('corner'), RU = ivyList('run'), SP = ivyList('sprig');
+    if (!C.length) return false;
+    var R = rand(seed), U = 5, gw = Math.ceil(W / U), gh = Math.ceil(H / U), occ = new Uint8Array(gw * gh);
+    function mark(x0, y0, x1, y1) {
+      var j1 = Math.min(gh - 1, Math.floor(y1 / U)), i1 = Math.min(gw - 1, Math.floor(x1 / U));
+      for (var j = Math.max(0, Math.floor(y0 / U)); j <= j1; j++) for (var i = Math.max(0, Math.floor(x0 / U)); i <= i1; i++) occ[j * gw + i] = 1;
+    }
+    (avoid || []).forEach(function (r) { mark(r[0] - 10, r[1] - 10, r[0] + r[2] + 10, r[1] + r[3] + 10); });
+    // a corner spray is about 30% of the page's short side across (110-250 px); the cut sprays are ~400 px
+    var unit = Math.min(W, H), k0 = Math.max(110, Math.min(250, unit * 0.3)) / 400, m = Math.max(3, unit * 0.01);
+    function place(slot, cx, cy, k, fx, fy, rot, halo) {   // halo: extra clearance (px) round each point
+      var img = images[slot], O = ivyPoints(slot), iw = img.naturalWidth, ih = img.naturalHeight;
+      var c = Math.cos(rot), s = Math.sin(rot), P = [], n, x, y;
+      for (n = 0; n < O.pts.length; n++) {
+        var u = (O.pts[n][0] - iw / 2) * k * fx, v = (O.pts[n][1] - ih / 2) * k * fy;
+        x = cx + u * c - v * s; y = cy + u * s + v * c;
+        if (x < 1 || y < 1 || x > W - 1 || y > H - 1 || occ[Math.floor(y / U) * gw + Math.floor(x / U)]) return false;
+        if (halo && [[halo, 0], [-halo, 0], [0, halo], [0, -halo]].some(function (o) {
+          var hx = x + o[0], hy = y + o[1];
+          return hx >= 0 && hy >= 0 && hx < W && hy < H && occ[Math.floor(hy / U) * gw + Math.floor(hx / U)];
+        })) return false;
+        P.push(x, y);
+      }
+      var r = O.st * k * 0.6 + 2;
+      for (n = 0; n < P.length; n += 2) mark(P[n] - r, P[n + 1] - r, P[n] + r, P[n + 1] + r);
+      ctx.save(); ctx.translate(cx, cy); ctx.rotate(rot); ctx.scale(k * fx, k * fy);
+      ctx.drawImage(img, -iw / 2, -ih / 2); ctx.restore();
+      return true;
+    }
+    function pick(list, used) {
+      var free = list.filter(function (sl) { return !used[sl]; });
+      return (free.length ? free : list)[Math.floor(R() * (free.length || list.length))];
+    }
+    // corners TL, TR, BR, BL: mirrored (never turned) so the knot sits in the corner and the arms run along the
+    // edges; the songbird (spray 6) only perches in a top corner, where it stays upright
+    var used = {};
+    [[1, 1], [-1, 1], [-1, -1], [1, -1]].forEach(function (q) {
+      var list = q[1] > 0 ? C : C.filter(function (sl) { return sl !== 'ivy.corner.6'; });
+      var sl = pick(list, used), img = images[sl], kj = 0.9 + R() * 0.2;
+      [1, 0.86, 0.74, 0.62].some(function (t) {
+        var k = k0 * kj * t, w = img.naturalWidth * k, h = img.naturalHeight * k;
+        var ok = place(sl, q[0] > 0 ? m + w / 2 : W - m - w / 2, q[1] > 0 ? m + h / 2 : H - m - h / 2, k, q[0], q[1], 0);
+        if (ok) used[sl] = 1;
+        return ok;
+      });
+    });
+    // runs along some sides, upright on the top and bottom, a quarter turn on the left and right
+    var sides = [[0, 0], [1, Math.PI / 2], [2, 0], [3, -Math.PI / 2]], runUsed = {};
+    sides.forEach(function (sd) {
+      if (!RU.length || R() > 0.6) return;
+      var horiz = sd[0] % 2 === 0, span = horiz ? W : H, fx = R() < 0.5 ? 1 : -1, sl0 = pick(RU, runUsed);
+      var order = [sl0].concat(RU.filter(function (sl) { return sl !== sl0; }).sort(function (a, b) { return images[a].naturalWidth - images[b].naturalWidth; }));
+      order.some(function (sl) {
+        var img = images[sl], k = k0 * (0.85 + R() * 0.15), th = img.naturalHeight * k;
+        return [0.5, 0.38, 0.62, 0.28, 0.72].some(function (f) {
+          var a = span * f, d = m + th / 2, cx, cy;
+          if (sd[0] === 0) { cx = a; cy = d; } else if (sd[0] === 2) { cx = a; cy = H - d; }
+          else if (sd[0] === 1) { cx = W - d; cy = a; } else { cx = d; cy = a; }
+          if (place(sl, cx, cy, k, fx, 1, sd[1])) { runUsed[sl] = 1; return true; }
+          return false;
+        });
+      });
+    });
+    // a few loose sprigs in the gaps near the edges, each tilted a little
+    var ns = SP.length ? 2 + Math.floor(R() * 4) : 0, spUsed = {};
+    for (var s = 0; s < ns; s++) {
+      for (var tries = 0; tries < 30; tries++) {
+        var sl = pick(SP, spUsed), side = Math.floor(R() * 4), depth = m + R() * unit * 0.16, along = R();
+        var cx = side === 1 ? W - depth : side === 3 ? depth : along * W, cy = side === 0 ? depth : side === 2 ? H - depth : along * H;
+        if (place(sl, cx, cy, k0 * (0.8 + R() * 0.3), R() < 0.5 ? 1 : -1, 1, (R() - 0.5) * 0.9, 16)) { spUsed[sl] = 1; break; }
+      }
+    }
+    return true;
+  }
+
   var ART = {
+    // the painted ivy on a page's vellum (false when its PNGs are not loaded)
+    ivyPage: ivyPage,
     INK: INK, PIG: PIG, ribbon: ribbon, mix: mix, rand: rand, maskShape: maskShape, makePage: makePage, sheet: drawSheet,
     // the board's enamel look: RIB colours, the cached panel (ground, filigree, gilded frame, ivy) and
     // layered gold-edged ribbon strokes
@@ -1458,6 +1635,8 @@
     pigment: function (name) { return PIG[name] || PIG.gold; },
     has: function (slot) { return !!images[slot]; },
     // where the board's ribbon stops on a painted beast's tile (tile frame, side 1, entry at -0.5), or null
+    // where the board's ribbon gives way to the painted knot (tiles from the centre), or null when drawn
+    knotStop: function () { return images.knot ? KNOT.stop : null; },
     beastStop: function (kind, band) {
       var sl = kind === 'tail' ? 'beast.tail' : 'beast.headShut';
       if (!beastReady(kind) || !prepBeast(sl)) return null;
@@ -1488,7 +1667,7 @@
       opts = opts || {};
       // a pigment mark draws its painted gem (mark.<pigment>) when that PNG is loaded
       if (slot === 'mark' && opts.pigment && images['mark.' + opts.pigment]) slot = 'mark.' + opts.pigment;
-      var img = slot === 'page' ? null : images[slot], m = metas[slot];   // the page lays its PNG itself (makePage)
+      var img = slot === 'page' || SELF[slot] ? null : images[slot], m = metas[slot];   // these lay their PNG themselves
       ctx.save();
       if (img && m && m.crisp && !opts.angle) drawCrisp(ctx, slot, img, x, y, w, h);
       else if (img) {
@@ -1511,19 +1690,20 @@
     load: function (base) {
       base = base || 'art/';
       if (typeof fetch === 'undefined') return Promise.resolve();
-      return fetch(base + 'manifest.json?v=6', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : {}; }).then(function (m) {
+      return fetch(base + 'manifest.json?v=8', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : {}; }).then(function (m) {
         return Promise.all(Object.keys(m).map(function (slot) {
           var e = typeof m[slot] === 'string' ? { file: m[slot] } : (m[slot] || {});
           if (!e.file) return null;
           return new Promise(function (res) {
             var img = new Image();
             img.onload = function () {
-              images[slot] = img; delete fadedCache[slot]; delete beastPrep[slot]; delete beastBad[slot];
+              images[slot] = img; delete fadedCache[slot]; delete ivyOcc[slot]; delete beastPrep[slot]; delete beastBad[slot];
               if (BEAST[slot]) { beastCache = {}; beastCacheN = 0; }
               metas[slot] = { aspect: img.naturalWidth / img.naturalHeight, stem: e.stem != null ? e.stem : 0.5,
                 fit: e.fit != null ? !!e.fit : slot.indexOf('drollery.') === 0,
                 crisp: e.crisp != null ? !!e.crisp : slot.indexOf('mark.') === 0, inset: e.inset };
               if (slot === 'page') cache.page = null;
+              if (slot === 'knot') { knotCache = {}; knotCacheN = 0; }
               Object.keys(crispCache).forEach(function (k) { if (k.indexOf(slot + ':') === 0) delete crispCache[k]; });
               res();
             };

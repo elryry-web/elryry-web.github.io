@@ -1,0 +1,42 @@
+{
+ "source": "VCSL Hand Chimes (Sam Gossner), CC0, https://github.com/sgossner/VCSL",
+ "sr": 22050,
+ "oneshot": true,
+ "notes": {
+  "D5": {
+   "file": "D5.wav",
+   "m": 74,
+   "hz": 587.4,
+   "gain": 0.4504,
+   "from": "sus_D4_r01_main.wav"
+  },
+  "F#5": {
+   "file": "Fs5.wav",
+   "m": 78,
+   "hz": 742.07,
+   "gain": 0.3365,
+   "from": "sus_F#4_r01_main.wav"
+  },
+  "A5": {
+   "file": "A5.wav",
+   "m": 81,
+   "hz": 880.639,
+   "gain": 1.962,
+   "from": "sus_A4_r01_main.wav"
+  },
+  "C6": {
+   "file": "C6.wav",
+   "m": 84,
+   "hz": 1047.208,
+   "gain": 0.5929,
+   "from": "sus_C5_r01_main.wav"
+  },
+  "D6": {
+   "file": "D6.wav",
+   "m": 86,
+   "hz": 1173.046,
+   "gain": 1.9153,
+   "from": "sus_D5_r01_main.wav"
+  }
+ }
+}

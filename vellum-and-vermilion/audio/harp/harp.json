@@ -1,0 +1,91 @@
+{
+ "source": "VCSL Folk Harp (Sam Gossner), CC0, https://github.com/sgossner/VCSL",
+ "sr": 22050,
+ "oneshot": true,
+ "notes": {
+  "G#2": {
+   "file": "Gs2.wav",
+   "m": 44,
+   "hz": 103.897,
+   "gain": 0.4198,
+   "from": "EWHarp_Normal_G#2_v2_RR1.wav"
+  },
+  "D3": {
+   "file": "D3.wav",
+   "m": 50,
+   "hz": 146.755,
+   "gain": 0.5889,
+   "from": "EWHarp_Normal_D3_v2_RR1.wav"
+  },
+  "F#3": {
+   "file": "Fs3.wav",
+   "m": 54,
+   "hz": 185.807,
+   "gain": 0.6578,
+   "from": "EWHarp_Normal_F#3_v2_RR1.wav"
+  },
+  "A#3": {
+   "file": "As3.wav",
+   "m": 58,
+   "hz": 233.113,
+   "gain": 0.7117,
+   "from": "EWHarp_Normal_A#3_v2_RR1.wav"
+  },
+  "C4": {
+   "file": "C4.wav",
+   "m": 60,
+   "hz": 261.513,
+   "gain": 1.1823,
+   "from": "EWHarp_Normal_C4_v2_RR1.wav"
+  },
+  "D4": {
+   "file": "D4.wav",
+   "m": 62,
+   "hz": 293.276,
+   "gain": 0.6997,
+   "from": "EWHarp_Normal_D4_v2_RR1.wav"
+  },
+  "E4": {
+   "file": "E4.wav",
+   "m": 64,
+   "hz": 328.546,
+   "gain": 0.5787,
+   "from": "EWHarp_Normal_E4_v2_RR1.wav"
+  },
+  "F#4": {
+   "file": "Fs4.wav",
+   "m": 66,
+   "hz": 370.097,
+   "gain": 0.8654,
+   "from": "EWHarp_Normal_F#4_v2_RR1.wav"
+  },
+  "G#4": {
+   "file": "Gs4.wav",
+   "m": 68,
+   "hz": 414.916,
+   "gain": 0.9749,
+   "from": "EWHarp_Normal_G#4_v2_RR1.wav"
+  },
+  "A#4": {
+   "file": "As4.wav",
+   "m": 70,
+   "hz": 466.027,
+   "gain": 0.9349,
+   "from": "EWHarp_Normal_A#4_v2_RR1.wav"
+  },
+  "C5": {
+   "file": "C5.wav",
+   "m": 72,
+   "hz": 522.882,
+   "gain": 0.7024,
+   "from": "EWHarp_Normal_C5_v2_RR1.wav"
+  },
+  "D5": {
+   "file": "D5.wav",
+   "m": 74,
+   "hz": 587.721,
+   "gain": 1.1988,
+   "from": "EWHarp_Normal_D5_v2_RR1.wav"
+  }
+ }
+}

@@ -70,10 +70,12 @@
 
   /* ---------- the book screen: the cover on the desk, then the leaves ---------- */
   #bk_scr { position: fixed; inset: 0; z-index: 20; display: none; overflow: hidden; transition: opacity .26s;
-    background: radial-gradient(ellipse 80% 70% at 50% 42%, #6a4222 0%, #45291500 60%), radial-gradient(ellipse at 50% 50%, #3e2412 0%, #1d1007 100%); }
+    background: url(art/desk.jpg?v=1) 70% 0% / cover no-repeat,   /* the painted desk; its candle glow is top right */
+      radial-gradient(ellipse 80% 70% at 50% 42%, #6a4222 0%, #45291500 60%), radial-gradient(ellipse at 50% 50%, #3e2412 0%, #1d1007 100%);
+    background-color: #2a180b; }
   #bk_scr.fade { opacity: 0; pointer-events: none; }
   #bk_scr::before { content: ""; position: absolute; inset: 0; pointer-events: none;
-    background: radial-gradient(circle at 88% 8%, rgba(255,190,90,0.22), rgba(255,170,70,0) 45%); animation: candle 3.2s ease-in-out infinite; }
+    background: radial-gradient(circle at 75% 4%, rgba(255,190,90,0.22), rgba(255,170,70,0) 45%); animation: candle 3.2s ease-in-out infinite; }
   @keyframes candle { 0%,100% { opacity: .85; } 30% { opacity: 1; } 55% { opacity: .7; } 70% { opacity: .95; } }
   #bkTop { position: absolute; left: 0; right: 0; top: 0; height: 52px; display: flex; align-items: center; gap: 10px; padding: max(6px, env(safe-area-inset-top)) 10px 0; z-index: 3; }
   #bkTop button, #bk_scr .nav { background: rgba(243,230,198,0.88); }
@@ -171,11 +173,12 @@
 
 <script src="js/levels.js?v=5"></script>
 <script src="js/puzzle.js?v=3"></script>
-<script src="js/art.js?v=14"></script>
+<script src="js/art.js?v=17"></script>
 <script src="js/drolleries.js?v=3"></script>
 <script src="js/audio.js?v=3"></script>
-<script src="js/board.js?v=11"></script>
-<script src="js/book.js?v=10"></script>
-<script src="js/main.js?v=8"></script>
+<script src="js/board.js?v=12"></script>
+<script src="js/book.js?v=12"></script>
+<script src="js/main.js?v=10"></script>
+<script src="js/music.js?v=1"></script>
 </body>
 </html>

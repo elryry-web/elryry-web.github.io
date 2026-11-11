@@ -620,7 +620,8 @@
         (function (a, b) { self._weaveShade(g, order[0], h, rw, S, function (gg) { piecePath(gg, a, b, h, false); }); })(a, b);
       }
       // a painted beast takes over from the ribbon short of the tile's centre
-      var bst = b < 0 && (M.beast[c] === 'h' || M.beast[c] === 't') ? ART.beastStop(M.beast[c] === 'h' ? 'head' : 'tail') : null;
+      // (and a painted knot takes over a little short of it)
+      var bst = b < 0 && (M.beast[c] === 'h' || M.beast[c] === 't') ? ART.beastStop(M.beast[c] === 'h' ? 'head' : 'tail') : b < 0 ? ART.knotStop() : null;
       if (bst != null) { g.save(); g.beginPath(); g.rect(-h - 2, -h - 2, S + 4, (bst + 0.5) * S + 2); g.clip(); }
       (function (a, b) {
         self._strokeRibbon(g, function (gg, rev, x) { piecePath(gg, a, b, h, rev, x); }, len, rw, col, { ang: ang, cell: c, piece: p });
@@ -676,7 +677,11 @@
       }
     }
     g.restore();
-    if (this.pins[c]) ART.draw(g, 'pin', cx + S * 0.18, cy - S * 0.42, S * 0.24, S * 0.24, t);
+    if (this.pins[c]) {
+      // a painted nail is a square centred on its dome (about half the side), its point running down-left
+      if (ART.has('pin')) ART.draw(g, 'pin', cx + S * 0.05, cy - S * 0.55, S * 0.5, S * 0.5, t);
+      else ART.draw(g, 'pin', cx + S * 0.18, cy - S * 0.42, S * 0.24, S * 0.24, t);
+    }
   };
 
   // a deterministic hash in [0, 1): where the paint falls short of the outline, per page, cell and piece
