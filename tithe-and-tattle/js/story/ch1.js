@@ -178,7 +178,7 @@ STORY.push({
   characters: ['Walter Crane', 'Hob', 'Joan Fletcher', 'Tom Webbe', 'Piers Carter'],
   size: '4×4',
   grade: 'Journeyman',
-  intro: "Walter Crane keeps what the town owes on his tally sticks, a notch for every penny, and he read them out to me at the Swan in the matter of the debts falling due this autumn, on St Luke's Day, All Saints, Martinmas and St Andrew's Day, which come in that order. I wrote it in Latin because the Prior prefers it, and I put the saints in the column meant for the pence, so that my page has Hob owing St Luke. Walter has gone to Lynn until Saturday.",
+  intro: "Walter Crane keeps what the town owes on tally sticks, a notch for every penny. He read them out to me at the Swan, for the debts falling due this autumn on St Luke's Day, All Saints, Martinmas and St Andrew's Day, which come in that order. I wrote it in Latin because the Prior prefers it. Afterwards I found I had put the saints in the column meant for the pence. Walter has gone to Lynn until Saturday.",
   task: 'Can you work out what each person owes, what for, and on which feast it falls due?',
   categories: [
     { id: 'who', name: 'Debtors', items: [
