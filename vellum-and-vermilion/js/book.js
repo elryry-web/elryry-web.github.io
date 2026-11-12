@@ -45,7 +45,7 @@
     gr.addColorStop(0, '#6e2219'); gr.addColorStop(0.6, '#561811'); gr.addColorStop(1, '#3a0f0a');
     g.fillStyle = gr; g.fillRect(0, 0, w, h);
     for (var i = 0; i < 60; i++) {   // mottling and wear
-      var x = R() * w, y = R() * h, r = 10 + R() * Math.min(w, h) * 0.22, m = g.createRadialGradient(x, y, 0, x, y, r);
+      var x = R() * w, y = R() * h, r = 10 + R() * Math.max(0, Math.min(w, h)) * 0.22, m = g.createRadialGradient(x, y, 0, x, y, r);
       m.addColorStop(0, R() < 0.5 ? 'rgba(20,4,2,0.18)' : 'rgba(150,70,50,0.10)'); m.addColorStop(1, 'rgba(0,0,0,0)');
       g.fillStyle = m; g.fillRect(x - r, y - r, 2 * r, 2 * r);
     }
@@ -300,7 +300,7 @@
     if (f === 0) faceIncipit(g, w, h, mx, top, cw, H);
     else if (f <= 5) faceQuire(f, g, w, h, mx, top, cw, H);
     else if (f === F_BEST) faceBestiary(g, w, h, mx, top, cw, H, t);
-    else faceColophon(g, w, h, mx, top, cw, H);
+    else faceColophon(g, w, h, mx, top, cw, H, t);
     // folio number at the foot, out of the way of the corner hot-spots
     g.textAlign = 'center'; g.fillStyle = 'rgba(168,38,26,0.7)'; font(g, clamp(w * 0.03, 9, 13), FELL, 'italic');
     g.fillText(['incipit', 'j', 'ij', 'iij', 'iiij', 'v', 'vj', 'vij'][f], w / 2, h - Math.max(10, h * 0.025));
@@ -461,27 +461,31 @@
       g.fillText(ellip(g, 'tap a creature to wake it', cw), w / 2, ny);
     }
   }
-  function faceColophon(g, w, h, mx, top, cw, H) {
-    var y = rubricTitle(g, 'Colophon', w, top, cw, clamp(w * 0.07, 12, 30)), done = allDone(), k = solvedCount();
-    if (!done) {
-      y += h * 0.12;
-      var s = clamp(w * 0.05, 12, 24); font(g, s, FELL, 'italic'); g.fillStyle = INKC;
-      wrap(g, 'The book is not finished yet.', cw).forEach(function (ln) { g.fillText(ln, w / 2, y); y += s * 1.3; });
-      y += s * 0.6; var s2 = clamp(w * 0.034, 10, 16); font(g, s2, FELL, 'italic'); g.fillStyle = 'rgba(42,27,16,0.7)';
-      g.fillText(k + ' of 30 pages finished', w / 2, y); y += s2 * 2;
-      // thirty little squares, gilt where a page is done
-      var n = G.LEVELS.length, per = 10, sq = Math.min(cw / per * 0.7, 18), gap = sq * 0.45, rowW = per * sq + (per - 1) * gap;
-      for (var i = 0; i < n; i++) {
-        var x = w / 2 - rowW / 2 + (i % per) * (sq + gap), yy = y + Math.floor(i / per) * (sq + gap);
-        if (G.save().solved[i + 1]) { g.fillStyle = goldFill(g, x, yy, x + sq, yy + sq); g.fillRect(x, yy, sq, sq); }
-        g.strokeStyle = 'rgba(110,70,40,0.5)'; g.lineWidth = 1; g.strokeRect(x + 0.5, yy + 0.5, sq - 1, sq - 1);
-      }
+  function faceColophon(g, w, h, mx, top, cw, H, t) {
+    if (allDone()) {
+      if (ART.has('colophon')) coloFace(g, w, h, mx, top, cw, H, t); else coloPlain(g, w, h, mx, top, cw);
       return;
     }
+    var y = rubricTitle(g, 'Colophon', w, top, cw, clamp(w * 0.07, 12, 30)), k = solvedCount();
+    y += h * 0.12;
+    var s = clamp(w * 0.05, 12, 24); font(g, s, FELL, 'italic'); g.fillStyle = INKC;
+    wrap(g, 'The book is not finished yet.', cw).forEach(function (ln) { g.fillText(ln, w / 2, y); y += s * 1.3; });
+    y += s * 0.6; var s2 = clamp(w * 0.034, 10, 16); font(g, s2, FELL, 'italic'); g.fillStyle = 'rgba(42,27,16,0.7)';
+    g.fillText(k + ' of 30 pages finished', w / 2, y); y += s2 * 2;
+    // thirty little squares, gilt where a page is done
+    var n = G.LEVELS.length, per = 10, sq = Math.min(cw / per * 0.7, 18), gap = sq * 0.45, rowW = per * sq + (per - 1) * gap;
+    for (var i = 0; i < n; i++) {
+      var x = w / 2 - rowW / 2 + (i % per) * (sq + gap), yy = y + Math.floor(i / per) * (sq + gap);
+      if (G.save().solved[i + 1]) { g.fillStyle = goldFill(g, x, yy, x + sq, yy + sq); g.fillRect(x, yy, sq, sq); }
+      g.strokeStyle = 'rgba(110,70,40,0.5)'; g.lineWidth = 1; g.strokeRect(x + 0.5, yy + 0.5, sq - 1, sq - 1);
+    }
+  }
+  // the finished Colophon when the painting has not loaded: the five painted capitals in a row (capital.<L>),
+  // fitted by height and centred in each box; the solved boards stand in for any capital that is missing
+  function coloPlain(g, w, h, mx, top, cw) {
+    var y = rubricTitle(g, 'Colophon', w, top, cw, clamp(w * 0.07, 12, 30));
     y += h * 0.04;
-    // the five gilded initials, L U M E N, in a row
     var bw = cw / 5, bs = Math.min(bw * 0.92, h * 0.2);
-    // the painted capitals (capital.<L>) when loaded, fitted by height and centred in each box; else the boards
     LETTERS.forEach(function (n, i) {
       var sl = 'capital.' + G.LEVELS[n - 1].initial, me = ART.meta(sl);
       if (!me) { drawThumbInBox(g, thumb(n, true), mx + i * bw + (bw - bs) / 2, y, bs); return; }
@@ -497,6 +501,190 @@
     wrap(g, note, cw * 0.94).forEach(function (ln) { y += ns * 1.35; g.fillText(ln, w / 2, y); });
     y += ns * 1.6; g.textAlign = 'right'; g.fillStyle = RED; font(g, ns, FELL, 'italic');
     g.fillText('— the scribe', mx + cw, y); g.textAlign = 'center';
+  }
+  /* ================= the Colophon page: the painted LUMEN monogram (slot `colophon`, art/colophon.jpg) =================
+     The painting fills the leaf above two small lines of text. Its own vellum was lifted to near-white when the
+     JPEG was made (tools/make-colophon.py), so it is laid on with `multiply`: the ground takes the leaf's warm
+     yellow and the paint sits in the page. A soft edge fade hides the picture's rectangle; then the paint is laid
+     again over itself at part strength (`source-over`, masked to the painted pixels) so the multiply does not
+     muddy the lapis and the gold (opaque pigment does not take the vellum's tint).
+     The reveal, the first time the finished leaf is shown or on a tap: a faint sepia underdrawing inks in, the
+     colour floods outward from the top of the L, a glint runs across the gold (an additive highlight masked to the
+     warm bright pixels), and it settles. Later visits and reduced motion show the finished page at once. The save
+     keeps s.colo = 1. The layers are composed once per leaf size (coloCache). */
+  var COLO_MS = 4500, COLO_RICH = 0.55, colo = { t0: 0, raf: 0, freeze: null }, coloCache = {}, coloScr = null;
+  // the painting's own blank margin (fractions of the picture): the letter sits inside these
+  var COLO_IN = { x0: 0.035, x1: 0.965, y0: 0.035, y1: 0.93 };
+  function reducedMotion() { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } }
+  function coloPending() { return allDone() && ART.has('colophon') && !G.save().colo && !reducedMotion(); }
+  function smooth(a, b, x) { var p = clamp((x - a) / (b - a), 0, 1); return p * p * (3 - 2 * p); }
+  function scratch(w, h) {
+    if (!coloScr) coloScr = document.createElement('canvas');
+    if (coloScr.width < w || coloScr.height < h) { coloScr.width = Math.max(w, coloScr.width); coloScr.height = Math.max(h, coloScr.height); }
+    var g = coloScr.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
+    g.clearRect(0, 0, w, h);
+    return g;
+  }
+  function canvasOf(w, h) { var cv = document.createElement('canvas'); cv.width = w; cv.height = h; return cv; }
+  function coloBuild(w, h, mx, top, cw) {
+    var dpr = Math.min(2, window.devicePixelRatio || 1);
+    var key = [w, h, dpr, ART.has('colophon') ? 1 : 0].join('|');
+    if (coloCache.key === key) return coloCache;
+    var C = { key: key, dpr: dpr, ms: COLO_MS }, pc = document.createElement('canvas').getContext('2d');
+    // the words at the foot, measured first: the painting takes the rest of the leaf
+    var ls = clamp(w * 0.06, 12, 30), ns = clamp(w * 0.03, 9.5, 15), foot = h - Math.max(10, h * 0.025);
+    font(pc, ns, FELL, 'italic');
+    // no-break spaces keep the signature on one line when the note wraps
+    var lines = wrap(pc, 'All thirty pages are finished. Thank you for playing. — the scribe', cw * 0.96);
+    var yLast = foot - ns * 1.75, yFirst = yLast - (lines.length - 1) * ns * 1.3, yL = yFirst - ns * 1.5;
+    C.text = { ls: ls, ns: ns, lines: lines, yFirst: yFirst, yL: yL };
+    // the letter (the picture less its blank margin) as large as fits between the leaf's edges and the words
+    var bx0 = mx * 0.4, bx1 = w - mx * 0.4, by0 = top * 0.6, by1 = yL - ls * 0.95 - Math.max(3, h * 0.01);
+    var me = ART.meta('colophon'), asp = me ? me.aspect : 0.75, fw = COLO_IN.x1 - COLO_IN.x0, fh = COLO_IN.y1 - COLO_IN.y0;
+    var ih = Math.min((by1 - by0) / fh, (bx1 - bx0) / (fw * asp)), iw = ih * asp;
+    var ix = w / 2 - iw * (COLO_IN.x0 + COLO_IN.x1) / 2, iy = (by0 + by1) / 2 - ih * (COLO_IN.y0 + COLO_IN.y1) / 2;
+    C.img = { x: ix, y: iy, w: iw, h: ih };
+    C.box = [ix + iw * COLO_IN.x0, iy + ih * COLO_IN.y0, iw * fw, ih * fh];
+    // the layers, in device pixels
+    var W = Math.max(1, Math.round(iw * dpr)), Hh = Math.max(1, Math.round(ih * dpr));
+    var src = canvasOf(W, Hh), sg = src.getContext('2d');
+    sg.imageSmoothingQuality = 'high';
+    ART.draw(sg, 'colophon', 0, 0, W, Hh, 0, {});
+    C.W = W; C.H = Hh;
+    try {
+      var id = sg.getImageData(0, 0, W, Hh), d = id.data, n = W * Hh;
+      var full = sg.createImageData(W, Hh), rich = sg.createImageData(W, Hh), under = sg.createImageData(W, Hh), glint = sg.createImageData(W, Hh);
+      var F = full.data, R = rich.data, U = under.data, Gd = glint.data;
+      // the soft edge: a little wider on the left, where the painting had its gutter tint
+      var fl = 0.04 * W, fr = 0.025 * W, ft = 0.025 * Hh, fb = 0.03 * Hh, ex = new Float32Array(W), ey = new Float32Array(Hh), x, y;
+      for (x = 0; x < W; x++) ex[x] = smooth(0, fl, x + 0.5) * smooth(0, fr, W - x - 0.5);
+      for (y = 0; y < Hh; y++) ey[y] = smooth(0, ft, y + 0.5) * smooth(0, fb, Hh - y - 0.5);
+      for (var i = 0; i < n; i++) {
+        var o = i * 4, r = d[o], gg = d[o + 1], b = d[o + 2], E = ex[i % W] * ey[(i / W) | 0];
+        var hi = Math.max(r, gg, b), lo = Math.min(r, gg, b), v = hi / 255, s = hi ? (hi - lo) / hi : 0;
+        F[o] = r; F[o + 1] = gg; F[o + 2] = b; F[o + 3] = 255 * E;
+        // the painted pixels (not the lifted ground): laid again at part strength over the multiply
+        R[o] = r; R[o + 1] = gg; R[o + 2] = b; R[o + 3] = 255 * E * COLO_RICH * smooth(0.05, 0.3, 1 - lo / 255);
+        // the underdrawing: the picture's value only, in a pale sepia, contrast cut to a third
+        var l = (r * 0.3 + gg * 0.59 + b * 0.11) / 255, k = (1 - l) * 0.34;
+        U[o] = 255 - (255 - 104) * k; U[o + 1] = 255 - (255 - 70) * k; U[o + 2] = 255 - (255 - 40) * k; U[o + 3] = 255 * E;
+        // the gold: warm hue (about 25-55 degrees), well saturated, bright
+        var hue = 0;
+        if (hi > lo && hi === r) hue = 60 * (gg - b) / (hi - lo);
+        else if (hi > lo && hi === gg) hue = 60 * (2 + (b - r) / (hi - lo));
+        var gm = smooth(20, 30, hue) * (1 - smooth(52, 62, hue)) * smooth(0.32, 0.46, s) * smooth(0.5, 0.72, v);
+        Gd[o] = 255; Gd[o + 1] = 238; Gd[o + 2] = 186; Gd[o + 3] = 255 * E * gm;
+      }
+      C.full = canvasOf(W, Hh); C.full.getContext('2d').putImageData(full, 0, 0);
+      C.rich = canvasOf(W, Hh); C.rich.getContext('2d').putImageData(rich, 0, 0);
+      C.under = canvasOf(W, Hh); C.under.getContext('2d').putImageData(under, 0, 0);
+      C.glint = canvasOf(W, Hh); C.glint.getContext('2d').putImageData(glint, 0, 0);
+    } catch (e) {
+      // a tainted canvas (file://): the plain picture, faded at the edges by alpha alone, and no reveal
+      C.full = src; C.rich = null; C.under = null; C.glint = null; C.ms = 0;
+    }
+    coloCache = C;
+    return C;
+  }
+  // draw a layer (device px) over the picture's place on the leaf
+  function coloBlit(g, C, cv, op, a) {
+    if (!cv || a <= 0) return;
+    g.globalCompositeOperation = op; g.globalAlpha = a;
+    g.drawImage(cv, 0, 0, C.W, C.H, C.img.x, C.img.y, C.img.w, C.img.h);
+    g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
+  }
+  // a layer cut by a mask gradient (kept where the gradient is opaque, or where it is clear when `out`)
+  function coloMasked(C, cv, grad, out) {
+    var sg = scratch(C.W, C.H);
+    sg.drawImage(cv, 0, 0);
+    sg.globalCompositeOperation = out ? 'destination-out' : 'destination-in';
+    sg.fillStyle = grad; sg.fillRect(0, 0, C.W, C.H);
+    sg.globalCompositeOperation = 'source-over';
+    return sg;
+  }
+  // one frame of the painting, el ms into the reveal (1e9: finished)
+  function coloFrame(g, C, el) {
+    if (el >= C.ms) { coloBlit(g, C, C.full, 'multiply', 1); coloBlit(g, C, C.rich, 'source-over', 1); return; }
+    var W = C.W, H = C.H;
+    // the colour's front: a soft ring spreading from the top of the L's stem to the far corner
+    var ox = W * 0.17, oy = H * 0.12, rMax = Math.hypot(W - ox, H - oy), soft = rMax * 0.24;
+    var p = ease(clamp((el - 800) / 2000, 0, 1)), r = p * (rMax + soft), grad = null;
+    if (r > 0) {
+      grad = scratch(1, 1).createRadialGradient(ox, oy, 0, ox, oy, r);
+      grad.addColorStop(0, 'rgba(0,0,0,1)'); grad.addColorStop(Math.max(0, (r - soft) / r), 'rgba(0,0,0,1)'); grad.addColorStop(1, 'rgba(0,0,0,0)');
+    }
+    // 1. the underdrawing inks in (and gives way where the colour has come)
+    var ua = ease(clamp(el / 1000, 0, 1));
+    if (ua > 0 && p < 1) {
+      if (grad) { coloMasked(C, C.under, grad, true); coloBlit(g, C, coloScr, 'multiply', ua); }
+      else coloBlit(g, C, C.under, 'multiply', ua);
+    }
+    // 2. the colour floods outward from the L
+    if (grad) {
+      if (p >= 1) { coloBlit(g, C, C.full, 'multiply', 1); coloBlit(g, C, C.rich, 'source-over', 1); }
+      else {
+        coloMasked(C, C.full, grad, false); coloBlit(g, C, coloScr, 'multiply', 1);
+        coloMasked(C, C.rich, grad, false); coloBlit(g, C, coloScr, 'source-over', 1);
+      }
+    }
+    // 3. a glint runs down across the gold
+    var gp = clamp((el - 2900) / 1100, 0, 1);
+    if (gp > 0 && gp < 1 && C.glint) {
+      var sl = scratch(W, H), mid = -0.12 + 1.24 * gp, bw = 0.09;
+      var lg = sl.createLinearGradient(0, 0, W * 0.75, H);
+      lg.addColorStop(clamp(mid - bw, 0, 1), 'rgba(0,0,0,0)'); lg.addColorStop(clamp(mid, 0, 1), 'rgba(0,0,0,1)');
+      lg.addColorStop(clamp(mid + bw, 0, 1), 'rgba(0,0,0,0)');
+      coloMasked(C, C.glint, lg, false);
+      coloBlit(g, C, coloScr, 'lighter', 0.75 * Math.sin(Math.PI * gp));
+    }
+  }
+  function coloFace(g, w, h, mx, top, cw, H, t) {
+    var C = coloBuild(w, h, mx, top, cw);
+    var ela = colo.freeze != null ? colo.freeze : colo.t0 ? (t || now()) - colo.t0 : (coloPending() ? 0 : 1e9);
+    coloFrame(g, C, ela);
+    var tx = C.text;
+    g.textAlign = 'center'; g.fillStyle = RED; fitFont(g, 'LUMEN — light', UNC, tx.ls, cw);
+    g.fillText('LUMEN — light', w / 2, tx.yL);
+    font(g, tx.ns, FELL, 'italic');
+    tx.lines.forEach(function (ln, i) {
+      var y = tx.yFirst + i * tx.ns * 1.3, k = ln.indexOf('—');
+      g.fillStyle = INKC;
+      if (k < 0) { g.fillText(ln, w / 2, y); return; }
+      var a = ln.slice(0, k), b = ln.slice(k), wa = g.measureText(a).width, wb = g.measureText(b).width, x0 = w / 2 - (wa + wb) / 2;
+      g.textAlign = 'left'; g.fillText(a, x0, y); g.fillStyle = RED; g.fillText(b, x0 + wa, y); g.textAlign = 'center';
+    });
+    H.push({ x: C.box[0], y: C.box[1], w: C.box[2], h: C.box[3], act: { colo: 1 } });
+  }
+  function coloSide() {
+    if (mode !== 'open') return null;
+    var fs = facesOf(pos), i = fs.indexOf(F_COLO);
+    if (i < 0) return null;
+    return { cv: i === 0 ? el.cA : el.cB, side: L.spread ? (i ? 'R' : 'L') : 'R' };
+  }
+  // the reveal: the first time the finished Colophon is in view, or on a tap (replay)
+  function coloStart(replay) {
+    if (!allDone() || !ART.has('colophon') || !coloSide()) return;
+    var s = G.save();
+    if (!replay && s.colo) return;
+    if (!s.colo) { s.colo = 1; G.persist(); }
+    if (reducedMotion() || coloCache.ms === 0) return;
+    colo.t0 = now();
+    if (window.SFX && window.SFX.solved) window.SFX.solved();
+    if (!colo.raf) colo.raf = requestAnimationFrame(coloLoop);
+  }
+  function coloLoop() {
+    colo.raf = 0;
+    var sd = coloSide();
+    if (!sd || !colo.t0) { colo.t0 = 0; return; }
+    var t = now(), done = t - colo.t0 >= (coloCache.ms || COLO_MS);
+    if (!T) {
+      var g = sd.cv.getContext('2d'), dpr = Math.min(2, window.devicePixelRatio || 1);
+      if (done) colo.t0 = 0;
+      g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, L.pw, L.ph);
+      renderFace(F_COLO, g, L.pw, L.ph, sd.side, t);
+    }
+    if (!done) colo.raf = requestAnimationFrame(coloLoop);
+    else colo.t0 = 0;
   }
   // where things sit on the painted leather (fractions of the board): the spine strip down the left edge,
   // and the plain recessed panel inside the tooled lattice
@@ -702,6 +890,7 @@
     var s = G.save(); s.face = fs[0]; G.persist();
     el.pos.textContent = labelOf(fs);
     el.prev.disabled = pos <= 0; el.next.disabled = pos >= posCount() - 1;
+    coloStart(false);
   }
   function labelOf(fs) {
     return fs.map(function (f) { return f === 0 ? 'Incipit' : f <= 5 ? 'Quire ' + QN[f - 1] : f === F_BEST ? 'Bestiary' : 'Colophon'; }).join(' · ');
@@ -716,7 +905,7 @@
   // re-render the faces in view (after a solve, a font or an art PNG arriving)
   function refresh() {
     if (mode === 'hidden') return;
-    thumbs = {};
+    thumbs = {}; coloCache = {};
     computeLayout();
     if (mode === 'open') setStatic();
     else if (mode === 'closed') { drawFaceTo(el.cF, 'cover'); drawFaceTo(el.cK, 'endpaper'); }
@@ -945,6 +1134,7 @@
       var h = list[i];
       if (hit.x < h.x || hit.y < h.y || hit.x > h.x + h.w || hit.y > h.y + h.h) continue;
       var a = h.act;
+      if (a.colo) { coloStart(true); return; }
       if (a.goto !== undefined) { gotoFace(a.goto); return; }
       if (a.page) { if (a.ok) toPlay(a.page); else nudgeSeal(); return; }
       if (a.beast) {
@@ -1047,7 +1237,9 @@
     state: function () { return { mode: mode, pos: pos, faces: facesOf(pos), spread: L.spread, pw: L.pw, ph: L.ph, turning: !!T, busy: busy(), marker: marker }; },
     _applyTurn: function (to, p) { if (beginTurn(to)) applyTurn(p); return !!T; },
     _finish: function (c) { finishTurn(c); },
-    _slow: function (k) { SLOW = k || 1; }
+    _slow: function (k) { SLOW = k || 1; },
+    // freeze the Colophon monogram ms into its reveal (null: live), for screenshots
+    _colo: function (ms) { colo.freeze = ms == null ? null : ms; if (mode === 'open') setStatic(); }
   };
   window.Book = Book;
 })();

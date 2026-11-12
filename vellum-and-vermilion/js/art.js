@@ -672,6 +672,7 @@
     return true;
   }
   function makePage(w, h, scale, margin, variant) {
+    w = Math.max(1, w); h = Math.max(1, h);   // a hidden window can lay the book out at zero or negative size
     var cv = document.createElement('canvas');
     cv.width = Math.max(1, Math.round(w * scale)); cv.height = Math.max(1, Math.round(h * scale));
     var g = cv.getContext('2d');

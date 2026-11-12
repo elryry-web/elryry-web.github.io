@@ -30,6 +30,7 @@
   "capital.M":         {"file": "initial-M.png", "v": 1},
   "capital.E":         {"file": "initial-E.png", "v": 1},
   "capital.N":         {"file": "initial-N.png", "v": 1},
+  "colophon":          {"file": "colophon.jpg", "v": 2},
   "pin":               {"file": "pin.png", "v": 1},
   "knot":              {"file": "knot.png", "v": 1},
   "twinFrame":         {"file": "twin-frame.png", "v": 1},
