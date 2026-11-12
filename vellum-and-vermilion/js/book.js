@@ -501,17 +501,54 @@
   // where things sit on the painted leather (fractions of the board): the spine strip down the left edge,
   // and the plain recessed panel inside the tooled lattice
   var PAINTED = { spine: 0.058, px0: 0.31, px1: 0.765, py0: 0.2, py1: 0.81 };
+  // a painted brass fitting set into the board rather than laid on it: the leather pressed dark around it,
+  // a soft drop shadow (the leather is lit from the top right, so it falls down and a little left), a
+  // tight contact shadow at its rim, and the metal given a gentle warm multiply so it matches the gilt
+  // title. Cached per size and angle; the piece itself stays exactly in its box (flush with the board)
+  var mountCache = {}, mountN = 0;
+  function drawMounted(g, slot, x, y, w, h, angle) {
+    var dpr = Math.min(2, window.devicePixelRatio || 1), key = [slot, ART.has(slot), w, h, angle || 0, dpr].join('|');
+    var c = mountCache[key];
+    if (!c) {
+      var p = Math.ceil(Math.min(w, h) * 0.14), S = Math.min(w, h) * dpr,
+        W = Math.ceil((w + 2 * p) * dpr), H = Math.ceil((h + 2 * p) * dpr);
+      var pc = document.createElement('canvas'); pc.width = W; pc.height = H;
+      var pg = pc.getContext('2d'); pg.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ART.draw(pg, slot, p, p, w, h, 0, angle ? { angle: angle } : {});
+      pg.setTransform(1, 0, 0, 1, 0, 0);
+      pg.globalCompositeOperation = 'multiply'; pg.fillStyle = 'rgb(255,248,226)'; pg.fillRect(0, 0, W, H);
+      pg.globalCompositeOperation = 'destination-in'; pg.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ART.draw(pg, slot, p, p, w, h, 0, angle ? { angle: angle } : {});
+      c = document.createElement('canvas'); c.width = W; c.height = H;
+      var cg = c.getContext('2d'), OFF = W + H + 100;
+      // each shadow pass draws the piece far off the canvas and lets only its shadow land
+      [['rgba(22,7,3,0.5)', S * 0.07, 0, 0],                         // the pressed, darkened leather
+       ['rgba(18,5,2,0.4)', S * 0.018, 0, 0],                        // ...deepest in the piercings
+       ['rgba(12,4,1,0.55)', S * 0.03, -S * 0.008, S * 0.022],       // the soft drop shadow
+       ['rgba(6,2,0,0.75)', Math.max(1, S * 0.006), -dpr * 0.5, dpr] // the contact shadow at the rim
+      ].forEach(function (d) {
+        cg.shadowColor = d[0]; cg.shadowBlur = d[1]; cg.shadowOffsetX = OFF + d[2]; cg.shadowOffsetY = d[3];
+        cg.drawImage(pc, -OFF, 0);
+      });
+      cg.shadowColor = 'transparent'; cg.shadowBlur = 0; cg.shadowOffsetX = cg.shadowOffsetY = 0;
+      cg.drawImage(pc, 0, 0);
+      c.pad = p;
+      if (++mountN > 24) { mountCache = {}; mountN = 1; }
+      mountCache[key] = c;
+    }
+    g.drawImage(c, x - c.pad, y - c.pad, w + 2 * c.pad, h + 2 * c.pad);
+  }
   function renderPaintedCover(g, w, h) {
     var P = PAINTED, cx = w * (P.px0 + P.px1) / 2, pw = w * (P.px1 - P.px0), y0 = h * P.py0, y1 = h * P.py1;
     // brass corners on the board's corners (right of the spine strip); the PNG points top-left
     var cs = Math.min(w, h) * 0.2, lx = w * P.spine;
     [[lx, 0, 0], [w - cs, 0, 1], [w - cs, h - cs, 2], [lx, h - cs, 3]].forEach(function (c) {
-      ART.draw(g, 'cover.corner', c[0], c[1], cs, cs, 0, { angle: c[2] * Math.PI / 2 });
+      drawMounted(g, 'cover.corner', c[0], c[1], cs, cs, c[2] * Math.PI / 2);
     });
     // two clasps: the strap comes over the fore-edge, the hook rests on the lattice border
     if (ART.has('cover.clasp')) {
       var ca = ART.meta('cover.clasp').aspect, cw = w * 0.22, ch = cw / ca;
-      [0.27, 0.73].forEach(function (f) { ART.draw(g, 'cover.clasp', w - cw, h * f - ch / 2, cw, ch, 0, {}); });
+      [0.27, 0.73].forEach(function (f) { drawMounted(g, 'cover.clasp', w - cw, h * f - ch / 2, cw, ch, 0); });
     } else {
       var dw = w * 0.13, dh = h * 0.085;
       [0.26, 0.74].forEach(function (f) { ART.draw(g, 'cover.clasp', w - dw, h * f - dh / 2, dw, dh, 0, {}); });

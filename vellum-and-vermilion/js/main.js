@@ -27,17 +27,18 @@
     pageCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ART.draw(pageCtx, 'page', 0, 0, w, h, 0, { scale: dpr, margin: 'right', variant: cur ? cur.n : 0 });
     // the painted ivy grows on the vellum round everything laid out on it (drawn once per page and size)
-    if (cur) ART.ivyPage(pageCtx, w, h, cur.n * 977 + 13, ivyAvoid());
+    if (cur) ART.ivyPage(pageCtx, w, h, cur.n * 977 + 13, ivyAvoid(), { narrow: !document.body.classList.contains('wide') });
     pageFor = cur ? cur.n : 0;
   }
-  // the boxes the ivy keeps clear of: the board's cells and gilded frame, the text (its own extent), the drollery, buttons
+  // the boxes the ivy keeps clear of: the board's cells and gilded frame, the text (its own extent), the drollery, buttons.
+  // A board box carries the frame's width too, so on a narrow page the ivy may tuck under the frame's outer edge
   function ivyAvoid() {
     var out = [];
     function box(r) { if (r && r.width > 0 && r.height > 0) out.push([r.left, r.top, r.width, r.height]); }
     // the board: each of its cells grown by the gilded frame, so the notches of a shaped page stay open
     var br = $('board').getBoundingClientRect(), M = board.M, S = board.S, pad = board.pad, bd = board.band;
     if (M && S && br.width > 0) M.kinds.forEach(function (k, c) {
-      if (k !== ' ') out.push([br.left + pad + (c % M.w) * S - bd, br.top + pad + (c / M.w | 0) * S - bd, S + 2 * bd, S + 2 * bd]);
+      if (k !== ' ') out.push([br.left + pad + (c % M.w) * S - bd, br.top + pad + (c / M.w | 0) * S - bd, S + 2 * bd, S + 2 * bd, bd]);
     });
     ['rubric', 'pname', 'lines'].forEach(function (id) {
       var el = $(id), rg = document.createRange(); rg.selectNodeContents(el);
@@ -309,7 +310,7 @@
         ART.ribbon(g, function (gg) { gg.arc(x, 68, 28, -Math.PI / 2, 0); }, 9, ART.PIG.lapis.base);
         g.restore();
         ART.draw(g, 'twinFrame', x, 12, 56, 56, 0, { lit: 0.4 });
-        ART.draw(g, 'twinEmblem', x + 2.5, 14.5, 12, 12, 0, { kind: 1 });
+        ART.draw(g, 'twinEmblem', x + 4.8, 16.8, 8.4, 8.4, 0, { kind: 1 });
       });
     } else { ['L', 'U', 'M', 'E', 'N'].forEach(function (ch, i) {
       g.font = '34px "Uncial Antiqua", serif'; g.fillStyle = i % 2 ? '#2b56a6' : '#a8261a'; g.fillText(ch, 18 + i * 36, 52); }); }

@@ -53,6 +53,8 @@
   };
   // a fourth jewel for pages without marks, so three jewels always contrast with the page's ground
   RIB.amethyst = { base: '#8a3fa8', dark: '#4f1f66', light: '#c08ad8', edge: '#73348e', name: 'amethyst' };
+  // a spare jewel for marked pages whose marks and ground leave too few jewels (board.js _jewels)
+  RIB.rose = { base: '#c75a8c', dark: '#7a2650', light: '#eeaacb', edge: '#ad4a78', name: 'rose madder' };
   // matte tempera for whole strands, as an illuminator lays it on vellum: sh (the same pigment darkened,
   // a shadow stroke along the edge away from the light), bd (the flat body colour), lt (body and lead white,
   // a narrower tint along the lit edge), mo (how strongly the hand-laid paint mottles). bare ribbons have
@@ -66,6 +68,7 @@
     vermilion:   ['#7e2412', '#cc4826', '#eb9c78', 0.9],
     orpiment:    ['#946a1e', '#d9b03e', '#f2dd9c', 0.9],
     amethyst:    ['#3d1d49', '#77418a', '#b895c3', 1],
+    rose:        ['#6a2246', '#c4588a', '#efb3cd', 1],
     gold:        ['#6b4a18', '#b48a40', '#e1c78a', 1.1],
     ink:         ['#1a1009', '#5a4330', '#a08060', 1]
   };
@@ -1423,13 +1426,13 @@
     },
     twinFrame: function (ctx, x, y, w, h, t, o) {
       // gilt corner brackets for a gilded-twin tile (clear of the ribbons, which cross mid-edges)
-      // light touch: three short brackets (the top-left corner holds the group's emblem instead)
+      // four short brackets; the group's emblem sits just inside the top-left one
       var L = w * 0.17, i = w * 0.05, glow = o.glow || 0, lit = o.lit || 0;
       if (images.twinFrame) {
         // the painted brackets: a 2x2 sheet, one bracket pushed into each cell's outer corner
         var im = images.twinFrame, cs = im.naturalWidth / 2, bs = w * 0.27, ins = w * 0.025;
         var put = function () {
-          [[1, 0], [0, 1], [1, 1]].forEach(function (q) {
+          [[0, 0], [1, 0], [0, 1], [1, 1]].forEach(function (q) {
             ctx.drawImage(im, q[0] * cs, q[1] * cs, cs, cs, q[0] ? x + w - ins - bs : x + ins, q[1] ? y + h - ins - bs : y + ins, bs, bs);
           });
         };
@@ -1438,7 +1441,7 @@
         if (shine > 0.01) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha *= 0.55 * shine; put(); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1; }
       } else {
       ctx.lineCap = 'square';
-      [[x + w - i, y + i, -1, 1], [x + i, y + h - i, 1, -1], [x + w - i, y + h - i, -1, -1]].forEach(function (c) {
+      [[x + i, y + i, 1, 1], [x + w - i, y + i, -1, 1], [x + i, y + h - i, 1, -1], [x + w - i, y + h - i, -1, -1]].forEach(function (c) {
         for (var pass = 0; pass < 2; pass++) {
           // o.dark (the board's madder ground): a brown hairline under a brighter, broader gold
           ctx.strokeStyle = pass ? mix(o.dark ? '#f2d27a' : '#d9b04a', '#fff1b8', Math.max(glow, lit * 0.5)) : (o.dark ? HAIR : 'rgba(94,63,14,0.8)');
@@ -1543,15 +1546,21 @@
   // lays the painted ivy for one page into ctx (the cached page background): a spray in each corner that has
   // room, a run along some sides, a few loose sprigs near the edges. avoid: [x, y, w, h] boxes kept clear
   // (board, text, drollery, buttons). The same seed and layout always give the same ivy. False when not loaded.
-  function ivyPage(ctx, W, H, seed, avoid) {
+  // opt.narrow (the portrait layout): ivyNarrow's packing instead. A box's fifth entry is the board's frame width:
+  // on a narrow page the ivy may tuck a little under that frame, as ivy behind a frame would
+  function ivyPage(ctx, W, H, seed, avoid, opt) {
     var C = ivyList('corner'), RU = ivyList('run'), SP = ivyList('sprig');
     if (!C.length) return false;
+    var narrow = !!(opt && opt.narrow);
     var R = rand(seed), U = 5, gw = Math.ceil(W / U), gh = Math.ceil(H / U), occ = new Uint8Array(gw * gh);
     function mark(x0, y0, x1, y1) {
       var j1 = Math.min(gh - 1, Math.floor(y1 / U)), i1 = Math.min(gw - 1, Math.floor(x1 / U));
       for (var j = Math.max(0, Math.floor(y0 / U)); j <= j1; j++) for (var i = Math.max(0, Math.floor(x0 / U)); i <= i1; i++) occ[j * gw + i] = 1;
     }
-    (avoid || []).forEach(function (r) { mark(r[0] - 10, r[1] - 10, r[0] + r[2] + 10, r[1] + r[3] + 10); });
+    (avoid || []).forEach(function (r) {
+      var p = narrow ? (r[4] ? -r[4] * 0.4 : 5) : 10;
+      mark(r[0] - p, r[1] - p, r[0] + r[2] + p, r[1] + r[3] + p);
+    });
     // a corner spray is about 30% of the page's short side across (110-250 px); the cut sprays are ~400 px
     var unit = Math.min(W, H), k0 = Math.max(110, Math.min(250, unit * 0.3)) / 400, m = Math.max(3, unit * 0.01);
     function place(slot, cx, cy, k, fx, fy, rot, halo) {   // halo: extra clearance (px) round each point
@@ -1577,6 +1586,7 @@
       var free = list.filter(function (sl) { return !used[sl]; });
       return (free.length ? free : list)[Math.floor(R() * (free.length || list.length))];
     }
+    if (narrow) return ivyNarrow();
     // corners TL, TR, BR, BL: mirrored (never turned) so the knot sits in the corner and the arms run along the
     // edges; the songbird (spray 6) only perches in a top corner, where it stays upright
     var used = {};
@@ -1617,6 +1627,70 @@
       }
     }
     return true;
+
+    // the portrait page: little bare margin, so the pieces come smaller and are packed into what room there is.
+    // A spray in each corner, slid down under the toolbar or up beside the buttons; trailing runs climbing both
+    // side margins; a run or two lying in the wider gaps; then sprigs, leaves, berries and flowers in the rest
+    function ivyNarrow() {
+      var kc = Math.max(90, Math.min(200, W * 0.27)) / 400, used = {}, SC = [1, 0.86, 0.74, 0.62, 0.52];
+      [[1, 1], [-1, 1], [-1, -1], [1, -1]].forEach(function (q) {
+        var list = q[1] > 0 ? C : C.filter(function (sl) { return sl !== 'ivy.corner.6'; });
+        var sl = pick(list, used), img = images[sl], kj = 0.9 + R() * 0.2;
+        for (var off = 0; off <= H * 0.3; off += 6) {
+          if (SC.some(function (t) {
+            var k = kc * kj * t, w = img.naturalWidth * k, h = img.naturalHeight * k;
+            return place(sl, q[0] > 0 ? m + w / 2 : W - m - w / 2, q[1] > 0 ? m + off + h / 2 : H - m - off - h / 2, k, q[0], q[1], 0);
+          })) { used[sl] = 1; return; }
+        }
+      });
+      // runs up the left and right margins, a quarter turn, as thick as the margin allows
+      var kr = Math.max(0.12, Math.min(0.3, W * 0.065 / 140)), runUsed = {};
+      function runOrder() {
+        var sl0 = pick(RU, runUsed);
+        return [sl0].concat(RU.filter(function (sl) { return sl !== sl0; }).sort(function () { return R() - 0.5; }));
+      }
+      if (RU.length) [[3, -Math.PI / 2], [1, Math.PI / 2]].forEach(function (sd) {
+        var y = m + R() * 30, n = 0;
+        while (y < H - 40 && n < 4) {
+          var fx = R() < 0.5 ? 1 : -1, got = 0;
+          runOrder().some(function (sl) {
+            var img = images[sl];
+            return [1, 0.82, 0.66, 0.52].some(function (t) {
+              var k = kr * t, len = img.naturalWidth * k, th = img.naturalHeight * k;
+              if (y + len > H - m) return false;
+              if (place(sl, sd[0] === 3 ? m + th / 2 : W - m - th / 2, y + len / 2, k, fx, 1, sd[1])) { runUsed[sl] = 1; got = len; return true; }
+              return false;
+            });
+          });
+          if (got) { y += got + 6 + R() * 24; n++; } else y += 8;
+        }
+      });
+      // the free cells of the grid, for dropping pieces into the gaps
+      function freeSpot() {
+        for (var t = 0; t < 40; t++) {
+          var c = Math.floor(R() * gw * gh);
+          if (!occ[c]) return [(c % gw + 0.5) * U, (Math.floor(c / gw) + 0.5) * U];
+        }
+        return null;
+      }
+      // a run or two lying across the wider gaps (under the board, beside the title), nearly level
+      var nr = RU.length ? 1 + Math.floor(R() * 2) : 0;
+      for (var a = 0; a < nr; a++) {
+        for (var tries = 0; tries < 60; tries++) {
+          var p = freeSpot(), sl = pick(RU, runUsed), k = kr * (0.55 + R() * 0.35);
+          if (p && place(sl, p[0], p[1], k, R() < 0.5 ? 1 : -1, 1, (R() - 0.5) * 0.2, 6)) { runUsed[sl] = 1; break; }
+        }
+      }
+      // sprigs, single leaves, berries and flowers in what is left, each a different piece until all have been used
+      var ks = kc * 1.15, ns = SP.length ? Math.round(W * H / 26000) + Math.floor(R() * 5) : 0, spUsed = {};
+      for (var s = 0; s < ns; s++) {
+        for (tries = 0; tries < 50; tries++) {
+          p = freeSpot(); sl = pick(SP, spUsed);
+          if (p && place(sl, p[0], p[1], ks * (0.8 + R() * 0.35), R() < 0.5 ? 1 : -1, 1, (R() - 0.5) * 1.1, 7)) { spUsed[sl] = 1; break; }
+        }
+      }
+      return true;
+    }
   }
 
   var ART = {

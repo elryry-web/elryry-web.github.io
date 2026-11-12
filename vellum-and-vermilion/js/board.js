@@ -12,8 +12,10 @@
    Look: a cached panel (ART.makePanel: the page's ground (ART.groundName: madder, lapis navy, deep
    verdigris, folium purple, or ink for the great initials), gold filigree, gilded frame tracing the mask,
    ivy at the corners) under broad gold-edged enamel ribbons (ART.ribLayers). On pages without
-   pigment marks, whole strands take three jewels clear of the ground's hue by strand; s.color (passed to the
-   callbacks and the bells) stays the puzzle's own colour.
+   pigment marks, whole strands take three jewels clear of the ground's hue by strand; on pages with marks,
+   marked strands take their pigment and unmarked ones take jewels clear of the ground and of the marks'
+   near-twins (never the old burnished gold); s.color (passed to the callbacks and the bells) stays the
+   puzzle's own colour ('gold' for an unmarked strand).
      ~2500 done (main.js writes the grumble, wakes the drollery and shows "Turn the page") */
 (function () {
   'use strict';
@@ -65,14 +67,34 @@
     this.letter = null;
     this.fit(this.fitW || 300, this.fitH || 300);
   };
-  // pages without pigment marks: colour the solution's strands with the three jewels that contrast with
-  // the page's ground (of ultramarine / emerald / crimson / amethyst) so that strands sharing a crossing
-  // (and, where easy, neighbouring strands) differ
+  // the jewel each mark pigment would be mistaken for, so a page with that mark never gives an unmarked
+  // strand its near-twin (orpiment's twin, the burnished gold, is no longer a strand colour at all)
+  var TWIN = { vermilion: 'crimson', verdigris: 'emerald', lapis: 'ultramarine' };
+  // the spare jewel (rose madder) for pages whose marks and ground leave fewer than two jewels; it is
+  // of the madder ground's own hue, so never laid on it
+  var SPARE = 'rose', SPARE_CLASH = { madder: 1 };
+  // colour the solution's strands with jewels that contrast with the page's ground (of ultramarine /
+  // emerald / crimson / amethyst) so that strands sharing a crossing (and, where easy, neighbouring
+  // strands) differ. On pages without marks every strand takes a jewel (three that suit the ground); on
+  // pages with marks the marked strands keep their pigments and only the unmarked ones take jewels, from
+  // those that suit the ground and are no near-twin of the page's marks
   B._jewels = function () {
-    var M = this.M, c; this.jewel = null;
-    for (c = 0; c < M.n; c++) if (M.mark[c]) return;
-    var st = P.trace(M, M.sol), cells = [], W = {}, JN = ART.jewelsFor(this.groundName), rot = ((M.level && M.level.n) || 1) % 3;
+    var M = this.M, c, marks = {}, any = false, gn = this.groundName; this.jewel = null;
+    for (c = 0; c < M.n; c++) if (M.mark[c]) { marks[M.mark[c]] = 1; any = true; }
+    var st = P.trace(M, M.sol), cells = [], W = {}, JN, rot = ((M.level && M.level.n) || 1) % 3;
+    if (!any) JN = ART.jewelsFor(gn);
+    else {
+      var clash = ((ART.GROUND[gn] || {}).clash) || [];
+      JN = ['ultramarine', 'emerald', 'crimson', 'amethyst'].filter(function (j) {
+        return clash.indexOf(j) < 0 && !Object.keys(marks).some(function (m) { return TWIN[m] === j; });
+      });
+      rot = JN.length ? rot % JN.length : 0;
+    }
     JN = JN.slice(rot).concat(JN.slice(0, rot));   // pages start on different jewels
+    var spareOk = any && !SPARE_CLASH[gn];
+    if (spareOk && JN.length < 2) { JN.push(SPARE); spareOk = false; }
+    // which of the solution's strands take a jewel (on a marked page, those without a pigment)
+    var free = st.strands.map(function (s) { return !any || s.color === 'gold'; });
     st.strands.forEach(function (s, si) { s.pieces.forEach(function (q) { (cells[q.c] = cells[q.c] || []).push(si); }); });
     function add(a, b, w) { if (a === b) return; var k = a < b ? a + ',' + b : b + ',' + a; W[k] = (W[k] || 0) + w; }
     for (c = 0; c < M.n; c++) {
@@ -83,22 +105,32 @@
         L.forEach(function (a) { cells[nc].forEach(function (b) { add(a, b, 1); }); });
       }
     }
-    var order = st.strands.map(function (s, si) { return si; }).sort(function (a, b) { return st.strands[b].pieces.length - st.strands[a].pieces.length || a - b; });
-    var col = [], used = [0, 0, 0];
-    order.forEach(function (si) {
-      var cost = [0, 0, 0];
-      col.forEach(function (ci, sj) { if (ci === undefined) return; var w = W[si < sj ? si + ',' + sj : sj + ',' + si]; if (w) cost[ci] += w; });
-      var best = 0;
-      for (var k = 1; k < 3; k++) if (cost[k] < cost[best] || (cost[k] === cost[best] && used[k] < used[best])) best = k;
-      col[si] = best; used[best]++;
-    });
-    this.jewel = { ps: st.pieceStrand, col: col.map(function (i) { return JN[i]; }) };
+    var order = st.strands.map(function (s, si) { return si; }).filter(function (si) { return free[si]; })
+      .sort(function (a, b) { return st.strands[b].pieces.length - st.strands[a].pieces.length || a - b; });
+    if (!JN.length) return;
+    function paint(K) {
+      var col = [], used = [], clashes = 0, k;
+      for (k = 0; k < K; k++) used[k] = 0;
+      order.forEach(function (si) {
+        var cost = used.map(function () { return 0; });
+        col.forEach(function (ci, sj) { if (ci === undefined) return; var w = W[si < sj ? si + ',' + sj : sj + ',' + si]; if (w) cost[ci] += w; });
+        var best = 0;
+        for (k = 1; k < K; k++) if (cost[k] < cost[best] || (cost[k] === cost[best] && used[k] < used[best])) best = k;
+        if (cost[best] >= 3) clashes++;   // shares a crossing with a strand of the same jewel
+        col[si] = best; used[best]++;
+      });
+      return { col: col, clashes: clashes };
+    }
+    var res = paint(JN.length);
+    if (res.clashes && spareOk) { JN.push(SPARE); res = paint(JN.length); }   // the spare only where it is needed
+    this.jewel = { ps: st.pieceStrand, col: res.col.map(function (i) { return i === undefined ? null : JN[i]; }), first: JN[0] };
   };
-  // the colour a whole strand is painted (a RIB name): its mark's pigment, else its jewel, else gold
+  // the colour a whole strand is painted (a RIB name): its mark's pigment, else its jewel (the jewel of
+  // the solution strand it shares most pieces with, or the page's first jewel)
   B._disp = function (s) {
     if (s.color !== 'gold' || !this.jewel) return s.color;
-    var J = this.jewel, n = {}, best = 'gold', bn = 0;
-    s.pieces.forEach(function (q) { var si = J.ps[q.c + ':' + q.p]; if (si === undefined) return; var nm = J.col[si]; n[nm] = (n[nm] || 0) + 1; if (n[nm] > bn) { bn = n[nm]; best = nm; } });
+    var J = this.jewel, n = {}, best = J.first, bn = 0;
+    s.pieces.forEach(function (q) { var si = J.ps[q.c + ':' + q.p]; if (si === undefined) return; var nm = J.col[si]; if (!nm) return; n[nm] = (n[nm] || 0) + 1; if (n[nm] > bn) { bn = n[nm]; best = nm; } });
     return best;
   };
   B.getState = function () {
@@ -528,7 +560,7 @@
   };
   B._emblem = function (g, m, gi, t, glow) {
     var M = this.M, S = this.S;
-    ART.draw(g, 'twinEmblem', this.pad + (m % M.w) * S + S * 0.04, this.pad + (m / M.w | 0) * S + S * 0.04, S * 0.2, S * 0.2, t, { kind: gi, glow: glow });
+    ART.draw(g, 'twinEmblem', this.pad + (m % M.w) * S + S * 0.085, this.pad + (m / M.w | 0) * S + S * 0.085, S * 0.15, S * 0.15, t, { kind: gi, glow: glow });
   };
   // the panel, the great initial, the play grid and the twins' brackets; returns each twin group's glow
   B._drawBase = function (g, t, K) {
