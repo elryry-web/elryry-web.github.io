@@ -227,7 +227,7 @@ STORY.push({
   characters: ['Brother Clement', 'Brother Anselm', 'Brother Odo', 'Kit', 'Hob'],
   size: '4×4',
   grade: 'Journeyman',
-  intro: "The Prior set four of us to watch the eel water, one each night from Monday to Thursday, each at a different place along the drain, from the sluice by the abbey wall past the willow and the reed bed to the black pool by Hob's mill. Each of us saw one thing. We all told it at Chapter at once, so the Prior made us go again one at a time while I wrote. Brother Odo told his longest.",
+  intro: "The Prior set four of us to watch the eel water, one each night from Monday to Thursday, each at a different place along the drain, from the sluice by the abbey wall past the willow and the reed bed to the black pool by Hob's mill. Each of us saw one thing. At Chapter we all talked over each other, so the Prior made us go again one at a time while I wrote. Brother Odo told his longest.",
   task: 'Can you work out which night each monk watched, where he watched from, and what he saw?',
   categories: [
     { id: 'who', name: 'Watchers', items: [
