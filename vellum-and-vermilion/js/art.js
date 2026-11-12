@@ -73,6 +73,12 @@
     ink:         ['#1a1009', '#5a4330', '#a08060', 1]
   };
   Object.keys(PAINT).forEach(function (k) { var p = PAINT[k]; RIB[k].sh = p[0]; RIB[k].bd = p[1]; RIB[k].lt = p[2]; RIB[k].mo = p[3]; });
+  // gilt: one accent strand per page (board.js _jewels) shaded as gold without metal paint (as Quill & Sigil's
+  // gilded lettering): hard bands across the ribbon, umber edge, red-brown, ochre, warm gold, and a sharp
+  // pale-cream line toward the light (paintBody hands it to gildBody). sh/bd/lt serve the beasts and the drain
+  RIB.gilt = { base: '#d9a23e', dark: '#5a2a0e', light: '#fff1c4', edge: '#8a4d18', name: 'gilt', nmm: 1,
+    sh: '#5a2a0e', bd: '#c98b2e', lt: '#f3d27a', mo: 0,
+    bands: ['#341405', '#7a3c14', '#b8782a', '#e4ad48', '#f6d47e'], hi: '#fff6d6' };
   var HAIR = '#2a1508', GILT = '#c08f38', GILT_L = '#ecca6e', MADDER = '#6c1b15';
 
   /* ---------- panel grounds: deep manuscript grounds the gold filigree reads on ----------
@@ -357,8 +363,9 @@
       });
     })();
   }
-  function beastModel(slot, q) {
-    var key = slot + '|' + q;
+  // GL, gk: other nested strokes (the gilt's, giltLayers) and their cache key; then m holds their value, no pen
+  function beastModel(slot, q, GL, gk) {
+    var key = slot + '|' + q + (GL ? '|' + gk : '');
     if (beastMod[key]) return beastMod[key];
     var P = prepBeast(slot), B = BEAST[slot];
     if (!P) return null;
@@ -370,7 +377,7 @@
     if (q === 0 || q === 3) iy = -iy;
     var ax = ix / r, cp = Math.cos(B.phi), sp = Math.sin(B.phi), ux = cp * ax + sp * iy, uy = -sp * ax + cp * iy;
     var ul = Math.hypot(ux, uy), nx = ux / ul, ny = uy / ul, s = SHADE, t = TINT;
-    var L = [[-1, 1, 0], [-0.6, 1 - 0.45 * s, 0.225 * s], [-0.25, 1 - 0.78 * s, 0.39 * s], [1, 1 - s, s / 2],
+    var L = GL || [[-1, 1, 0], [-0.6, 1 - 0.45 * s, 0.225 * s], [-0.25, 1 - 0.78 * s, 0.39 * s], [1, 1 - s, s / 2],
       [0.6, 1 - s - 0.45 * t, (s - 0.45 * t) / 2], [0.28, 1 - s - 0.75 * t, (s - 0.75 * t) / 2], [0, 1 - s - t, (s - t) / 2]];
     var m = new Float32Array(N), pen = new Float32Array(N), pw = 0.034 * w, pd = w * (0.5 - 0.2 * 0.7071), AA = 1.4, D = P.D;
     for (var y = 0; y < H; y++) for (var x = 0; x < W; x++) {
@@ -383,6 +390,7 @@
         if (c > 0) v += (L[k][0] - v) * (c > 1 ? 1 : c);
       }
       m[i] = v;
+      if (GL) continue;
       var pf = sstep(B.pen[0], B.pen[1], P.xa[i]);
       if (pf > 0 && Math.abs(D[i] - pd) < pw) {   // the pen keeps its distance in from the lit edge, as on the ribbon
         var gx = sampD(P, x + 1, y) - sampD(P, x - 1, y), gy = sampD(P, x, y + 1) - sampD(P, x, y - 1), gl = Math.hypot(gx, gy);
@@ -398,6 +406,7 @@
   // the ramp a beast is retinted to: a painted strand's own, the bare vellum's, or one made from a flat colour
   function beastRamp(o) {
     var r = o.fill;
+    if (r && r.nmm) return { key: 'gilt', sh: r.sh, bd: r.bd, lt: r.lt, mo: 0, paint: true, gilt: r };
     if (r && r.sh) return { key: r.sh + r.bd + r.lt, sh: r.sh, bd: r.bd, lt: r.lt, mo: r.mo || 1, paint: true };
     if (o.flat) return { key: 'flat' + o.flat, sh: mix(o.flat, '#120800', 0.45), bd: o.flat, lt: mix(o.flat, '#fffbe8', 0.5) };
     var b = RIB.bare;
@@ -423,10 +432,16 @@
   // the cut). It also keeps a mask of its paint, for the mottle laid over it where it lies on the page
   function beastCanvas(slot, ramp, kc, rim, q) {
     var painted = !!ramp.paint && q != null;
-    var key = slot + '|' + ramp.key + '|' + Math.round(kc * 4000) + '|' + (rim ? rim.join(',') : '') + (painted ? '|q' + q : '');
+    var key = slot + '|' + ramp.key + '|' + Math.round(kc * 4000) + '|' + (rim ? rim.join(',') : '') + (ramp.paint && q != null ? '|q' + q : '');
     if (beastCache[key]) return beastCache[key];
     var P = prepBeast(slot); if (!P) return null;
-    var Mo = painted ? beastModel(slot, q) : null;
+    var gilt = painted && ramp.gilt, Mo, CG, eF, hF, glint = null, gv = -1;
+    if (gilt) {   // the gilt's bands measured from the beast's outline, with the ribbon's pixel floors at this size
+      var wd = BEAST[slot].band * kc;   // the ribbon's width in device px
+      eF = Math.round(Math.max(0.1, 1.4 / wd) * 200) / 200; hF = Math.round(Math.max(0.085, 1.6 / wd) * 200) / 200;
+      Mo = beastModel(slot, q, giltLayers(eF, hF), eF + ',' + hF);
+      CG = ramp.gilt.bands.concat([ramp.gilt.hi]).map(rgbOf);
+    } else Mo = painted ? beastModel(slot, q) : null;
     var W = P.W, H = P.H, N = W * H, lut = [], k, i, B = BEAST[slot];
     for (k = 0; k <= 64; k++) lut.push(rgbOf(beastAt(ramp, k / 64)));
     var low = lut[Math.round(0.1 * 64)], ref = [170, 154, 128];
@@ -435,6 +450,7 @@
     var mk = painted ? sg.createImageData(W, H) : null, md = mk ? mk.data : null;
     var S0, B0, L0, CT, PC = [251, 241, 218], pc = [0, 0, 0];
     if (painted) { S0 = rgbOf(ramp.sh); B0 = rgbOf(ramp.bd); L0 = rgbOf(ramp.lt); CT = rgbOf(mix(ramp.sh, HAIR, 0.3)); }
+    if (gilt) CT = rgbOf(mix(ramp.gilt.bands[0], HAIR, 0.5));
     for (i = 0; i < N; i++) {
       var qq = i * 4, a = P.fade[i] > 0 ? d[qq + 3] : 0;   // cut square at the neck; faded after the rim is on
       if (a < 1) { o[qq + 3] = 0; continue; }
@@ -444,11 +460,20 @@
         var ob = sstep(B.band / 2 + 3, B.band / 2 + 15, Math.abs(ya));   // out of the band (an ear): part of the head
         var xa = P.xa[i], hv = 1 - sstep(B.mod[0], B.mod[1], xa) * (1 - ob);   // 0 on the neck, 1 over the head
         var dl = (L - P.Lmed) / P.Lsp; dl = dl < -1 ? -1 : dl > 1 ? 1 : dl; dl = dl < 0 ? -Math.pow(-dl, 1.6) : Math.pow(dl, 1.6);
+        if (gilt) {   // the ribbon's bands run on up the neck; over the head the art's own light is laid in the same
+          // hard steps (umber, red-brown, ochre, gold, pale gold), never blended softly between them
+          var gv0 = Mo.m[i] * (1 - 0.4 * hv) + (1.2 + 1.6 * (dl + 1)) * 0.4 * hv;
+          gv0 = gv0 < 0 ? 0 : gv0 > 5 ? 5 : gv0;
+          var gf = Math.min(4, gv0 | 0), gt = sstep(0.35, 0.65, gv0 - gf), c0 = CG[gf], c1 = CG[gf + 1];
+          pc[0] = c0[0] + (c1[0] - c0[0]) * gt; pc[1] = c0[1] + (c1[1] - c0[1]) * gt; pc[2] = c0[2] + (c1[2] - c0[2]) * gt;
+          if (hv > 0.6 && ob < 0.5 && L >= 0.62 && P.D[i] > B.band * 0.12 && gv0 > gv) { gv = gv0; glint = [px, py]; }
+        } else {
         var v = Mo.m[i] * (1 - 0.45 * hv) + dl * (0.1 + 0.3 * hv);
         v = v < -1 ? -1 : v > 1 ? 1 : v;
         var tg = v < 0 ? S0 : L0, av = v < 0 ? -v : v;
         pc[0] = B0[0] + (tg[0] - B0[0]) * av; pc[1] = B0[1] + (tg[1] - B0[1]) * av; pc[2] = B0[2] + (tg[2] - B0[2]) * av;
-        var pa = Mo.pen[i] * 0.5 * (1 - ob);
+        }
+        var pa = gilt ? 0 : Mo.pen[i] * 0.5 * (1 - ob);
         if (pa > 0) { pc[0] += (PC[0] - pc[0]) * pa; pc[1] += (PC[1] - pc[1]) * pa; pc[2] += (PC[2] - pc[2]) * pa; }
         var kw = L >= 0.62 ? w : w * sstep(0.22, 0.62, L);   // the pixel's share of cream (an outline's soft edge: part)
         if (kw < 1) {
@@ -471,6 +496,11 @@
       o[qq] = r < 0 ? 0 : r > 255 ? 255 : r; o[qq + 1] = g < 0 ? 0 : g > 255 ? 255 : g; o[qq + 2] = b < 0 ? 0 : b > 255 ? 255 : b; o[qq + 3] = a;
     }
     sg.putImageData(id, 0, 0);
+    if (glint) {   // a pinpoint of near-white on the head's brightest gold
+      var gr = Math.max(B.band * 0.07, 1.3 / kc);
+      sg.fillStyle = 'rgba(255,250,232,0.55)'; sg.beginPath(); sg.arc(glint[0], glint[1], gr * 1.6, 0, 6.2832); sg.fill();
+      sg.fillStyle = '#fffdf4'; sg.beginPath(); sg.arc(glint[0], glint[1], gr * 0.8, 0, 6.2832); sg.fill();
+    }
     var tw = Math.max(2, Math.round(W * kc)), th = Math.max(2, Math.round(H * kc));
     var art = beastDown(src, W, H, tw, th), mask = null;
     if (painted) { sg.putImageData(mk, 0, 0); mask = beastDown(src, W, H, tw, th); }
@@ -575,7 +605,7 @@
       if (!c) return;
       ctx.globalAlpha = i === 1 && c0 ? amt : 1;
       ctx.drawImage(c.cv, -c.pad / c.kc, -c.pad / c.kc, c.cv.width / c.kc, c.cv.height / c.kc);
-      if (i === 1 && still) {   // the strand's mottle, pinned to the page, runs on over the beast
+      if (i === 1 && still && !ramp.gilt) {   // the strand's mottle, pinned to the page, runs on over the beast
         var Mc = ctx.getTransform().translate(-c.pad / c.kc, -c.pad / c.kc).scale(1 / c.kc), mot = beastMottle(c, Mc, dev);
         if (mot) {
           ctx.globalAlpha = Math.min(1, 0.75 * (ramp.mo || 1)) * (c0 ? amt : 1);
@@ -1012,7 +1042,58 @@
   // ext (path(ctx, ext) runs its ends this much further, so strokes moved toward the light leave no gaps)
   var PEN = 'line';   // lead-white penwork: 'line' or 'dots'
   var SHADE = 0.3, TINT = 0.13;   // the shadow and the tint, in ribbons, where the light falls square across
+  // gilt as a miniature painter lays it: nested hard-edged bands, each a flat colour, the lighter ones narrower
+  // and pushed toward the light, so the shadowed edge runs dark umber and red-brown and the lit side carries a
+  // narrow pale-cream line beside a dark rim; no gradients (a soft ramp only reads as better ochre). Widths are
+  // fractions of the ribbon with floors in pixels, so on a phone the line stays a line and the umber edge stays
+  // visible. Where the strand has its own centre (a piece's middle, so its crossing tile's over-pass) a pinpoint
+  // near-white glint sits on the line, on about half the pieces, fixed per piece
+  // the gilt's nested strokes, shared by the ribbon (gildBody) and its beasts (beastModel): [value, width, shift
+  // toward the light], widths and shifts as fractions of the ribbon. value: 0..4 the bands (rib.bands), 5 the
+  // cream line (rib.hi); the dark line beside it is band 1. eF, hF: the umber rim's and the line's widths
+  function giltLayers(eF, hF) {
+    var inner = 1 - 2 * eF, hs = Math.min(0.5 - eF - hF * 0.5 - 0.04, 0.3);
+    return [[0, 1, 0], [1, inner, 0.02], [2, inner * 0.78, 0.07], [3, inner * 0.56, 0.12], [4, inner * 0.3, 0.2],
+      [1, hF + 0.05, hs + 0.03], [5, hF, hs]];
+  }
+  function gildBody(ctx, path, w, S, rib, dash, fx) {
+    var ang = fx.ang || 0, ext = fx.ext || 0, C = rib.bands;
+    var vx = -0.7071, vy = -0.7071;
+    var ux = vx * Math.cos(ang) + vy * Math.sin(ang), uy = -vx * Math.sin(ang) + vy * Math.cos(ang);
+    var tm = ctx.getTransform ? ctx.getTransform() : { a: 1, b: 0 }, px = 1 / Math.max(1, Math.hypot(tm.a, tm.b));   // one device pixel, in path units
+    var edgeW = Math.max(1.4 * px, w * 0.1);   // the umber rim on each side never thinner than about a device pixel and a half
+    var hiW = Math.max(1.6 * px, w * 0.085);   // the highlight line: at least a pixel and a half wide
+    var GL = giltLayers(edgeW / w, hiW / w), L = GL.slice(0, 5).map(function (q) { return [C[q[0]], q[1], q[2]]; });
+    var inner = 1 - 2 * edgeW / w;
+    if (fx.mini) L = [[C[0], 1, 0], [C[2], inner, 0.03], [C[4], inner * 0.4, 0.15]];
+    ctx.lineCap = 'butt';
+    function band(col, wid, sh) {
+      ctx.strokeStyle = col; ctx.lineWidth = wid;
+      if (sh) { ctx.save(); ctx.translate(ux * sh * w, uy * sh * w); if (dash) ctx.lineDashOffset = -ext; }
+      ctx.beginPath(); if (sh) path(ctx, ext); else path(ctx); ctx.stroke();
+      if (sh) ctx.restore();
+    }
+    for (var k = 0; k < L.length; k++) band(L[k][0], w * L[k][1], L[k][2]);
+    // the burnished line: a sharp pale-cream stroke on the lit side of the warm gold, a dark line beside it
+    // on its outer side (the umber shows between it and the lit rim), so it reads as a reflection, not paint
+    var hs = GL[6][2];
+    band(C[1], hiW + 2 * Math.max(0.6 * px, w * 0.025), hs + 0.03);
+    band(rib.hi, hiW, hs);
+    if (dash) ctx.lineDashOffset = 0;
+    // the glint
+    var Lp = fx.len || 0;
+    if (fx.mini || dash || !Lp) return;
+    var h = ((fx.cell || 0) * 7 + (fx.piece || 0) * 3 + 1) * 2654435761 % 4294967296;
+    if (h % 2) return;
+    var T = Lp + 2 * ext, r = Math.max(1.3 * px, w * 0.08);
+    ctx.save(); ctx.translate(ux * hs * w, uy * hs * w);
+    ctx.lineCap = 'round'; ctx.setLineDash([0.01, T * 3]); ctx.lineDashOffset = -T / 2;
+    ctx.strokeStyle = 'rgba(255,250,232,0.55)'; ctx.lineWidth = r * 3.2; ctx.beginPath(); path(ctx, ext); ctx.stroke();
+    ctx.strokeStyle = '#fffdf4'; ctx.lineWidth = r * 1.6; ctx.beginPath(); path(ctx, ext); ctx.stroke();
+    ctx.setLineDash([]); ctx.lineDashOffset = 0; ctx.restore();
+  }
   function paintBody(ctx, path, w, S, rib, dash, fx) {
+    if (rib.nmm) { gildBody(ctx, path, w, S, rib, dash, fx); return; }
     var rich = rib.rich == null ? 1 : rib.rich, ang = fx.ang || 0, ext = fx.ext || 0;
     // the light falls from the top-left of the page whatever the tile's turn: u, in the tile's frame
     var vx = -0.7071, vy = -0.7071;

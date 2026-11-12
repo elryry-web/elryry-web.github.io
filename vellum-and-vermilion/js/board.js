@@ -73,6 +73,8 @@
   // the spare jewel (rose madder) for pages whose marks and ground leave fewer than two jewels; it is
   // of the madder ground's own hue, so never laid on it
   var SPARE = 'rose', SPARE_CLASH = { madder: 1 };
+  // the mark pigment a gilt strand could be mistaken for: a page with an orpiment mark has no gilt
+  var GILT_CLASH = { orpiment: 1 };
   // colour the solution's strands with jewels that contrast with the page's ground (of ultramarine /
   // emerald / crimson / amethyst) so that strands sharing a crossing (and, where easy, neighbouring
   // strands) differ. On pages without marks every strand takes a jewel (three that suit the ground); on
@@ -123,7 +125,11 @@
     }
     var res = paint(JN.length);
     if (res.clashes && spareOk) { JN.push(SPARE); res = paint(JN.length); }   // the spare only where it is needed
-    this.jewel = { ps: st.pieceStrand, col: res.col.map(function (i) { return i === undefined ? null : JN[i]; }), first: JN[0] };
+    var col = res.col.map(function (i) { return i === undefined ? null : JN[i]; });
+    // one accent of gilt (ART.RIB.gilt): the longest unmarked strand (ties to the lower index), never on a page
+    // with a warm mark it could be taken for
+    if (order.length && !Object.keys(marks).some(function (m) { return GILT_CLASH[m]; })) col[order[0]] = 'gilt';
+    this.jewel = { ps: st.pieceStrand, col: col, first: JN[0] };
   };
   // the colour a whole strand is painted (a RIB name): its mark's pigment, else its jewel (the jewel of
   // the solution strand it shares most pieces with, or the page's first jewel)
