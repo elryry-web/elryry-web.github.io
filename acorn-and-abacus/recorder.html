@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pip's Recorder</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Andika:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --cream: #fbf6e4; --paper: #fffcf2; --leaf: #e2efcf; --moss: #7fa85a; --moss-d: #557a3a;
+      --bark: #8a6a45; --bark-d: #5a4126; --ink: #3b2e20; --sun-soft: #fcebb0; --berry: #d0563c;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--cream); color: var(--ink); font: 17px/1.4 Andika, system-ui, sans-serif; }
+    header { position: sticky; top: 0; z-index: 2; background: var(--paper); border-bottom: 2px solid var(--bark); padding: 12px 20px 14px; }
+    h1 { font-size: 22px; margin: 0 12px 0 0; display: inline-block; }
+    .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+    .counts { color: var(--bark-d); }
+    button { font: inherit; cursor: pointer; border: 2px solid var(--bark); border-radius: 10px; background: var(--paper); color: var(--ink); padding: 4px 12px; }
+    button:hover { background: var(--leaf); }
+    button:disabled { opacity: .4; cursor: default; background: var(--paper); }
+    .warn { background: var(--sun-soft); border: 2px solid #d9b44a; border-radius: 10px; padding: 8px 12px; margin-top: 10px; }
+    .warn[hidden] { display: none; }
+    .now { display: grid; grid-template-columns: 1fr auto; gap: 4px 20px; margin-top: 12px; padding: 12px 16px; border-radius: 14px; background: var(--leaf); border: 2px solid var(--moss); }
+    .now .text { font-size: 34px; font-weight: 700; line-height: 1.2; }
+    .now .note { color: var(--bark-d); }
+    .now .key { font: 13px ui-monospace, Consolas, monospace; color: var(--bark); }
+    .now .state { grid-row: 1 / span 3; grid-column: 2; align-self: center; text-align: right; min-width: 260px; }
+    .state .msg { font-weight: 700; }
+    .state.rec .msg { color: var(--berry); }
+    .meter { height: 10px; width: 260px; border-radius: 5px; background: #fff; border: 1px solid var(--bark); overflow: hidden; margin: 6px 0 0 auto; }
+    .meter i { display: block; height: 100%; width: 0; background: var(--moss); }
+    .meter.hot i { background: var(--berry); }
+    .help { color: var(--bark-d); font-size: 15px; margin-top: 8px; }
+    kbd { font: 13px ui-monospace, Consolas, monospace; border: 1px solid var(--bark); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; background: #fff; }
+    main { padding: 10px 20px 60px; max-width: 1100px; }
+    h2 { font-size: 20px; margin: 26px 0 4px; }
+    h3 { font-size: 16px; margin: 16px 0 4px; color: var(--bark-d); }
+    .line { display: grid; grid-template-columns: 22px 1fr auto; gap: 0 12px; align-items: center; padding: 6px 10px; border-radius: 10px; cursor: pointer; border: 2px solid transparent; }
+    .line:hover { background: var(--paper); }
+    .line.sel { background: var(--paper); border-color: var(--moss); }
+    .line .dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--bark); }
+    .line.done .dot { background: var(--moss); border-color: var(--moss-d); }
+    .line .t { font-weight: 700; }
+    .line .n { color: var(--bark-d); font-size: 15px; }
+    .line .k { font: 12px ui-monospace, Consolas, monospace; color: var(--bark); margin-left: 8px; font-weight: 400; }
+    @media (max-width: 700px) {
+      .now { grid-template-columns: 1fr; }
+      .now .state { grid-row: auto; grid-column: 1; text-align: left; }
+      .meter { margin-left: 0; width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="bar">
+      <h1>Pip's recorder</h1>
+      <span class="counts" id="counts"></span>
+      <button id="pick">Choose the audio folder</button>
+      <button id="reconnect" hidden>Reconnect</button>
+      <span id="folder" class="counts"></span>
+    </div>
+    <div id="nofs" class="warn" hidden>
+      This browser can't save files into a folder, so nothing can be saved here.
+      Open this page in Chrome or Edge on a computer. You can still read the script and try takes.
+    </div>
+    <div id="norec" class="warn" hidden>This browser can't record from the microphone.</div>
+    <div id="err" class="warn" hidden></div>
+    <div class="now" id="now">
+      <div class="text" id="now-text"></div>
+      <div class="note" id="now-note"></div>
+      <div class="key" id="now-key"></div>
+      <div class="state" id="state"><div class="msg" id="msg"></div><div class="meter" id="meter"><i></i></div></div>
+    </div>
+    <div class="help">
+      <kbd>Space</kbd> start or stop recording (it plays back on its own) ·
+      <kbd>Enter</kbd> keep it and go to the next line not yet recorded ·
+      <kbd>Backspace</kbd> record it again ·
+      <kbd>↑</kbd> <kbd>↓</kbd> or click to move.
+      Leave a short breath before and after; the silence is cut off.
+    </div>
+  </header>
+  <main id="list"></main>
+  <script type="module" src="js/recorder.js"></script>
+</body>
+</html>

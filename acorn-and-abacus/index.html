@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Acorn &amp; Abacus</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Andika:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="stage" data-screen="start">
+    <aside id="side">
+      <div id="guide-slot"></div>
+      <button id="home-btn" class="side-btn target" aria-label="Back to the games" hidden>
+        <svg viewBox="0 0 100 100" width="64" height="64" aria-hidden="true">
+          <path d="M16 50 L50 20 L84 50" fill="none" stroke="#5a3d26" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M26 46 V82 H74 V46" fill="#f4e2c2" stroke="#5a3d26" stroke-width="7" stroke-linejoin="round"/>
+          <rect x="43" y="58" width="15" height="24" fill="#8a5d3b"/>
+        </svg>
+      </button>
+      <div class="side-gap"></div>
+      <button id="replay-btn" class="side-btn replay target" aria-label="Say it again (R)">
+        <svg viewBox="0 0 100 100" width="92" height="92" aria-hidden="true">
+          <path d="M58 22 C40 22 30 36 30 50 C30 60 36 64 40 70 C44 76 42 84 50 86 C58 88 62 80 62 74 C62 66 72 62 72 48 C72 34 66 22 58 22 Z"
+                fill="#f4d3b4" stroke="#5a3d26" stroke-width="6" stroke-linejoin="round"/>
+          <path d="M44 48 C44 38 56 34 60 42 C63 48 56 52 52 56" fill="none" stroke="#5a3d26" stroke-width="5" stroke-linecap="round"/>
+          <path d="M80 34 C86 42 86 56 80 64" fill="none" stroke="#55703f" stroke-width="6" stroke-linecap="round"/>
+          <path d="M88 26 C98 38 98 60 88 72" fill="none" stroke="#55703f" stroke-width="6" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </aside>
+    <main id="main"></main>
+    <div id="caption" class="caption" hidden aria-live="polite"><div class="cap-prev"></div><div class="cap-now"></div></div>
+    <button id="grownup-btn" aria-label="Grown-up corner: hold for 2 seconds">Grown-up</button>
+    <div id="overlay" hidden></div>
+    <div id="grownup-layer" hidden></div>
+  </div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
