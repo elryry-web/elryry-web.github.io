@@ -664,11 +664,19 @@
     g.scale(scale, scale);
     var R = rand(1234);
     if (drawSheet(g, 'page', 0, 0, w, h, variant)) {   // the painted vellum, then only the ruling below
-      g.fillStyle = 'rgba(250,240,215,0.16)'; g.fillRect(0, 0, w, h);   // a touch of lead white so ink reads
+      // warmed to the drawn leaf's tone: a multiply wash whose stops are PAGE_WASH over the
+      // painted sheet's mean colour (so its stains and fibres stay, but its average and falloff match), then
+      // the same darker edges
+      var pm = pageMean(), wash = g.createRadialGradient(w * 0.5, h * 0.45, Math.min(w, h) * 0.1, w * 0.5, h * 0.5, Math.max(w, h) * 0.75);
+      PAGE_WASH.forEach(function (s) {
+        wash.addColorStop(s[0], 'rgb(' + s[1].map(function (c, i) { return Math.min(255, Math.round(255 * c / pm[i])); }).join(',') + ')');
+      });
+      g.save(); g.globalCompositeOperation = 'multiply'; g.fillStyle = wash; g.fillRect(0, 0, w, h); g.restore();
+      pageEdges(g, w, h);
       return rulePage(g, cv, w, h, margin, R);
     }
     var grd = g.createRadialGradient(w * 0.5, h * 0.45, Math.min(w, h) * 0.1, w * 0.5, h * 0.5, Math.max(w, h) * 0.75);
-    grd.addColorStop(0, '#f1e3c1'); grd.addColorStop(0.6, '#e8d3a6'); grd.addColorStop(1, '#cfae76');
+    PAGE_STOPS.forEach(function (s) { grd.addColorStop(s[0], 'rgb(' + s[1].join(',') + ')'); });
     g.fillStyle = grd; g.fillRect(0, 0, w, h);
     // mottling
     for (var i = 0; i < 70; i++) {
@@ -696,14 +704,36 @@
       g.fillStyle = 'rgba(90,60,30,' + (0.05 + R() * 0.12) + ')';
       g.beginPath(); g.arc(R() * w, R() * h, 0.3 + R() * 0.7, 0, 6.283); g.fill();
     }
-    // darker edges
+    pageEdges(g, w, h);
+    return rulePage(g, cv, w, h, margin, R);
+  }
+  // the drawn leaf's gradient (#f1e3c1, #e8d3a6, #cfae76), which the painted sheet is warmed to match
+  var PAGE_STOPS = [[0, [241, 227, 193]], [0.6, [232, 211, 166]], [1, [207, 174, 118]]], pageMeanC = null;
+  // what the painted sheet's mean is pulled to: the drawn leaf's stops darkened as its own mottle, fibres and
+  // speckles darken them (measured in the browser: drawn leaf centre 224,210,177, mid 222,204,166)
+  var PAGE_WASH = [[0, [223, 207, 171]], [0.6, [218, 198, 154]], [1, [205, 172, 118]]];
+  // the painted sheet's mean colour, measured once from a small copy of its cropped area
+  function pageMean() {
+    if (pageMeanC && pageMeanC.img === images.page) return pageMeanC.rgb;
+    var rgb = [240, 227, 202];   // measured from vellum-leaf.png, in case the canvas can't be read
+    try {
+      var c = document.createElement('canvas'); c.width = c.height = 32;
+      drawSheet(c.getContext('2d'), 'page', 0, 0, 32, 32, 0);
+      var d = c.getContext('2d').getImageData(0, 0, 32, 32).data, s = [0, 0, 0];
+      for (var i = 0; i < d.length; i += 4) { s[0] += d[i]; s[1] += d[i + 1]; s[2] += d[i + 2]; }
+      rgb = s.map(function (a) { return Math.max(1, a / (d.length / 4)); });
+    } catch (err) { /* keep the measured fallback */ }
+    pageMeanC = { img: images.page, rgb: rgb };
+    return rgb;
+  }
+  // darker edges
+  function pageEdges(g, w, h) {
     var e = Math.min(w, h) * 0.09;
     [['left', 0, 0, e, 0], ['right', w, 0, w - e, 0], ['top', 0, 0, 0, e], ['bottom', 0, h, 0, h - e]].forEach(function (s) {
       var lg = g.createLinearGradient(s[1], s[2], s[3], s[4]);
       lg.addColorStop(0, 'rgba(110,70,25,0.32)'); lg.addColorStop(1, 'rgba(110,70,25,0)');
       g.fillStyle = lg; g.fillRect(0, 0, w, h);
     });
-    return rulePage(g, cv, w, h, margin, R);
   }
   // margins, ruling and pricking (over the drawn or the painted vellum)
   function rulePage(g, cv, w, h, margin, R) {
