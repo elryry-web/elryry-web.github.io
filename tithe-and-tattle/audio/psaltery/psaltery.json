@@ -1,0 +1,88 @@
+{
+ "source": "VCSL Bowed Psaltery, LongBow (Sam Gossner), CC0, https://github.com/sgossner/VCSL",
+ "sr": 22050,
+ "oneshot": false,
+ "notes": {
+  "C5": {
+   "file": "C5.wav",
+   "m": 72,
+   "hz": 523.008,
+   "gain": 0.6871,
+   "from": "BowedPsaltery_C4_Main_LongBow_rr1.wav",
+   "loopStart": 0.3,
+   "loopEnd": 1.400091
+  },
+  "D5": {
+   "file": "D5.wav",
+   "m": 74,
+   "hz": 588.105,
+   "gain": 0.5946,
+   "from": "BowedPsaltery_D4_Main_LongBow_rr1.wav",
+   "loopStart": 0.3,
+   "loopEnd": 1.400816
+  },
+  "E5": {
+   "file": "E5.wav",
+   "m": 76,
+   "hz": 658.423,
+   "gain": 0.5792,
+   "from": "BowedPsaltery_E4_Main_LongBow_rr2.wav",
+   "loopStart": 0.3,
+   "loopEnd": 1.401179
+  },
+  "F#5": {
+   "file": "Fs5.wav",
+   "m": 78,
+   "hz": 740.346,
+   "gain": 0.713,
+   "from": "BowedPsaltery_F#4_Main_LongBow_rr1.wav",
+   "loopStart": 0.3,
+   "loopEnd": 1.400862
+  },
+  "G#5": {
+   "file": "Gs5.wav",
+   "m": 80,
+   "hz": 831.824,
+   "gain": 0.7441,
+   "from": "BowedPsaltery_G#4_Main_LongBow_rr1.wav",
+   "loopStart": 0.3,
+   "loopEnd": 1.399048
+  },
+  "A#5": {
+   "file": "As5.wav",
+   "m": 82,
+   "hz": 933.164,
+   "gain": 0.6348,
+   "from": "BowedPsaltery_A#4_Main_LongBow_rr2.wav",
+   "loopStart": 0.3,
+   "loopEnd": 1.344898
+  },
+  "C6": {
+   "file": "C6.wav",
+   "m": 84,
+   "hz": 1047.192,
+   "gain": 0.8241,
+   "from": "BowedPsaltery_C5_Main_LongBow_rr1.wav",
+   "loopStart": 0.3,
+   "loopEnd": 1.400862
+  },
+  "D6": {
+   "file": "D6.wav",
+   "m": 86,
+   "hz": 1175.251,
+   "gain": 0.5647,
+   "from": "BowedPsaltery_D5_Main_LongBow_rr2.wav",
+   "loopStart": 0.3,
+   "loopEnd": 1.022404
+  },
+  "E6": {
+   "file": "E6.wav",
+   "m": 88,
+   "hz": 1319.926,
+   "gain": 0.588,
+   "from": "BowedPsaltery_E5_Main_LongBow_rr2.wav",
+   "loopStart": 0.3,
+   "loopEnd": 1.078186
+  }
+ }
+}

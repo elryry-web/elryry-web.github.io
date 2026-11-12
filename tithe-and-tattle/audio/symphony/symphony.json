@@ -1,0 +1,43 @@
+{
+ "source": "University of Iowa Musical Instrument Samples (Lawrence Fritts), cello arco mf, free to use without restrictions, https://theremin.music.uiowa.edu/MIScello.html",
+ "sr": 22050,
+ "notes": {
+  "G2": {
+   "file": "G2.wav",
+   "m": 43,
+   "hz": 98.25,
+   "loopStart": 0.249977,
+   "loopEnd": 1.624127,
+   "gain": 0.5062,
+   "from": "Cello.arco.mf.sulG.G2Bb2.aiff @ 1.93 s"
+  },
+  "D3": {
+   "file": "D3.wav",
+   "m": 50,
+   "hz": 148.687,
+   "loopStart": 0.249977,
+   "loopEnd": 1.01678,
+   "gain": 0.5815,
+   "from": "Cello.arco.mf.sulG.B2A3.aiff @ 24.78 s"
+  },
+  "F3": {
+   "file": "F3.wav",
+   "m": 53,
+   "hz": 171.86,
+   "loopStart": 0.249977,
+   "loopEnd": 1.012063,
+   "gain": 0.4924,
+   "from": "Cello.arco.mf.sulG.B2A3.aiff @ 47.93 s"
+  },
+  "C4": {
+   "file": "C4.wav",
+   "m": 60,
+   "hz": 260.959,
+   "loopStart": 0.249977,
+   "loopEnd": 0.866893,
+   "gain": 0.467,
+   "from": "Cello.arco.mf.sulD.C4Bb4.aiff @ 3.13 s"
+  }
+ },
+ "drones": {}
+}

@@ -1,0 +1,21 @@
+{
+ "source": "VCSL Tubular Bells 2 (Sam Gossner), CC0, https://github.com/sgossner/VCSL",
+ "sr": 22050,
+ "oneshot": true,
+ "notes": {
+  "D4": {
+   "file": "D4.wav",
+   "m": 62,
+   "hz": 294.2,
+   "gain": 0.8549,
+   "from": "TB_hit_D4_v4_2.wav"
+  },
+  "A4": {
+   "file": "A4.wav",
+   "m": 69,
+   "hz": 440.823,
+   "gain": 0.8235,
+   "from": "TB_hit_A4_v4_1.wav"
+  }
+ }
+}

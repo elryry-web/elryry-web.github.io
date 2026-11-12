@@ -1,0 +1,35 @@
+{
+ "source": "VCSL Snare Drum, Rope Tension (Sam Gossner), CC0, https://github.com/sgossner/VCSL",
+ "sr": 44100,
+ "oneshot": true,
+ "notes": {
+  "x1": {
+   "file": "x1.wav",
+   "hit": "x",
+   "rel": 0.0,
+   "gain": 0.9769,
+   "from": "RopeSnare_hi_sn_Main_vl4_rr1.wav"
+  },
+  "x2": {
+   "file": "x2.wav",
+   "hit": "x",
+   "rel": 2.3,
+   "gain": 1.1036,
+   "from": "RopeSnare_hi_sn_Main_vl4_rr2.wav"
+  },
+  "o1": {
+   "file": "o1.wav",
+   "hit": "o",
+   "rel": -13.9,
+   "gain": 0.6064,
+   "from": "RopeSnare_hi_sn_Main_vl2_rr1.wav"
+  },
+  "o2": {
+   "file": "o2.wav",
+   "hit": "o",
+   "rel": -13.3,
+   "gain": 0.6365,
+   "from": "RopeSnare_hi_sn_Main_vl2_rr2.wav"
+  }
+ }
+}

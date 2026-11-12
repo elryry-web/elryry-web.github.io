@@ -1,0 +1,84 @@
+{
+ "source": "VCSL Strumstick (Sam Gossner), CC0, https://github.com/sgossner/VCSL",
+ "sr": 22050,
+ "oneshot": true,
+ "notes": {
+  "D3": {
+   "file": "D3.wav",
+   "m": 50,
+   "hz": 146.871,
+   "gain": 0.7104,
+   "from": "Strumstick_Finger_Str1_Main_D2_vl2_rr1.wav"
+  },
+  "E3": {
+   "file": "E3.wav",
+   "m": 52,
+   "hz": 164.96,
+   "gain": 1.0991,
+   "from": "Strumstick_Finger_Str1_Main_E2_vl2_rr1.wav"
+  },
+  "G3": {
+   "file": "G3.wav",
+   "m": 55,
+   "hz": 195.76,
+   "gain": 0.6545,
+   "from": "Strumstick_Finger_Str1_Main_G2_vl2_rr1.wav"
+  },
+  "B3": {
+   "file": "B3.wav",
+   "m": 59,
+   "hz": 246.788,
+   "gain": 1.2049,
+   "from": "Strumstick_Finger_Str2_Main_B2_vl2_rr1.wav"
+  },
+  "C#4": {
+   "file": "Cs4.wav",
+   "m": 61,
+   "hz": 277.02,
+   "gain": 0.7674,
+   "from": "Strumstick_Finger_Str2_Main_C#3_vl2_rr1.wav"
+  },
+  "D4": {
+   "file": "D4.wav",
+   "m": 62,
+   "hz": 293.617,
+   "gain": 0.7887,
+   "from": "Strumstick_Finger_Str2_Main_D3_vl2_rr1.wav"
+  },
+  "E4": {
+   "file": "E4.wav",
+   "m": 64,
+   "hz": 329.264,
+   "gain": 1.1546,
+   "from": "Strumstick_Finger_Str3_Main_E3_vl2_rr1.wav"
+  },
+  "F#4": {
+   "file": "Fs4.wav",
+   "m": 66,
+   "hz": 370.192,
+   "gain": 0.4994,
+   "from": "Strumstick_Finger_Str3_Main_F#3_vl2_rr1.wav"
+  },
+  "G4": {
+   "file": "G4.wav",
+   "m": 67,
+   "hz": 391.986,
+   "gain": 0.7298,
+   "from": "Strumstick_Finger_Str3_Main_G3_vl2_rr1.wav"
+  },
+  "A4": {
+   "file": "A4.wav",
+   "m": 69,
+   "hz": 439.926,
+   "gain": 0.8123,
+   "from": "Strumstick_Finger_Str3_Main_A3_vl2_rr1.wav"
+  },
+  "B4": {
+   "file": "B4.wav",
+   "m": 71,
+   "hz": 493.895,
+   "gain": 0.8517,
+   "from": "Strumstick_Finger_Str3_Main_B3_vl2_rr1.wav"
+  }
+ }
+}

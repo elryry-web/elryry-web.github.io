@@ -1,7 +1,9 @@
-/* Tithe & Tattle: a small score of background music in Web Audio: synthesized, with recorded bagpipe,
- * recorder and organ (audio/, see MUSIC.md) that fall back to synthesis.
- * All six pieces are new compositions in the manner of English and northern French music c.1300-1340.
- * Tuning is Pythagorean (pure fifths), so drones and open fifths sit still.
+/* Tithe & Tattle: a small score of background music in Web Audio, on recorded instruments (bagpipe,
+ * alto and soprano recorder, organ, harp, bowed psaltery, hand chimes: audio/, see MUSIC.md) and
+ * synthesized voices; every recorded voice falls back to synthesis while it loads or if it fails.
+ * Pieces 1-6 are new compositions in the manner of English and northern French music c.1300-1340;
+ * 7-12 come from Vellum & Vermilion (insular and monastic, before c.1200). Tuning is Pythagorean
+ * (pure fifths), so drones and open fifths sit still.
  *
  *   1. Estampie of the Eel Rents   estampie: five puncti, each played with an ouvert then a clos ending
  *                                   G Dorian, in the pipe's own key. Bagpipe (chanter and drones; real
@@ -22,11 +24,21 @@
  *   6. Compline at St Alnoth       chant-like solo line, then the same line in parallel-fifth organum,
  *                                   framed by the abbey bells. D Hypodorian. Small organ (samples from audio/organ/) and bells.
  *                                   Abbey: town screens.
+ *   7. Iona Round                  ring dance A A B B, A on the harp alone, A. D Mixolydian. Soprano
+ *                                   recorder ("whistle") over harp fifths, hand chimes at the turns. Town.
+ *   8. Lai of the Scriptorium      lai, paired versicles A A' B B' A A'. G Dorian. Harp in two voices. Town.
+ *   9. Bells for Terce             chimes, a chant on bowed psaltery, chimes, the chant again in organum at
+ *                                   the fourth below (held on C at its floor), chimes. D Dorian. Town.
+ *  10. Planctus                    lament, E Phrygian. Bowed psaltery over held psaltery notes. Quiet.
+ *  11. Vigil                       slow harp, A Aeolian, low and sparse. Quiet.
+ *  12. Night Antiphon              recorder phrases each answered by the harp an octave below. D Dorian. Quiet.
  *
  * Score notation: a line is space-separated tokens PITCH/UNITS (D4/2, Bb3/1, C#5/3), r/UNITS for a rest,
  * x/UNITS and o/UNITS for strong and light tabor strokes. '|' is ignored (bar lines for the eye).
  * A line ending in '*' repeats to fill its section. Every other line in a section must add up to the
  * same number of units. piece.unit is seconds per unit; piece.level evens out loudness between pieces.
+ * An order item {s, mute:[voices]} silences voices for one pass; {s, add: section} also plays section
+ * `add` from the start of s (its lines may be shorter).
  *
  *   MUSIC.setEnabled(bool)   on/off (default on). Nothing plays until the first touch or key.
  *   MUSIC.screen(name)       'puzzle' -> quiet pieces, anything else -> town pieces
@@ -155,6 +167,107 @@
         END: { bell: 'D4/7 D4/7 D4/14' }
       },
       order: ['TOLL', 'S1', 'MID', 'S2', 'END']
+    },
+    // ---- 7-12: from Vellum & Vermilion's js/music.js, scores unchanged ('psaltery' there is bowed: 'bowed' here)
+    {
+      id: 'iona', title: 'Iona Round', form: 'ring dance: A A B B, A on the harp alone, A', mode: 'D Mixolydian', moods: ['town'],
+      unit: 0.22, accent: 3, level: 0.3,
+      voices: { wh: { inst: 'whistle' }, hm: { inst: 'harp', gain: 0.9 }, lo: { inst: 'harp', gain: 0.75 }, hi: { inst: 'harp', gain: 0.5 }, ch: { inst: 'chimes', gain: 0.7 } },
+      sections: {
+        A: { wh: 'D5/2 E5/1 | F#5/2 G5/1 | A5/2 F#5/1 | D5/3 | E5/2 F#5/1 | G5/2 E5/1 | C5/2 E5/1 | D5/3 | ' +
+                 'D5/2 E5/1 | F#5/2 A5/1 | B5/2 A5/1 | F#5/3 | G5/2 E5/1 | C5/2 E5/1 | E5/1 D5/1 C5/1 | D5/3',
+             lo: 'D3/3 | D3/3 | D3/3 | D3/3 | D3/3 | D3/3 | C4/3 | D3/3 | D3/3 | D3/3 | G3/3 | D3/3 | C4/3 | C4/3 | A3/3 | D3/3',
+             hi: 'r/1 A3/2 | r/1 A3/2 | r/1 A3/2 | r/1 A3/2 | r/1 A3/2 | r/1 A3/2 | r/1 G4/2 | r/1 A3/2 | ' +
+                 'r/1 A3/2 | r/1 A3/2 | r/1 D4/2 | r/1 A3/2 | r/1 G4/2 | r/1 G4/2 | r/1 E4/2 | r/1 A3/2' },
+        B: { wh: 'A5/2 B5/1 | C6/2 B5/1 | A5/2 G5/1 | A5/3 | D6/2 C6/1 | B5/2 A5/1 | G5/2 A5/1 | B5/3 | ' +
+                 'A5/2 B5/1 | C6/2 A5/1 | G5/2 E5/1 | F#5/3 | G5/2 E5/1 | C5/2 E5/1 | E5/1 D5/1 C5/1 | D5/3',
+             lo: 'A3/3 | C4/3 | D3/3 | A3/3 | D3/3 | G3/3 | G3/3 | G3/3 | D3/3 | C4/3 | C4/3 | D3/3 | C4/3 | C4/3 | A3/3 | D3/3',
+             hi: 'r/1 E4/2 | r/1 G4/2 | r/1 A3/2 | r/1 E4/2 | r/1 A3/2 | r/1 D4/2 | r/1 D4/2 | r/1 D4/2 | ' +
+                 'r/1 A3/2 | r/1 G4/2 | r/1 G4/2 | r/1 A3/2 | r/1 G4/2 | r/1 G4/2 | r/1 E4/2 | r/1 A3/2' },
+        H: { hm: 'D4/2 E4/1 | F#4/2 G4/1 | A4/2 F#4/1 | D4/3 | E4/2 F#4/1 | G4/2 E4/1 | C4/2 E4/1 | D4/3 | ' +
+                 'D4/2 E4/1 | F#4/2 A4/1 | B4/2 A4/1 | F#4/3 | G4/2 E4/1 | C4/2 E4/1 | E4/1 D4/1 C4/1 | D4/3',
+             lo: 'D3/6 | D3/6 | D3/6 | C4/3 D3/3 | D3/6 | G3/6 | C4/6 | A3/3 D3/3' },
+        RING: { ch: 'D6/3 A5/3 D5/6' },
+        END: { wh: 'D5/9 r/3', lo: 'D3/12', hi: 'r/1 A3/11', ch: 'r/3 D6/3 A5/3 D5/3' }
+      },
+      order: [{ s: 'A', add: 'RING' }, 'A', 'B', 'B', 'H', 'A', 'END']
+    },
+    {
+      id: 'scriptorium', title: 'Lai of the Scriptorium', form: "lai: paired versicles A A' B B' A A'", mode: 'G Dorian', moods: ['town'],
+      unit: 0.34, accent: 3, level: 0.95,
+      voices: { mel: { inst: 'harp' }, lo: { inst: 'harp', gain: 0.75 } },
+      sections: {
+        A1: { mel: 'G4/3 | Bb4/2 A4/1 | G4/2 F4/1 | G4/3 | Bb4/2 C5/1 | D5/3 | C5/2 Bb4/1 | A4/6 | r/3',
+              lo: 'G3/6 | G3/6 | Bb3/6 | F3/6 | D3/3 r/3' },
+        A2: { mel: 'G4/3 | Bb4/2 A4/1 | G4/2 F4/1 | G4/3 | Bb4/2 C5/1 | D5/3 | C5/2 A4/1 | G4/6 | r/3',
+              lo: 'G3/6 | G3/6 | Bb3/6 | F3/3 D3/3 | G3/3 r/3' },
+        B1: { mel: 'D5/2 C5/1 | D5/3 | F4/2 G4/1 | A4/3 | Bb4/2 A4/1 | G4/2 F4/1 | E4/2 F4/1 | D4/6 | r/3',
+              lo: 'Bb3/6 | F3/6 | C4/6 | A3/3 F3/3 | D3/3 r/3' },
+        B2: { mel: 'D5/2 C5/1 | D5/3 | F4/2 G4/1 | A4/3 | Bb4/2 A4/1 | G4/2 F4/1 | A4/2 F#4/1 | G4/6 | r/3',
+              lo: 'Bb3/6 | F3/6 | C4/6 | D3/6 | G3/3 r/3' }
+      },
+      order: ['A1', 'A2', 'B1', 'B2', 'A1', 'A2']
+    },
+    {
+      id: 'terce', title: 'Bells for Terce', form: 'chimes, chant, chimes, the chant in organum at the fourth, chimes', mode: 'D Dorian', moods: ['town'],
+      unit: 0.42, accent: 1000, level: 0.83,
+      voices: { vp: { inst: 'bowed' }, vo: { inst: 'bowed', gain: 0.7 }, ch: { inst: 'chimes' } },
+      sections: {
+        TOLL: { ch: 'D6/2 C6/2 A5/2 G5/2 | D5/6' },
+        S1: { vp: 'D5/1 F5/1 G5/2 | A5/1 A5/1 A5/1 G5/1 A5/2 | G5/1 F5/1 E5/1 D5/2 | r/2 | ' +
+                  'F5/1 G5/1 A5/2 C6/1 A5/1 | G5/1 A5/1 F5/1 G5/2 | E5/1 F5/1 D5/1 E5/1 C5/2 | r/2 | ' +
+                  'D5/1 F5/1 G5/1 A5/2 G5/1 | F5/1 G5/1 E5/1 D5/1 C5/1 D5/2 | F5/1 E5/1 D5/1 C5/1 D5/1 E5/1 D5/4 | r/3' },
+        MID: { ch: 'A5/3 D5/5' },
+        // vox principalis and, a fourth below it, vox organalis, which may not go below C: so it holds C
+        // against D, E and F and meets the chant in unison at the ends of phrases
+        S2: { vp: 'D5/1 F5/1 G5/2 | A5/1 A5/1 A5/1 G5/1 A5/2 | G5/1 F5/1 E5/1 D5/2 | r/2 | ' +
+                  'F5/1 G5/1 A5/2 C6/1 A5/1 | G5/1 A5/1 F5/1 G5/2 | E5/1 F5/1 D5/1 E5/1 C5/2 | r/2 | ' +
+                  'D5/1 F5/1 G5/1 A5/2 G5/1 | F5/1 G5/1 E5/1 D5/1 C5/1 D5/2 | F5/1 E5/1 D5/1 C5/1 D5/1 E5/1 D5/4 | r/3',
+              vo: 'C5/1 C5/1 D5/2 | E5/1 E5/1 E5/1 D5/1 E5/2 | D5/1 C5/1 C5/1 D5/2 | r/2 | ' +
+                  'C5/1 D5/1 E5/2 G5/1 E5/1 | D5/1 E5/1 C5/1 D5/2 | C5/1 C5/1 C5/1 C5/1 C5/2 | r/2 | ' +
+                  'C5/1 C5/1 D5/1 E5/2 D5/1 | C5/1 D5/1 C5/1 C5/1 C5/1 D5/2 | C5/1 C5/1 C5/1 C5/1 C5/1 C5/1 D5/4 | r/3' },
+        END: { ch: 'D6/2 A5/2 D5/8' }
+      },
+      order: ['TOLL', 'S1', 'MID', 'S2', 'END']
+    },
+    {
+      id: 'planctus', title: 'Planctus', form: 'lament in four phrases, the first returning', mode: 'E Phrygian', moods: ['quiet'],
+      unit: 0.5, accent: 4, level: 0.58,
+      voices: { mel: { inst: 'bowed' }, dr: { inst: 'bowed', gain: 0.4 } },
+      sections: {
+        P1: { mel: 'E5/2 F5/1 G5/1 | A5/3 G5/1 | F5/2 E5/2 | F5/1 G5/1 F5/2 | E5/6 | r/2', dr: 'r/4 E5/18 r/2' },
+        P2: { mel: 'G5/2 A5/1 B5/1 | C6/3 B5/1 | A5/2 B5/1 A5/1 | G5/4 | A5/2 G5/1 F5/1 | E5/6 | r/2', dr: 'r/4 E5/22 r/2' },
+        P3: { mel: 'C6/2 D6/1 E6/1 | D6/3 C6/1 | B5/2 A5/2 | B5/2 C6/2 | A5/4 | G5/2 F5/2 | G5/1 F5/1 E5/6 | r/3',
+              dr: 'r/8 A5/12 r/4 E5/8 r/3' },
+        P4: { mel: 'E5/2 F5/1 G5/1 | A5/2 G5/2 | F5/3 E5/1 | E5/8 | r/4', dr: 'r/4 E5/16 r/4' }
+      },
+      order: ['P1', 'P2', 'P3', 'P1', 'P4']
+    },
+    {
+      id: 'vigil', title: 'Vigil', form: 'four slow phrases, twice', mode: 'A Aeolian', moods: ['quiet'],
+      unit: 0.45, accent: 4, level: 0.96,
+      voices: { mel: { inst: 'harp' }, lo: { inst: 'harp', gain: 0.5 } },
+      sections: {
+        S1: { mel: 'A3/2 C4/2 | E4/4 | D4/2 C4/1 B3/1 | A3/4 | r/4', lo: 'A2/8 | E3/4 | A2/4 | r/4' },
+        S2: { mel: 'C4/2 D4/2 | E4/2 G4/2 | F4/2 E4/1 D4/1 | E4/4 | r/4', lo: 'A2/4 | E3/4 | D3/4 | E3/4 | r/4' },
+        S3: { mel: 'A4/2 G4/2 | E4/2 D4/2 | C4/2 D4/1 E4/1 | D4/4 | r/4', lo: 'F3/4 | G3/4 | A3/4 | D3/4 | r/4' },
+        S4: { mel: 'C4/2 B3/1 A3/1 | G3/2 A3/2 | B3/2 C4/1 B3/1 | A3/6 | r/6', lo: 'A2/4 | E3/4 | E3/4 | A2/6 | r/6' }
+      },
+      order: ['S1', 'S2', 'S3', 'S4', 'S1', 'S2', 'S3', 'S4']
+    },
+    {
+      id: 'antiphon', title: 'Night Antiphon', form: 'recorder phrases, each answered by the harp', mode: 'D Dorian', moods: ['quiet'],
+      unit: 0.4, accent: 4, level: 0.57,
+      voices: { wh: { inst: 'whistle', gain: 0.55 }, hp: { inst: 'harp' }, lo: { inst: 'harp', gain: 0.7 } },
+      sections: {
+        Q1: { wh: 'D5/2 F5/2 G5/2 A5/2 | C6/2 A5/2 G5/4 | A5/6 r/2', lo: 'D3/8 r/16' },
+        R1: { hp: 'D4/2 F4/2 G4/2 A4/2 | C5/2 A4/2 G4/2 F4/2 | D4/6 r/2', lo: 'D3/8 r/8 A2/6 r/2' },
+        Q2: { wh: 'A5/2 C6/2 D6/4 | C6/2 A5/2 G5/2 F5/2 | G5/6 r/2', lo: 'G3/8 r/16' },
+        R2: { hp: 'A4/2 C5/2 D5/4 | C5/2 A4/2 G4/2 E4/2 | D4/6 r/2', lo: 'D3/8 r/8 D3/6 r/2' },
+        Q3: { wh: 'F5/2 E5/2 D5/2 F5/2 | G5/2 F5/2 E5/2 C5/2 | D5/8', lo: 'D3/8 | C4/8 | D3/8' },
+        R3: { hp: 'F4/2 E4/2 D4/2 F4/2 | E4/2 C4/2 D4/4 | r/8', lo: 'D3/8 | A2/4 D3/4 | r/8' }
+      },
+      order: ['Q1', 'R1', 'Q2', 'R2', 'Q1', 'R1', 'Q3', 'R3']
     }
   ];
 
@@ -203,9 +316,17 @@
           L = Math.max(L, n);
         }
       });
-      Object.keys(lines).forEach(function (v) {
+      if (item.add) {     // another section played over this one from its start
+        var ex = P.sections[item.add];
+        if (!ex) throw new Error(P.id + ': no section ' + item.add);
+        Object.keys(ex).forEach(function (v) {
+          if (!P.voices[v]) throw new Error(P.id + '/' + item.add + ': no voice ' + v);
+          var k = v + '+'; lines[k] = parse(ex[v]); lines[k].voice = v;
+        });
+      }
+      Object.keys(lines).forEach(function (k) {
+        var notes = lines[k], v = notes.voice || k, pos = 0, i = 0;
         if (mute.indexOf(v) >= 0) return;
-        var notes = lines[v], pos = 0, i = 0;
         while (pos < L - 1e-9 && (notes.loop || i < notes.length)) {
           var n = notes[i % notes.length], d = Math.min(n.d, L - pos);
           if (!n.r) ev.push({ t: (t + pos) * u, v: v, m: n.m, hit: n.hit, d: d * u, vel: Math.abs(pos % acc) < 1e-9 ? 1 : 0.8, sec: si });
@@ -295,13 +416,33 @@
     pipe: [1, 0.28, 0.16, 0.06, 0.03],
     organ: [1, 0.5, 0.3, 0.17, 0.1, 0.06, 0.04, 0.025],
     reed: [1, 0.75, 0.6, 0.48, 0.36, 0.3, 0.22, 0.16, 0.12, 0.08, 0.05],
-    saw: [1, 0.5, 0.33, 0.25, 0.2, 0.167, 0.143, 0.125, 0.111, 0.1, 0.09, 0.083]
+    saw: [1, 0.5, 0.33, 0.25, 0.2, 0.167, 0.143, 0.125, 0.111, 0.1, 0.09, 0.083],
+    whistle: [1, 0.1, 0.04, 0.012],
+    bowed: [1, 0.55, 0.38, 0.22, 0.16, 0.1, 0.07, 0.05]
   };
+  // wind and bowed voices (the bowed psaltery is played like a wind: an envelope over a steady tone)
   var WINDS = {
     recorder: { wave: 'recorder', att: 0.045, rel: 0.08, vib: 0.0035, vibRate: 4.8, nf: 2.2, nq: 2.5, chiff: 0.32, breath: 0.045, gain: 0.3, legatoGap: 0.02 },
     pipe: { wave: 'pipe', att: 0.02, rel: 0.05, vib: 0.002, vibRate: 5.5, nf: 2, nq: 2, chiff: 0.45, breath: 0.06, gain: 0.17, legatoGap: 0.035 },
-    organ: { wave: 'organ', att: 0.06, rel: 0.15, vib: 0, nf: 3, nq: 3, chiff: 0.22, breath: 0.01, gain: 0.15, legatoGap: 0.05 }
+    organ: { wave: 'organ', att: 0.06, rel: 0.15, vib: 0, nf: 3, nq: 3, chiff: 0.22, breath: 0.01, gain: 0.15, legatoGap: 0.05 },
+    whistle: { wave: 'whistle', att: 0.04, rel: 0.08, vib: 0.003, vibRate: 5, nf: 2.2, nq: 2.5, chiff: 0.3, breath: 0.04, gain: 0.26, legatoGap: 0.02 },
+    bowed: { wave: 'bowed', att: 0.12, rel: 0.3, vib: 0.002, vibRate: 4.6, nf: 3, nq: 4, chiff: 0.12, breath: 0.03, gain: 0.13, legatoGap: 0.03 }
   };
+  // a hand chime: a fundamental with its twelfth (the tuned third harmonic) and a faint high partial
+  function chimeData(m) {
+    var key = 'chime' + m;
+    if (dataCache[key]) return dataCache[key];
+    var sr = KS_SR, f = hz(m), len = Math.floor(3 * sr), out = new Float32Array(len), pk = 0, i;
+    [[1, 1, 2.6], [3, 0.3, 0.9], [5.2, 0.06, 0.35], [1.003, 0.25, 2.6]].forEach(function (p) {
+      if (f * p[0] > sr / 2.2) return;
+      var w = 2 * Math.PI * f * p[0] / sr, k = Math.pow(10, -3 / (p[2] * sr)), a = p[1];
+      for (var n = 0; n < len; n++) { out[n] += a * Math.sin(w * n); a *= k; }
+    });
+    for (i = 0; i < Math.floor(0.003 * sr); i++) out[i] *= i / (0.003 * sr);
+    for (i = 0; i < len; i++) if (Math.abs(out[i]) > pk) pk = Math.abs(out[i]);
+    for (i = 0; i < len; i++) out[i] /= pk;
+    return (dataCache[key] = out);
+  }
 
   function Engine(ac, dest) {
     var E = this;
@@ -354,24 +495,30 @@
     return t + hold + rel;
   }
 
+  // a struck or plucked buffer, played once (rate bends a recorded note to pitch). Polyphony cap: past
+  // CAP, let go of the oldest one still sounding
+  function oneBuf(E, b, t, gain, out, rate) {
+    var ac = E.ac, src = ac.createBufferSource(); src.buffer = b;
+    if (rate) src.playbackRate.value = rate;
+    E.plucks = E.plucks.filter(function (p) { return p.end > t; });
+    if (E.plucks.length >= CAP) {
+      var old = E.plucks.shift();
+      try { old.g.gain.setValueAtTime(old.g.gain.value, t); old.g.gain.linearRampToValueAtTime(0, t + 0.06); old.src.stop(t + 0.08); } catch (e) { /* ended */ }
+    }
+    var a = ac.createGain(); a.gain.value = gain;
+    src.connect(a); a.connect(out); src.start(Math.max(0, t));
+    E.plucks.push({ src: src, g: a, end: t + b.duration / (rate || 1) });
+    E.track(src, [src, a]);
+  }
+
   var INST = {};
   Object.keys(STRINGS).forEach(function (name) {
     INST[name] = function (E, t, m, d, g, out) {
-      var spec = STRINGS[name], ac = E.ac, b = E.buf(name + m, ksData(spec, m));
-      t += (Math.random() - 0.5) * 0.012;
-      // polyphony cap: let go of the oldest string still sounding
-      E.plucks = E.plucks.filter(function (p) { return p.end > t; });
-      if (E.plucks.length >= CAP) {
-        var old = E.plucks.shift();
-        try { old.g.gain.setValueAtTime(old.g.gain.value, t); old.g.gain.linearRampToValueAtTime(0, t + 0.06); old.src.stop(t + 0.08); } catch (e) { /* ended */ }
-      }
-      var src = ac.createBufferSource(); src.buffer = b;
-      var a = ac.createGain(); a.gain.value = spec.gain * g;
-      src.connect(a); a.connect(out); src.start(t);
-      E.plucks.push({ src: src, g: a, end: t + b.duration });
-      E.track(src, [src, a]);
+      var spec = STRINGS[name];
+      oneBuf(E, E.buf(name + m, ksData(spec, m)), t + (Math.random() - 0.5) * 0.012, spec.gain * g, out);
     };
   });
+  INST.chimes = function (E, t, m, d, g, out) { oneBuf(E, E.buf('chime' + m, chimeData(m)), t, 0.3 * g, out); };
   Object.keys(WINDS).forEach(function (name) {
     INST[name] = function (E, t, m, d, g, out) {
       var W = WINDS[name], ac = E.ac, f = hz(m), dd = Math.max(0.05, d - W.legatoGap);
@@ -474,17 +621,44 @@
   // chosen; until it is ready, or if it fails, the piece plays on the synth voices above, so the music
   // never waits long and is never silent. Each note loops the steady part of its sample and is bent by
   // playbackRate from the nearest sample's measured pitch to this file's Pythagorean hz().
-  var AUDIO_V = 6;
-  var SETS = { pipe: {}, recorder: {}, organ: {} };
-  var SAMPLED = { chanter: 'pipe', bagdrone: 'pipe', recorder: 'recorder', organ: 'organ' };
+  //
+  // Adding a set: put its folder at audio/<set>/ with <set>.json (the schema of tools/make-samples.py:
+  // { oneshot?, notes: { NAME: { file, m, hz, gain, loopStart?, loopEnd?, hit? } }, drones? }), then map
+  // the instrument to it in SAMPLED (one line) and give it a starting SLEVEL. A json with "oneshot": true
+  // plays each note once (struck or plucked); otherwise the note loops between loopStart and loopEnd
+  // under an envelope (SENV). Unpitched notes (the tabor's x and o strokes) pick the sample whose "hit"
+  // matches, at its own rate. Only sets named in SAMPLED are ever fetched; a set that fails to load
+  // plays its voices on the synth, and the rest of the piece is unaffected.
+  var AUDIO_V = 9;
+  // instrument -> sample set. The carol's tabor 'pipe' (F5 to C6) plays the soprano recorder set: a tabor
+  // pipe is a duct flute, and the bagpipe chanter set stops at G5
+  var SAMPLED = {
+    chanter: 'pipe', bagdrone: 'pipe', recorder: 'recorder', organ: 'organ',
+    harp: 'harp', bowed: 'psaltery', chimes: 'chimes', whistle: 'whistle',
+    psaltery: 'harp',     // the Abbot's Pears' plucked psaltery: no plucked psaltery set, so the harp
+    tabor: 'tabor', symphony: 'symphony', gittern: 'gittern', bell: 'bells',
+    pipe: 'whistle'
+  };
+  var SETS = {};
+  Object.keys(SAMPLED).forEach(function (k) { SETS[SAMPLED[k]] = {}; });
   // loudness of each recorded voice against its synth stand-in (the samples are levelled to one RMS)
-  var SLEVEL = { chanter: 0.215, bagdrone: 0.26, recorder: 0.92, organ: 0.46 };
+  var SLEVEL = { chanter: 0.215, bagdrone: 0.26, recorder: 0.92, organ: 0.46,
+    harp: 0.375, psaltery: 0.185, bowed: 0.62, chimes: 0.47, whistle: 1,
+    tabor: 0.35, symphony: 0.2, gittern: 0.133, bell: 0.65, pipe: 0.74 };
+  // looped notes: [attack, release] in seconds
+  var SENV = { bowed: [0.03, 0.32], whistle: [0.012, 0.09], pipe: [0.012, 0.09], symphony: [0.5, 0.7] };
+  function setOf(V) { return SAMPLED[V.inst]; }
   function setsFor(P) {
     var s = [];
-    Object.keys(P.voices).forEach(function (k) { var n = SAMPLED[P.voices[k].inst]; if (n && s.indexOf(n) < 0) s.push(n); });
+    Object.keys(P.voices).forEach(function (k) { var n = setOf(P.voices[k]); if (n && s.indexOf(n) < 0) s.push(n); });
     return s;
   }
-  function setsReady(P) { return setsFor(P).every(function (n) { return SETS[n].state === 'ready'; }); }
+  // which of a piece's sets are ready, fixed when the piece starts so no voice changes mid-piece
+  function setsReady(P) {
+    var r = {};
+    setsFor(P).forEach(function (n) { if (SETS[n].state === 'ready') r[n] = true; });
+    return r;
+  }
   function setsLoading(P) { return setsFor(P).some(function (n) { return SETS[n].state === 'loading'; }); }
   function getOk(url, how) {
     return fetch(url).then(function (r) { if (!r.ok) throw new Error(url + ': ' + r.status); return r[how](); });
@@ -504,7 +678,8 @@
       })).then(function () {
         S.notes = Object.keys(man.notes).map(function (k) { return man.notes[k]; });
         S.drones = Object.keys(man.drones || {}).map(function (k) { return man.drones[k]; });
-        S.state = 'ready';
+        S.oneshot = !!man.oneshot;
+        S.state = S.notes.length ? 'ready' : 'failed';
       });
     }).catch(function (err) { S.state = 'failed'; S.err = String(err && err.message || err); });
     return S.p;
@@ -580,10 +755,34 @@
       v.src.stop(end + 0.02);
     };
   });
+  // every other recorded voice: by its set's kind. One-shot sets (harp, chimes, gittern, bells, tabor)
+  // play the note as recorded; looped sets (bowed psaltery, whistle, symphony) hold the steady part under
+  // an envelope. The symphony's cello notes (D3 +22 and F3 -28 cents) are retuned from their measured hz
+  function sGeneric(inst) {
+    return function (E, t, m, d, g, out, ev) {
+      var S = SETS[SAMPLED[inst]], lvl = SLEVEL[inst] == null ? 1 : SLEVEL[inst], e, rate = 1;
+      if (m == null) {      // unpitched: alternate the samples for this stroke (round robin), else the first
+        var hit = ev && ev.hit, rr = S.notes.filter(function (x) { return x.hit === hit; });
+        if (!rr.length) rr = [S.notes[0]];
+        S.rr = S.rr || {}; S.rr[hit] = ((S.rr[hit] || 0) + 1) % rr.length;
+        e = rr[S.rr[hit]];
+        if (hit === 'o') g *= 0.5;      // the samples are levelled equal: keep the synth's light stroke at -6 dB
+      } else { e = nearest(S.notes, m); rate = hz(m) / e.hz; }
+      if (S.oneshot || !(e.loopEnd > e.loopStart)) {
+        var plucked = inst === 'harp' || inst === 'psaltery' || inst === 'gittern';
+        oneBuf(E, e.buf, t + (plucked ? (Math.random() - 0.5) * 0.012 : 0), e.gain * lvl * g, out, rate);
+        return;
+      }
+      var W = WINDS[inst], r = SENV[inst] || [0.02, 0.15], dd = Math.max(0.05, d - (W ? W.legatoGap : 0.03));
+      var v = sVoice(E, e, rate, t, 0, out);
+      v.src.stop(env(v.a.gain, t, dd, r[0], r[1], e.gain * lvl * g) + 0.02);
+    };
+  }
+  Object.keys(SAMPLED).forEach(function (inst) { if (!SINST[inst]) SINST[inst] = sGeneric(inst); });
 
-  // one event of a piece, at absolute time t0 + ev.t; samp: play its recorded voices
+  // one event of a piece, at absolute time t0 + ev.t; samp: the piece's sets that were ready when it began
   function play(E, P, ev, t0, out, legato, samp) {
-    var V = P.voices[ev.v], I = (samp && SINST[V.inst]) || INST[V.inst], t = t0 + ev.t, g = (V.gain || 1) * ev.vel;
+    var V = P.voices[ev.v], I = (samp && samp[setOf(V)] && SINST[V.inst]) || INST[V.inst], t = t0 + ev.t, g = (V.gain || 1) * ev.vel;
     var m = ev.m != null ? ev.m + (V.oct || 0) : null;
     if (I.legato) {
       var h = legato[ev.v];
