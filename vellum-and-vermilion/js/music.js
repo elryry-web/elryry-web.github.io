@@ -7,7 +7,7 @@
  *                              hand chimes at the turns. Warm: the cover and the book.
  *   2. Lai of the Scriptorium  lai, paired versicles A A' B B' A A'. G Dorian. Harp in two voices. Warm.
  *   3. Bells for Terce         chimes, a chant on bowed psaltery, chimes, the chant again in organum at
- *                              the fourth below (the organal voice held on C at its floor, as in Musica
+ *                              the fourth below (the organal voice held on C4 at its floor, as in Musica
  *                              enchiriadis), chimes. D Dorian. Warm.
  *   4. Planctus                lament, E Phrygian. Bowed psaltery over held psaltery drone notes. Quiet:
  *                              while a page is being solved.
@@ -84,18 +84,18 @@
       voices: { vp: { inst: 'psaltery' }, vo: { inst: 'psaltery', gain: 0.7 }, ch: { inst: 'chimes' } },
       sections: {
         TOLL: { ch: 'D6/2 C6/2 A5/2 G5/2 | D5/6' },
-        S1: { vp: 'D5/1 F5/1 G5/2 | A5/1 A5/1 A5/1 G5/1 A5/2 | G5/1 F5/1 E5/1 D5/2 | r/2 | ' +
-                  'F5/1 G5/1 A5/2 C6/1 A5/1 | G5/1 A5/1 F5/1 G5/2 | E5/1 F5/1 D5/1 E5/1 C5/2 | r/2 | ' +
-                  'D5/1 F5/1 G5/1 A5/2 G5/1 | F5/1 G5/1 E5/1 D5/1 C5/1 D5/2 | F5/1 E5/1 D5/1 C5/1 D5/1 E5/1 D5/4 | r/3' },
+        S1: { vp: 'D4/1 F4/1 G4/2 | A4/1 A4/1 A4/1 G4/1 A4/2 | G4/1 F4/1 E4/1 D4/2 | r/2 | ' +
+                  'F4/1 G4/1 A4/2 C5/1 A4/1 | G4/1 A4/1 F4/1 G4/2 | E4/1 F4/1 D4/1 E4/1 C4/2 | r/2 | ' +
+                  'D4/1 F4/1 G4/1 A4/2 G4/1 | F4/1 G4/1 E4/1 D4/1 C4/1 D4/2 | F4/1 E4/1 D4/1 C4/1 D4/1 E4/1 D4/4 | r/3' },
         MID: { ch: 'A5/3 D5/5' },
-        // vox principalis and, a fourth below it, vox organalis, which may not go below C: so it holds C
+        // vox principalis and, a fourth below it, vox organalis, which may not go below C4: so it holds C4
         // against D, E and F and meets the chant in unison at the ends of phrases
-        S2: { vp: 'D5/1 F5/1 G5/2 | A5/1 A5/1 A5/1 G5/1 A5/2 | G5/1 F5/1 E5/1 D5/2 | r/2 | ' +
-                  'F5/1 G5/1 A5/2 C6/1 A5/1 | G5/1 A5/1 F5/1 G5/2 | E5/1 F5/1 D5/1 E5/1 C5/2 | r/2 | ' +
-                  'D5/1 F5/1 G5/1 A5/2 G5/1 | F5/1 G5/1 E5/1 D5/1 C5/1 D5/2 | F5/1 E5/1 D5/1 C5/1 D5/1 E5/1 D5/4 | r/3',
-              vo: 'C5/1 C5/1 D5/2 | E5/1 E5/1 E5/1 D5/1 E5/2 | D5/1 C5/1 C5/1 D5/2 | r/2 | ' +
-                  'C5/1 D5/1 E5/2 G5/1 E5/1 | D5/1 E5/1 C5/1 D5/2 | C5/1 C5/1 C5/1 C5/1 C5/2 | r/2 | ' +
-                  'C5/1 C5/1 D5/1 E5/2 D5/1 | C5/1 D5/1 C5/1 C5/1 C5/1 D5/2 | C5/1 C5/1 C5/1 C5/1 C5/1 C5/1 D5/4 | r/3' },
+        S2: { vp: 'D4/1 F4/1 G4/2 | A4/1 A4/1 A4/1 G4/1 A4/2 | G4/1 F4/1 E4/1 D4/2 | r/2 | ' +
+                  'F4/1 G4/1 A4/2 C5/1 A4/1 | G4/1 A4/1 F4/1 G4/2 | E4/1 F4/1 D4/1 E4/1 C4/2 | r/2 | ' +
+                  'D4/1 F4/1 G4/1 A4/2 G4/1 | F4/1 G4/1 E4/1 D4/1 C4/1 D4/2 | F4/1 E4/1 D4/1 C4/1 D4/1 E4/1 D4/4 | r/3',
+              vo: 'C4/1 C4/1 D4/2 | E4/1 E4/1 E4/1 D4/1 E4/2 | D4/1 C4/1 C4/1 D4/2 | r/2 | ' +
+                  'C4/1 D4/1 E4/2 G4/1 E4/1 | D4/1 E4/1 C4/1 D4/2 | C4/1 C4/1 C4/1 C4/1 C4/2 | r/2 | ' +
+                  'C4/1 C4/1 D4/1 E4/2 D4/1 | C4/1 D4/1 C4/1 C4/1 C4/1 D4/2 | C4/1 C4/1 C4/1 C4/1 C4/1 C4/1 D4/4 | r/3' },
         END: { ch: 'D6/2 A5/2 D5/8' }
       },
       order: ['TOLL', 'S1', 'MID', 'S2', 'END']
@@ -105,11 +105,11 @@
       unit: 0.5, accent: 4, level: 1.0,
       voices: { mel: { inst: 'psaltery' }, dr: { inst: 'psaltery', gain: 0.4 } },
       sections: {
-        P1: { mel: 'E5/2 F5/1 G5/1 | A5/3 G5/1 | F5/2 E5/2 | F5/1 G5/1 F5/2 | E5/6 | r/2', dr: 'r/4 E5/18 r/2' },
-        P2: { mel: 'G5/2 A5/1 B5/1 | C6/3 B5/1 | A5/2 B5/1 A5/1 | G5/4 | A5/2 G5/1 F5/1 | E5/6 | r/2', dr: 'r/4 E5/22 r/2' },
-        P3: { mel: 'C6/2 D6/1 E6/1 | D6/3 C6/1 | B5/2 A5/2 | B5/2 C6/2 | A5/4 | G5/2 F5/2 | G5/1 F5/1 E5/6 | r/3',
-              dr: 'r/8 A5/12 r/4 E5/8 r/3' },
-        P4: { mel: 'E5/2 F5/1 G5/1 | A5/2 G5/2 | F5/3 E5/1 | E5/8 | r/4', dr: 'r/4 E5/16 r/4' }
+        P1: { mel: 'E4/2 F4/1 G4/1 | A4/3 G4/1 | F4/2 E4/2 | F4/1 G4/1 F4/2 | E4/6 | r/2', dr: 'r/4 E4/18 r/2' },
+        P2: { mel: 'G4/2 A4/1 B4/1 | C5/3 B4/1 | A4/2 B4/1 A4/1 | G4/4 | A4/2 G4/1 F4/1 | E4/6 | r/2', dr: 'r/4 E4/22 r/2' },
+        P3: { mel: 'C5/2 D5/1 E5/1 | D5/3 C5/1 | B4/2 A4/2 | B4/2 C5/2 | A4/4 | G4/2 F4/2 | G4/1 F4/1 E4/6 | r/3',
+              dr: 'r/8 A4/12 r/4 E4/8 r/3' },
+        P4: { mel: 'E4/2 F4/1 G4/1 | A4/2 G4/2 | F4/3 E4/1 | E4/8 | r/4', dr: 'r/4 E4/16 r/4' }
       },
       order: ['P1', 'P2', 'P3', 'P1', 'P4']
     },
@@ -263,7 +263,7 @@
   var WAVES = { whistle: [1, 0.1, 0.04, 0.012], bowed: [1, 0.55, 0.38, 0.22, 0.16, 0.1, 0.07, 0.05] };
   var WINDS = {
     whistle: { wave: 'whistle', att: 0.04, rel: 0.08, vib: 0.003, vibRate: 5, nf: 2.2, nq: 2.5, chiff: 0.3, breath: 0.04, gain: 0.26, legatoGap: 0.02 },
-    psaltery: { wave: 'bowed', att: 0.12, rel: 0.3, vib: 0.002, vibRate: 4.6, nf: 3, nq: 4, chiff: 0.12, breath: 0.03, gain: 0.13, legatoGap: 0.03 }
+    psaltery: { wave: 'bowed', att: 0.12, rel: 0.3, vib: 0.002, vibRate: 4.6, nf: 3, nq: 4, chiff: 0.12, breath: 0.03, gain: 0.15, legatoGap: 0.03 }
   };
 
   function Engine(ac, dest) {
@@ -372,7 +372,7 @@
   // Made by tools/make-samples.py (see MUSIC.md). A set loads the first time a piece that needs it is
   // chosen; until it is ready, or if it fails, the piece plays on the synth voices above. Each note is
   // bent by playbackRate from the nearest sample's measured pitch to this file's Pythagorean hz().
-  var AUDIO_V = 1;
+  var AUDIO_V = 2;
   var SETS = { harp: {}, psaltery: {}, chimes: {}, whistle: {} };
   // loudness of each recorded voice against its synth stand-in (the samples are levelled to one RMS)
   var SLEVEL = { harp: 0.6, psaltery: 0.8, chimes: 0.75, whistle: 1 };
