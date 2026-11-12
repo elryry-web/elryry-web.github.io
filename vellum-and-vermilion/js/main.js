@@ -64,7 +64,7 @@
     onSkip: function () { skipSequence(); }
   });
   function storeProgress() {
-    if (!cur) return;
+    if (!cur || save.solved[cur.n]) return;   // a solved page being painted again keeps no progress: leaving reopens it finished
     var st = board.getState();
     save.prog[cur.n] = { r: st.rots.join(''), p: st.pins };
     persist();
@@ -117,6 +117,8 @@
     layout();
     if (solved) pageSolved(false);
     else if (!opts.quiet && cur.folio === 1 && !save.seen[cur.quire]) { save.seen[cur.quire] = 1; persist(); openRule(); }
+    ART.want && ART.want('drollery.' + cur.drollery);
+    setTimeout(startDroll, 0);   // book.js sets its mode to the page screen just after calling this
   }
 
   /* ---------- illumination sequence ----------
@@ -131,7 +133,9 @@
     board.illuminate();
     seq = { timers: [] };
     seq.timers.push(setTimeout(function () { writeGrumble(); }, 1100));
-    seq.timers.push(setTimeout(function () { droll.wakeT0 = performance.now(); }, 1800));
+    seq.timers.push(setTimeout(function () { droll.wakeT0 = performance.now(); startDroll(); }, 1800));
+    // the last page done: the Colophon is next, so send for its painting now
+    if (ART.want && LEVELS.every(function (L) { return save.solved[L.n]; })) ART.want('colophon');
     seq.timers.push(setTimeout(function () { if (seq) { seq.lit = true; maybeFinish(); } }, 2550));
   }
   function maybeFinish() { if (seq && seq.lit && seq.written) { endSequence(); showNext(); } }
@@ -146,6 +150,7 @@
     endSequence();
     setLines(cur.text.length, false);
     if (droll.wakeT0 === null || performance.now() - droll.wakeT0 < WAKE_MS) droll.wakeT0 = performance.now() - WAKE_MS * 0.6;
+    startDroll();
     showNext();
   }
   // the grumble is always laid out in full (unwritten letters transparent) so nothing shifts as it is written
@@ -209,9 +214,10 @@
     }
   }
   function sizeDroll() {
-    var cv = $('droll'), dpr = Math.min(3, window.devicePixelRatio || 1);
+    var cv = $('droll'), dpr = Math.min(2, window.devicePixelRatio || 1);
     droll.w = cv.clientWidth || 72; droll.h = cv.clientHeight || 72; droll.dpr = dpr;
     cv.width = Math.round(droll.w * dpr); cv.height = Math.round(droll.h * dpr);
+    if (dl) startDroll();   // resizing clears it: redraw at once
     drawDroll(performance.now());
   }
   function glint(g, x, y, r, k) {   // the gold star of waking (as in js/drolleries.js)
@@ -269,10 +275,30 @@
     g.globalCompositeOperation = 'destination-out'; g.fillStyle = ff; g.fillRect(0, H - ih * 0.07, W, ih * 0.07);
     g.globalCompositeOperation = 'source-over';
   }
-  (function tick(t) {
-    if (t - droll.last > 33) { droll.last = t; drawDroll(t); }
-    requestAnimationFrame(tick);
-  })(0);
+  // the drollery is drawn only while its page is in view: not behind the book, not in a hidden tab, not when
+  // there is no room for it. Its idle breath and sway are slow, so 15 frames a second; the 1.1 s wake keeps
+  // the old 30. Between frames it waits on a timer, not on every animation frame.
+  var dl = { raf: 0, to: 0 };
+  function drollLive() {
+    var cv = $('droll'), B = window.Book;
+    return !document.hidden && !!cur && cv.clientWidth > 0 && cv.clientHeight > 0 && !(B && B.mode && B.mode() !== 'hidden');
+  }
+  function drollTick(t) {
+    dl.raf = 0;
+    if (!drollLive()) return;
+    droll.last = t; drawDroll(t);
+    var a = droll.freeze != null ? -1 : droll.wakeT0 === null ? -1 : (t - droll.wakeT0) / WAKE_MS;
+    var gap = a > -0.1 && a < 1.05 ? 33 : 66;
+    dl.to = setTimeout(function () { dl.to = 0; dl.raf = requestAnimationFrame(drollTick); }, Math.max(0, gap - (performance.now() - t) - 8));
+  }
+  // (re)start it after anything that may have brought it back into view or woken it; a no-op while it runs
+  function startDroll() {
+    if (dl.to) { clearTimeout(dl.to); dl.to = 0; }
+    if (!dl.raf && drollLive()) dl.raf = requestAnimationFrame(drollTick);
+  }
+  document.addEventListener('visibilitychange', startDroll);
+  // book.js hides and shows its screen (and sets its mode) around its own calls into this file
+  if (window.MutationObserver && $('bk_scr')) new MutationObserver(function () { setTimeout(startDroll, 0); }).observe($('bk_scr'), { attributes: true, attributeFilter: ['style', 'class'] });
 
   /* ---------- rule card ---------- */
   function openRule() {
@@ -283,7 +309,7 @@
     $('ruleModal').classList.add('show');
   }
   function drawRuleArt(q) {
-    var cv = $('ruleArt'), dpr = Math.min(3, window.devicePixelRatio || 1);
+    var cv = $('ruleArt'), dpr = Math.min(2, window.devicePixelRatio || 1);
     cv.width = 200 * dpr; cv.height = 80 * dpr; cv.style.width = '200px'; cv.style.height = '80px';
     var g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, 200, 80);
     var gold = ART.PIG.gold.base, lap = ART.PIG.lapis.base;
@@ -324,9 +350,34 @@
   $('bRule').onclick = openRule;
   $('ruleOk').onclick = function () { $('ruleModal').classList.remove('show'); };
   $('bHint').onclick = function () { board.hint(); };
-  $('bReset').onclick = function () { if (!board.solved) $('resetModal').classList.add('show'); };
+  // on a finished page the same button and modal offer to paint it again: the board is scrambled as for a new
+  // page and the whole illumination runs again on solving. save.solved stays set and no progress is stored, so
+  // leaving partway reopens the page finished.
+  var resetCard = $('resetModal').querySelector('.card'), resetText = {
+    plain: [resetCard.querySelector('h2').textContent, resetCard.querySelector('p').textContent, $('resetYes').textContent],
+    again: ['Scrape the page and paint it again?', 'The colour comes off and the tiles go back to where they started. The page stays finished in the book.', 'Paint it again']
+  };
+  function resetLabels(again) {
+    var t = again ? resetText.again : resetText.plain;
+    resetCard.querySelector('h2').textContent = t[0]; resetCard.querySelector('p').textContent = t[1]; $('resetYes').textContent = t[2];
+    $('bReset').title = again ? 'Paint the page again' : 'Reset the page';
+  }
+  function paintAgain() {
+    endSequence();
+    board.setLevel(cur, { solved: false });   // the page's starting scramble, as on a first visit
+    setLines(0, false);
+    droll.wakeT0 = null;
+    $('next').classList.remove('show');
+    layout(); startDroll();
+  }
+  $('bReset').onclick = function () { resetLabels(board.solved); $('resetModal').classList.add('show'); };
   $('resetNo').onclick = function () { $('resetModal').classList.remove('show'); };
-  $('resetYes').onclick = function () { $('resetModal').classList.remove('show'); board.reset(); delete save.prog[cur.n]; persist(); };
+  $('resetYes').onclick = function () {
+    $('resetModal').classList.remove('show');
+    if (board.solved) { paintAgain(); return; }
+    board.reset();
+    if (!save.solved[cur.n]) { delete save.prog[cur.n]; persist(); }
+  };
   function soundLabel() { $('bSound').innerHTML = save.sound ? '&#9835;' : '<s>&#9835;</s>'; $('bSound').title = save.sound ? 'Sound on' : 'Sound off'; }
   $('bSound').onclick = function () { save.sound = !save.sound; SFX.enabled = save.sound; persist(); soundLabel(); if (save.sound) { SFX.unlock(); SFX.pin(); } };
   $('next').onclick = function () { if (cur.n < LEVELS.length) load(cur.n + 1); else Book.fromPlay(7); };   // the last page closes on the Colophon
@@ -354,7 +405,8 @@
       };
     },
     // hold the drollery at a wake fraction 0..1 (null lets it run again), for checking the wake frame by frame
-    drollery: function (a) { droll.freeze = a == null ? null : +a; drawDroll(performance.now()); return droll.freeze; },
+    drollery: function (a) { droll.freeze = a == null ? null : +a; drawDroll(performance.now()); startDroll(); return droll.freeze; },
+    droll: function () { return { running: !!(dl.raf || dl.to), w: $('droll').width, h: $('droll').height }; },
     board: board, save: function () { return save; }, book: window.Book
   };
 
@@ -368,7 +420,107 @@
   });
   load(save.current || 1, { quiet: true });   // the page screen is ready behind the cover
   Book.boot();
-  ART.load().then(function () { layout(); Book.refresh(); });
+
+  /* ---------- the painted art arrives a picture at a time ----------
+     What the first screen shows loads first (ART.load ranks it), and each screen is redrawn as its pictures
+     land (at most every 250 ms) rather than once at the very end. The closed cover is held back (the desk
+     alone) until its pictures are in, then fades in, so it never shows its procedural stand-in first; after
+     6 s it shows with whatever has come. */
+  var bootMode = Book.mode();
+  function artRank(slot) {
+    // ART.rank: 0 closed cover, 1 leaves, 2 board, DEFER drolleries, DEMAND (only when asked for) Colophon, capitals
+    var r = ART.rank(slot), D = ART.DEFER || 10;
+    // the page's own drollery goes with its board; the next page's drollery leads the ones held back
+    if (cur && slot === 'drollery.' + cur.drollery) r = 2;
+    else if (cur && cur.n < LEVELS.length && slot === 'drollery.' + LEVELS[cur.n].drollery) r = D;
+    else if (r === D) r = D + 1;
+    // a finished book: the Colophon is wanted soon, so it heads the queue held back for later
+    if (slot === 'colophon' && LEVELS.every(function (L) { return save.solved[L.n]; })) r = D;
+    if (r >= D) return r;
+    if (bootMode === 'hidden') {   // straight onto a page: its vellum, board and drollery first
+      if (slot === 'page' || (cur && slot === 'drollery.' + cur.drollery)) return 0;
+      return r === 2 ? 1 : 2;
+    }
+    if (bootMode === 'open') {     // the open book: its leaves and binding, then what is drawn on them
+      if (slot === 'page' || slot === 'cover.spine' || slot === 'cover.pages') return 0;
+      return r === 2 ? 1 : 2;
+    }
+    return r;
+  }
+  var art = { page: false, book: false, timer: 0, last: 0, gap: 250, done: false, log: [], redraws: 0 };
+  window.VV.art = art;   // test hook: the order and time each picture landed
+  function artLanded(slot, ok) {
+    art.log.push([slot, ok, Math.round(performance.now())]);
+    var cover = slot.indexOf('cover.') === 0;
+    var isDroll = slot.indexOf('drollery.') === 0, own = cur && slot === 'drollery.' + cur.drollery;
+    if (!cover && slot !== 'colophon' && slot.indexOf('capital.') !== 0 && (!isDroll || own)) art.page = true;
+    // the closed book shows only the cover pieces; the open book can show almost anything (a drollery held
+    // back for later only on the Bestiary)
+    var st = Book.state && Book.state(), best = st && st.faces && st.faces.indexOf(6) >= 0;
+    if (cover || (Book.mode() === 'open' && (!isDroll || own || best))) art.book = true;
+    gateCheck();
+    artSchedule();
+  }
+  function artSchedule() {
+    if (art.timer) return;
+    art.timer = setTimeout(function () { art.timer = 0; artRedraw(); }, Math.max(16, art.gap - (performance.now() - art.last)));
+  }
+  function artRedraw() {
+    var st = Book.state && Book.state();
+    if (st && (st.turning || st.busy)) { art.timer = setTimeout(function () { art.timer = 0; artSchedule(); }, 250); return; }
+    art.last = performance.now(); art.redraws++;
+    // the page screen is relaid only while it is in view (going to it relays it anyway)
+    if (art.page && Book.mode() === 'hidden') {
+      art.page = false; layout();
+      if (cur && $('ruleModal').classList.contains('show')) drawRuleArt(cur.quire);
+    }
+    if (art.book) { art.book = false; Book.refresh(); }
+    // a slow phone gets fewer redraws: at least 250 ms apart, or five times what this one took
+    art.gap = Math.max(250, Math.min(2000, (performance.now() - art.last) * 5));
+  }
+
+  // the cover gate
+  var GATE = ['cover.leather', 'cover.spine', 'cover.title', 'cover.medallion', 'cover.corner', 'cover.clasp', 'cover.pages'];
+  var gate = null;
+  function gateHold() {
+    var sp = $('bk_spread'), ui = $('coverUI');
+    [sp, ui].forEach(function (e) { e.style.opacity = '0'; e.style.pointerEvents = 'none'; });
+    // a tap or Enter on the empty desk must not open the book it can't see yet
+    function swallow(e) { if (gate && !gate.open && $('bk_scr').contains(e.target)) { e.stopPropagation(); e.preventDefault(); } }
+    function swallowKey(e) { if (gate && !gate.open && (e.key === 'Enter' || e.key === ' ')) { e.stopPropagation(); e.preventDefault(); } }
+    window.addEventListener('click', swallow, true);
+    window.addEventListener('keydown', swallowKey, true);
+    gate = { open: false, els: [sp, ui], off: function () {
+      window.removeEventListener('click', swallow, true); window.removeEventListener('keydown', swallowKey, true);
+    } };
+    gate.timer = setTimeout(function () { gate.why = 'timeout'; gateOpen(); }, 6000);
+    art.gate = gate;
+  }
+  function gateCheck() {
+    if (!gate || gate.open) return;
+    var all = ART.status(), known = Object.keys(all).length > 0;
+    if (known && GATE.every(function (s) { return all[s] === undefined || all[s] !== 0; })) gateOpen();
+  }
+  function gateOpen() {
+    if (!gate || gate.open) return;
+    gate.open = true; gate.at = Math.round(performance.now()); clearTimeout(gate.timer); gate.off();
+    Book.refresh();   // the cover as it now is, painted, before it shows
+    // (timers and a forced style flush rather than animation frames, which a background tab doesn't run)
+    gate.els.forEach(function (e) { e.style.transition = 'opacity 300ms ease-out'; void e.offsetWidth; e.style.opacity = '1'; });
+    setTimeout(function () {   // hand the elements back to book.js's own styles
+      // 'none' cancels the fade outright if it hasn't finished (a stalled frame clock would otherwise leave it faint)
+      gate.els.forEach(function (e) { e.style.transition = 'none'; e.style.opacity = ''; e.style.pointerEvents = ''; void e.offsetWidth; e.style.transition = ''; });
+    }, 340);
+  }
+  if (bootMode === 'closed' && typeof fetch !== 'undefined') gateHold();
+
+  ART.load('art/', artLanded, { rank: artRank }).then(function () {
+    art.done = true; gateOpen();
+    clearTimeout(art.timer); art.timer = 0;
+    // once more with everything in: the page screen even if it is behind the book, the book when it is still
+    art.page = false; layout();
+    art.book = true; artRedraw();
+  });
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () {
     if (cur && $('ruleModal').classList.contains('show')) drawRuleArt(cur.quire);
     Book.refresh();

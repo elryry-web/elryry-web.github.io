@@ -152,11 +152,110 @@
     var c = (GROUND[gn] || GROUND.madder).clash;
     return JEWELS.filter(function (j) { return c.indexOf(j) < 0; }).slice(0, 3);
   }
-  var images = {}, metas = {}, fadedCache = {}, crispCache = {};
+  var images = {}, metas = {}, crispCache = {}, status = {};
   // slots whose drawing function lays its own PNG (placement, cells or tint), so ART.draw doesn't stretch it
   var SELF = { knot: 1, twinFrame: 1, twinEmblem: 1 };
   // the painted knot (knot.png, ribbon entering from the top): where it sits in the tile, in tiles from the
   // centre, and where the board's ribbon gives way to it; its cream band is tinted to the strand
+  // the progressive loader (ART.load): eager items (rank below ART.DEFER) first, opts.concurrency at a time,
+  // those for the first screen (ranks 0 and 1) decoded before they are announced; then the deferred ones two
+  // at a time; urgent ones (want) jump every queue and are decoded. A picture not decoded here is decoded
+  // when it is first drawn, so nothing holds decoded pixels for a screen that isn't showing.
+  var loader = null;
+  function startItem(q) {
+    var L = loader, slot = q.slot, e = q.e, decode = q.urgent || q.r < 2;   // ranks 0-1: the first screen
+    q.started = true; L.active++;
+    q.promise = new Promise(function (res) {
+      var img = new Image(), settled = false;
+      function done(ok) {
+        if (settled) return; settled = true;
+        status[slot] = ok ? 1 : -1;
+        if (L.onSlot) try { L.onSlot(slot, ok); } catch (err) { if (window.console) console.error(err); }
+        L.active--; res(ok);
+        if (L.settle && !L.eagerAll.some(function (x) { return status[x.slot] === 0; })) { var s = L.settle; L.settle = null; s(); }
+        pump();
+      }
+      img.onload = function () {
+        images[slot] = img; delete sizedCache[slot + '|f']; delete sizedCache[slot + '|p']; delete ivyOcc[slot]; delete beastPrep[slot]; delete beastBad[slot];
+        if (BEAST[slot]) { beastCache = {}; beastCacheN = 0; }
+        metas[slot] = { aspect: img.naturalWidth / img.naturalHeight, stem: e.stem != null ? e.stem : 0.5,
+          fit: e.fit != null ? !!e.fit : slot.indexOf('drollery.') === 0,
+          crisp: e.crisp != null ? !!e.crisp : slot.indexOf('mark.') === 0, inset: e.inset };
+        if (slot === 'page') cache.page = null;
+        if (slot === 'knot') { knotCache = {}; knotCacheN = 0; }
+        Object.keys(crispCache).forEach(function (k) { if (k.indexOf(slot + ':') === 0) delete crispCache[k]; });
+        // decode off the main thread where the browser can, so the first redraw with it doesn't stall
+        // (decode() can stay pending forever in some tabs/engines, so never wait on it for long)
+        if (decode && img.decode) {
+          img.decode().then(function () { done(true); }, function () { done(true); });
+          setTimeout(function () { done(true); }, 300);
+        } else done(true);
+      };
+      img.onerror = function () { done(false); };
+      img.src = L.base + e.file + (e.v != null ? '?v=' + e.v : '');
+    });
+  }
+  function pump() {
+    var L = loader; if (!L) return;
+    function take(list) { while (list.length && list[0].started) list.shift(); return list.shift(); }
+    var q;
+    while (L.active < L.conc && (q = take(L.urgent) || take(L.eager))) startItem(q);
+    if (!L.eager.some(function (x) { return !x.started; })) while (L.active < 2 && (q = take(L.defer))) startItem(q);
+  }
+  // force: from ART.want, for any slot; otherwise (ART.has/ART.meta asking) only for one held back for later,
+  // so asking after an eager picture doesn't reorder the first screen's queue
+  function want(slot, force) {
+    var L = loader, q = L && L.items[slot];
+    if (!q) return Promise.resolve(!!images[slot]);
+    if (q.started) return q.promise;
+    if (!force && q.r < ART.DEFER) return Promise.resolve(false);
+    // the capitals stand in for the Colophon only when its painting failed: asking after them while it is
+    // still on its way doesn't send for them
+    if (!force && slot.indexOf('capital.') === 0 && status.colophon !== -1 && status.colophon !== undefined) return Promise.resolve(false);
+    if (L.urgent.indexOf(q) < 0) { q.urgent = true; L.urgent.push(q); }
+    pump();
+    return q.started ? q.promise : new Promise(function (res) {
+      (function wait() { if (q.started) q.promise.then(res); else setTimeout(wait, 50); })();
+    });
+  }
+  // copies of a fit PNG (the drolleries) resampled to the device size they are drawn at: a few per slot,
+  // one reused while the size it is wanted at stays within -3%..+60% of it (so a breath or a resize by a
+  // few pixels doesn't rebuild it). faded: the sepia underdrawing, made once at full size and then resampled
+  var sizedCache = {};
+  function fadeFull(img) {
+    try {
+      var cv = document.createElement('canvas'); cv.width = img.naturalWidth; cv.height = img.naturalHeight;
+      var g = cv.getContext('2d'); g.drawImage(img, 0, 0);
+      var id = g.getImageData(0, 0, cv.width, cv.height), d = id.data;
+      for (var i = 0; i < d.length; i += 4) {
+        var l = (d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11) / 255, k = 1 - l;
+        d[i] = 72 + l * 150; d[i + 1] = 48 + l * 120; d[i + 2] = 26 + l * 84;
+        d[i + 3] = d[i + 3] * (0.22 + 0.78 * Math.pow(k, 0.7));
+      }
+      g.putImageData(id, 0, 0);
+      return cv;
+    } catch (e) { return null; }   // a tainted canvas (file://): callers fall back to a thin alpha
+  }
+  function sizedCopy(slot, img, faded, need) {
+    var key = slot + (faded ? '|f' : '|p'), list = sizedCache[key] || (sizedCache[key] = []), natH = img.naturalHeight;
+    if (list.bad) return null;
+    var want = Math.min(natH, Math.max(8, need));
+    for (var i = 0; i < list.length; i++) if (list[i].height >= want * 0.97 && list[i].height <= want * 1.6 + 2) return list[i];
+    var src = faded ? fadeFull(img) : img;
+    if (!src) { list.bad = true; return null; }
+    var th = Math.min(natH, Math.ceil(want * 1.15)), cv = src;
+    if (th < natH) {
+      // halve while more than twice too big, then one smooth step to the size
+      while (cv.height > th * 2) {
+        var hc = document.createElement('canvas'); hc.width = Math.max(1, Math.round(cv.width / 2)); hc.height = Math.max(1, Math.round(cv.height / 2));
+        var hg = hc.getContext('2d'); hg.imageSmoothingQuality = 'high'; hg.drawImage(cv, 0, 0, hc.width, hc.height); cv = hc;
+      }
+      var oc = document.createElement('canvas'); oc.height = th; oc.width = Math.max(1, Math.round(img.naturalWidth * th / natH));
+      var og = oc.getContext('2d'); og.imageSmoothingQuality = 'high'; og.drawImage(cv, 0, 0, oc.width, oc.height); cv = oc;
+    }
+    list.push(cv); if (list.length > 3) list.shift();
+    return cv;
+  }
   var KNOT = { y0: -0.30, y1: 0.48, w: 0.40, stop: -0.26, cream: [243, 233, 208] }, knotCache = {}, knotCacheN = 0;
   function knotCanvas(w, h, body) {
     var key = Math.round(w) + 'x' + Math.round(h) + body;
@@ -1846,7 +1945,9 @@
     // register another drawn slot (drolleries.js uses this)
     define: function (slot, fn) { DRAW[slot] = fn; },
     pigment: function (name) { return PIG[name] || PIG.gold; },
-    has: function (slot) { return !!images[slot]; },
+    // asking after a picture that is held back for later (see load) sends for it: book.js only asks for the
+    // Colophon once the book is finished, and for every drollery when the Bestiary is in view
+    has: function (slot) { if (images[slot]) return true; if (status[slot] === 0) want(slot); return false; },
     // where the board's ribbon stops on a painted beast's tile (tile frame, side 1, entry at -0.5), or null
     // where the board's ribbon gives way to the painted knot (tiles from the centre), or null when drawn
     knotStop: function () { return images.knot ? KNOT.stop : null; },
@@ -1856,25 +1957,13 @@
       return beastGeom(kind, band || BEAST_BAND).stop;
     },
     // a loaded PNG's shape: aspect = width / height, stem = where its vine meets the bottom edge (0..1)
-    meta: function (slot) { return images[slot] ? metas[slot] : null; },
-    // the unpainted state of a PNG: a sepia ink underdrawing (dark lines kept, light fills thinned away)
-    faded: function (slot) {
+    meta: function (slot) { if (images[slot]) return metas[slot]; if (status[slot] === 0) want(slot); return null; },
+    // the unpainted state of a PNG: a sepia ink underdrawing (dark lines kept, light fills thinned away), at
+    // about px device pixels tall (the full picture when px is left out)
+    faded: function (slot, px) {
       var img = images[slot];
       if (!img) return null;
-      if (fadedCache[slot] !== undefined) return fadedCache[slot];
-      var cv = null;
-      try {
-        cv = document.createElement('canvas'); cv.width = img.naturalWidth; cv.height = img.naturalHeight;
-        var g = cv.getContext('2d'); g.drawImage(img, 0, 0);
-        var id = g.getImageData(0, 0, cv.width, cv.height), d = id.data;
-        for (var i = 0; i < d.length; i += 4) {
-          var l = (d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11) / 255, k = 1 - l;
-          d[i] = 72 + l * 150; d[i + 1] = 48 + l * 120; d[i + 2] = 26 + l * 84;
-          d[i + 3] = d[i + 3] * (0.22 + 0.78 * Math.pow(k, 0.7));
-        }
-        g.putImageData(id, 0, 0);
-      } catch (e) { cv = null; }   // a tainted canvas (file://): callers fall back to a thin alpha
-      fadedCache[slot] = cv; return cv;
+      return sizedCopy(slot, img, true, px || img.naturalHeight);
     },
     draw: function (ctx, slot, x, y, w, h, t, opts) {
       opts = opts || {};
@@ -1888,7 +1977,11 @@
           var k = Math.min(w / img.naturalWidth, h / img.naturalHeight), dw = img.naturalWidth * k, dh = img.naturalHeight * k;
           x += (w - dw) * (opts.alignX != null ? opts.alignX : 0.5); y += (h - dh) * (opts.alignY != null ? opts.alignY : 1);
           w = dw; h = dh;
-          if (opts.faded) { var f = ART.faded(slot); if (f) img = f; else ctx.globalAlpha *= 0.4; }
+          // drawn from a copy resampled once to about the size it is shown at (device pixels), not scaled
+          // down from the full picture every frame; the faded underdrawing likewise
+          var tf = ctx.getTransform ? ctx.getTransform() : null, need = h * (tf ? Math.hypot(tf.c, tf.d) : 1);
+          if (opts.faded) { var f = sizedCopy(slot, img, true, need); if (f) img = f; else ctx.globalAlpha *= 0.4; }
+          else img = sizedCopy(slot, img, false, need) || img;
         }
         if (opts.angle) { ctx.translate(x + w / 2, y + h / 2); ctx.rotate(opts.angle); ctx.drawImage(img, -w / 2, -h / 2, w, h); }
         else ctx.drawImage(img, x, y, w, h);
@@ -1899,33 +1992,56 @@
       ctx.restore();
     },
     // the manifest is revalidated on every start; each PNG URL carries its entry's v so a replaced picture
-    // reaches phones as soon as its v is bumped
-    load: function (base) {
-      base = base || 'art/';
+    // reaches phones as soon as its v is bumped.
+    // The pictures come in priority order (opts.rank(slot): lower first, default ART.rank), at most
+    // opts.concurrency (6) at a time, so what the first screen shows isn't queued behind all ~65 of them.
+    // onSlot(slot, ok) is called as each one lands (its caches already cleared) so the caller can redraw
+    // progressively; the promise resolves once every eager picture (rank below ART.DEFER) has loaded or failed; the rest go on loading after.
+    load: function (base, onSlot, opts) {
+      base = base || 'art/'; opts = opts || {};
+      var rank = opts.rank || ART.rank, conc = Math.max(1, opts.concurrency || 6);
       if (typeof fetch === 'undefined') return Promise.resolve();
       return fetch(base + 'manifest.json?v=8', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : {}; }).then(function (m) {
-        return Promise.all(Object.keys(m).map(function (slot) {
+        var keys = Object.keys(m), order = {}, all = [];
+        keys.forEach(function (slot, i) {
           var e = typeof m[slot] === 'string' ? { file: m[slot] } : (m[slot] || {});
-          if (!e.file) return null;
-          return new Promise(function (res) {
-            var img = new Image();
-            img.onload = function () {
-              images[slot] = img; delete fadedCache[slot]; delete ivyOcc[slot]; delete beastPrep[slot]; delete beastBad[slot];
-              if (BEAST[slot]) { beastCache = {}; beastCacheN = 0; }
-              metas[slot] = { aspect: img.naturalWidth / img.naturalHeight, stem: e.stem != null ? e.stem : 0.5,
-                fit: e.fit != null ? !!e.fit : slot.indexOf('drollery.') === 0,
-                crisp: e.crisp != null ? !!e.crisp : slot.indexOf('mark.') === 0, inset: e.inset };
-              if (slot === 'page') cache.page = null;
-              if (slot === 'knot') { knotCache = {}; knotCacheN = 0; }
-              Object.keys(crispCache).forEach(function (k) { if (k.indexOf(slot + ':') === 0) delete crispCache[k]; });
-              res();
-            };
-            img.onerror = function () { res(); };
-            img.src = base + e.file + (e.v != null ? '?v=' + e.v : '');
-          });
-        }));
+          if (!e.file) return;
+          order[slot] = i; status[slot] = 0;
+          var r = +rank(slot); if (r !== r) r = 0;
+          all.push({ slot: slot, e: e, r: r });
+        });
+        all.sort(function (a, b) { return a.r - b.r || order[a.slot] - order[b.slot]; });
+        var L = loader = { base: base, onSlot: onSlot, conc: conc, items: {}, urgent: [], active: 0, settle: null,
+          eager: all.filter(function (q) { return q.r < ART.DEFER; }),
+          // pump() shifts started items off eager, so whether they have all landed is read from this copy
+          eagerAll: all.filter(function (q) { return q.r < ART.DEFER; }),
+          defer: all.filter(function (q) { return q.r >= ART.DEFER && q.r < ART.DEMAND; }) };
+        all.forEach(function (q) { L.items[q.slot] = q; });
+        return new Promise(function (res) {
+          L.settle = res;
+          if (!L.eagerAll.length) res();
+          pump();
+        });
       }).catch(function () {});
     },
+    // ask for a picture now, ahead of whatever is still queued (one held back for later, or one left to be
+    // asked for, such as the Colophon); the promise settles when it has loaded or failed
+    want: function (slot) { return want(slot, true); },
+    // ranks at or past DEFER load after everything else, two at a time, without forcing a decode; DEMAND
+    // (Infinity) only when asked for (ART.want, or ART.has/ART.meta asking after it)
+    DEFER: 10, DEMAND: Infinity,
+    // the default load order: the closed book on the desk, then the leaves, then the board; the drolleries
+    // after all that; the Colophon and the capitals (drawn only on the Colophon when its painting is
+    // missing) only once something asks for them
+    rank: function (slot) {
+      if (/^cover\.(leather|spine|title|medallion|corner|clasp|pages)$/.test(slot)) return 0;
+      if (slot === 'page' || slot === 'cover.endpaper' || slot === 'cover.flyleaf') return 1;
+      if (/^(capital\.|colophon$)/.test(slot)) return ART.DEMAND;
+      if (slot.indexOf('drollery.') === 0) return ART.DEFER;
+      return 2;
+    },
+    // a manifest slot's load state: 0 waiting, 1 loaded, -1 failed, undefined not in the manifest (or not read yet)
+    status: function (slot) { return slot == null ? Object.assign({}, status) : status[slot]; },
     slots: function () { return Object.keys(DRAW).filter(function (k) { return k !== 'drollery'; }).concat(['drollery.<id>']); }
   };
   window.ART = ART;

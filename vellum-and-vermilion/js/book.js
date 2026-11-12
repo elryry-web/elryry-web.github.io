@@ -7,7 +7,7 @@
      cover.leather  the whole front board: tooled oxblood leather with blind-tooled frames
      cover.corner   one gold-tooled corner piece, drawn for the top-left corner (opts.angle turns it)
      cover.medallion the round knotwork medallion in the middle of the board
-     cover.clasp    one brass clasp on the fore-edge (the box's right edge is the board's edge)
+     cover.clasp    one brass clasp on the fore-edge (the box's right edge is the board's edge): strap, hook and keeper pin
      cover.title    the gold title lettering (opts.text: lines joined by \n)
      cover.endpaper the inside of the front board (the pastedown); a PNG is mirrored so its lacing sits at the hinge
      cover.spine    (PNG only) the spine, stood behind the hinge: its edge and headbands show beside the cover / gutter
@@ -138,26 +138,65 @@
     g.fillStyle = gold;
     for (i = 0; i < 8; i++) { var b = i * Math.PI / 4; g.beginPath(); g.arc(cx + Math.cos(b) * R * 0.81, cy + Math.sin(b) * R * 0.81, R * 0.028, 0, 6.283); g.fill(); }
   });
-  ART.define('cover.clasp', function (g, x, y, w, h) {
-    // a leather strap from the back board, a brass plate riveted over the fore-edge, and the catch
-    var sy = y + h * 0.3, sh = h * 0.4;
-    g.fillStyle = '#3a0f0a'; g.fillRect(x + w * 0.35, sy, w * 0.65, sh);
-    g.strokeStyle = 'rgba(0,0,0,0.5)'; g.lineWidth = 1; g.strokeRect(x + w * 0.35, sy, w * 0.65, sh);
-    var px = x + w * 0.05, pw = w * 0.62, br = g.createLinearGradient(px, y, px, y + h);
-    br.addColorStop(0, '#f1d48a'); br.addColorStop(0.45, '#b98a34'); br.addColorStop(0.6, '#8a6220'); br.addColorStop(1, '#d9b45e');
-    g.fillStyle = 'rgba(0,0,0,0.35)'; g.beginPath(); g.moveTo(px + 2, y + h * 0.12 + 3); g.lineTo(px + pw + 2, y + 3); g.lineTo(px + pw + 2, y + h + 3); g.lineTo(px + 2, y + h * 0.88 + 3); g.closePath(); g.fill();
-    g.fillStyle = br; g.strokeStyle = '#4a300c'; g.lineWidth = Math.max(1, w * 0.02);
-    g.beginPath(); g.moveTo(px, y + h * 0.12); g.lineTo(px + pw, y); g.lineTo(px + pw, y + h); g.lineTo(px, y + h * 0.88); g.closePath(); g.fill(); g.stroke();
-    // engraved line and rivets
-    g.strokeStyle = 'rgba(80,50,10,0.6)'; g.lineWidth = Math.max(0.6, w * 0.012);
-    g.beginPath(); g.moveTo(px + pw * 0.15, y + h * 0.5); g.lineTo(px + pw * 0.85, y + h * 0.5); g.stroke();
-    [[0.25, 0.3], [0.25, 0.7], [0.8, 0.22], [0.8, 0.78]].forEach(function (r) {
-      var rx = px + pw * r[0], ry = y + h * r[1], rr = Math.max(1.2, w * 0.045);
-      g.fillStyle = '#5a3a0e'; g.beginPath(); g.arc(rx + 0.6, ry + 0.6, rr, 0, 6.283); g.fill();
-      g.fillStyle = '#f6e2a4'; g.beginPath(); g.arc(rx, ry, rr * 0.8, 0, 6.283); g.fill();
-    });
-    // the hook catching a pin near the plate's tip
-    g.fillStyle = br; g.beginPath(); g.arc(px + pw * 0.06, y + h * 0.5, h * 0.1, 0, 6.283); g.fill(); g.stroke();
+  ART.define('cover.clasp', function (g, x, y, w, h, t, o) {
+    // a leather strap laid over the fore-edge from the back board, a riveted brass plate on its end,
+    // and a hook that curls round the pin of a keeper riveted to the front board. Light from the top
+    // right, so shadows fall down and a little left. o.part draws one piece: 'keeper' (plate and pin,
+    // on the front board), 'strap' (strap, plate and hook, which belong to the back board) or 'pin'
+    var part = o && o.part, K = !part || part === 'keeper', SP = !part || part === 'strap', PN = !part || part === 'keeper' || part === 'pin';
+    var cy = y + h * 0.5, sw = Math.max(1, h * 0.02);
+    var pcx = x + w * 0.26, pr = h * 0.085, lw = h * 0.12, rr = pr + lw * 0.5;
+    function brass(x0, y0, x1, y1) {
+      var b = g.createLinearGradient(x0, y0, x1, y1);
+      b.addColorStop(0, '#f1d48a'); b.addColorStop(0.45, '#b98a34'); b.addColorStop(0.6, '#8a6220'); b.addColorStop(1, '#d9b45e');
+      return b;
+    }
+    function rivet(rx, ry, r) {
+      g.fillStyle = '#4a300c'; g.beginPath(); g.arc(rx - r * 0.15, ry + r * 0.3, r, 0, 6.283); g.fill();
+      g.fillStyle = '#e8cd84'; g.beginPath(); g.arc(rx, ry, r * 0.8, 0, 6.283); g.fill();
+      g.fillStyle = 'rgba(255,248,215,0.9)'; g.beginPath(); g.arc(rx + r * 0.25, ry - r * 0.25, r * 0.25, 0, 6.283); g.fill();
+    }
+    // the keeper: a small plate set into the leather (dark rim), two rivets and the pin
+    var kx = x + w * 0.03, kw = w * 0.34, ky = y + h * 0.1, kh = h * 0.8;
+    if (K) {
+      g.fillStyle = 'rgba(15,3,2,0.6)'; g.fillRect(kx - sw, ky - sw, kw + 2 * sw, kh + 2 * sw);
+      g.fillStyle = brass(kx, ky, kx, ky + kh); g.fillRect(kx, ky, kw, kh);
+      g.strokeStyle = '#4a300c'; g.lineWidth = sw; g.strokeRect(kx, ky, kw, kh);
+      rivet(pcx - w * 0.05, y + h * 0.19, h * 0.05); rivet(pcx - w * 0.05, y + h * 0.81, h * 0.05);
+    }
+    if (SP) strap();
+    if (PN) pin();
+    function strap() {
+    // the strap's cast shadow, then the strap, darkening as it bends round the fore-edge
+    var sx = x + w * 0.58, sy = cy - h * 0.2, sh = h * 0.4;
+    g.fillStyle = 'rgba(10,3,1,0.45)'; g.fillRect(sx - h * 0.04, sy + h * 0.07, x + w - sx, sh);
+    var st = g.createLinearGradient(x + w * 0.75, 0, x + w, 0);
+    st.addColorStop(0, '#5a1810'); st.addColorStop(0.55, '#4a130c'); st.addColorStop(0.7, '#7a3a2a'); st.addColorStop(0.8, '#3a0f0a'); st.addColorStop(1, '#1a0503');
+    g.fillStyle = st; g.fillRect(sx, sy, x + w - sx, sh);
+    g.strokeStyle = 'rgba(0,0,0,0.55)'; g.lineWidth = sw; g.strokeRect(sx, sy, x + w - sx + sw, sh);
+    var px = x + w * 0.46, pw = w * 0.24;
+    // the hook: out from under the plate, round the left of the pin, a short tail back under it
+    function hook() { g.beginPath(); g.moveTo(px + pw * 0.2, cy - rr); g.lineTo(pcx, cy - rr); g.arc(pcx, cy, rr, -Math.PI / 2, Math.PI / 2, true); g.lineTo(pcx + rr * 0.7, cy + rr); }
+    g.lineCap = 'round';
+    g.save(); g.translate(-h * 0.03, h * 0.05); g.strokeStyle = 'rgba(10,3,1,0.45)'; g.lineWidth = lw; hook(); g.stroke(); g.restore();
+    g.strokeStyle = '#4a300c'; g.lineWidth = lw + 2 * sw; hook(); g.stroke();
+    g.strokeStyle = brass(pcx, cy - rr - lw / 2, pcx, cy + rr + lw / 2); g.lineWidth = lw; hook(); g.stroke();
+    g.strokeStyle = 'rgba(255,240,190,0.55)'; g.lineWidth = Math.max(0.6, lw * 0.18);
+    g.beginPath(); g.moveTo(px + pw * 0.2, cy - rr - lw * 0.22); g.lineTo(pcx, cy - rr - lw * 0.22); g.stroke();
+    g.lineCap = 'butt';
+    // the plate on the strap's end, with its shadow
+    function plate() { g.beginPath(); g.moveTo(px, y + h * 0.2); g.lineTo(px + pw, y + h * 0.06); g.lineTo(px + pw, y + h * 0.94); g.lineTo(px, y + h * 0.8); g.closePath(); }
+    g.save(); g.translate(-h * 0.04, h * 0.07); g.fillStyle = 'rgba(10,3,1,0.45)'; plate(); g.fill(); g.restore();
+    g.fillStyle = brass(px, y, px, y + h); g.strokeStyle = '#4a300c'; g.lineWidth = sw; plate(); g.fill(); g.stroke();
+    rivet(px + pw * 0.62, y + h * 0.24, h * 0.055); rivet(px + pw * 0.62, y + h * 0.76, h * 0.055);
+    }
+    // the pin's head, over the hook
+    function pin() {
+    g.fillStyle = 'rgba(10,3,1,0.5)'; g.beginPath(); g.arc(pcx - pr * 0.2, cy + pr * 0.35, pr * 1.15, 0, 6.283); g.fill();
+    g.fillStyle = brass(pcx, cy - pr, pcx, cy + pr); g.strokeStyle = '#3a2408'; g.lineWidth = sw;
+    g.beginPath(); g.arc(pcx, cy, pr * 1.1, 0, 6.283); g.fill(); g.stroke();
+    g.fillStyle = 'rgba(255,248,215,0.85)'; g.beginPath(); g.arc(pcx + pr * 0.3, cy - pr * 0.35, pr * 0.3, 0, 6.283); g.fill();
+    }
   });
   ART.define('cover.title', function (g, x, y, w, h, t, o) {
     var lines = String(o.text || 'Vellum\n& Vermilion').split('\n'), lh = h / lines.length;
@@ -210,6 +249,9 @@
   });
 
   /* ================= parchment leaves ================= */
+  // a canvas let go of: its pixels are freed at once, not whenever the collector gets to it (phones run short)
+  function zap(cv) { if (cv && cv.getContext) { cv.width = 0; cv.height = 0; } }
+  function freeAll(o) { for (var k in o) zap(o[k]); return {}; }
   var paperCache = {};
   function paperCanvas(w, h, side, variant) {
     var dpr = Math.min(2, window.devicePixelRatio || 1), pv = ART.has('page') ? (variant | 0) : 0;
@@ -293,6 +335,7 @@
   var marker = null;      // {face, x, y, s} where the ☙ goes
   var best = { woke: {}, sel: null, selT: 0 };
   function renderFace(f, g, w, h, side, t) {
+    if (!(w > 0 && h > 0)) { hits[f] = []; return; }   // a window with no size yet: drawn once it has one
     paper(g, w, h, side, f + 1);
     var H = hits[f] = [];
     var mx = Math.max(14, w * 0.09), top = Math.max(12, h * 0.05), cw = w - 2 * mx;
@@ -432,6 +475,7 @@
     y += ss * 0.8;
     var nameH = clamp(h * 0.09, 22, 54), gh = h - y - nameH - Math.max(26, h * 0.05), cell = Math.min(cw / 3, gh / 3);
     var gx = (w - cell * 3) / 2, gy = y + (gh - cell * 3) / 2, r = cell * 0.42;
+    if (!(cell > 0)) return;   // a leaf too small for the roundels
     BEASTS.forEach(function (id, i) {
       var cx = gx + (i % 3 + 0.5) * cell, cy = gy + (Math.floor(i / 3) + 0.5) * cell, isF = found(id);
       g.fillStyle = isF ? 'rgba(255,250,232,0.55)' : 'rgba(255,250,232,0.25)';
@@ -512,7 +556,7 @@
      colour floods outward from the top of the L, a glint runs across the gold (an additive highlight masked to the
      warm bright pixels), and it settles. Later visits and reduced motion show the finished page at once. The save
      keeps s.colo = 1. The layers are composed once per leaf size (coloCache). */
-  var COLO_MS = 4500, COLO_RICH = 0.55, colo = { t0: 0, raf: 0, freeze: null }, coloCache = {}, coloScr = null;
+  var COLO_MS = 4500, COLO_RICH = 0.55, colo = { t0: 0, raf: 0, freeze: null, hidAt: 0 }, coloCache = {}, coloScr = null;
   // the painting's own blank margin (fractions of the picture): the letter sits inside these
   var COLO_IN = { x0: 0.035, x1: 0.965, y0: 0.035, y1: 0.93 };
   function reducedMotion() { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } }
@@ -670,12 +714,34 @@
     if (reducedMotion() || coloCache.ms === 0) return;
     colo.t0 = now();
     if (window.SFX && window.SFX.solved) window.SFX.solved();
+    colo.hidAt = document.hidden ? now() : 0;
+    if (!colo.raf && !document.hidden) colo.raf = requestAnimationFrame(coloLoop);
+  }
+  // the tab hidden: the reveal waits where it is (no frames), and carries on from there when it returns
+  function coloPause() {
+    if (colo.raf) { cancelAnimationFrame(colo.raf); colo.raf = 0; }
+    if (colo.t0 && !colo.hidAt) colo.hidAt = now();
+  }
+  function coloResume() {
+    if (!colo.t0) return;
+    if (colo.hidAt) { colo.t0 += now() - colo.hidAt; colo.hidAt = 0; }
     if (!colo.raf) colo.raf = requestAnimationFrame(coloLoop);
+  }
+  function coloStop() {
+    if (colo.raf) { cancelAnimationFrame(colo.raf); colo.raf = 0; }
+    colo.t0 = 0; colo.hidAt = 0;
+  }
+  // the reveal's layers are big (the picture at device size, four times over): let go of them while the book is shut
+  function coloFree() {
+    coloStop();
+    ['full', 'rich', 'under', 'glint'].forEach(function (k) { zap(coloCache[k]); });
+    coloCache = {}; zap(coloScr); coloScr = null;
   }
   function coloLoop() {
     colo.raf = 0;
+    if (document.hidden) { coloPause(); return; }
     var sd = coloSide();
-    if (!sd || !colo.t0) { colo.t0 = 0; return; }
+    if (!sd || !colo.t0 || (tween && !T)) { colo.t0 = 0; return; }   // a closing (not a turn) ends it
     var t = now(), done = t - colo.t0 >= (coloCache.ms || COLO_MS);
     if (!T) {
       var g = sd.cv.getContext('2d'), dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -694,19 +760,25 @@
   // tight contact shadow at its rim, and the metal given a gentle warm multiply so it matches the gilt
   // title. Cached per size and angle; the piece itself stays exactly in its box (flush with the board)
   var mountCache = {}, mountN = 0;
+  // slot is an ART slot name, or a canvas carrying its own cache name in .slot (the clasp's keeper)
+  function putPiece(pg, slot, x, y, w, h, angle) {
+    if (typeof slot !== 'string') { drawSmooth(pg, slot, x, y, w, h); return; }
+    ART.draw(pg, slot, x, y, w, h, 0, angle ? { angle: angle } : {});
+  }
   function drawMounted(g, slot, x, y, w, h, angle) {
-    var dpr = Math.min(2, window.devicePixelRatio || 1), key = [slot, ART.has(slot), w, h, angle || 0, dpr].join('|');
+    var name = typeof slot === 'string' ? slot : slot.slot;
+    var dpr = Math.min(2, window.devicePixelRatio || 1), key = [name, typeof slot !== 'string' || ART.has(slot), w, h, angle || 0, dpr].join('|');
     var c = mountCache[key];
     if (!c) {
       var p = Math.ceil(Math.min(w, h) * 0.14), S = Math.min(w, h) * dpr,
         W = Math.ceil((w + 2 * p) * dpr), H = Math.ceil((h + 2 * p) * dpr);
       var pc = document.createElement('canvas'); pc.width = W; pc.height = H;
       var pg = pc.getContext('2d'); pg.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ART.draw(pg, slot, p, p, w, h, 0, angle ? { angle: angle } : {});
+      putPiece(pg, slot, p, p, w, h, angle);
       pg.setTransform(1, 0, 0, 1, 0, 0);
       pg.globalCompositeOperation = 'multiply'; pg.fillStyle = 'rgb(255,248,226)'; pg.fillRect(0, 0, W, H);
       pg.globalCompositeOperation = 'destination-in'; pg.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ART.draw(pg, slot, p, p, w, h, 0, angle ? { angle: angle } : {});
+      putPiece(pg, slot, p, p, w, h, angle);
       c = document.createElement('canvas'); c.width = W; c.height = H;
       var cg = c.getContext('2d'), OFF = W + H + 100;
       // each shadow pass draws the piece far off the canvas and lets only its shadow land
@@ -726,6 +798,171 @@
     }
     g.drawImage(c, x - c.pad, y - c.pad, w + 2 * c.pad, h + 2 * c.pad);
   }
+  // The painted clasp (cover-clasp.png, measured at 569 px wide): the hook's curl closes round a pocket
+  // centred on CLASP.pin; stud is the pin's head radius; rivet is the hinge plate's lobe rivet (x, y, r).
+  // The keeper is built from the PNG's own hinge leaf (x 190-268, the strap keyed out): the leaf mirrored,
+  // so its lobe and rivets face away from the hook, a plain stretch of plate L wide, then the leaf's lobe
+  // again, unmirrored, reaching into the hook's curl with the pin standing on it. KEEPER.s scales it
+  // against the clasp; its pin is where that second lobe's rivet was
+  var CLASP = { W: 569, pin: [44, 75], stud: 14, rivet: [242, 67, 12] };
+  var KEEPER = { s: 0.8, L: 32, pin: [123, 67] }, keeperCv = null, studCv = null;
+  function claspNative() {
+    var c = document.createElement('canvas'); c.width = CLASP.W; c.height = Math.round(CLASP.W / ART.meta('cover.clasp').aspect);
+    ART.draw(c.getContext('2d'), 'cover.clasp', 0, 0, c.width, c.height, 0, {});
+    return c;
+  }
+  // a big bitmap drawn small: halved step by step first, so its dark outline stays a smooth line instead of
+  // breaking into teeth (one bilinear pass at a quarter size skips most of the source pixels)
+  function drawSmooth(g, src, x, y, w, h) {
+    var m = g.getTransform ? g.getTransform() : null, s = m ? Math.hypot(m.a, m.b) : 1, c = src;
+    while (c.width / 2 >= w * s && c.height / 2 >= h * s && c.width > 2) {
+      var n = document.createElement('canvas'); n.width = Math.round(c.width / 2); n.height = Math.round(c.height / 2);
+      var ng = n.getContext('2d'); ng.imageSmoothingQuality = 'high'; ng.drawImage(c, 0, 0, n.width, n.height); c = n;
+    }
+    g.save(); g.imageSmoothingQuality = 'high'; g.drawImage(c, x, y, w, h); g.restore();
+  }
+  function keeperArt() {
+    if (keeperCv) return keeperCv;
+    var src = claspNative(), H = src.height, sg = src.getContext('2d'), L = KEEPER.L;
+    try {   // the red strap behind the plate's lobe goes: keep the brass and its dark outline (green/red high)
+      var id = sg.getImageData(182, 0, 87, H), d = id.data;
+      for (var i = 0; i < d.length; i += 4) {
+        var q = d[i + 1] / Math.max(1, d[i]);
+        d[i + 3] *= Math.max(0, Math.min(1, (q - 0.3) / 0.15));
+      }
+      sg.putImageData(id, 182, 0);
+    } catch (e) {   // a tainted canvas: cut the strap away above and below the lobe instead
+      sg.clearRect(246, 0, 30, 38); sg.clearRect(246, 97, 30, H);
+    }
+    var k = document.createElement('canvas'), kg = k.getContext('2d');
+    k.width = 117 + L; k.height = H;
+    kg.save(); kg.translate(78, 0); kg.scale(-1, 1); kg.drawImage(src, 190, 0, 78, H, 0, 0, 78, H); kg.restore();
+    kg.drawImage(src, 190, 0, 2, H, 78, 0, L, H);
+    kg.drawImage(src, 229, 0, 39, H, 78 + L, 0, 39, H);
+    k.slot = 'cover.keeper';
+    KEEPER.pin = [91 + L, CLASP.rivet[1]];
+    return (keeperCv = k);
+  }
+  // the keeper's pin: the clasp's own lobe rivet, cut out round and ringed, standing proud of the hook
+  function drawStud(g, x, y, r) {
+    if (!studCv) {
+      var src = claspNative(), R = CLASP.rivet[2], sc = document.createElement('canvas'); sc.width = sc.height = 2 * R;
+      var sg = sc.getContext('2d');
+      sg.beginPath(); sg.arc(R, R, R - 0.5, 0, 6.283); sg.save(); sg.clip();
+      sg.drawImage(src, R - CLASP.rivet[0], R - CLASP.rivet[1]);
+      sg.globalCompositeOperation = 'multiply'; sg.fillStyle = 'rgb(255,248,226)'; sg.fillRect(0, 0, 2 * R, 2 * R);
+      sg.restore();
+      sg.strokeStyle = 'rgba(38,22,7,0.95)'; sg.lineWidth = 1.6; sg.beginPath(); sg.arc(R, R, R - 0.8, 0, 6.283); sg.stroke();
+      studCv = sc;
+    }
+    var dpr = Math.min(2, window.devicePixelRatio || 1);
+    g.save();
+    g.shadowColor = 'rgba(10,3,0,0.65)'; g.shadowBlur = r * 0.45 * dpr; g.shadowOffsetX = -r * 0.15 * dpr; g.shadowOffsetY = r * 0.32 * dpr;
+    drawSmooth(g, studCv, x - r, y - r, 2 * r, 2 * r);
+    g.restore();
+  }
+  // The clasps belong to the BACK board: each strap is riveted to it, comes round the fore-edge over the
+  // page edges and lies on the front board, where its hook catches the keeper's pin (the keeper is part
+  // of the front cover, drawn by drawKeepers). So the straps have a layer of their own (bk_clasp, made in
+  // init): over the page block, and over the closed cover while fastened, but not on the cover, which
+  // swings open without them. claspBoxes gives the clasp boxes in the cover's frame: x0 the box's left,
+  // ex the fore-edge from x0, t the depth of the page block past it, ys the boxes' tops
+  function claspBoxes(w, h) {
+    var painted = ART.has('cover.clasp'), cw, ch, x0;
+    if (painted) { cw = w * 0.22; ch = cw / ART.meta('cover.clasp').aspect; x0 = w * 0.812; }
+    else { cw = w * 0.16; ch = h * 0.085; x0 = w - cw; }
+    return { painted: painted, cw: cw, ch: ch, x0: x0, ex: w - x0, t: ART.has('cover.pages') ? clamp(h * 0.014, 5, 11) : 5,
+      ys: [0.27, 0.73].map(function (f) { return h * f - ch / 2; }) };
+  }
+  // the keepers, riveted into the front board, each with its pin standing proud
+  function drawKeepers(g, w, h) {
+    var B = claspBoxes(w, h), u = B.cw / CLASP.W;
+    B.ys.forEach(function (y) {
+      if (!B.painted) { ART.draw(g, 'cover.clasp', B.x0, y, B.cw, B.ch, 0, { part: 'keeper' }); return; }
+      var kp = keeperArt(), kw = kp.width * KEEPER.s * u, kh = kp.height * KEEPER.s * u;
+      drawMounted(g, kp, B.x0 + (CLASP.pin[0] - KEEPER.pin[0] * KEEPER.s) * u, y + (CLASP.pin[1] - KEEPER.pin[1] * KEEPER.s) * u, kw, kh, 0);
+      drawStud(g, B.x0 + CLASP.pin[0] * u, y + CLASP.pin[1] * u, CLASP.stud * u);
+    });
+  }
+  // One strap with its plate and hook, laid on the boards (not set into them): a thin dark edge for its
+  // thickness and a cast shadow, light from the top right so down and a little left. Drawn in the clasp
+  // box's frame (x from the box's left). Fastened (open false): flat on the front board up to the
+  // fore-edge (ex), where it darkens a little toward the bend with a catch of light along it, then down
+  // across the page edges to the back board's edge (ex + t), sheared as the block is drawn (its depth runs
+  // right and a little down, SHEAR) and darker on that side face. Unfastened (open true): the same strap
+  // turned over about the middle of the block's edge (ex + t/2), lying out to the right with the hook
+  // pointing away, darkest where it comes from the board
+  var SHEAR = 0.45, pieceCache = {}, pieceN = 0;
+  function claspPiece(B, open) {
+    var dpr = Math.min(2, window.devicePixelRatio || 1), key = [B.painted, open, B.cw, B.ch, B.ex, B.t, dpr].join('|'), c = pieceCache[key];
+    if (c) return c;
+    var cw = B.cw, ch = B.ch, ex = B.ex, t = B.t, p = Math.ceil(ch * 0.4), S = ch * dpr;
+    var PW = 2 * ex + t, PH = ch + t * SHEAR, W = Math.ceil((PW + 2 * p) * dpr), H = Math.ceil((PH + 2 * p) * dpr);
+    // the strap alone, unshaded, in the box's frame
+    var ac = document.createElement('canvas'); ac.width = W; ac.height = H;
+    var ag = ac.getContext('2d'); ag.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (B.painted) {
+      var nat = claspNative();
+      drawSmooth(ag, nat, p, p, cw, ch);
+      ag.setTransform(1, 0, 0, 1, 0, 0);
+      ag.globalCompositeOperation = 'multiply'; ag.fillStyle = 'rgb(255,248,226)'; ag.fillRect(0, 0, W, H);
+      ag.globalCompositeOperation = 'destination-in'; ag.setTransform(dpr, 0, 0, dpr, 0, 0);
+      drawSmooth(ag, nat, p, p, cw, ch);
+      ag.globalCompositeOperation = 'source-over';
+    } else {
+      ART.draw(ag, 'cover.clasp', p, p, cw, ch, 0, { part: 'strap' });
+      ag.fillStyle = '#4a130c'; ag.fillRect(p + ex - 0.5, p + ch * 0.3, t + 0.5, ch * 0.4);   // its run round the block
+    }
+    var pc = document.createElement('canvas'); pc.width = W; pc.height = H;
+    var pg = pc.getContext('2d'), e = p + ex, E = ch * 0.6, HH = PH + 2 * p;
+    pg.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (!open) {
+      pg.save(); pg.beginPath(); pg.rect(0, 0, e, HH); pg.clip();   // on the front board
+      pg.drawImage(ac, 0, 0, W / dpr, H / dpr);
+      pg.globalCompositeOperation = 'source-atop';
+      var dk = pg.createLinearGradient(e - E, 0, e, 0);
+      dk.addColorStop(0, 'rgba(14,3,2,0)'); dk.addColorStop(0.6, 'rgba(14,3,2,0.12)'); dk.addColorStop(1, 'rgba(14,3,2,0.42)');
+      pg.fillStyle = dk; pg.fillRect(e - E, 0, E, HH);
+      var hl = pg.createLinearGradient(e - E * 0.3, 0, e, 0);
+      hl.addColorStop(0, 'rgba(255,214,186,0)'); hl.addColorStop(0.6, 'rgba(255,214,186,0.3)'); hl.addColorStop(1, 'rgba(255,214,186,0.05)');
+      pg.fillStyle = hl; pg.fillRect(e - E * 0.3, 0, E * 0.3, HH);
+      pg.restore();
+      pg.save(); pg.beginPath(); pg.rect(e, 0, t, HH); pg.clip();     // down over the page edges
+      pg.transform(1, SHEAR, 0, 1, 0, -SHEAR * e);
+      pg.drawImage(ac, 0, 0, W / dpr, H / dpr);
+      pg.setTransform(dpr, 0, 0, dpr, 0, 0);
+      pg.globalCompositeOperation = 'source-atop';
+      var sd = pg.createLinearGradient(e, 0, e + t, 0);
+      sd.addColorStop(0, 'rgba(14,3,2,0.38)'); sd.addColorStop(0.75, 'rgba(14,3,2,0.46)'); sd.addColorStop(1, 'rgba(14,3,2,0.75)');
+      pg.fillStyle = sd; pg.fillRect(e, 0, t, HH);
+      pg.restore();
+    } else {
+      pg.save(); pg.beginPath(); pg.rect(e, 0, PW, HH); pg.clip();
+      pg.transform(-1, 0, 0, 1, 2 * e + t, 0);                        // box x -> 2ex + t - x
+      pg.drawImage(ac, 0, 0, W / dpr, H / dpr);
+      pg.setTransform(dpr, 0, 0, dpr, 0, 0);
+      pg.globalCompositeOperation = 'source-atop';
+      var rd = pg.createLinearGradient(e, 0, e + E, 0);
+      rd.addColorStop(0, 'rgba(14,3,2,0.6)'); rd.addColorStop(0.4, 'rgba(14,3,2,0.2)'); rd.addColorStop(1, 'rgba(14,3,2,0)');
+      pg.fillStyle = rd; pg.fillRect(e, 0, E, HH);
+      pg.restore();
+    }
+    c = document.createElement('canvas'); c.width = W; c.height = H;
+    var cg = c.getContext('2d'), OFF = W + H + 100;
+    [['rgba(8,2,1,0.42)', S * 0.16, -S * 0.07, S * 0.17],      // the cast shadow on the leather (and the page edges)
+     ['rgba(10,3,1,0.5)', S * 0.04, -S * 0.025, S * 0.07],     // ...darker where it is close
+     ['rgba(22,8,3,0.95)', Math.max(1, S * 0.012), -S * 0.012, S * 0.035]           // the strap's and plate's thickness
+    ].forEach(function (d) {
+      cg.shadowColor = d[0]; cg.shadowBlur = d[1]; cg.shadowOffsetX = OFF + d[2]; cg.shadowOffsetY = d[3];
+      cg.drawImage(pc, -OFF, 0);
+    });
+    cg.shadowColor = 'transparent'; cg.shadowBlur = 0; cg.shadowOffsetX = cg.shadowOffsetY = 0;
+    cg.drawImage(pc, 0, 0);
+    c.pad = p; c.cw = PW + 2 * p; c.ch = PH + 2 * p;
+    if (++pieceN > 8) { pieceCache = {}; pieceN = 1; }
+    pieceCache[key] = c;
+    return c;
+  }
   function renderPaintedCover(g, w, h) {
     var P = PAINTED, cx = w * (P.px0 + P.px1) / 2, pw = w * (P.px1 - P.px0), y0 = h * P.py0, y1 = h * P.py1;
     // brass corners on the board's corners (right of the spine strip); the PNG points top-left
@@ -733,14 +970,9 @@
     [[lx, 0, 0], [w - cs, 0, 1], [w - cs, h - cs, 2], [lx, h - cs, 3]].forEach(function (c) {
       drawMounted(g, 'cover.corner', c[0], c[1], cs, cs, c[2] * Math.PI / 2);
     });
-    // two clasps: the strap comes over the fore-edge, the hook rests on the lattice border
-    if (ART.has('cover.clasp')) {
-      var ca = ART.meta('cover.clasp').aspect, cw = w * 0.22, ch = cw / ca;
-      [0.27, 0.73].forEach(function (f) { drawMounted(g, 'cover.clasp', w - cw, h * f - ch / 2, cw, ch, 0); });
-    } else {
-      var dw = w * 0.13, dh = h * 0.085;
-      [0.26, 0.74].forEach(function (f) { ART.draw(g, 'cover.clasp', w - dw, h * f - dh / 2, dw, dh, 0, {}); });
-    }
+    // two keepers set into the lattice border; the straps that hook onto them are the back board's
+    // (drawn on their own layer, see claspBoxes)
+    drawKeepers(g, w, h);
     // the title at the head of the panel, the medallion centred in what is left below it
     var ty = y0 + (y1 - y0) * 0.05, tw = pw * 0.92, th;
     if (ART.has('cover.title')) {
@@ -769,9 +1001,7 @@
     var R = Math.min(w * 0.3, h * 0.2);
     ART.draw(g, 'cover.medallion', w / 2 - R, h * 0.6 - R, 2 * R, 2 * R, 0, {});
     ART.draw(g, 'cover.title', b + cs * 0.5, h * 0.16, w - 2 * b - cs, h * 0.22, 0, { text: 'Vellum\n& Vermilion' });
-    var cw = w * 0.13, ch = h * 0.085;
-    ART.draw(g, 'cover.clasp', w - cw, h * 0.26 - ch / 2, cw, ch, 0, {});
-    ART.draw(g, 'cover.clasp', w - cw, h * 0.74 - ch / 2, cw, ch, 0, {});
+    drawKeepers(g, w, h);
   }
   function prep(cv, w, h) {
     var dpr = Math.min(2, window.devicePixelRatio || 1), W = Math.round(w * dpr), Hh = Math.round(h * dpr);
@@ -780,6 +1010,7 @@
     return g;
   }
   function drawFaceTo(cv, f, side, t) {
+    if (!(L.pw > 0 && L.ph > 0)) return;   // a window with no size yet (a background tab): drawn on the resize that gives it one
     var g = prep(cv, L.pw, L.ph);
     if (f === 'verso') { paper(g, L.pw, L.ph, side, 11); return; }
     if (f === 'endpaper') {
@@ -857,8 +1088,64 @@
       bg.restore();
       el.block.style.display = '';
     } else el.block.style.display = 'none';
+    drawClasps();
   }
   function blockAlpha(a) { el.block.style.opacity = String(a); }
+
+  /* the clasps' layer (see claspBoxes). CL.s is the straps' swing about the block's fore-edge: 1 fastened
+     over the closed cover, -1 turned out past it (hook outward), passing edge-on at 0; z is the layer's
+     z-index (3, over the closed cover; 1, under the leaf but over the block and the open pages, while the
+     cover moves or the book is open) and a its opacity: open, the straps lie out right of the back board
+     where the spread leaves room before the next-page button, and are hidden where it doesn't */
+  var CL = { s: 1, z: 3, a: 1, geo: null };
+  function drawClasps() {
+    if (!el.clasp) return;
+    if (!(L.pw > 0 && L.ph > 0)) { CL.geo = null; el.clasp.getContext('2d').clearRect(0, 0, el.clasp.width, el.clasp.height); return; }   // a window with no size yet: nothing to draw (a negative radius would throw)
+    var B = claspBoxes(L.pw, L.ph), hinge = L.spread ? L.pw : 0, p = Math.ceil(B.ch * 0.4) + 2;
+    var w = 2 * B.ex + B.t + 2 * p, h = L.ph + B.t * SHEAR + 2 * p;
+    CL.geo = { B: B, p: p, w: w, h: h };
+    placeCanvas(el.clasp, hinge + B.x0 - p, -p, w, h);
+    if (mode === 'open' && !tween) { CL.s = -1; CL.z = 1; CL.a = openFits() ? 1 : 0; }
+    paintClasps();
+  }
+  function openFits() {
+    if (!L.spread) return false;
+    var B = claspBoxes(L.pw, L.ph);
+    return L.left + 2 * L.pw + B.ex + B.t + B.ch * 0.3 <= L.W - 58;   // the next-page button is 52 px in from the right
+  }
+  function paintClasps() {
+    var Gm = CL.geo; if (!Gm) return;
+    var cv = el.clasp, dpr = Math.min(2, window.devicePixelRatio || 1), g = cv.getContext('2d');
+    g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, Gm.w, Gm.h);
+    cv.style.zIndex = String(CL.z); cv.style.opacity = String(CL.a);
+    var B = Gm.B, p = Gm.p, s = CL.s, piv = p + B.ex + B.t / 2;
+    if (CL.a <= 0 || Math.abs(s) < 0.004) return;
+    var c = claspPiece(B, s < 0);
+    g.save();
+    if (s < 0) { g.beginPath(); g.rect(p + B.ex, 0, Gm.w, Gm.h); g.clip(); }   // never over the open page
+    g.translate(piv, 0); g.scale(Math.abs(s), 1); g.translate(-piv, 0);
+    B.ys.forEach(function (y) { g.drawImage(c, p - c.pad, p + y - c.pad, c.cw, c.ch); });
+    g.restore();
+    if (s !== 1) return;
+    var u = B.cw / CLASP.W;   // fastened: the pin's head stands over the hook
+    B.ys.forEach(function (y) {
+      if (B.painted) drawStud(g, p + CLASP.pin[0] * u, p + y + CLASP.pin[1] * u, CLASP.stud * u);
+      else ART.draw(g, 'cover.clasp', p, p + y, B.cw, B.ch, 0, { part: 'pin' });
+    });
+  }
+  // swing the straps from CL.s = s0 to s1 (1 or -1) over the fore-edge, then done(); at once under reduced motion
+  function swingClasps(s0, s1, done) {
+    CL.z = 3; CL.a = 1;
+    if (reducedMotion() || !CL.geo) { CL.s = s1; paintClasps(); done(); return; }
+    var t0 = now(), D = 300 * SLOW, a0 = Math.acos(s0), a1 = Math.acos(s1);
+    (function step() {
+      var k = clamp((now() - t0) / D, 0, 1);
+      CL.s = k < 1 ? Math.cos(a0 + (a1 - a0) * ease(k)) : s1;
+      paintClasps();
+      if (k < 1) { requestAnimationFrame(step); return; }
+      done();
+    })();
+  }
 
   /* the flyleaf: a blank leaf over the face beneath the cover while it opens, lifted away with the endpaper */
   function flyOn() {
@@ -871,13 +1158,13 @@
     el.fly.style.display = 'block'; el.fly.style.opacity = '1';
     return true;
   }
-  function flyOff() { el.fly.style.display = 'none'; }
+  function flyOff() { el.fly.style.display = 'none'; zap(el.fly); }
   function posCount() { return L.spread ? NFACES / 2 : NFACES; }
   function posOfFace(f) { return L.spread ? f >> 1 : f; }
   function facesOf(p) { return L.spread ? [2 * p, 2 * p + 1] : [p]; }
 
   /* ================= state ================= */
-  var SLOW = 1, mode = 'hidden', pos = 0, T = null, busyUntil = 0, tween = null, liveRaf = 0;
+  var SLOW = 1, mode = 'hidden', pos = 0, T = null, busyUntil = 0, tween = null, liveRaf = 0, liveTo = 0, liveWas = false;
   function busy() { return now() < busyUntil || !!T || !!tween; }
   function lock(ms) { busyUntil = Math.max(busyUntil, now() + ms); }
   function setStatic() {
@@ -905,23 +1192,52 @@
   // re-render the faces in view (after a solve, a font or an art PNG arriving)
   function refresh() {
     if (mode === 'hidden') return;
-    thumbs = {}; coloCache = {};
+    thumbs = freeAll(thumbs);
+    ['full', 'rich', 'under', 'glint'].forEach(function (k) { zap(coloCache[k]); }); coloCache = {};
     computeLayout();
     if (mode === 'open') setStatic();
-    else if (mode === 'closed') { drawFaceTo(el.cF, 'cover'); drawFaceTo(el.cK, 'endpaper'); }
+    else if (mode === 'closed') {   // the endpaper (inside the board) only matters while the cover is lifting
+      drawFaceTo(el.cF, 'cover');
+      if (tween) drawFaceTo(el.cK, 'endpaper', 'L');
+    }
+  }
+  // everything a shut (or hidden) book doesn't show: the parchment, the thumbnails, the silhouettes, the
+  // Colophon's layers, and the leaves' own canvases. Opening draws what it needs again (the parchment is cheap)
+  function freeFaces() {
+    stopLive();
+    paperCache = freeAll(paperCache); thumbs = freeAll(thumbs); silCache = freeAll(silCache);
+    if (tb) { zap(tb.cv); tb = null; }
+    coloFree();
+    [el.cA, el.cB, el.cK].forEach(zap);
+  }
+  // the Bestiary redraws only while something on it moves: a name fading in, a beast waking, or a beast
+  // still drawn by hand (no painted PNG yet), whose idle loop runs on the clock. At most ~14 frames a second.
+  var LIVE_MS = 70;
+  function bestMoving(t) {
+    if (best.sel && t - best.selT < 320) return true;
+    for (var id in best.woke) if (t - best.woke[id] < 1150) return true;
+    return BEASTS.some(function (b) { return found(b) && !ART.has('drollery.' + b); });
   }
   function liveLoop() {
     liveRaf = 0;
-    if (mode !== 'open') return;
-    var fs = facesOf(pos), bi = fs.indexOf(F_BEST);
-    if (bi >= 0 && !T) {
-      var t = now(), cv = bi === 0 ? el.cA : el.cB, g = cv.getContext('2d'), dpr = Math.min(2, window.devicePixelRatio || 1);
+    var bi = mode === 'open' && !T && !tween && !document.hidden ? facesOf(pos).indexOf(F_BEST) : -1;
+    if (bi < 0) { liveWas = false; return; }
+    var t = now(), mv = bestMoving(t);
+    if (mv || liveWas) {   // ...and once more after it settles, for the final frame
+      var cv = bi === 0 ? el.cA : el.cB, g = cv.getContext('2d'), dpr = Math.min(2, window.devicePixelRatio || 1);
       g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, L.pw, L.ph);
       renderFace(F_BEST, g, L.pw, L.ph, L.spread ? (bi ? 'R' : 'L') : 'R', t);
     }
-    if (bi >= 0) setTimeout(function () { if (!liveRaf) liveRaf = requestAnimationFrame(liveLoop); }, 40);
+    liveWas = mv;
+    if (mv) liveTo = setTimeout(liveKick, LIVE_MS);
   }
-  function startLive() { if (!liveRaf) liveRaf = requestAnimationFrame(liveLoop); }
+  function liveKick() { liveTo = 0; if (!liveRaf) liveRaf = requestAnimationFrame(liveLoop); }
+  function startLive() { if (!liveRaf && !liveTo) liveRaf = requestAnimationFrame(liveLoop); }
+  function stopLive() {
+    if (liveRaf) cancelAnimationFrame(liveRaf);
+    if (liveTo) clearTimeout(liveTo);
+    liveRaf = 0; liveTo = 0; liveWas = false;
+  }
 
   /* ================= the leaf: page turns ================= */
   function leafShow(on) { el.leaf.style.display = on ? 'block' : 'none'; el.leaf.style.opacity = '1'; }
@@ -976,7 +1292,7 @@
       if (complete) pos = to;
       T = null; tween = null;
       setStatic();           // the new faces are on the static leaves before the turning leaf goes
-      leafShow(false);
+      leafShow(false); zap(el.cF); zap(el.cK);   // the turning leaf is drawn afresh for every turn
       startLive();
     })();
   }
@@ -988,12 +1304,14 @@
   function spreadXf(k, dx, dy) { el.spread.style.transform = 'translate(' + dx + 'px,' + dy + 'px) scale(' + k + ')'; }
   function showClosed() {
     mode = 'closed'; show(true);
+    CL.s = 1; CL.z = 3; CL.a = 1;
     computeLayout();
     document.body.classList.add('bkClosed'); document.body.classList.remove('bkOpen');
     el.fA.style.visibility = 'hidden'; el.fB.style.visibility = 'hidden';
     el.leaf.classList.add('cover'); leafAt(L.spread ? L.pw : 0, 'left center'); leafShow(true); setAngle(0);
     el.shF.style.background = 'none'; el.shK.style.background = 'none';
-    drawFaceTo(el.cF, 'cover'); drawFaceTo(el.cK, 'endpaper', 'L');
+    freeFaces();   // the leaves are hidden under the cover; the endpaper is drawn when the cover lifts
+    drawFaceTo(el.cF, 'cover');
     spreadXf(L.closed.k, L.closed.dx, L.closed.dy);
     blockAlpha(1); flyOff();
     el.mark.style.display = 'none';
@@ -1006,46 +1324,53 @@
   function startFace() { var n = nextUnsolved(); return n ? G.LEVELS[n - 1].quire : F_COLO; }
   function openBook(face) {
     if (mode !== 'closed' || busy()) return;
-    lock(1200);
+    lock(1500);
     pos = posOfFace(face === undefined ? startFace() : face);
-    var fs = facesOf(pos), C = L.closed;
-    drawFaceTo(L.spread ? el.cB : el.cA, L.spread ? fs[1] : fs[0], 'R');
-    if (L.spread) drawFaceTo(el.cA, fs[0], 'L');
-    el.fB.style.visibility = ''; el.fA.style.visibility = L.spread ? 'hidden' : '';
-    document.body.classList.remove('bkClosed');
-    var fly = flyOn();
-    var t0 = now(), D = 900 * SLOW;
+    var fs = facesOf(pos), C = L.closed, fits = openFits();
     tween = {};
-    (function step() {
-      var k = clamp((now() - t0) / D, 0, 1), e = ease(k);
-      spreadXf(C.k + (1 - C.k) * e, C.dx * (1 - e), C.dy * (1 - e));
-      setAngle(-180 * e);
-      blockAlpha(clamp(1 - e * 4, 0, 1));   // the block's edge sinks under the opened leaves
-      var s = Math.abs(Math.sin(Math.PI * e));
-      el.shF.style.background = 'linear-gradient(to right, rgba(20,5,2,' + (0.4 * s) + '), rgba(20,5,2,0))';
-      (L.spread ? el.shB : el.shA).style.background = 'linear-gradient(to right, rgba(30,15,5,' + (0.5 * s) + '), rgba(30,15,5,0) 60%)';
-      if (!L.spread) el.leaf.style.opacity = String(clamp((1 - k) / 0.2, 0, 1));
-      if (k < 1) { requestAnimationFrame(step); return; }
-      el.fA.style.visibility = '';
-      var f0 = now(), FD = (fly ? 320 : 200) * SLOW;
-      (function fade() {   // the endpaper (and the flyleaf facing it) lifts away to show the first leaves beneath
-        var q = clamp((now() - f0) / FD, 0, 1);
-        el.leaf.style.opacity = String(L.spread ? 1 - q : 0);
-        if (fly) el.fly.style.opacity = String(1 - q);
-        if (q < 1) { requestAnimationFrame(fade); return; }
-        tween = null; leafShow(false); el.leaf.classList.remove('cover'); flyOff();
-        mode = 'open'; document.body.classList.add('bkOpen');
-        var sv = G.save(); sv.screen = 'book'; G.persist();
-        setStatic(); startLive();
+    document.body.classList.remove('bkClosed');
+    // the clasps unfasten first: the straps swing out over the fore-edge; then the cover lifts over them
+    swingClasps(1, -1, function () {
+      CL.z = 1; paintClasps();
+      drawFaceTo(el.cK, 'endpaper', 'L');
+      drawFaceTo(L.spread ? el.cB : el.cA, L.spread ? fs[1] : fs[0], 'R');
+      if (L.spread) drawFaceTo(el.cA, fs[0], 'L');
+      el.fB.style.visibility = ''; el.fA.style.visibility = L.spread ? 'hidden' : '';
+      var fly = flyOn();
+      var t0 = now(), D = 900 * SLOW;
+      (function step() {
+        var k = clamp((now() - t0) / D, 0, 1), e = ease(k);
+        spreadXf(C.k + (1 - C.k) * e, C.dx * (1 - e), C.dy * (1 - e));
+        setAngle(-180 * e);
+        blockAlpha(clamp(1 - e * 4, 0, 1));   // the block's edge sinks under the opened leaves
+        if (!fits && CL.a > 0) { CL.a = clamp(1 - e * 4, 0, 1); paintClasps(); }   // ...and the straps with it, where they don't fit
+        var s = Math.abs(Math.sin(Math.PI * e));
+        el.shF.style.background = 'linear-gradient(to right, rgba(20,5,2,' + (0.4 * s) + '), rgba(20,5,2,0))';
+        (L.spread ? el.shB : el.shA).style.background = 'linear-gradient(to right, rgba(30,15,5,' + (0.5 * s) + '), rgba(30,15,5,0) 60%)';
+        if (!L.spread) el.leaf.style.opacity = String(clamp((1 - k) / 0.2, 0, 1));
+        if (k < 1) { requestAnimationFrame(step); return; }
+        el.fA.style.visibility = '';
+        var f0 = now(), FD = (fly ? 320 : 200) * SLOW;
+        (function fade() {   // the endpaper (and the flyleaf facing it) lifts away to show the first leaves beneath
+          var q = clamp((now() - f0) / FD, 0, 1);
+          el.leaf.style.opacity = String(L.spread ? 1 - q : 0);
+          if (fly) el.fly.style.opacity = String(1 - q);
+          if (q < 1) { requestAnimationFrame(fade); return; }
+          tween = null; leafShow(false); el.leaf.classList.remove('cover'); flyOff(); zap(el.cF); zap(el.cK);
+          mode = 'open'; document.body.classList.add('bkOpen');
+          var sv = G.save(); sv.screen = 'book'; G.persist();
+          setStatic(); startLive();
+        })();
       })();
-    })();
+    });
   }
   function closeBook() {
     if (mode !== 'open' || busy()) return;
-    lock(1200);
+    lock(1500); stopLive(); coloStop();
     document.body.classList.remove('bkOpen');
     el.mark.style.display = 'none';
-    var C = L.closed;
+    var C = L.closed, fits = openFits();
+    CL.s = -1; CL.z = 1; CL.a = fits ? 1 : 0; paintClasps();
     // the right face (or the single face) stays beneath; the board comes back over from the left
     el.leaf.classList.add('cover'); leafAt(L.spread ? L.pw : 0, 'left center');
     drawFaceTo(el.cF, 'cover'); drawFaceTo(el.cK, 'endpaper', 'L');
@@ -1067,10 +1392,12 @@
         spreadXf(1 + (C.k - 1) * e, C.dx * e, C.dy * e);
         if (!L.spread) el.leaf.style.opacity = String(clamp(k / 0.2, 0, 1));
         blockAlpha(clamp(e * 4 - 3, 0, 1));
+        if (!fits) { CL.a = clamp(e * 4 - 3, 0, 1); paintClasps(); }
         var s = Math.abs(Math.sin(Math.PI * e));
         el.shF.style.background = 'linear-gradient(to right, rgba(20,5,2,' + (0.4 * s) + '), rgba(20,5,2,0))';
         if (k < 1) { requestAnimationFrame(step); return; }
-        tween = null; showClosed();
+        // the cover is down: the straps swing back over the fore-edge and hook on
+        swingClasps(-1, 1, function () { tween = null; showClosed(); });
       })();
     })();
   }
@@ -1086,8 +1413,12 @@
     G.load(n);
     var s = G.save(); s.screen = 'play'; G.persist();
     el.scr.classList.add('fade');
-    var m = mode; mode = 'hidden';
-    setTimeout(function () { if (mode === 'hidden') { el.scr.style.display = 'none'; el.scr.classList.remove('fade'); } }, 300);
+    var m = mode; mode = 'hidden'; stopLive(); coloStop();
+    setTimeout(function () {
+      if (mode !== 'hidden') return;
+      el.scr.style.display = 'none'; el.scr.classList.remove('fade');
+      freeFaces(); zap(el.cF); flyOff();   // the page screen needs the memory more; the book is drawn again on return
+    }, 300);
     if (m === 'closed') { el.leaf.classList.remove('cover'); }
   }
   // from the page screen back to the book, open at a face (default: the current page's quire)
@@ -1197,6 +1528,11 @@
         else if (e.key === 'ArrowLeft') { turn(-1); e.preventDefault(); }
       } else if (mode === 'closed' && (e.key === 'Enter' || e.key === ' ')) { openBook(); e.preventDefault(); }
     });
+    // a hidden tab draws nothing: the Bestiary and the Colophon's reveal stop, and pick up again on return
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) { stopLive(); coloPause(); return; }
+      if (mode === 'open') { startLive(); coloResume(); }
+    });
     var rt = 0;
     window.addEventListener('resize', function () {
       clearTimeout(rt);
@@ -1217,6 +1553,8 @@
       ['scr', 'spread', 'fA', 'fB', 'cA', 'cB', 'shA', 'shB', 'leaf', 'cF', 'cK', 'shF', 'shK', 'mark', 'cornL', 'cornR', 'prev', 'next', 'pos', 'close', 'open', 'cont']
         .forEach(function (k) { el[k] = $('bk_' + k); });
       el.spine = $('bk_spine'); el.block = $('bk_block');
+      el.clasp = document.createElement('canvas'); el.clasp.className = 'bind'; el.clasp.id = 'bk_clasp';
+      el.block.parentNode.insertBefore(el.clasp, el.block.nextSibling);
       el.fly = document.createElement('canvas'); el.fly.className = 'fly';
       bindInput();
     },

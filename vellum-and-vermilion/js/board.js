@@ -35,7 +35,8 @@
     this.raf = 0; this.busyUntil = 0;
     this._bindInput();
     var self = this;
-    this._base = null;
+    this._base = null; this._still = null; this._onCv = false; this._rest = false;
+    this._panels = []; this._warmGen = 0;
     this._loop = function () { self.raf = 0; self.draw(); if (now() < self.busyUntil || self.parts.length) self.kick(); };
     this._idle = setInterval(function () { self._idleBeasts(); }, 2600);
   }
@@ -156,13 +157,48 @@
     this.band = band; this.ivy = Math.round(band * 0.65); this.pad = band + this.ivy;
     S = Math.floor(Math.min((maxW - 2 * this.pad) / w, (maxH - 2 * this.pad) / h, 150));
     this.S = Math.max(16, S);
-    this.panel = null; this._base = null;
+    this.panel = null; this._base = null; this._still = null; this._onCv = false;
     this.cssW = w * this.S + 2 * this.pad; this.cssH = h * this.S + 2 * this.pad;
-    this.dpr = Math.min(3, window.devicePixelRatio || 1);
+    // two device pixels per CSS pixel is as sharp as a phone shows these tiles; a third costs 2.25x the fill
+    this.dpr = Math.min(2, window.devicePixelRatio || 1);
     this.cv.style.width = this.cssW + 'px'; this.cv.style.height = this.cssH + 'px';
     this.cv.width = Math.round(this.cssW * this.dpr); this.cv.height = Math.round(this.cssH * this.dpr);
     this._buildLetter();
+    this._warmBeasts();
     this.kick();
+  };
+  // the page's painted beasts in the strands' own colours (and the head's open jaw) are slow to build the
+  // first time; make them in idle time after a page loads, so the floods and the illumination don't stall
+  B._warmBeasts = function () {
+    var self = this, M = this.M, gen = ++this._warmGen;
+    if (this.mini || !M || this.S < 24 || !window.ART || !ART.draw) return;
+    var jobs = [];
+    P.trace(M, M.sol).strands.forEach(function (s) {
+      var rb = null;
+      s.pieces.forEach(function (q) {
+        var b = M.beast[q.c]; if (b !== 'h' && b !== 't') return;
+        rb = rb || ART.rib(self._disp(s));
+        jobs.push({ c: q.c, b: b, rb: rb, snap: 0 });
+        if (b === 'h') jobs.push({ c: q.c, b: b, rb: rb, snap: 0.5 });
+      });
+    });
+    if (!jobs.length) return;
+    var idle = window.requestIdleCallback || function (f) { return setTimeout(f, 60); }, g = null;
+    (function step() {
+      idle(function () {
+        if (gen !== self._warmGen || !jobs.length || !self.M) return;
+        var j = jobs.shift(), S = self.S, h = S / 2, d = self.dpr, q = ((M.sol[j.c] % 4) + 4) % 4;
+        var cx = self.pad + (j.c % M.w + 0.5) * S, cy = self.pad + ((j.c / M.w | 0) + 0.5) * S;
+        var body = j.rb.sh ? j.rb.bd : j.rb.base, paint = j.rb.sh ? j.rb : null;
+        try {
+          if (!g) { var sc = document.createElement('canvas'); sc.width = sc.height = 1; g = sc.getContext('2d'); }
+          g.setTransform(d, 0, 0, d, 0, 0); g.translate(cx, cy); g.rotate(q * Math.PI / 2);
+          if (j.b === 'h') ART.draw(g, 'beastHead', -h, -h, S, S, now(), { body: body, paint: paint, snap: j.snap, blink: 0, gilt: true, q: q, fill: j.rb, amt: 1, mini: false });
+          else ART.draw(g, 'beastTail', -h, -h, S, S, now(), { body: body, paint: paint, wag: 0, gilt: true, rw: 0.36, q: q, fill: j.rb, amt: 1, mini: false });
+        } catch (e) { /* only a warm-up */ }
+        if (jobs.length) step();
+      });
+    })();
   };
   B._buildLetter = function () {
     var M = this.M;
@@ -369,7 +405,10 @@
   };
   B._idleBeasts = function () {
     // whole beasts come alive now and then: blink, snap the jaw, flick the tail
-    if (!this.M || document.hidden) return;
+    // only while the page itself is in view: not under the book or its cover, not in a hidden tab
+    if (!this.M || document.hidden || this.mini) return;
+    if (window.Book && Book.mode && Book.mode() !== 'hidden') return;
+    if (!this.cv.isConnected || this.cv.offsetParent === null) return;
     var heads = [], tails = [], self = this;
     (this.tr ? this.tr.strands : []).forEach(function (s) {
       if (!s.whole || s.loop) return;
@@ -509,8 +548,73 @@
   };
 
   B.draw = function () {
-    var M = this.M, g = this.ctx; if (!M) return;
-    var t = now(), S = this.S, pad = this.pad, self = this;
+    var M = this.M; if (!M) return;
+    var t = now(), e = this.illum ? t - this.illum.t0 : -1;
+    // a solved, illuminated page at rest is one still picture: blit it, and repaint only the tiles whose
+    // beasts are blinking, snapping or flicking a tail
+    if (this.solved && e >= ILLUM_MS && !this.mini && this._settled(t)) { this._drawStill(t); return; }
+    this._still = null; this._onCv = false;
+    this._drawFull(t);
+  };
+  function anyKey(o) { for (var k in o) return true; return false; }
+  B._settled = function (t) {
+    if (this.parts.length || anyKey(this.twinFx) || anyKey(this.anim) || anyKey(this.wig) || anyKey(this.drain)) return false;
+    for (var k in this.flood) if (t - this.flood[k].t0 < 1300) return false;   // floods run at most ~1.2 s
+    return true;
+  };
+  B._drawStill = function (t) {
+    var g = this.ctx, cv = this.cv, k;
+    if (!this._still) {
+      // the whole frame with every beast at rest (their pending moves are left for the patches below)
+      this._rest = true;
+      try { this._drawFull(t); } finally { this._rest = false; }
+      var sc = document.createElement('canvas'); sc.width = cv.width; sc.height = cv.height;
+      sc.getContext('2d').drawImage(cv, 0, 0); this._still = sc; this._onCv = true;
+    } else if (!this._onCv) {
+      g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cv.width, cv.height); g.drawImage(this._still, 0, 0);
+      this._onCv = true;
+    }
+    var dirty = {};
+    for (k in this.blinkAt) dirty[k] = 1;
+    for (k in this.snap) dirty[k] = 1;
+    for (k in this.wagAt) dirty[k] = 1;
+    // a tile whose animation ends this frame is drawn at rest, which puts the still picture back
+    for (k in dirty) this._patch(+k, t);
+  };
+  // repaint one tile's own rest box exactly as the full frame would: the base, then every tile that can reach
+  // into it (its neighbours' half-pixel overlaps and pins) in drawing order, then any twin emblems among them.
+  // They are drawn unclipped on a scratch canvas and only the box is copied back, because a clip edge running
+  // through a ribbon changes its antialiasing and would leave faint seams in the still picture
+  B._patch = function (c, t) {
+    var M = this.M, cv = this.cv, g = this.ctx, S = this.S, h = S / 2, d = this.dpr, self = this;
+    var pc = this._pcv;
+    if (!pc) pc = this._pcv = document.createElement('canvas');
+    if (pc.width !== cv.width || pc.height !== cv.height) { pc.width = cv.width; pc.height = cv.height; }
+    var q = pc.getContext('2d');
+    var x = c % M.w, y = c / M.w | 0, cx = this.pad + (x + 0.5) * S, cy = this.pad + (y + 0.5) * S;
+    // the box in device pixels, and the neighbourhood's (with room for pins and overlaps) to prepare
+    var X0 = Math.floor((cx - h - 0.5) * d), Y0 = Math.floor((cy - h - 0.5) * d);
+    var X1 = Math.ceil((cx + h + 0.5) * d), Y1 = Math.ceil((cy + h + 0.5) * d);
+    var NX0 = Math.max(0, Math.floor((cx - 2 * S) * d)), NY0 = Math.max(0, Math.floor((cy - 2 * S) * d));
+    var NX1 = Math.min(cv.width, Math.ceil((cx + 2 * S) * d)), NY1 = Math.min(cv.height, Math.ceil((cy + 2 * S) * d));
+    q.setTransform(1, 0, 0, 1, 0, 0);
+    q.clearRect(NX0, NY0, NX1 - NX0, NY1 - NY0);
+    q.drawImage(this._base, NX0, NY0, NX1 - NX0, NY1 - NY0, NX0, NY0, NX1 - NX0, NY1 - NY0);
+    q.setTransform(d, 0, 0, d, 0, 0);
+    var near = [], xx, yy;
+    for (yy = Math.max(0, y - 1); yy <= Math.min(M.h - 1, y + 1); yy++)
+      for (xx = Math.max(0, x - 1); xx <= Math.min(M.w - 1, x + 1); xx++) near.push(yy * M.w + xx);
+    near.forEach(function (n) { self._drawTile(q, n, t); });
+    M.groups.forEach(function (grp, gi) {
+      grp.forEach(function (m) { if (near.indexOf(m) >= 0) self._emblem(q, m, gi, t, 0.6); });
+    });
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(X0, Y0, X1 - X0, Y1 - Y0);
+    g.drawImage(pc, X0, Y0, X1 - X0, Y1 - Y0, X0, Y0, X1 - X0, Y1 - Y0);
+  };
+  B._drawFull = function (t) {
+    var M = this.M, g = this.ctx;
+    var S = this.S, pad = this.pad, self = this;
     g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     g.clearRect(0, 0, this.cssW, this.cssH);
     var e = this.illum ? t - this.illum.t0 : -1;
@@ -573,11 +677,27 @@
     var M = this.M, S = this.S, pad = this.pad, self = this;
     var borderK = K(150, 900), letterK = K(450, 1100), twinK = K(650, 600);
     // the panel: the page's ground, filigree, gilded frame tracing the mask, ivy (drawn once per page and size)
+    // (kept for this page and the last one, so going back and forth or laying out again doesn't repaint it;
+    // the key counts the art that has arrived, as the ivy and border images change the panel)
     if (!this.panel) {
-      var inm = M.kinds.map(function (k) { return k !== ' '; }), rect = inm.every(Boolean);
-      this.panel = ART.makePanel({ w: M.w, h: M.h, inm: inm, S: S, pad: pad, band: this.band, ivy: this.ivy,
-        cssW: this.cssW, cssH: this.cssH, dpr: this.dpr, rect: rect, seed: (M.level.n || 7) * 31 + 7, ground: this.groundName,
-        round: rect ? 0 : S * (this.isInitial ? 0.3 : 0.18) });
+      var st = ART.status ? ART.status() : {}, nl = 0, nf = 0;
+      for (var sk in st) { if (st[sk] === 1) nl++; else if (st[sk] === -1) nf++; }
+      var pk = [M.level.n, M.w, M.h, M.kinds.join(''), S, pad, this.band, this.ivy, this.cssW, this.cssH, this.dpr,
+        this.isInitial, this.groundName, nl, nf].join('|');
+      var hit = null, pi;
+      for (pi = 0; pi < this._panels.length; pi++) if (this._panels[pi].key === pk) { hit = this._panels.splice(pi, 1)[0]; break; }
+      if (!hit) {
+        var inm = M.kinds.map(function (k) { return k !== ' '; }), rect = inm.every(Boolean);
+        hit = { key: pk, panel: ART.makePanel({ w: M.w, h: M.h, inm: inm, S: S, pad: pad, band: this.band, ivy: this.ivy,
+          cssW: this.cssW, cssH: this.cssH, dpr: this.dpr, rect: rect, seed: (M.level.n || 7) * 31 + 7, ground: this.groundName,
+          round: rect ? 0 : S * (this.isInitial ? 0.3 : 0.18) }) };
+      }
+      this._panels.push(hit);
+      while (this._panels.length > 2) {   // let an old panel's memory go now rather than at some later collection
+        var old = this._panels.shift().panel;
+        if (old && old.cv && old.cv !== hit.panel.cv) { old.cv.width = 0; old.cv.height = 0; }
+      }
+      this.panel = hit.panel;
     }
     g.drawImage(this.panel.cv, 0, 0, this.cssW, this.cssH);
     // the great initial's body: faint while the page is worked, gilded from the top-left on solving
@@ -689,14 +809,18 @@
         var bamt = col.fill && col.frac > 0 ? col.frac : col.drain ? 1 - col.drain.k : 0;
         if (bs === 'h') {
           var sn = this.snap[c], snapK = 0, blk = 0;
-          if (sn && t >= sn) { var q2 = (t - sn) / 420; if (q2 < 1) snapK = q2; else delete this.snap[c]; }
-          if (sn && t < sn) this.busy(sn - t + 450);
-          if (this.blinkAt[c]) { var bq = (t - this.blinkAt[c]) / 220; if (bq < 1) blk = Math.sin(bq * Math.PI); else delete this.blinkAt[c]; }
+          if (!this._rest) {   // (_rest: the still picture, every beast at rest and its pending moves kept)
+            if (sn && t >= sn) { var q2 = (t - sn) / 420; if (q2 < 1) snapK = q2; else delete this.snap[c]; }
+            if (sn && t < sn) this.busy(sn - t + 450);
+            if (this.blinkAt[c]) { var bq = (t - this.blinkAt[c]) / 220; if (bq < 1) blk = Math.sin(bq * Math.PI); else delete this.blinkAt[c]; }
+          }
           ART.draw(g, 'beastHead', -h, -h, S, S, t, { body: body, paint: paint, snap: snapK, blink: blk, gilt: true, q: bq0, fill: bfill, amt: bamt, mini: this.mini || S < 24 });
         } else if (bs === 't') {
           var wa = this.wagAt[c], wagK = 0;
-          if (wa !== undefined && t >= wa) { var q3 = (t - wa) / 700; if (q3 < 1) wagK = q3; else delete this.wagAt[c]; }
-          if (wa !== undefined && t < wa) this.busy(wa - t + 750);
+          if (!this._rest) {
+            if (wa !== undefined && t >= wa) { var q3 = (t - wa) / 700; if (q3 < 1) wagK = q3; else delete this.wagAt[c]; }
+            if (wa !== undefined && t < wa) this.busy(wa - t + 750);
+          }
           ART.draw(g, 'beastTail', -h, -h, S, S, t, { body: body, paint: paint, wag: wagK, gilt: true, rw: 0.36, q: bq0, fill: bfill, amt: bamt, mini: this.mini || S < 24 });
         } else ART.draw(g, 'knot', -h, -h, S, S, t, { body: body, rib: rb, rw: 0.36, mini: this.mini || S < 24, ang: ang });
       }

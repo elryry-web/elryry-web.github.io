@@ -273,10 +273,11 @@
     E.noise = ac.createBuffer(1, sr, sr);
     d = E.noise.getChannelData(0);
     for (i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-    // a stone chapel: a longer, darker tail than a hall, mono to keep the convolver cheap
-    n = Math.floor(sr * 2.6);
+    // a stone chapel: a dark tail, mono and short (1.2 s) to keep the convolver cheap on a phone
+    // (the convolver normalises the impulse, so the wet level holds)
+    n = Math.floor(sr * 1.2);
     var ir = ac.createBuffer(1, n, sr), id = ir.getChannelData(0), lp = 0, pre = Math.floor(0.02 * sr);
-    for (i = pre; i < n; i++) { var x = (i - pre) / sr; lp += ((Math.random() * 2 - 1) - lp) * (0.42 - 0.28 * x / 2.6); id[i] = lp * Math.exp(-x * 6.9 / 2.2); }
+    for (i = pre; i < n; i++) { var x = (i - pre) / sr; lp += ((Math.random() * 2 - 1) - lp) * (0.42 - 0.28 * x / 1.2); id[i] = lp * Math.exp(-x * 6.9 / 1.1); }
     E.out = ac.createGain(); E.out.gain.value = OUT;
     E.bus = ac.createGain();
     var dry = ac.createGain(); dry.gain.value = 0.8;
@@ -541,7 +542,7 @@
       if (E && E.ac.state === 'running') { E.suspended = true; E.ac.suspend(); }
     } else {
       held = false;
-      if (E && E.suspended) { E.suspended = false; E.ac.resume(); }
+      if (E && E.suspended) { E.suspended = false; if (on) E.ac.resume(); }
       kick();
     }
   });
@@ -555,7 +556,12 @@
       if (timer) { clearTimeout(timer); timer = 0; }
       if (cur) { fade(E.ac.currentTime, 0.35); var c = cur; cur = null; setTimeout(function () { try { c.g.disconnect(); } catch (e) { /* gone */ } }, 600); }
       nextAt = 0; pend = null; flourish = false;
-      setTimeout(function () { if (!on && E.connected) { E.out.disconnect(); E.connected = false; } }, 500);
+      // muted: once faded, unhook and stop the context's clock too (unlock() wakes it when sound comes back)
+      setTimeout(function () {
+        if (on) return;
+        if (E.connected) { E.out.disconnect(); E.connected = false; }
+        if (E.ac.state === 'running') E.ac.suspend();
+      }, 500);
     } else {
       if (!E.connected) { E.out.connect(E.dest); E.connected = true; }
       unlock();
@@ -633,11 +639,21 @@
       window.SFX.solved = function () { var r = solvedSfx.apply(this, arguments); try { API.solved(); } catch (e) { /* music only */ } return r; };
     }
   }
-  // the screen: the page screen ('play') is quiet, the cover and the book are warm
-  setInterval(function () {
+  // the screen: the page screen ('play') is quiet, the cover and the book are warm. The screen only changes
+  // after a tap or a key, so look shortly after each one (and once more when the page-turn or cover has run);
+  // a slow fallback only reads one field, and does nothing at all while the tab is hidden
+  var lastScr = null;
+  function checkScreen() {
+    if (document.hidden) return;
     var s = null;
     try { s = window.VV && window.VV.save && window.VV.save(); } catch (e) { /* not ready */ }
-    if (s) API.screen(s.screen === 'play' ? 'play' : 'book');
-  }, 400);
+    if (!s) return;
+    var scr = s.screen === 'play' ? 'play' : 'book';
+    if (scr !== lastScr) { lastScr = scr; API.screen(scr); }
+  }
+  function soon() { setTimeout(checkScreen, 60); setTimeout(checkScreen, 1300); }
+  ['pointerup', 'keyup'].forEach(function (ev) { window.addEventListener(ev, soon, { passive: true, capture: true }); });
+  setInterval(checkScreen, 1500);
+  setTimeout(checkScreen, 300);
   return API;
 });
