@@ -83,7 +83,10 @@
       var ac = getComputedStyle(app);
       boxDroll(true, app.clientHeight - parseFloat(ac.paddingTop) - parseFloat(ac.paddingBottom));
       w = app.clientWidth - parseFloat(ac.paddingLeft) - parseFloat(ac.paddingRight) - side - gap;
-      h = app.clientHeight - parseFloat(ac.paddingTop) - parseFloat(ac.paddingBottom);
+      h = Math.min(app.clientHeight, window.innerHeight) - parseFloat(ac.paddingTop) - parseFloat(ac.paddingBottom);
+      // the board's area is pinned to this height from the top of the grid, so a side column that runs taller
+      // than the screen (big system fonts on a short phone) can't push the board down and crop it
+      app.style.setProperty('--boardH', Math.max(120, h) + 'px');
     } else {
       var cs = getComputedStyle(app);
       boxDroll(false, window.innerHeight);
@@ -195,7 +198,7 @@
       cv.style.height = '0px';
       var col = $('grumbleRow').clientWidth || 300;
       var room = availH - $('hud').offsetHeight - $('head').offsetHeight - $('foot').offsetHeight - 24;
-      var hh = Math.round(Math.max(70, Math.min(250, room)));
+      var hh = room < 56 ? 0 : Math.round(Math.max(70, Math.min(250, room)));   // no room: no drollery
       cv.style.width = col + 'px'; cv.style.height = hh + 'px';
       droll.anchor = 0.42;
     } else {

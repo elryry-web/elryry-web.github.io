@@ -489,7 +489,7 @@
     g.beginPath(); offsetSpan(g, a, b, h, side * (rw / 2 - sw * 0.5), mid0 - span * 0.22, mid0 + span * 0.22); g.stroke();
     g.restore();
   };
-  B._edges = function () { var S = this.S; return { E: Math.max(1, S * 0.042), HL: Math.max(0.7, S * 0.012) }; };
+  B._edges = function () { var S = this.S; return { E: Math.max(1, S * 0.042), HL: ART.hairOf(S, 1 / Math.max(1, this.dpr || 1)) }; };
 
   // the under ribbon of a crossing is cut short by a sliver of dark ground at the over ribbon's edges
   B._weaveShade = function (g, underP, h, rw, S, overPath) {
@@ -500,10 +500,10 @@
     var gr = horiz ? g.createLinearGradient(-h, 0, h, 0) : g.createLinearGradient(0, -h, 0, h);
     var a = (half + S * 0.03) / S, sh = 'rgba(' + this.ground.deep + ',';
     gr.addColorStop(0, sh + '0)'); gr.addColorStop(clamp(0.5 - a - 0.14, 0, 1), sh + '0)');
-    gr.addColorStop(0.5 - a, sh + '0.22)'); gr.addColorStop(0.5 + a, sh + '0.22)');
+    gr.addColorStop(0.5 - a, sh + '0.36)'); gr.addColorStop(0.5 + a, sh + '0.36)');
     gr.addColorStop(clamp(0.5 + a + 0.14, 0, 1), sh + '0)'); gr.addColorStop(1, sh + '0)');
     g.fillStyle = gr; g.fillRect(-h, -h, 2 * h, 2 * h);
-    g.strokeStyle = 'rgba(' + this.ground.deep + ',0.92)'; g.lineWidth = 2 * half + 2 * Math.max(1.2, S * 0.03); g.lineCap = 'butt';
+    g.strokeStyle = 'rgba(' + this.ground.deep + ',0.92)'; g.lineWidth = 2 * half + 2 * Math.max(1.5, S * 0.04); g.lineCap = 'butt';
     g.beginPath(); overPath(g); g.stroke();
     g.restore();
   };

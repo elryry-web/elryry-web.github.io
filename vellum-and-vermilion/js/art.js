@@ -410,7 +410,7 @@
     if (r && r.sh) return { key: r.sh + r.bd + r.lt, sh: r.sh, bd: r.bd, lt: r.lt, mo: r.mo || 1, paint: true };
     if (o.flat) return { key: 'flat' + o.flat, sh: mix(o.flat, '#120800', 0.45), bd: o.flat, lt: mix(o.flat, '#fffbe8', 0.5) };
     var b = RIB.bare;
-    return { key: 'bare', sh: mix(b.edge, b.dark, 0.5), bd: b.base, lt: b.light };
+    return { key: 'bare', sh: b.dark, bd: b.base, lt: b.light };
   }
   // halve a canvas in steps, then to tw x th, for a clean small copy
   function beastDown(src, W, H, tw, th) {
@@ -449,6 +449,9 @@
     var sg = src.getContext('2d'), id = sg.createImageData(W, H), o = id.data, d = P.d;
     var mk = painted ? sg.createImageData(W, H) : null, md = mk ? mk.data : null;
     var S0, B0, L0, CT, PC = [251, 241, 218], pc = [0, 0, 0];
+    // a bare (unpainted) beast is cream on a cream ribbon: its ink lines are taken well toward the hairline's
+    // umber so the head and its features read at phone size
+    var inkUp = !painted && ramp.key === 'bare' ? 0.6 : 0, IK = rgbOf(HAIR);
     if (painted) { S0 = rgbOf(ramp.sh); B0 = rgbOf(ramp.bd); L0 = rgbOf(ramp.lt); CT = rgbOf(mix(ramp.sh, HAIR, 0.3)); }
     if (gilt) CT = rgbOf(mix(ramp.gilt.bands[0], HAIR, 0.5));
     for (i = 0; i < N; i++) {
@@ -493,6 +496,7 @@
           r += (low[0] - ref[0]) * f; g += (low[1] - ref[1]) * f; b += (low[2] - ref[2]) * f;
         }
       }
+      if (inkUp) { var ik = (1 - sstep(0.2, 0.62, L)) * inkUp; r += (IK[0] - r) * ik; g += (IK[1] - g) * ik; b += (IK[2] - b) * ik; }
       o[qq] = r < 0 ? 0 : r > 255 ? 255 : r; o[qq + 1] = g < 0 ? 0 : g > 255 ? 255 : g; o[qq + 2] = b < 0 ? 0 : b > 255 ? 255 : b; o[qq + 3] = a;
     }
     sg.putImageData(id, 0, 0);
@@ -504,12 +508,21 @@
     var tw = Math.max(2, Math.round(W * kc)), th = Math.max(2, Math.round(H * kc));
     var art = beastDown(src, W, H, tw, th), mask = null;
     if (painted) { sg.putImageData(mk, 0, 0); mask = beastDown(src, W, H, tw, th); }
-    var pad = rim ? Math.ceil(rim[0]) + 2 : 1, cv = document.createElement('canvas');
+    var pad = rim ? Math.ceil(rim[3] || rim[0]) + 2 : 1, cv = document.createElement('canvas');
     cv.width = tw + 2 * pad; cv.height = th + 2 * pad;
     var g2 = cv.getContext('2d'); g2.imageSmoothingEnabled = true; g2.imageSmoothingQuality = 'high';
     if (rim) {   // the board's gilt edge: a dark hairline, the gold, a burnished lip, stamped round the silhouette
       var sil = document.createElement('canvas'); sil.width = tw; sil.height = th;
       var sl = sil.getContext('2d');
+      if (rim[3]) {   // the ribbon's soft umber shadow round the silhouette: stamped solid on its own, then laid at its alpha
+        var shc = document.createElement('canvas'); shc.width = cv.width; shc.height = cv.height;
+        var shg = shc.getContext('2d'), R3 = rim[3], st3 = Math.max(12, Math.ceil(R3 * 5));
+        sl.drawImage(art, 0, 0); sl.globalCompositeOperation = 'source-in'; sl.fillStyle = 'rgb(14,6,2)'; sl.fillRect(0, 0, tw, th);
+        for (var rg3 = 1; rg3 <= 2; rg3++) for (var s3 = 0; s3 < st3; s3++) {
+          var an3 = s3 / st3 * 6.2832; shg.drawImage(sil, pad + Math.cos(an3) * R3 * rg3 / 2, pad + Math.sin(an3) * R3 * rg3 / 2);
+        }
+        g2.globalAlpha = 0.42; g2.drawImage(shc, 0, 0); g2.globalAlpha = 1;
+      }
       [[rim[0], HAIR], [rim[1], GILT], [rim[2], GILT_L]].forEach(function (st) {
         sl.globalCompositeOperation = 'source-over'; sl.clearRect(0, 0, tw, th); sl.drawImage(art, 0, 0);
         sl.globalCompositeOperation = 'source-in'; sl.fillStyle = st[1]; sl.fillRect(0, 0, tw, th);
@@ -578,8 +591,9 @@
     var kc = Gm.kl * S * dev;
     var rim = null;
     if (gilt) {
-      var E = Math.max(1, S * 0.042), HL = Math.max(0.7, S * 0.012), bandGap = (0.36 - BEAST_BAND) / 2 * S;
-      rim = [(E + HL + bandGap) * dev, (E + bandGap) * dev, (E * 0.45 + bandGap) * dev].map(function (v) { return Math.round(v * 4) / 4; });
+      var E = Math.max(1, S * 0.042), HL = hairOf(S, 1 / Math.max(1, dev)), bandGap = (0.36 - BEAST_BAND) / 2 * S;
+      rim = [(E + HL + bandGap) * dev, (E + bandGap) * dev, (E * 0.45 + bandGap) * dev,
+        (E + HL + bandGap + Math.max(2 / Math.max(1, dev), S * 0.05)) * dev].map(function (v) { return Math.round(v * 4) / 4; });
     }
     var ramp = o.fill || o.flat ? beastRamp(o) : null, bare = beastRamp({}), amt = o.fill ? (o.amt == null ? 1 : o.amt) : o.flat ? 1 : 0;
     var q = o.q;
@@ -974,7 +988,13 @@
     var gp = G.path(b * 0.3), GR = GROUND[o.ground] || GROUND.madder;
     g.fillStyle = GR.base; g.fill(gp);
     g.save(); g.clip(gp);
-    // a painted mottle in the ground
+    // the gold diaper, then a wash of the ground laid back over it so it stays a quiet texture under the
+    // ribbons: always somewhat, and more as the cells shrink (late, big boards on a phone), where bright
+    // gold scrolls the size of a ribbon's edge would otherwise read as much as the tiles do
+    filigree(g, box[0], box[1], box[2], box[3], S, R, Math.max(0.55, Math.min(1.3, S * 0.016)));
+    var calm = Math.max(0, Math.min(1, (64 - S) / 34));
+    g.globalAlpha = 0.34 + 0.24 * calm; g.fillStyle = GR.base; g.fill(gp); g.globalAlpha = 1;
+    // a painted mottle in the ground (over the diaper, so the wash doesn't flatten it)
     var nb = Math.round(o.w * o.h * 1.5);
     for (var i = 0; i < nb; i++) {
       var x = box[0] + R() * box[2], y = box[1] + R() * box[3], r = S * (0.4 + R() * 1.1), dk = R() < 0.5;
@@ -982,7 +1002,6 @@
       m.addColorStop(0, dk ? 'rgba(' + GR.dk + ',0.3)' : 'rgba(' + GR.lt + ',0.22)'); m.addColorStop(1, 'rgba(0,0,0,0)');
       g.fillStyle = m; g.fillRect(x - r, y - r, 2 * r, 2 * r);
     }
-    filigree(g, box[0], box[1], box[2], box[3], S, R, Math.max(0.55, Math.min(1.3, S * 0.016)));
     // a soft shadow under the frame's inner edge
     g.strokeStyle = 'rgba(' + GR.deep + ',0.45)'; g.lineWidth = b * 0.6; g.stroke(G.path(b * 0.1));
     g.restore();
@@ -994,10 +1013,18 @@
   /* ---------- enamel ribbons on the board ---------- */
   // one ribbon path in layers: dark hairline, gold edge, gouache body (darker edge, mid, centre) and a
   // faint lighter stripe. rib: {base, edge, light}; edges: draw the gold; dash: dash array for the body
+  // the dark hairline outside a ribbon's gold edge (css px, px: one device pixel): never under a device pixel
+  // and a half, so the ribbon's outline stays crisp on a phone. board.js (_edges) and the beasts' rim match it
+  function hairOf(S, px) { return Math.max(0.7, 1.6 * (px || 1), S * 0.016); }
   function ribLayers(ctx, path, w, S, rib, edges, dash, stripe, fx) {
-    var E = Math.max(1, S * 0.042), HL = Math.max(0.7, S * 0.012);
+    var tm = ctx.getTransform ? ctx.getTransform() : { a: 1, b: 0 }, px = 1 / Math.max(1, Math.hypot(tm.a, tm.b));
+    var E = Math.max(1, S * 0.042), HL = hairOf(S, px);
     ctx.lineCap = 'butt'; ctx.lineJoin = 'round';
     if (edges) {
+      // a soft umber shadow round the ribbon on the ground (and, from the over ribbon, on the under one at
+      // a crossing), so neighbouring and crossing ribbons part cleanly at phone size
+      ctx.strokeStyle = 'rgba(14,6,2,0.42)'; ctx.lineWidth = w + 2 * (E + HL) + 2 * Math.max(2 * px, S * 0.05);
+      ctx.beginPath(); path(ctx); ctx.stroke();
       ctx.strokeStyle = HAIR; ctx.lineWidth = w + 2 * (E + HL); ctx.beginPath(); path(ctx); ctx.stroke();
       ctx.strokeStyle = GILT; ctx.lineWidth = w + 2 * E; ctx.beginPath(); path(ctx); ctx.stroke();
     }
@@ -1810,7 +1837,7 @@
     INK: INK, PIG: PIG, ribbon: ribbon, mix: mix, rand: rand, maskShape: maskShape, makePage: makePage, sheet: drawSheet,
     // the board's enamel look: RIB colours, the cached panel (ground, filigree, gilded frame, ivy) and
     // layered gold-edged ribbon strokes
-    RIB: RIB, HAIR: HAIR, GILT: GILT, MADDER: MADDER, makePanel: makePanel, ribLayers: ribLayers, ribMix: ribMix,
+    RIB: RIB, HAIR: HAIR, hairOf: hairOf, GILT: GILT, MADDER: MADDER, makePanel: makePanel, ribLayers: ribLayers, ribMix: ribMix,
     setPen: function (m) { PEN = m; }, rampAt: function (rib, x) { return rampAt(rib, x); },
     // the page's panel ground (a GROUND name, from the level) and the jewels that contrast with it
     GROUND: GROUND, groundName: groundName, ground: function (name) { return GROUND[name] || GROUND.madder; }, jewelsFor: jewelsFor,
