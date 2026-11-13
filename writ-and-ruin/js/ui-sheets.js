@@ -476,7 +476,10 @@
       var sc = H.screenFor(c);
       where = c.age ? E.ageTitle(c.age.ageNo) + (sc === 'age' ? (c.age.phase === 'prophecy' ? ', choosing prophecies' : ', round ' + c.age.round) : sc === 'end' ? ', ended' : sc === 'reckon' ? ', the Reckoning' : ', in the Annals') : '';
     }
-    return '<div class="screen title-screen"><div class="titleblock"><div class="title-art">' + titleArt() + '</div>' +
+    // Ryan's painted valley when it has loaded, else the drawn woodcut; the name sits below it on the paper
+    var hero = A.paintedUrl && A.paintedUrl('title');
+    return '<div class="screen title-screen"><div class="titleblock"><div class="title-art' + (hero ? ' painted' : '') + '">' +
+      (hero ? '<img src="' + hero + '" alt="A painted valley: a river winding past a castle to the sea">' : titleArt()) + '</div>' +
       '<h1 class="gametitle">Writ <span>&amp;</span> Ruin</h1><p class="tagline">A valley of eight regions, four houses and one Crown. Win an age, write its law, and carry the grudges into the next.</p></div>' +
       '<div class="menu">' +
       (save ? btn('Continue <small>' + esc(where) + '</small>', function () { U.go(H.screenFor(U.c)); }, { cls: 'go big' }) : '') +

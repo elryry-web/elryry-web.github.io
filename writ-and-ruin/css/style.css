@@ -230,6 +230,9 @@ body.sheet-up { overflow: hidden; }
 .title-screen { display: flex; flex-direction: column; align-items: stretch; min-height: 100vh; justify-content: center; }
 .titleblock { text-align: center; }
 .title-art svg { width: 100%; max-width: 440px; margin: 0 auto; height: auto; }
+/* the painting keeps its 3:2 shape, its own paper margin and the frame ink; it gives up height before the menu does */
+.title-art.painted img { display: block; width: 100%; max-width: min(760px, calc(46vh * 1.5)); height: auto; margin: 0 auto;
+  border: 4px solid var(--ink); box-shadow: 4px 4px 0 var(--ink); }
 .gametitle { font-size: 3rem; margin: 12px 0 4px; letter-spacing: .02em; }
 .gametitle span { color: var(--rust); }
 .tagline { font-size: 1.05rem; max-width: 30em; margin: 0 auto 16px; }
@@ -264,20 +267,31 @@ body.sheet-up { overflow: hidden; }
   }
   .sheet-card.wide { width: min(820px, 94vw); }
 }
-@media (min-width: 960px) {
+/* two columns: the map on the left, sized by the height left between the hint and the action bar so the whole
+   board shows and nothing sits under the bar; the strip, status and side panels take the spare width.
+   The map is 420x521 (4:5); its frame is 12px wider and taller (border and padding). */
+@media (min-width: 760px) {
   .age {
-    display: grid; grid-template-columns: minmax(0, 1fr) 360px; grid-template-rows: auto auto 1fr;
-    grid-template-areas: 'top top' 'strip strip' 'map side'; column-gap: 16px; padding: 0 16px calc(var(--bar-h) + 30px);
+    --map-h: min(max(300px, calc(100vh - 212px)), calc((100vw - 400px) * 521 / 420));
+    display: grid; grid-template-columns: auto minmax(300px, 1fr); grid-template-rows: auto auto auto auto 1fr;
+    grid-template-areas: 'top top' 'hint hint' 'map strip' 'map status' 'map side';
+    column-gap: 16px; padding: 0 16px calc(var(--bar-h) + 30px);
   }
   .topbar { grid-area: top; }
-  .strip { grid-area: strip; grid-template-columns: repeat(var(--n, 4), minmax(0, 1fr)); gap: 8px; }
-  .mapbox { grid-area: map; }
-  .side { grid-area: side; margin-top: 4px; max-height: calc(100vh - 210px); overflow-y: auto; position: sticky; top: 8px; align-self: start; }
+  .mapbox { display: contents; }
+  .hint { grid-area: hint; margin-top: 4px; }
+  .mapframe { grid-area: map; align-self: start; }
+  .mapframe .map { display: block; height: var(--map-h); width: calc(var(--map-h) * 420 / 521); max-height: none; }
+  .strip { grid-area: strip; margin-top: 2px; }
+  .status { grid-area: status; }
+  .side { grid-area: side; margin-top: 4px; }
+}
+@media (min-width: 960px) {
+  .strip { gap: 8px; }
   .chip { padding: 5px 8px; }
   .chip-name { font-size: 1rem; }
   .chip-nums { font-size: .9rem; }
   .bar { height: 11px; }
-  .mapframe .map { max-height: calc(100vh - 290px); }
   .loglist { max-height: 360px; }
 }
 @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }

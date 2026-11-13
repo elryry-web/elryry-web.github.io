@@ -1,6 +1,6 @@
 /* Writ & Ruin: code-drawn art in the colour woodcut style (black key block over flat colour,
- * colour nudged off the line). Every picture goes through art(slot): later, painted art loaded
- * from a manifest replaces these slot by slot, and these stay as the fallback.
+ * colour nudged off the line). Every picture goes through art(slot): painted art listed in
+ * art/manifest.json (made by tools/prep-art.py) replaces these slot by slot, and these stay as the fallback.
  *   art('house/varrow')  heraldic stamp      art('site/crown')  site glyph
  *   art('suit/Lore')     suit glyph          art('card/drover') card glyph (suit, or relic)
  *   art('annals/3')      Annals vignette
@@ -145,9 +145,38 @@
   }
 
   // ---------------------------------------------------------------- the art hook
-  var painted = {};   // later: slot -> image url, from a manifest
+  // Painted art: art/manifest.json maps a slot ('board', 'site-crown', 'house-varrow', 'stamp-crown', ...) to an
+  // image url. Each image is preloaded and only listed in `painted` once it has loaded, so a missing file
+  // keeps the code-drawn fallback. art('house/varrow') looks up the slot 'house-varrow'.
+  var painted = {}, listeners = [], redraw = null;
+  function paintedUrl(slot) { return painted[slot] || painted[slot.replace('/', '-')] || null; }
+  function onPainted(fn) { listeners.push(fn); }
+  function arrived() {
+    if (redraw) return;
+    redraw = setTimeout(function () { redraw = null; listeners.forEach(function (fn) { try { fn(); } catch (e) { if (root.console) console.error(e); } }); }, 30);
+  }
+  function loadManifest() {
+    if (typeof fetch !== 'function' || typeof Image === 'undefined') return;
+    try {
+      fetch('art/manifest.json', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (m) {
+        if (!m || typeof m !== 'object') return;
+        Object.keys(m).forEach(function (slot) {
+          var url = m[slot];
+          if (typeof url !== 'string') return;
+          var im = new Image();
+          var once = false;
+          var done = function () { if (once) return; once = true; painted[slot] = url; arrived(); };
+          // decode() first so the picture does not flash in blank, but a background tab can hold
+          // decode() back indefinitely, so the loaded image is used after a short wait regardless
+          im.onload = function () { if (im.decode) { im.decode().then(done, done); setTimeout(done, 800); } else done(); };
+          im.src = url;
+        });
+      }).catch(function () {});
+    } catch (e) { /* file:// or no fetch: stay with the drawn art */ }
+  }
   function art(slot, opts) {
-    if (painted[slot]) return '<img class="painted" src="' + painted[slot] + '" alt="">';
+    var url = paintedUrl(slot);
+    if (url) return '<img class="painted" src="' + url + '" alt=""' + (opts && opts.size ? ' style="width:' + opts.size + 'px;height:auto"' : '') + '>';
     var p = slot.split('/'), kind = p[0], id = p[1];
     if (kind === 'house') return stamp(id, opts && opts.size);
     if (kind === 'site') return siteGlyph(id, opts && opts.size);
@@ -156,9 +185,10 @@
     if (kind === 'annals') return vignette(opts);
     return '';
   }
+  if (typeof document !== 'undefined') loadManifest();
 
   root.WR_ART = { PAL: PAL, HOUSE: HOUSE, houseCol: houseCol, textOn: textOn, SUIT_COL: SUIT_COL, suitCol: suitCol, cardSuit: cardSuit,
     hash: hash, rng: rng, blob: blob, blobPoints: blobPoints, smooth: smooth, gouges: gouges, f1: f1,
     stamp: stamp, suitGlyph: suitGlyph, siteGlyph: siteGlyph, SITE_GLYPH: SITE_GLYPH, card: card, vignette: vignette,
-    art: art, painted: painted };
+    art: art, painted: painted, paintedUrl: paintedUrl, onPainted: onPainted };
 })(typeof self !== 'undefined' ? self : this);

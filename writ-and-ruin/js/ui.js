@@ -698,6 +698,8 @@
     if (c) U.c = c;
     U.screen = 'title';
     render();
+    // painted art arrives after the first draw; draw again with it
+    if (A.onPainted) A.onPainted(function () { if (!U.busy) render(); });
   }
 
   // exports for ui-sheets.js and for tests
