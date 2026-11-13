@@ -26,6 +26,9 @@
     return x ? cap(x.short) : cap(h);
   }
   function whoLow(h, s) { var w = who(h, s); return w === 'You' ? 'you' : (/^The /.test(w) ? 'the' + w.slice(3) : w); }
+  // a house's: "Your" / "your" for the player, never "You's"
+  function whose(h, s) { return h === 'player' ? 'Your' : who(h, s) + "'s"; }
+  function whoseLow(h, s) { return h === 'player' ? 'your' : whoLow(h, s) + "'s"; }
   function rn(r) { return r === 'camp' ? 'the Far Pass camp' : (REG[r] ? REG[r].name : r); }
   function cardName(id) { return D.CARDS[id] ? D.CARDS[id].name : id; }
   function listAnd(a) { return a.length <= 1 ? (a[0] || '') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1]; }
@@ -144,11 +147,10 @@
   }
   // the Tide Reader and Heron Witch draws of a battle, in plain sentences, or ''
   function fortuneNotes(ev, s) {
-    function poss(h) { return h === 'player' ? 'Your' : who(h, s) + "'s"; }
     var out = [];
-    if (ev.tideCard != null) out.push(poss(ev.house) + ' Tide Reader drew two cards: a ' + ev.tideCard + ' and a ' + (ev.witch && ev.witch.house === ev.house ? ev.witch.discarded : ev.attCard) + '. ' +
+    if (ev.tideCard != null) out.push(whose(ev.house, s) + ' Tide Reader drew two cards: a ' + ev.tideCard + ' and a ' + (ev.witch && ev.witch.house === ev.house ? ev.witch.discarded : ev.attCard) + '. ' +
       who(ev.house, s) + ' kept the higher.');
-    if (ev.witch) out.push(poss(ev.witch.house) + ' Heron Witch redrew a ' + ev.witch.discarded + ' as a ' + ev.witch.card + '.');
+    if (ev.witch) out.push(whose(ev.witch.house, s) + ' Heron Witch redrew a ' + ev.witch.discarded + ' as a ' + ev.witch.card + '.');
     return out.join(' ');
   }
   U.fortuneNotes = fortuneNotes;
@@ -181,9 +183,9 @@
         return W + ' assaulted ' + rn(ev.to) + ' (' + d + '): ' + ev.attack + ' + ' + ev.attCard + ' against ' + ev.defence + ' + ' + ev.defCard + '. ' +
           (ev.winner === 'attacker' ? W + ' took it.' : 'The assault failed.') + (fn ? ' ' + fn : '');
       }
-      case 'assaultCollapsed': return W + "'s assault on " + rn(ev.to) + ' came to nothing.';
+      case 'assaultCollapsed': return whose(h, s) + ' assault on ' + rn(ev.to) + ' came to nothing.';
       case 'pactBroken': return W + ' broke ' + (PACT_NAME[ev.pact.type] || 'a pact') + ' with ' + whoLow(ev.wronged, s) + '.';
-      case 'judge': return who(ev.house, s) + "'s Hanging Judge cost " + whoLow(ev.breaker, s) + ' ' + ev.lost.length + ' warbands.';
+      case 'judge': return whose(ev.house, s) + ' Hanging Judge cost ' + whoLow(ev.breaker, s) + ' ' + plural(ev.lost.length, 'warband') + '.';
       case 'oath': return 'The Broken Word cost ' + whoLow(h, s) + ' ' + ev.lost.length + ' warbands.';
       case 'recruit': return W + ' recruited ' + cardName(ev.card) + ' at ' + rn(ev.region) + '.';
       case 'build': return W + ' built the ' + REG[ev.region].site + ' at ' + rn(ev.region) + ' for ' + ev.silver + ' silver.';
@@ -196,18 +198,18 @@
           (ev.to === 'site' ? ' at ' + rn(ev.region) : '') + '.';
       case 'pactOffered': return W + ' offered ' + whoLow(ev.target, s) + ' ' + pactWords(ev.offer, s) + '.';
       case 'pactAccepted': return W + ' accepted ' + pactWords(ev.pact.type === 'tribute' ? { type: 'tribute', payer: ev.pact.payer, payee: ev.pact.payee } : ev.pact, s) + ' with ' + whoLow(ev.from, s) + '.';
-      case 'pactRefused': return W + ' refused ' + whoLow(ev.from, s) + "'s offer.";
+      case 'pactRefused': return W + ' refused ' + whoseLow(ev.from, s) + ' offer.';
       case 'pactExpired': return 'The ' + (ev.pact.type === 'tribute' ? 'tribute' : 'truce') + ' between ' + whoLow(ev.pact.a, s) + ' and ' + whoLow(ev.pact.b, s) + ' ran out.';
       case 'depart': return W + ' departed by the Far Pass.';
       case 'poison': return W + ' poisoned ' + cardName(ev.card) + '.';
-      case 'seeProphecy': return h === 'player' ? 'The Bell Seer read ' + whoLow(ev.target, s) + "'s prophecy: “" + D.PROPHECIES[ev.prophecy - 1].text + '”' : W + ' read ' + whoLow(ev.target, s) + "'s prophecy.";
+      case 'seeProphecy': return h === 'player' ? 'The Bell Seer read ' + whoseLow(ev.target, s) + ' prophecy: “' + D.PROPHECIES[ev.prophecy - 1].text + '”' : W + ' read ' + whoseLow(ev.target, s) + ' prophecy.';
       case 'intent': return 'Plan: ' + planWords(ev.label, W) + '.';
       case 'intentRevised': return (ev.then ? 'New second move: ' : 'New plan: ') + planWords(ev.label, W) + '.';
       case 'intentChanged':
         if (ev.note === 'nearest') return W + ' could not keep to its plan and did the nearest thing.';
         if (ev.note === 'dropped') return W + ' dropped its plan (' + ev.label.replace(/^[^:]+: /, '') + ').';
         return W + ' changed its plan.';
-      case 'campBroken': return W + "'s camp broke up: " + ev.count + ' warbands lost.';
+      case 'campBroken': return whose(h, s) + ' camp broke up: ' + ev.count + ' warbands lost.';
       case 'ageDraw': return ev.ended ? (ev.of === 1 ? 'The last round is over: the age ends.' : 'The age-end draw came up: the age ends.') : 'The age-end draw came up blank: the age goes on.';
       case 'seize': return W + ' held six regions at the end of the turn.';
       case 'victory': return null;
@@ -728,7 +730,7 @@
   }
 
   // exports for ui-sheets.js and for tests
-  U.h = { esc: esc, cap: cap, age: age, me: me, who: who, whoLow: whoLow, rn: rn, cardName: cardName, listAnd: listAnd, plural: plural,
+  U.h = { esc: esc, cap: cap, age: age, me: me, who: who, whoLow: whoLow, whose: whose, whoseLow: whoseLow, rn: rn, cardName: cardName, listAnd: listAnd, plural: plural,
     stamp: stamp, btn: btn, K: K, plain: plain, toast: toast, save: save, hasSave: hasSave, logLine: logLine, describe: describe,
     pactWords: pactWords, screenFor: screenFor, isMyTurn: isMyTurn, legalNow: legalNow, bars: bars, unguarded: unguarded };
   U.go = go; U.render = render; U.pump = pump; U.skipAhead = skip; U.doAction = doAction; U.newCampaign = newCampaign; U.nextAge = nextAge;

@@ -962,9 +962,9 @@
     if (!it) return who + ': no plan';
     var w = it.why && s.houses[it.why.house], base = intentBase(it, who, R);
     if (!w) return base;
-    var them = w.short;
+    var you = it.why.house === 'player', them = you ? 'you' : w.short, theirs = you ? 'your' : w.short + "'s";
     return base + (it.why.kind === 'depart' ? ' to stop ' + them + ' departing' :
-      it.why.kind === 'seat' ? ' to take the Crown from ' + them : ' to break ' + them + "'s claim");
+      it.why.kind === 'seat' ? ' to take the Crown from ' + them : ' to break ' + theirs + ' claim');
   }
   function intentBase(it, who, R) {
     switch (it.type) {

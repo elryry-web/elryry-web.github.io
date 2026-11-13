@@ -5,7 +5,7 @@
   'use strict';
   var D = root.WR_DATA, E = root.WR_ENGINE, AI = root.WR_AI, A = root.WR_ART, M = root.WR_MAP, U = root.WR_UI;
   var N = D.NUM, REG = D.REGION, IDS = D.REGION_IDS, H = U.h;
-  var esc = H.esc, cap = H.cap, age = H.age, who = H.who, whoLow = H.whoLow, rn = H.rn, cardName = H.cardName,
+  var esc = H.esc, cap = H.cap, age = H.age, who = H.who, whoLow = H.whoLow, whose = H.whose, whoseLow = H.whoseLow, rn = H.rn, cardName = H.cardName,
     listAnd = H.listAnd, plural = H.plural, stamp = H.stamp, btn = H.btn, K = H.K, plain = H.plain, toast = H.toast;
 
   function me() { return age().houses.player; }
@@ -86,7 +86,7 @@
       var m = E.check(s, a), pv = E.battlePreview(s, a), o = winOdds(s, a), p = o.p, extra = [];
       if (o.tide) extra.push('Your Tide Reader draws two cards for you. You keep the higher.');
       if (o.attWitch) extra.push('Your Heron Witch can redraw your card once if you are losing.');
-      if (o.defWitch) extra.push(who(o.defWitch) + "'s Heron Witch can redraw their card once if they are losing.");
+      if (o.defWitch) extra.push(whose(o.defWitch) + " Heron Witch can redraw their card once if they are losing.");
       var left = E.fortuneLeft(s), broke = E.pactsBrokenBy(s, 'player', pv.defender);
       var g = s.regions[to], defBands = pv.defender ? E.bandsAt(s, pv.defender, to) : g.folk;
       return '<h2>Assault ' + rn(to) + '</h2><p>From ' + rn(from) + '. ' + (pv.defender ? 'Held by <b>' + who(pv.defender) + '</b> with ' + plural(defBands, 'warband') + '.' : 'Defended by ' + plural(g.folk, 'band') + ' of free folk.') + '</p>' +
@@ -96,7 +96,7 @@
         '<div class="versus"><div class="vs-side"><span class="lbl">Your attack</span><b class="big">' + pv.attack + '</b></div><span class="vs">against</span>' +
         '<div class="vs-side"><span class="lbl">Their defence</span><b class="big">' + pv.defence + '</b></div></div>' +
         '<p>Each side then draws a fortune card (0 to 3) and adds it. You draw first. A tie goes to the defender.</p>' +
-        (pv.lastStand ? '<p class="note"><b>Last stand:</b> this is ' + whoLow(pv.defender) + "'s only region, so it defends with +" + pv.lastStand + '. That is counted above.</p>' : '') +
+        (pv.lastStand ? '<p class="note"><b>Last stand:</b> this is ' + whoseLow(pv.defender) + " only region, so it defends with +" + pv.lastStand + '. That is counted above.</p>' : '') +
         (pv.peek != null ? '<p class="note"><b>Star Reader:</b> the next fortune card is a <b>' + pv.peek + '</b>. You will draw it.</p>' : '') +
         '<p class="fortune-line"><span class="lbl">Fortune left</span> ' + [0, 1, 2, 3].map(function (v) { return '<span class="fc"><b>' + v + '</b>×' + (left[v] || 0) + '</span>'; }).join('') +
         (s.fortune.length ? '' : ' <span class="muted">(the deck reshuffles first)</span>') + '</p>' +
