@@ -4,6 +4,8 @@
   // Book II (phase 1 test entry): index.html?book=2 plays window.LEVELS2 straight onto a page, with no book screen
   var B2 = /[?&]book=2(&|$)/.test(location.search);
   var LEVELS = B2 ? window.LEVELS2 : window.LEVELS, ART = window.ART, P = window.Puzzle;
+  // Book II wears a Book of Hours' look (art.js setBook): set before the board is made or any art loads
+  if (B2) { ART.setBook(2); document.body.classList.add('b2'); }
   var KEY = 'vellum.v1';
   var $ = function (id) { return document.getElementById(id); };
 
@@ -375,7 +377,14 @@
         ART.draw(g, 'twinFrame', x, 12, 56, 56, 0, { lit: 0.4 });
         ART.draw(g, 'twinEmblem', x + 4.8, 16.8, 8.4, 8.4, 0, { kind: 1 });
       });
-    } else { (B2 ? ['H', 'O', 'R', 'A', 'E'] : ['L', 'U', 'M', 'E', 'N']).forEach(function (ch, i) {
+    } else if (B2) {
+      // the five great initials as small Gothic capitals on gold; drawn again once the blackletter has loaded
+      ['H', 'O', 'R', 'A', 'E'].forEach(function (ch, i) { ART.draw(g, 'b2.capital.' + ch, 9 + i * 38, 23, 34, 34, 0); });
+      if (!drawRuleArt.font && document.fonts && document.fonts.load) {
+        drawRuleArt.font = true;
+        document.fonts.load('34px UnifrakturMaguntia').then(function () { if ($('ruleModal').classList.contains('show')) drawRuleArt(q); });
+      }
+    } else { ['L', 'U', 'M', 'E', 'N'].forEach(function (ch, i) {
       g.font = '34px "Uncial Antiqua", serif'; g.fillStyle = i % 2 ? '#2b56a6' : '#a8261a'; g.fillText(ch, 18 + i * 36, 52); }); }
   }
 

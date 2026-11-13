@@ -125,7 +125,7 @@
   var TWIN = { vermilion: 'crimson', verdigris: 'emerald', lapis: 'ultramarine' };
   // the spare jewel (rose madder) for pages whose marks and ground leave fewer than two jewels; it is
   // of the madder ground's own hue, so never laid on it
-  var SPARE = 'rose', SPARE_CLASH = { madder: 1 };
+  var SPARE = 'rose', SPARE_CLASH = { madder: 1, rose: 1 };
   // the mark pigment a gilt strand could be mistaken for: a page with an orpiment mark has no gilt
   var GILT_CLASH = { orpiment: 1 };
   // colour the solution's strands with jewels that contrast with the page's ground (of ultramarine /
@@ -181,7 +181,8 @@
     var col = res.col.map(function (i) { return i === undefined ? null : JN[i]; });
     // one accent of gilt (ART.RIB.gilt): the longest unmarked strand (ties to the lower index), never on a page
     // with a warm mark it could be taken for
-    if (order.length && !Object.keys(marks).some(function (m) { return GILT_CLASH[m]; })) col[order[0]] = 'gilt';
+    // (nor on Book II's burnished-gold ground, where gilt would vanish)
+    if (order.length && !(ART.GROUND[gn] || {}).noGilt && !Object.keys(marks).some(function (m) { return GILT_CLASH[m]; })) col[order[0]] = 'gilt';
     this.jewel = { ps: st.pieceStrand, col: col, first: JN[0] };
   };
   // the colour a whole strand is painted (a RIB name): its mark's pigment, else its jewel (the jewel of
@@ -260,6 +261,7 @@
   B._buildLetter = function () {
     var M = this.M;
     // the procedural letter is the panel itself; a supplied initial.<L> PNG still overlays and gilds
+    // (in Book II ART.has and ART.draw read initial.<L> as its b2.initial.<L>)
     if (!this.isInitial || !ART.has('initial.' + M.level.initial)) { this.letter = null; return; }
     var inm = M.kinds.map(function (k) { return k !== ' '; });
     var shape = ART.maskShape(M.w, M.h, inm, this.S, this.pad, this.pad);
@@ -967,7 +969,7 @@
         var inm = M.kinds.map(function (k) { return k !== ' '; }), rect = inm.every(Boolean);
         hit = { key: pk, panel: ART.makePanel({ w: M.w, h: M.h, inm: inm, S: S, pad: pad, band: this.band, ivy: this.ivy,
           cssW: this.cssW, cssH: this.cssH, dpr: this.dpr, rect: rect, seed: (M.level.n || 7) * 31 + 7, ground: this.groundName,
-          round: rect ? 0 : S * (this.isInitial ? 0.3 : 0.18) }) };
+          round: rect ? 0 : S * (this.isInitial ? 0.3 : 0.18), letter: this.isInitial && ART.book === 2 ? M.level.initial : null }) };
       }
       this._panels.push(hit);
       while (this._panels.length > 2) {   // let an old panel's memory go now rather than at some later collection
@@ -1009,6 +1011,8 @@
       var fx = self.twinFx[gi], glow = 0;
       if (fx !== undefined) { var q = (t - fx) / 650; if (q < 1 && q >= 0) glow = Math.sin(q * Math.PI); else if (q >= 1) delete self.twinFx[gi]; }
       twinGlow[gi] = glow;
+      // Book II: a red silk thread runs through the twins' seals (each tile's top-left corner, as _emblem)
+      if (ART.book === 2) ART.twinThread(g, grp.map(function (m) { return [pad + (m % M.w + 0.16) * S, pad + ((m / M.w | 0) + 0.16) * S]; }), S, glow);
       grp.forEach(function (m) {
         ART.draw(g, 'twinFrame', pad + (m % M.w) * S, pad + (m / M.w | 0) * S, S, S, t, { glow: glow, lit: twinK, dark: true });
       });
@@ -1144,9 +1148,10 @@
       }
       if (M.mark[c]) {
         var pm = pieceMid(a, b, h), ms;
-        if (ART.has('mark.' + M.mark[c])) {
+        if (ART.book === 2 || ART.has('mark.' + M.mark[c])) {
           // the painted gem: larger, and kept upright (its light falls from the top-left) as the tile turns
-          ms = S * GEM; var ca = Math.cos(ang), sa = Math.sin(ang), qx = pm[0] * ca - pm[1] * sa, qy = pm[0] * sa + pm[1] * ca;
+          // (Book II's flowers are always kept upright)
+          ms = ART.has('mark.' + M.mark[c]) ? S * GEM : S * 0.38; var ca = Math.cos(ang), sa = Math.sin(ang), qx = pm[0] * ca - pm[1] * sa, qy = pm[0] * sa + pm[1] * ca;
           g.save(); g.rotate(-ang);
           ART.draw(g, 'mark', qx - ms / 2, qy - ms / 2, ms, ms, t, { pigment: M.mark[c] });
           g.restore();

@@ -80,6 +80,11 @@
     sh: '#5a2a0e', bd: '#c98b2e', lt: '#f3d27a', mo: 0,
     bands: ['#341405', '#7a3c14', '#b8782a', '#e4ad48', '#f6d47e'], hi: '#fff6d6' };
   var HAIR = '#2a1508', GILT = '#c08f38', GILT_L = '#ecca6e', MADDER = '#6c1b15';
+  // which volume is open (ART.setBook): Book II (a French Book of Hours, about 1450) draws its own b2.* slots
+  // and never Book I's Insular art. BP: the painted beasts' slot prefix. RH / RG / RL: a board ribbon's outer
+  // hairline, edge and inner lip (Book I: dark-brown, gold, pale gold; Book II: black ink and a white hairline)
+  var BOOK = 1, BP = '', RH = HAIR, RG = GILT, RL = GILT_L;
+  var INK2 = '#1c1610', WHITE2 = '#fbf8ef';
 
   /* ---------- panel grounds: deep manuscript grounds the gold filigree reads on ----------
      base: the ground; dk / lt: rgb of the painted mottle; band: the frame's dotted band (a brighter
@@ -92,7 +97,24 @@
     folium:    { base: '#3b1744', dk: '20,4,26', lt: '110,52,124', band: '#6a2c78', deep: '24,5,30', clash: ['amethyst'], name: 'folium purple' },
     ink:       { base: '#17141d', dk: '4,3,8',   lt: '62,56,76',   band: '#7e2418', deep: '6,4,10',  clash: [], name: 'ink black' }
   };
+  // Book II's grounds: diaper patterns in azure, rose and deep green (alt: the chequer's second tone, pen: the
+  // white penwork), and burnished gold with punched dots (Compline; also the square behind each great initial,
+  // whose letter is painted rose or azure). noGilt: no gilt accent strand on it
+  GROUND.azure = { base: '#2a4c98', dk: '10,22,60', lt: '80,118,196', band: '#3b62b4', deep: '8,16,48', alt: '#203c7c', clash: ['lapis', 'ultramarine'], name: 'azure diaper' };
+  GROUND.rose  = { base: '#9a3a5c', dk: '58,12,30', lt: '196,104,140', band: '#b45478', deep: '44,8,22', alt: '#7e2c4a', clash: ['crimson', 'rose'], name: 'rose diaper' };
+  GROUND.green = { base: '#2d5a40', dk: '10,32,20', lt: '86,140,104', band: '#3f7a56', deep: '6,26,14', alt: '#22492f', clash: ['verdigris', 'emerald'], name: 'green diaper' };
+  GROUND.gold  = { base: '#a9802f', dk: '92,60,14', lt: '236,204,120', band: '#c89a42', deep: '58,36,6', alt: '#9a7228', clash: ['orpiment', 'gold'], name: 'burnished gold', noGilt: 1, gold: 1 };
   var GROUND_ORDER = ['madder', 'lapis', 'verdigris', 'folium'];
+  var GROUND2 = ['azure', 'rose', 'green'];
+  // Book II: Compline on gold; each great initial's letter rose (H, R, E) or azure (O, A); every other page
+  // turns through azure, rose and green by its number, past a ground of one of its marks' hues
+  function groundName2(l) {
+    if (l.initial) return /[OA]/.test(l.initial) ? 'azure' : 'rose';
+    if (l.quire === 5) return 'gold';
+    var m = marksOf(l), k = ((l.n || 1) - 1) % 3;
+    for (var j = 0; j < 3; j++) { var gn = GROUND2[(k + j) % 3]; if (!GROUND[gn].clash.some(function (c) { return m[c]; })) return gn; }
+    return GROUND2[k];
+  }
   var JEWELS = ['ultramarine', 'emerald', 'crimson', 'amethyst'];
   function marksOf(l) { var m = {}; (l.marks || []).forEach(function (k) { m[k[1]] = 1; }); return m; }
   function groundsFit(l) {   // the everyday grounds none of whose clashing colours are among the page's marks
@@ -137,6 +159,7 @@
     return null;
   }
   function groundName(l) {
+    if (BOOK === 2 && l) return groundName2(l);
     if (!l) return 'madder';
     var L = (typeof window !== 'undefined' && window.LEVELS) || null;
     if (L && !groundTable) groundTable = buildGrounds(L) || {};
@@ -154,7 +177,7 @@
   }
   var images = {}, metas = {}, crispCache = {}, status = {};
   // slots whose drawing function lays its own PNG (placement, cells or tint), so ART.draw doesn't stretch it
-  var SELF = { knot: 1, twinFrame: 1, twinEmblem: 1 };
+  var SELF = { knot: 1, twinFrame: 1, twinEmblem: 1, 'b2.knot': 1, 'b2.twinFrame': 1, 'b2.twinEmblem': 1 };
   // the painted knot (knot.png, ribbon entering from the top): where it sits in the tile, in tiles from the
   // centre, and where the board's ribbon gives way to it; its cream band is tinted to the strand
   // the progressive loader (ART.load): eager items (rank below ART.DEFER) first, opts.concurrency at a time,
@@ -177,12 +200,13 @@
       }
       img.onload = function () {
         images[slot] = img; delete sizedCache[slot + '|f']; delete sizedCache[slot + '|p']; delete ivyOcc[slot]; delete beastPrep[slot]; delete beastBad[slot];
+        if (BEAST[slot] && e.beast) Object.assign(BEAST[slot], e.beast);   // a painted beast's own measurements (a, phi, band, len, f0, f1, fy, eye, mod, pen)
         if (BEAST[slot]) { beastCache = {}; beastCacheN = 0; }
         metas[slot] = { aspect: img.naturalWidth / img.naturalHeight, stem: e.stem != null ? e.stem : 0.5,
           fit: e.fit != null ? !!e.fit : slot.indexOf('drollery.') === 0,
-          crisp: e.crisp != null ? !!e.crisp : slot.indexOf('mark.') === 0, inset: e.inset };
+          crisp: e.crisp != null ? !!e.crisp : /^(b2\.)?mark\./.test(slot), inset: e.inset };
         if (slot === 'page') cache.page = null;
-        if (slot === 'knot') { knotCache = {}; knotCacheN = 0; }
+        if (slot === 'knot' || slot === 'b2.knot') { knotCache = {}; knotCacheN = 0; }
         Object.keys(crispCache).forEach(function (k) { if (k.indexOf(slot + ':') === 0) delete crispCache[k]; });
         // decode off the main thread where the browser can, so the first redraw with it doesn't stall
         // (decode() can stay pending forever in some tabs/engines, so never wait on it for long)
@@ -257,18 +281,19 @@
     return cv;
   }
   var KNOT = { y0: -0.30, y1: 0.48, w: 0.40, stop: -0.26, cream: [243, 233, 208] }, knotCache = {}, knotCacheN = 0;
-  function knotCanvas(w, h, body) {
-    var key = Math.round(w) + 'x' + Math.round(h) + body;
+  function knotCanvas(w, h, body, im) {
+    im = im || images.knot;
+    var key = (im === images.knot ? '' : 'b2|') + Math.round(w) + 'x' + Math.round(h) + body;
     if (knotCache[key]) return knotCache[key];
     if (knotCacheN++ > 80) { knotCache = {}; knotCacheN = 0; }
     var cv = document.createElement('canvas'); cv.width = Math.max(1, Math.round(w)); cv.height = Math.max(1, Math.round(h));
     var g = cv.getContext('2d'), c = hexRgb(body);
-    g.drawImage(images.knot, 0, 0, cv.width, cv.height);
+    g.drawImage(im, 0, 0, cv.width, cv.height);
     // multiply by body / cream, so the painted cream becomes the strand's colour and the ink stays dark
     g.globalCompositeOperation = 'multiply';
     g.fillStyle = 'rgb(' + c.map(function (v, i) { return Math.min(255, Math.round(v * 255 / KNOT.cream[i])); }).join(',') + ')';
     g.fillRect(0, 0, cv.width, cv.height);
-    g.globalCompositeOperation = 'destination-in'; g.drawImage(images.knot, 0, 0, cv.width, cv.height);
+    g.globalCompositeOperation = 'destination-in'; g.drawImage(im, 0, 0, cv.width, cv.height);
     knotCache[key] = cv; return cv;
   }
   function hexRgb(s) {
@@ -277,8 +302,8 @@
   }
   // the painted plait (border-plait.png, one seamless repeat) laid round a rectangular panel: each side
   // between the corners holds a whole number of repeats, stretched a little to fit; red corner bosses
-  function paintBorder(g, box, b) {
-    var img = images.border, rep = b * img.naturalWidth / img.naturalHeight;
+  function paintBorder(g, box, b, im) {
+    var img = im || images.border, rep = b * img.naturalWidth / img.naturalHeight;
     var x = box[0], y = box[1], w = box[2], h = box[3];
     function side(len) {   // drawn along +x from (0,0), the band's outer edge at y=0
       var n = Math.max(1, Math.round(len / rep)), L = len / n;
@@ -354,6 +379,11 @@
     'beast.headOpen': { a: [422.0, 149.1], phi: -0.0937, band: 130, len: 421, f0: -36, f1: -4, fy: -76, eye: [129.5, 84.5, 15], kind: 'head', mouth: true, mod: [-245, -165], pen: [-235, -150] },
     'beast.tail':     { a: [440.0, 78.0], phi: 0.085, band: 138, len: 438, f0: -44, f1: -6, fy: -999, kind: 'tail', mod: [-330, -230], pen: [-300, -200] }
   };
+  // Book II's crane (b2.beast.*): Book I's measurements as placeholders. Re-measure these for the crane PNGs
+  // when they arrive (the same fields: the cut's centre a, its angle phi, band, len, the fade f0/f1/fy, the eye)
+  BEAST['b2.beast.headShut'] = Object.assign({}, BEAST['beast.headShut']);
+  BEAST['b2.beast.headOpen'] = Object.assign({}, BEAST['beast.headOpen']);
+  BEAST['b2.beast.tail'] = Object.assign({}, BEAST['beast.tail']);
   // mod: [x0, x1] along the axis, where the ribbon's modelling (shadow band, tint) eases off over the head or the
   // tail's curl; pen: where the lead-white penwork tapers to a point. Both in source px from the cut (negative)
   var BEAST_BAND = 0.36, BEAST_MARGIN = 0.02;   // the art band's share of a tile: the board's ribbon body, so the gilt meets
@@ -670,12 +700,12 @@
   // the scale of a painted beast in a tile of side 1: along its axis (fitted to the tile) and across it
   // (its band matched to the ribbon); null when the painted beast isn't ready
   function beastGeom(kind, band) {
-    var B = kind === 'tail' ? BEAST['beast.tail'] : BEAST['beast.headShut'];
+    var B = kind === 'tail' ? BEAST[BP + 'beast.tail'] : BEAST[BP + 'beast.headShut'];
     var kl = band / B.band, ka = Math.min(kl, (1 - BEAST_MARGIN) / B.len);
     return { B: B, kl: kl, ka: ka, stop: -0.5 + (-B.f0 + 3) * ka };
   }
   function beastReady(kind) {
-    var s = kind === 'tail' ? ['beast.tail'] : ['beast.headShut'];
+    var s = kind === 'tail' ? [BP + 'beast.tail'] : [BP + 'beast.headShut'];
     return s.every(function (x) { return images[x] && !beastBad[x]; });
   }
   // draw a painted beast into a tile box; false when it can't (the drawn beast is used instead).
@@ -684,7 +714,7 @@
   // o.amt: how much of it has flooded in (or is left as it drains); o.flat: a flat colour (the rule card)
   function paintedBeast(ctx, kind, x, y, w, h, t, o) {
     if (!beastReady(kind)) return false;
-    var slot = kind === 'tail' ? 'beast.tail' : (o.snap > 0.06 && o.snap < 0.85 && images['beast.headOpen'] && !beastBad['beast.headOpen'] ? 'beast.headOpen' : 'beast.headShut');
+    var slot = kind === 'tail' ? BP + 'beast.tail' : (o.snap > 0.06 && o.snap < 0.85 && images[BP + 'beast.headOpen'] && !beastBad[BP + 'beast.headOpen'] ? BP + 'beast.headOpen' : BP + 'beast.headShut');
     var B = BEAST[slot], S = Math.min(w, h), gilt = !!o.gilt;
     var Gm = beastGeom(kind, gilt ? BEAST_BAND : (o.band || 0.33)), dev = devScale(ctx);
     var kc = Gm.kl * S * dev;
@@ -699,7 +729,7 @@
     if (q == null) q = ((Math.round((o.angle || 0) / (Math.PI / 2)) % 4) + 4) % 4;
     var c0 = amt < 1 ? beastCanvas(slot, bare, kc, rim) : null, c1 = ramp && amt > 0 ? beastCanvas(slot, ramp, kc, rim, q) : null;
     if (!c0 && !c1) { if (!prepBeast(slot)) return false; }
-    if (!c1 && gilt && !o.mini) { warmBeast(slot, q); if (kind !== 'tail') warmBeast('beast.headOpen', q); }
+    if (!c1 && gilt && !o.mini) { warmBeast(slot, q); if (kind !== 'tail') warmBeast(BP + 'beast.headOpen', q); }
     var mir = q === 3 || q === 0;
     ctx.translate(x + w / 2, y + h / 2);
     if (o.q == null) ctx.rotate(o.angle || 0);
@@ -1071,6 +1101,186 @@
       ctx.fillStyle = '#f6e6bd'; ctx.beginPath(); ctx.arc(p[0], p[1], dr, 0, 6.283); ctx.fill();
     });
   }
+  /* ---------- Book II: a French Book of Hours of about 1450 ---------- */
+  // every Book II slot is drawn here in code; a b2.* PNG in the manifest replaces its drawing
+  var B2PINK = { base: '#d47a98', dark: '#8a3456', light: '#f6c9d8' }, B2BLUE = { base: '#4b6fc0', dark: '#22397a', light: '#b9cbf0' };
+  function bezant(g, x, y, r) {
+    g.fillStyle = INK2; g.beginPath(); g.arc(x, y, r + Math.max(0.5, r * 0.22), 0, 6.283); g.fill();
+    var gd = g.createRadialGradient(x - r * 0.35, y - r * 0.35, r * 0.1, x, y, r);
+    gd.addColorStop(0, '#fbe7a6'); gd.addColorStop(0.55, '#d6a948'); gd.addColorStop(1, '#8e651e');
+    g.fillStyle = gd; g.beginPath(); g.arc(x, y, r, 0, 6.283); g.fill();
+  }
+  function quatrefoil(p, x, y, r) {
+    for (var i = 0; i < 4; i++) { var a = i * Math.PI / 2, px = x + Math.cos(a) * r * 0.5, py = y + Math.sin(a) * r * 0.5; p.moveTo(px + r * 0.5, py); p.arc(px, py, r * 0.5, 0, 6.283); }
+  }
+  // the diaper behind the knot: a lozenge or a chequer grid in the ground's two tones, gold quatrefoils at
+  // the nodes and fine white penwork in the cells (drawn once, into the cached panel)
+  function diaper(g, x, y, w, h, S, GR, R) {
+    var c = Math.max(9, S * 0.5), loz = R() < 0.55, hl = Math.max(0.45, S * 0.011), i, j, k, cx, cy;
+    var nx = Math.ceil(w / c) + 2, q = Math.max(1.3, c * 0.13), dot = Math.max(0.45, c * 0.035);
+    var gold = new Path2D(), white = new Path2D(), pen = new Path2D();
+    g.save(); g.translate(x, y);
+    if (loz) {
+      var ny = Math.ceil(h / (c / 2)) + 2;
+      g.fillStyle = GR.alt; g.beginPath();
+      for (j = -2; j < ny; j += 2) for (i = -1; i < nx; i++) {
+        cx = i * c + c / 2; cy = j * c / 2;
+        g.moveTo(cx, cy - c / 2); g.lineTo(cx + c / 2, cy); g.lineTo(cx, cy + c / 2); g.lineTo(cx - c / 2, cy); g.closePath();
+      }
+      g.fill();
+      var kk = Math.ceil((w + h) / c) + 2;
+      g.beginPath();
+      for (k = -kk; k <= kk; k++) {
+        var s = c / 2 + k * c;
+        g.moveTo(s + c, -c); g.lineTo(s - h - c, h + c);
+        g.moveTo(s - c, -c); g.lineTo(s + h + c, h + c);
+      }
+      g.strokeStyle = 'rgba(' + GR.dk + ',0.7)'; g.lineWidth = hl * 1.6; g.stroke();
+      for (j = -2; j < ny; j++) for (i = -1; i < nx; i++) {
+        cx = i * c + (j & 1 ? 0 : c / 2); cy = j * c / 2;
+        if (j & 1) quatrefoil(gold, cx, cy, q);
+        else if ((i + (j >> 1)) & 1) { pen.moveTo(cx - c * 0.12, cy); pen.quadraticCurveTo(cx, cy - c * 0.13, cx + c * 0.12, cy); pen.quadraticCurveTo(cx, cy + c * 0.13, cx - c * 0.12, cy); }
+        else for (k = 0; k < 4; k++) { var a = k * Math.PI / 2 + Math.PI / 4, px = cx + Math.cos(a) * c * 0.12, py = cy + Math.sin(a) * c * 0.12; white.moveTo(px + dot, py); white.arc(px, py, dot, 0, 6.283); }
+      }
+    } else {
+      var nyc = Math.ceil(h / c) + 2;
+      g.fillStyle = GR.alt; g.beginPath();
+      for (j = -1; j < nyc; j++) for (i = -1; i < nx; i++) if ((i + j) & 1) g.rect(i * c, j * c, c, c);
+      g.fill();
+      g.beginPath();
+      for (i = -1; i < nx; i++) { g.moveTo(i * c, -c); g.lineTo(i * c, h + c); }
+      for (j = -1; j < nyc; j++) { g.moveTo(-c, j * c); g.lineTo(w + c, j * c); }
+      g.strokeStyle = 'rgba(' + GR.dk + ',0.65)'; g.lineWidth = hl * 1.4; g.stroke();
+      for (j = -1; j < nyc; j++) for (i = -1; i < nx; i++) {
+        if (!((i + j) & 1)) quatrefoil(gold, i * c, j * c, q);
+        cx = i * c + c / 2; cy = j * c + c / 2;
+        if ((i + j) & 1) { pen.moveTo(cx - c * 0.15, cy - c * 0.15); pen.lineTo(cx + c * 0.15, cy + c * 0.15); pen.moveTo(cx + c * 0.15, cy - c * 0.15); pen.lineTo(cx - c * 0.15, cy + c * 0.15); }
+        else { white.moveTo(cx + dot * 1.4, cy); white.arc(cx, cy, dot * 1.4, 0, 6.283); }
+      }
+    }
+    g.save(); g.translate(hl * 0.7, hl * 0.7); g.fillStyle = 'rgba(' + GR.dk + ',0.85)'; g.fill(gold); g.restore();
+    g.fillStyle = '#e2bb5e'; g.fill(gold);
+    g.fillStyle = 'rgba(251,248,239,0.8)'; g.fill(white);
+    g.strokeStyle = 'rgba(251,248,239,0.65)'; g.lineWidth = hl; g.lineCap = 'round'; g.stroke(pen);
+    g.restore();
+  }
+  // burnished gold tooled with punched dots: a lozenge lattice of punches with a rosette in each lozenge
+  function goldGround(g, x, y, w, h, S) {
+    g.fillStyle = burnish(g, x, y, w, h); g.fillRect(x, y, w, h);
+    var c = Math.max(14, S * 0.64), st = Math.max(3, c * 0.15), dr = Math.max(0.55, S * 0.012);
+    var dk = new Path2D(), lt = new Path2D(), kk = Math.ceil((w + h) / c) + 2, k, n, i, j;
+    function punch(px, py, r) {
+      if (px < x - r || py < y - r || px > x + w + r || py > y + h + r) return;
+      dk.moveTo(px + r, py); dk.arc(px, py, r, 0, 6.283);
+      lt.moveTo(px - r * 0.3 + r * 0.45, py - r * 0.3); lt.arc(px - r * 0.3, py - r * 0.3, r * 0.45, 0, 6.283);
+    }
+    var L = (h + 2 * c) * Math.SQRT2;
+    for (k = -kk; k <= kk; k++) {
+      var s = x + k * c;
+      for (n = 0; n * st < L; n++) { var d = n * st / Math.SQRT2; punch(s + d, y - c + d, dr); punch(s - d, y - c + d, dr); }
+    }
+    for (j = -1; j * c / 2 < h + c; j++) for (i = -1; i * c < w + c; i++) {
+      var cx = x + i * c + (j & 1 ? c / 2 : 0), cy = y + j * c / 2 + c / 2;
+      punch(cx, cy, dr * 1.3);
+      for (n = 0; n < 6; n++) { var a = n * Math.PI / 3; punch(cx + Math.cos(a) * c * 0.13, cy + Math.sin(a) * c * 0.13, dr); }
+    }
+    g.fillStyle = 'rgba(92,58,12,0.55)'; g.fill(dk);
+    g.fillStyle = 'rgba(255,244,200,0.5)'; g.fill(lt);
+  }
+  // one acanthus leaf on a curling spine (len along it, wid across, curl in radians over its length): lobed
+  // on the outer side of the curl, its turned-over inner side darker, a white highlight and an ink outline
+  function acanthusLeaf(g, x, y, ang, len, wid, curl, col, lw) {
+    var N = 30, sp = [], a = ang, px = x, py = y, i, so = curl > 0 ? -1 : 1;
+    for (i = 0; i <= N; i++) {
+      var t = i / N; sp.push([px, py, a, t]);
+      a += curl * (0.3 + 2.4 * t * t) / N;
+      px += Math.cos(a) * len / N; py += Math.sin(a) * len / N;
+    }
+    var O = [], I = [];
+    sp.forEach(function (s) {
+      var t = s[3], wd = wid * Math.pow(Math.sin(Math.PI * Math.min(1, t * 0.96 + 0.04)), 0.7) * (1 - 0.4 * t);
+      var lobe = 0.62 + 0.5 * Math.abs(Math.sin(t * Math.PI * 3.5 + 0.4)), nx = -Math.sin(s[2]) * so, ny = Math.cos(s[2]) * so;
+      O.push([s[0] + nx * wd * lobe * 0.62, s[1] + ny * wd * lobe * 0.62]); I.push([s[0] - nx * wd * 0.36, s[1] - ny * wd * 0.36]);
+    });
+    var path = new Path2D(), inner = new Path2D();
+    path.moveTo(O[0][0], O[0][1]); for (i = 1; i <= N; i++) path.lineTo(O[i][0], O[i][1]);
+    for (i = N; i >= 0; i--) path.lineTo(I[i][0], I[i][1]); path.closePath();
+    inner.moveTo(sp[0][0], sp[0][1]); for (i = 1; i <= N; i++) inner.lineTo(sp[i][0], sp[i][1]);
+    for (i = N; i >= 0; i--) inner.lineTo(I[i][0], I[i][1]); inner.closePath();
+    g.fillStyle = col.base; g.fill(path);
+    g.globalAlpha *= 0.6; g.fillStyle = col.dark; g.fill(inner); g.globalAlpha /= 0.6;
+    g.lineJoin = 'round'; g.lineCap = 'round';
+    g.strokeStyle = 'rgba(255,255,255,0.85)'; g.lineWidth = lw * 0.9; g.beginPath();
+    for (i = 3; i < N - 3; i++) { var hx = O[i][0] * 0.7 + sp[i][0] * 0.3, hy = O[i][1] * 0.7 + sp[i][1] * 0.3; if (i > 3) g.lineTo(hx, hy); else g.moveTo(hx, hy); }
+    g.stroke();
+    g.strokeStyle = INK2; g.lineWidth = lw; g.stroke(path);
+  }
+  // a corner spray: a leaf out along the diagonal and one along each edge, in pink and blue, with bezants
+  function acanthusSpray(g, c, b, room, idx) {
+    var col = idx % 2 ? B2BLUE : B2PINK, alt = idx % 2 ? B2PINK : B2BLUE, lw = Math.max(0.55, b * 0.045);
+    var dx = c.nx / Math.SQRT2, dy = c.ny / Math.SQRT2, L = Math.max(b * 1.1, room * 1.05), da = Math.atan2(dy, dx);
+    [[-c.u1[0], -c.u1[1], c.u1[1], -c.u1[0]], [c.u2[0], c.u2[1], c.u2[1], -c.u2[0]]].forEach(function (e) {
+      var out = Math.sign(e[0] * e[3] - e[1] * e[2]) || 1, ea = Math.atan2(e[1], e[0]);
+      acanthusLeaf(g, c.x + e[0] * b * 0.1 + e[2] * b * 0.1, c.y + e[1] * b * 0.1 + e[3] * b * 0.1, ea + out * 0.38, L * 1.05, L * 0.4, out * 1.3, alt, lw);
+    });
+    acanthusLeaf(g, c.x, c.y, da - 0.3, L * 0.95, L * 0.5, 1.5, col, lw);
+    bezant(g, c.x, c.y, Math.max(1.2, b * 0.17));
+  }
+  // the thin gilt bar round the board with the vellum showing between it and the ground, sprays at the corners
+  function b2Frame(g, G, b, box, room) {
+    var gold = burnish(g, box[0], box[1], box[2], box[3]), bw = b * 0.28, off = b * 0.64, hl = Math.max(0.6, b * 0.045);
+    g.lineJoin = 'round'; g.lineCap = 'butt';
+    g.strokeStyle = INK2; g.lineWidth = Math.max(0.7, b * 0.05); g.stroke(G.path(b * 0.3));
+    g.strokeStyle = INK2; g.lineWidth = bw + 2 * hl; g.stroke(G.path(off));
+    g.strokeStyle = gold; g.lineWidth = bw; g.stroke(G.path(off));
+    g.strokeStyle = 'rgba(255,250,228,0.9)'; g.lineWidth = Math.max(0.5, b * 0.04); g.stroke(G.path(off - bw * 0.22));
+    g.strokeStyle = 'rgba(95,58,12,0.55)'; g.lineWidth = Math.max(0.5, b * 0.03); g.stroke(G.path(off + bw * 0.28));
+    G.corners(off).forEach(function (c, i) { acanthusSpray(g, c, b, room, i); });
+  }
+  // Book II's panel: a diaper ground (burnished gold on Compline's pages); on a great initial, a square of
+  // burnished gold with the letter (the page's mask) laid on it in rose or azure and filled with acanthus
+  function b2Panel(g, o, G, b, box, R) {
+    var S = o.S, GR = GROUND[o.ground] || GROUND.azure, room = o.ivy + b * 0.36, calm = Math.max(0, Math.min(1, (64 - S) / 34));
+    var gp = G.path(b * 0.3), FG = G, pat = images['b2.ground'];
+    if (o.letter) {
+      FG = frameGeom(o.w, o.h, o.inm.map(function () { return true; }), S, o.pad, o.pad, 0);
+      g.save(); g.clip(FG.path(b * 0.3)); goldGround(g, box[0], box[1], box[2], box[3], S); g.restore();
+      var col = o.ground === 'azure' ? B2BLUE : B2PINK, lp = G.path(b * 0.14);
+      g.save(); g.shadowColor = 'rgba(40,20,4,0.45)'; g.shadowBlur = b * 0.5; g.shadowOffsetX = b * 0.12; g.shadowOffsetY = b * 0.18;
+      g.fillStyle = col.base; g.fill(lp); g.restore();
+      g.save(); g.clip(lp);
+      // tonal acanthus scrolling through the letter's body, kept quiet so the strands read over it
+      var n = Math.round(o.w * o.h / 4) + 3, tone = { base: mix(col.base, col.light, 0.35), dark: col.dark };
+      g.globalAlpha = 0.55;
+      for (var i = 0; i < n; i++) {
+        acanthusLeaf(g, box[0] + R() * box[2], box[1] + R() * box[3], R() * 6.283, S * (1.1 + R() * 0.8), S * 0.6, (R() < 0.5 ? -1 : 1) * 1.6, tone, Math.max(0.4, S * 0.014));
+      }
+      g.globalAlpha = 0.3 + 0.25 * calm; g.fillStyle = col.base; g.fill(lp); g.globalAlpha = 1;
+      g.strokeStyle = 'rgba(255,255,255,0.75)'; g.lineWidth = Math.max(0.8, b * 0.14); g.stroke(lp);
+      g.strokeStyle = 'rgba(0,0,0,0.25)'; g.lineWidth = b * 0.5; g.stroke(G.path(-b * 0.2));
+      g.restore();
+      g.strokeStyle = INK2; g.lineWidth = Math.max(0.8, b * 0.08); g.stroke(lp);
+    } else {
+      g.save(); g.clip(gp);
+      if (GR.gold) {
+        goldGround(g, box[0], box[1], box[2], box[3], S);
+        g.globalAlpha = 0.1 + 0.15 * calm; g.fillStyle = GR.base; g.fill(gp); g.globalAlpha = 1;
+      } else {
+        g.fillStyle = GR.base; g.fill(gp);
+        if (pat) {   // a painted diaper tile, repeated about every two cells
+          var pt = g.createPattern(pat, 'repeat'), k = S * 2 / pat.naturalWidth;
+          if (pt.setTransform && window.DOMMatrix) pt.setTransform(new DOMMatrix([k, 0, 0, k, o.pad, o.pad]));
+          g.fillStyle = pt; g.fill(gp);
+        } else diaper(g, box[0], box[1], box[2], box[3], S, GR, R);
+        g.globalAlpha = 0.22 + 0.24 * calm; g.fillStyle = GR.base; g.fill(gp); g.globalAlpha = 1;
+      }
+      g.strokeStyle = 'rgba(' + GR.deep + ',0.5)'; g.lineWidth = b * 0.6; g.stroke(G.path(b * 0.1));
+      g.restore();
+    }
+    if (images['b2.border'] && (o.rect || o.letter)) paintBorder(g, box, b, images['b2.border']);
+    else b2Frame(g, FG, b, box, room);
+  }
+
   // the whole puzzle panel, drawn once to an offscreen canvas (the board caches it per size and DPR):
   // ivy at the outer corners, the page's ground with gold filigree over the masked cells, the gilded
   // frame tracing the mask outline. o: w, h, inm (mask flags), S (tile), pad (mask origin), band (frame
@@ -1083,6 +1293,7 @@
     g.setTransform(o.dpr, 0, 0, o.dpr, 0, 0);
     var b = o.band, S = o.S, G = frameGeom(o.w, o.h, o.inm, S, o.pad, o.pad, o.round || 0), R = rand(o.seed || 7);
     var box = [o.pad - b, o.pad - b, o.w * S + 2 * b, o.h * S + 2 * b];
+    if (BOOK === 2) { b2Panel(g, o, G, b, box, R); return { cv: cv, geom: G }; }
     // the drawn ivy round the frame is the fallback: with the painted ivy loaded it grows on the page's vellum instead
     if (o.ivy > 3 && !images['ivy.corner.1']) G.corners(b).forEach(function (c) { ivyCorner(g, c, o.ivy, R); });
     var gp = G.path(b * 0.3), GR = GROUND[o.ground] || GROUND.madder;
@@ -1125,12 +1336,12 @@
       // a crossing), so neighbouring and crossing ribbons part cleanly at phone size
       ctx.strokeStyle = 'rgba(14,6,2,0.42)'; ctx.lineWidth = w + 2 * (E + HL) + 2 * Math.max(2 * px, S * 0.05);
       ctx.beginPath(); path(ctx); ctx.stroke();
-      ctx.strokeStyle = HAIR; ctx.lineWidth = w + 2 * (E + HL); ctx.beginPath(); path(ctx); ctx.stroke();
-      ctx.strokeStyle = GILT; ctx.lineWidth = w + 2 * E; ctx.beginPath(); path(ctx); ctx.stroke();
+      ctx.strokeStyle = RH; ctx.lineWidth = w + 2 * (E + HL); ctx.beginPath(); path(ctx); ctx.stroke();
+      ctx.strokeStyle = RG; ctx.lineWidth = w + 2 * E; ctx.beginPath(); path(ctx); ctx.stroke();
     }
     if (dash) ctx.setLineDash(dash);
     if (edges) {   // a burnished inner lip on the gold
-      ctx.strokeStyle = GILT_L; ctx.lineWidth = w + E * 0.9; ctx.beginPath(); path(ctx); ctx.stroke();
+      ctx.strokeStyle = RL; ctx.lineWidth = w + E * 0.9; ctx.beginPath(); path(ctx); ctx.stroke();
     }
     if (!rib) return;   // edges only (a painted body is drawn over them in full)
     if (rib.sh) { paintBody(ctx, path, w, S, rib, dash, fx || {}); if (dash) ctx.setLineDash([]); return; }
@@ -1475,12 +1686,12 @@
       ctx.beginPath(); ctx.arc(cx, cy, r * 0.55, Math.PI * 1.05, Math.PI * 1.55); ctx.stroke();
     },
     knot: function (ctx, x, y, w, h, t, o) {
-      if (images.knot) {
+      if (o.im || images.knot) {
         // the painted knot, tinted to the strand: the band comes in from the top and gathers into the knot
         var KU = Math.min(w, h), kw = KU * KNOT.w, kh = KU * (KNOT.y1 - KNOT.y0);
         ctx.translate(x + w / 2, y + h / 2); ctx.rotate(o.angle || 0);
         var dpr = Math.min(3, window.devicePixelRatio || 1);
-        ctx.drawImage(knotCanvas(kw * dpr, kh * dpr, o.body || PIG.bare.base), -kw / 2, KU * KNOT.y0, kw, kh);
+        ctx.drawImage(knotCanvas(kw * dpr, kh * dpr, o.body || PIG.bare.base, o.im), -kw / 2, KU * KNOT.y0, kw, kh);
         return;
       }
       if (o.rib) {
@@ -1666,9 +1877,9 @@
       // gilt corner brackets for a gilded-twin tile (clear of the ribbons, which cross mid-edges)
       // four short brackets; the group's emblem sits just inside the top-left one
       var L = w * 0.17, i = w * 0.05, glow = o.glow || 0, lit = o.lit || 0;
-      if (images.twinFrame) {
+      if (o.im || images.twinFrame) {
         // the painted brackets: a 2x2 sheet, one bracket pushed into each cell's outer corner
-        var im = images.twinFrame, cs = im.naturalWidth / 2, bs = w * 0.27, ins = w * 0.025;
+        var im = o.im || images.twinFrame, cs = im.naturalWidth / 2, bs = w * 0.27, ins = w * 0.025;
         var put = function () {
           [[0, 0], [1, 0], [0, 1], [1, 1]].forEach(function (q) {
             ctx.drawImage(im, q[0] * cs, q[1] * cs, cs, cs, q[0] ? x + w - ins - bs : x + ins, q[1] ? y + h - ins - bs : y + ins, bs, bs);
@@ -1699,9 +1910,9 @@
       var cx = x + w / 2, cy = y + h / 2, r = Math.min(w, h) / 2, k = (o.kind || 0) % 4, glow = o.glow || 0;
       var gold = mix('#e2b443', '#fff3c0', glow);
       ctx.translate(cx, cy); ctx.scale(1 + 0.25 * glow, 1 + 0.25 * glow);
-      if (images.twinEmblem) {
+      if (o.im || images.twinEmblem) {
         // the painted signs: one 1:1 cell each in a row, star, quatrefoil, trefoil, cross (kinds 0..3)
-        var em = images.twinEmblem, es = em.naturalHeight, er = r * 1.1;
+        var em = o.im || images.twinEmblem, es = em.naturalHeight, er = r * 1.1;
         ctx.drawImage(em, k * es, 0, es, es, -er, -er, 2 * er, 2 * er);
         if (glow > 0) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha *= 0.6 * glow; ctx.drawImage(em, k * es, 0, es, es, -er, -er, 2 * er, 2 * er); }
         return;
@@ -1753,6 +1964,163 @@
         ctx.fillStyle = 'rgba(90,20,10,0.5)'; ctx.beginPath(); ctx.arc(p[0] + dr * 0.25, p[1] + dr * 0.3, dr * 0.45, 0, 6.283); ctx.fill();
       });
     },
+    /* ----- Book II's drawn slots (ART.draw sends the board's knot, beasts, marks and twins here in Book II) ----- */
+    // a ribbon end: a silk tassel in the strand's colour hanging from a gold knob (o.rib on the board,
+    // o.body on a rule card); a painted b2.knot is tinted to the strand as Book I's knot is
+    'b2.knot': function (ctx, x, y, w, h, t, o) {
+      if (images['b2.knot']) return DRAW.knot(ctx, x, y, w, h, t, Object.assign({}, o, { im: images['b2.knot'] }));
+      var U = Math.min(w, h), rib = o.rib, a = U * (o.rw || 0.36) / 2;
+      ctx.translate(x + w / 2, y + h / 2); ctx.rotate(o.angle || 0);
+      var ky = U * 0.02, lw = Math.max(0.8, U * 0.022);
+      if (rib) ribLayers(ctx, function (g) { g.moveTo(0, -U * 0.22); g.lineTo(0, ky); }, 2 * a, U, rib, false, null, 0, { pen: false, mini: o.mini, ang: o.ang });
+      var base = rib ? (rib.sh ? rib.bd : rib.base) : (o.body || PIG.bare.base), dark = rib ? (rib.sh || rib.edge) : mix(base, '#000', 0.4), light = rib ? (rib.lt || rib.light) : mix(base, '#ffffff', 0.5);
+      var top = ky + U * 0.08, bot = U * 0.47, tw = U * 0.17, bw = U * 0.24;
+      var p = new Path2D();
+      p.moveTo(-tw * 0.55, top); p.bezierCurveTo(-tw, top + U * 0.1, -bw, bot - U * 0.1, -bw, bot);
+      for (var i = 0; i <= 8; i++) { var fx = -bw + i * bw / 4; p.lineTo(fx, bot + (i % 2 ? U * 0.025 : 0)); }
+      p.bezierCurveTo(bw, bot - U * 0.1, tw, top + U * 0.1, tw * 0.55, top); p.closePath();
+      var gd = ctx.createLinearGradient(-bw, 0, bw, 0);
+      gd.addColorStop(0, dark); gd.addColorStop(0.35, light); gd.addColorStop(0.6, base); gd.addColorStop(1, dark);
+      ctx.fillStyle = gd; ctx.fill(p);
+      ctx.save(); ctx.clip(p); ctx.strokeStyle = 'rgba(28,22,16,0.4)'; ctx.lineWidth = lw * 0.6; ctx.beginPath();
+      for (i = -3; i <= 3; i++) { ctx.moveTo(i * tw * 0.12, top); ctx.lineTo(i * bw * 0.28, bot + U * 0.03); }
+      ctx.stroke(); ctx.restore();
+      ctx.strokeStyle = INK2; ctx.lineWidth = lw; ctx.lineJoin = 'round'; ctx.stroke(p);
+      // the binding round the tassel's neck, then the gold knob above it
+      ctx.fillStyle = '#c0303a'; ctx.fillRect(-tw * 0.75, top + U * 0.05, tw * 1.5, U * 0.045); ctx.strokeRect(-tw * 0.75, top + U * 0.05, tw * 1.5, U * 0.045);
+      bezant(ctx, 0, ky + U * 0.03, U * 0.085);
+      ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.beginPath(); ctx.arc(-U * 0.025, ky + U * 0.005, U * 0.02, 0, 6.283); ctx.fill();
+    },
+    // a crane's head in profile, lying along +y from the tile centre (the ribbon brings its neck in from the
+    // top): grey-white crown patch, the long horn beak opening as it snaps (o.snap), an eye that blinks
+    'b2.beastHead': function (ctx, x, y, w, h, t, o) {
+      if (paintedBeast(ctx, 'head', x, y, w, h, t, o)) return;
+      var U = Math.min(w, h), snap = o.snap || 0, blink = o.blink || 0, body = o.body || PIG.bare.base, pt = o.paint && o.paint.sh ? o.paint : null;
+      ctx.translate(x + w / 2, y + h / 2); ctx.rotate(o.angle || 0); ctx.scale(U, U);
+      if (o.gilt) ctx.scale(1.2, 1);
+      var lw = Math.max(1.1 / U, 0.026), open = snap > 0 && snap < 1 ? 0.34 * Math.sin(snap * Math.PI) : 0;
+      ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.strokeStyle = INK2; ctx.lineWidth = lw;
+      var skin = body;
+      if (pt) { skin = ctx.createRadialGradient(-0.03, 0.02, 0.02, 0, 0.06, 0.2); skin.addColorStop(0, mix(pt.bd, pt.lt, 0.55)); skin.addColorStop(0.5, pt.bd); skin.addColorStop(1, pt.sh); }
+      // the beak: two horn mandibles hinged at the face, the lower one darker, a red gape between them
+      var hx = 0.0, hy = 0.15, horn = '#d9b864', hornD = '#8a6a2c';
+      function mandible(sd, col) {
+        ctx.save(); ctx.translate(hx, hy); ctx.rotate(-sd * open);
+        ctx.beginPath(); ctx.moveTo(0, -0.01); ctx.lineTo(sd * 0.055, 0.0); ctx.quadraticCurveTo(sd * 0.04, 0.18, sd * 0.004, 0.35); ctx.lineTo(0, 0.35); ctx.closePath();
+        var gb = ctx.createLinearGradient(0, 0, 0, 0.35); gb.addColorStop(0, col); gb.addColorStop(1, '#4e3a18');
+        ctx.fillStyle = gb; ctx.fill(); ctx.stroke(); ctx.restore();
+      }
+      if (open > 0.01) {
+        ctx.fillStyle = '#7a1a16'; ctx.beginPath(); ctx.moveTo(hx, hy);
+        ctx.lineTo(hx + Math.sin(open) * 0.3, hy + Math.cos(open) * 0.3); ctx.lineTo(hx - Math.sin(open) * 0.3, hy + Math.cos(open) * 0.3); ctx.closePath(); ctx.fill();
+      }
+      mandible(-1, hornD); mandible(1, horn);
+      ctx.strokeStyle = 'rgba(255,250,230,0.75)'; ctx.lineWidth = lw * 0.7;
+      ctx.save(); ctx.translate(hx, hy); ctx.rotate(-open); ctx.beginPath(); ctx.moveTo(0.03, 0.03); ctx.quadraticCurveTo(0.03, 0.15, 0.012, 0.26); ctx.stroke(); ctx.restore();
+      ctx.strokeStyle = INK2; ctx.lineWidth = lw;
+      // the head: a rounded skull narrowing to the beak, white-edged
+      var sk = new Path2D();
+      sk.moveTo(-0.14, -0.05); sk.bezierCurveTo(-0.15, -0.17, 0.15, -0.17, 0.14, -0.05);
+      sk.bezierCurveTo(0.14, 0.09, 0.09, 0.14, 0.045, 0.17); sk.lineTo(-0.045, 0.17); sk.bezierCurveTo(-0.09, 0.14, -0.14, 0.09, -0.14, -0.05); sk.closePath();
+      ctx.fillStyle = skin; ctx.fill(sk);
+      ctx.save(); ctx.clip(sk);
+      ctx.fillStyle = '#c4302a'; ctx.beginPath(); ctx.ellipse(0, -0.13, 0.11, 0.075, 0, 0, 6.283); ctx.fill();
+      ctx.fillStyle = 'rgba(28,22,16,0.55)'; ctx.beginPath(); ctx.ellipse(-0.1, 0.06, 0.06, 0.14, -0.3, 0, 6.283); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = lw * 0.9; ctx.beginPath(); ctx.moveTo(0.115, -0.08); ctx.bezierCurveTo(0.12, 0.0, 0.08, 0.08, 0.045, 0.13); ctx.stroke();
+      ctx.restore();
+      ctx.strokeStyle = INK2; ctx.lineWidth = lw; ctx.stroke(sk);
+      // the eye, a white ring round a dark pupil; the lid drops on a blink
+      ctx.fillStyle = '#fbf8ef'; ctx.beginPath(); ctx.ellipse(0.055, 0.0, 0.034, 0.034 * (1 - 0.9 * blink), 0, 0, 6.283); ctx.fill(); ctx.stroke();
+      if (blink < 0.5) { ctx.fillStyle = INK2; ctx.beginPath(); ctx.arc(0.06, 0.004, 0.017, 0, 6.283); ctx.fill(); }
+    },
+    // a crane's fanned tail: grey-tipped feathers in the strand's colour, spread round the ribbon's end
+    'b2.beastTail': function (ctx, x, y, w, h, t, o) {
+      if (paintedBeast(ctx, 'tail', x, y, w, h, t, o)) return;
+      var U = Math.min(w, h), body = o.body || PIG.bare.base, pt = o.paint && o.paint.sh ? o.paint : null, wag = o.wag ? Math.sin(o.wag * Math.PI * 2) * 0.14 : 0;
+      ctx.translate(x + w / 2, y + h / 2); ctx.rotate(o.angle || 0); ctx.scale(U, U);
+      var lw = Math.max(1.1 / U, 0.024), n = 9, i, base = pt ? pt.bd : body, light = pt ? mix(pt.bd, pt.lt, 0.5) : mix(body, '#ffffff', 0.35);
+      ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+      ctx.rotate(wag);
+      var order = [0, 8, 1, 7, 2, 6, 3, 5, 4];   // a wide fan, drawn from the outside in
+      order.forEach(function (j) {
+        var a = Math.PI / 2 + (j - (n - 1) / 2) * 0.29, L = 0.41 - Math.abs(j - 4) * 0.022, fw = 0.072;
+        ctx.save(); ctx.translate(0, 0.02); ctx.rotate(a - Math.PI / 2);
+        var p = new Path2D(); p.moveTo(-fw * 0.4, 0); p.bezierCurveTo(-fw * 1.2, L * 0.4, -fw * 1.1, L * 0.85, 0, L); p.bezierCurveTo(fw * 1.1, L * 0.85, fw * 1.2, L * 0.4, fw * 0.4, 0); p.closePath();
+        var gd = ctx.createLinearGradient(0, 0, 0, L);
+        gd.addColorStop(0, base); gd.addColorStop(0.5, light); gd.addColorStop(0.68, base); gd.addColorStop(0.78, '#8e8c86'); gd.addColorStop(1, '#4e4c48');
+        ctx.fillStyle = gd; ctx.fill(p); ctx.strokeStyle = INK2; ctx.lineWidth = lw; ctx.stroke(p);
+        ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = lw * 0.6; ctx.beginPath(); ctx.moveTo(0, L * 0.08); ctx.lineTo(0, L * 0.9); ctx.stroke();
+        ctx.restore();
+      });
+      // the rump the feathers spring from, over the ribbon's end
+      ctx.beginPath(); ctx.ellipse(0, 0.0, 0.16, 0.085, 0, 0, 6.283);
+      ctx.fillStyle = pt ? mix(pt.bd, pt.sh, 0.3) : mix(body, '#000', 0.12); ctx.fill(); ctx.strokeStyle = INK2; ctx.lineWidth = lw; ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = lw * 0.7; ctx.beginPath(); ctx.ellipse(0, -0.01, 0.115, 0.045, 0, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+    },
+    // a pigment mark: a small painted flower, one kind per pigment, on a vellum roundel
+    'b2.mark': function (ctx, x, y, w, h, t, o) {
+      var r = Math.min(w, h) / 2, cx = x + w / 2, cy = y + h / 2, f = { lapis: 'cornflower', vermilion: 'rose', verdigris: 'hellebore', orpiment: 'buttercup' }[o.pigment];
+      var spec = FLOWERS[f];
+      if (!spec) { var pg = PIG[o.pigment] || PIG.gold; spec = { n: 8, shape: 'point', col: { base: pg.base, dark: pg.dark || mix(pg.base, '#000', 0.4), light: pg.light || mix(pg.base, '#ffffff', 0.5) }, eye: '#e3b130' }; }
+      ctx.fillStyle = 'rgba(251,248,239,0.92)'; ctx.strokeStyle = INK2; ctx.lineWidth = Math.max(0.7, r * 0.08);
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, 6.283); ctx.fill(); ctx.stroke();
+      b2Flower(ctx, cx, cy, r * 0.82, spec, f === 'cornflower' ? 0.2 : -Math.PI / 2);
+    },
+    // a gilded twin: red silk stitched across each corner of the tile (the board runs the thread between them)
+    'b2.twinFrame': function (ctx, x, y, w, h, t, o) {
+      if (images['b2.twinFrame']) return DRAW.twinFrame(ctx, x, y, w, h, t, Object.assign({}, o, { im: images['b2.twinFrame'] }));
+      var glow = o.glow || 0, lit = o.lit || 0, L = w * 0.11, i = w * 0.08;
+      ctx.lineCap = 'round';
+      [[x + i, y + i, 1, 1], [x + w - i, y + i, -1, 1], [x + i, y + h - i, 1, -1], [x + w - i, y + h - i, -1, -1]].forEach(function (c) {
+        for (var pass = 0; pass < 2; pass++) {
+          ctx.strokeStyle = pass ? mix('#c0303a', '#ff9a8a', Math.max(glow, lit * 0.4)) : 'rgba(40,4,8,0.75)';
+          ctx.lineWidth = Math.max(pass ? 1 : 1.8, w * (pass ? 0.026 : 0.046));
+          ctx.beginPath(); ctx.moveTo(c[0], c[1]); ctx.lineTo(c[0] + c[2] * L, c[1] + c[3] * L);
+          ctx.moveTo(c[0] + c[2] * L, c[1]); ctx.lineTo(c[0], c[1] + c[3] * L); ctx.stroke();
+        }
+      });
+      if (glow > 0) {
+        var g = ctx.createRadialGradient(x + w / 2, y + h / 2, w * 0.2, x + w / 2, y + h / 2, w * 0.75);
+        g.addColorStop(0, 'rgba(255,170,150,0)'); g.addColorStop(1, 'rgba(255,190,160,' + (0.42 * glow) + ')');
+        ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
+      }
+    },
+    // the group's wax seal on the thread, pressed with its sign: 0 star, 1 quatrefoil, 2 trefoil, 3 cross
+    'b2.twinEmblem': function (ctx, x, y, w, h, t, o) {
+      if (images['b2.twinEmblem']) return DRAW.twinEmblem(ctx, x, y, w, h, t, Object.assign({}, o, { im: images['b2.twinEmblem'] }));
+      var cx = x + w / 2, cy = y + h / 2, r = Math.min(w, h) / 2 * 1.15, k = (o.kind || 0) % 4, glow = o.glow || 0, i, a;
+      ctx.translate(cx, cy); ctx.scale(1 + 0.25 * glow, 1 + 0.25 * glow); ctx.lineJoin = 'round';
+      ctx.beginPath();
+      for (i = 0; i <= 36; i++) { a = i / 36 * 6.283; var rr = r * (0.92 + 0.08 * Math.sin(a * 5 + 1) + 0.04 * Math.sin(a * 9)); ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); }
+      ctx.closePath();
+      var gd = ctx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r);
+      gd.addColorStop(0, mix('#d8463c', '#ffb0a0', glow)); gd.addColorStop(0.7, '#a01c1c'); gd.addColorStop(1, '#6a0e10');
+      ctx.fillStyle = gd; ctx.fill(); ctx.strokeStyle = INK2; ctx.lineWidth = Math.max(0.6, r * 0.1); ctx.stroke();
+      ctx.strokeStyle = 'rgba(70,6,8,0.7)'; ctx.lineWidth = Math.max(0.5, r * 0.08); ctx.beginPath(); ctx.arc(0, 0, r * 0.66, 0, 6.283); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,190,170,0.9)'; ctx.fillStyle = 'rgba(255,190,170,0.9)'; ctx.lineWidth = Math.max(0.6, r * 0.11); ctx.beginPath();
+      if (k === 0) { for (i = 0; i < 8; i++) { a = i * Math.PI / 4 - Math.PI / 2; var q = i % 2 ? r * 0.2 : r * 0.48; ctx.lineTo(Math.cos(a) * q, Math.sin(a) * q); } ctx.closePath(); ctx.fill(); }
+      else if (k === 1) { for (i = 0; i < 4; i++) { a = i * Math.PI / 2; ctx.moveTo(Math.cos(a) * r * 0.24 + r * 0.2, Math.sin(a) * r * 0.24); ctx.arc(Math.cos(a) * r * 0.24, Math.sin(a) * r * 0.24, r * 0.2, 0, 6.283); } ctx.stroke(); }
+      else if (k === 2) { for (i = 0; i < 3; i++) { a = i * 2.094 - Math.PI / 2; ctx.moveTo(Math.cos(a) * r * 0.2 + r * 0.22, Math.sin(a) * r * 0.2); ctx.arc(Math.cos(a) * r * 0.2, Math.sin(a) * r * 0.2, r * 0.22, 0, 6.283); } ctx.stroke(); }
+      else { ctx.moveTo(0, -r * 0.45); ctx.lineTo(0, r * 0.45); ctx.moveTo(-r * 0.45, 0); ctx.lineTo(r * 0.45, 0); ctx.stroke(); }
+      ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.beginPath(); ctx.ellipse(-r * 0.4, -r * 0.45, r * 0.18, r * 0.09, -0.6, 0, 6.283); ctx.fill();
+    },
+    // a Gothic capital on a square of burnished gold (the rule card's letters, and the Colophon's stand-ins):
+    // the letter in rose (H, R, E) or azure (O, A) in UnifrakturMaguntia, white-lit and outlined in ink
+    'b2.capital': function (ctx, x, y, w, h, t, o) {
+      var L = (o.id || 'H').charAt(0), col = /[OA]/.test(L) ? B2BLUE : B2PINK, s = Math.min(w, h);
+      ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip(); goldGround(ctx, x, y, w, h, s * 0.5); ctx.restore();
+      ctx.strokeStyle = INK2; ctx.lineWidth = Math.max(0.8, s * 0.03); ctx.strokeRect(x, y, w, h);
+      ctx.font = Math.round(s * 0.86) + 'px UnifrakturMaguntia, "IM Fell English", serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+      var bx = x + w / 2, by = y + h * 0.8;
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = INK2; ctx.lineWidth = Math.max(1.2, s * 0.06); ctx.strokeText(L, bx, by);
+      ctx.fillStyle = col.dark; ctx.fillText(L, bx + s * 0.012, by + s * 0.012);
+      var gd = ctx.createLinearGradient(x, y, x, y + h); gd.addColorStop(0, col.light); gd.addColorStop(0.45, col.base); gd.addColorStop(1, col.dark);
+      ctx.fillStyle = gd; ctx.fillText(L, bx, by);
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = Math.max(0.4, s * 0.012); ctx.strokeText(L, bx - s * 0.008, by - s * 0.008);
+    },
+    // (a Book II great initial is the panel itself, makePanel's o.letter; a b2.initial.<L> PNG overlays it)
+    'b2.initial': function () {},
     drollery: function (ctx, x, y, w, h, t, o) {
       // fallback for a drollery id with no drawing: a sleeping pencil oval
       ctx.strokeStyle = 'rgba(80,60,40,0.4)'; ctx.lineWidth = 1.2;
@@ -1781,12 +2149,182 @@
     } catch (e) { pts = []; for (j = 0; j <= 10; j++) for (i = 0; i <= 10; i++) pts.push([iw * i / 10, ih * j / 10]); }
     return (ivyOcc[slot] = { pts: pts, st: st });
   }
+  // a painted flower seen from above: n petals (shape round, point, narrow or jag) in col {base, dark, light}
+  // round an eye, each petal shaded to the centre with a white hairline and an ink outline
+  function b2Flower(g, x, y, r, f, rot) {
+    var n = f.n, lw = Math.max(0.5, r * 0.07), i, a, pw = { round: 0.62, point: 0.5, narrow: 0.22, jag: 0.42 }[f.shape] * r;
+    g.save(); g.translate(x, y); g.rotate(rot || 0); g.lineJoin = 'round'; g.lineCap = 'round';
+    for (var layer = 0; layer < (f.ring ? 2 : 1); layer++) {
+      var rr = layer ? r * 0.6 : r, ww = layer ? pw * 0.62 : pw;
+      for (i = 0; i < n; i++) {
+        a = (i + (layer ? 0.5 : 0)) * 6.283 / n;
+        var c = Math.cos(a), s = Math.sin(a), p = new Path2D();
+        var P = function (u, v) { return [c * u - s * v, s * u + c * v]; };
+        var q0 = P(rr * 0.15, -ww * 0.3), q1 = P(rr * 0.15, ww * 0.3), m0 = P(rr * 0.65, -ww * 0.55), m1 = P(rr * 0.65, ww * 0.55), tp = P(rr, 0);
+        p.moveTo(q0[0], q0[1]);
+        if (f.shape === 'jag') {
+          var t1 = P(rr, -ww * 0.4), t2 = P(rr * 0.86, -ww * 0.14), t3 = P(rr * 0.86, ww * 0.14), t4 = P(rr, ww * 0.4);
+          p.quadraticCurveTo(m0[0], m0[1], t1[0], t1[1]); p.lineTo(t2[0], t2[1]); p.lineTo(tp[0], tp[1]); p.lineTo(t3[0], t3[1]); p.lineTo(t4[0], t4[1]);
+          p.quadraticCurveTo(m1[0], m1[1], q1[0], q1[1]);
+        } else if (f.shape === 'round') {
+          var e0 = P(rr * 1.08, -ww * 0.5), e1 = P(rr * 1.08, ww * 0.5);
+          p.bezierCurveTo(m0[0], m0[1], e0[0], e0[1], tp[0], tp[1]); p.bezierCurveTo(e1[0], e1[1], m1[0], m1[1], q1[0], q1[1]);
+        } else { p.quadraticCurveTo(m0[0], m0[1], tp[0], tp[1]); p.quadraticCurveTo(m1[0], m1[1], q1[0], q1[1]); }
+        p.closePath();
+        var gd = g.createRadialGradient(0, 0, 0, 0, 0, rr);
+        gd.addColorStop(0, f.col.dark); gd.addColorStop(0.55, f.col.base); gd.addColorStop(1, layer ? f.col.base : f.col.light);
+        g.fillStyle = gd; g.fill(p);
+        g.strokeStyle = INK2; g.lineWidth = lw; g.stroke(p);
+        var h0 = P(rr * 0.4, 0), h1 = P(rr * 0.82, 0);
+        g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = lw * 0.8; g.beginPath(); g.moveTo(h0[0], h0[1]); g.lineTo(h1[0], h1[1]); g.stroke();
+      }
+    }
+    g.fillStyle = f.eye; g.strokeStyle = INK2; g.lineWidth = lw;
+    g.beginPath(); g.arc(0, 0, r * (f.eyeR || 0.24), 0, 6.283); g.fill(); g.stroke();
+    if (f.dots) { g.fillStyle = f.dots; for (i = 0; i < 6; i++) { a = i * 1.047; g.beginPath(); g.arc(Math.cos(a) * r * 0.12, Math.sin(a) * r * 0.12, Math.max(0.4, r * 0.04), 0, 6.283); g.fill(); } }
+    g.restore();
+  }
+  var FLOWERS = {
+    daisy:      { n: 12, shape: 'narrow', col: { base: '#f8f5ec', dark: '#c9b9b4', light: '#ffffff' }, eye: '#e3b130', dots: '#8a5a10' },
+    cornflower: { n: 8, shape: 'jag', col: { base: '#3d63c4', dark: '#1d2f74', light: '#9db6ee' }, eye: '#2a2060', eyeR: 0.2 },
+    rose:       { n: 5, shape: 'round', ring: 1, col: { base: '#cf3f30', dark: '#7c1612', light: '#f19a84' }, eye: '#e9be44', eyeR: 0.18, dots: '#8a3a10' },
+    hellebore:  { n: 5, shape: 'point', col: { base: '#7aa684', dark: '#2f5c40', light: '#dcead6' }, eye: '#e4d27a', eyeR: 0.22, dots: '#5c6e2a' },
+    buttercup:  { n: 5, shape: 'round', col: { base: '#e8b52a', dark: '#9c6a0a', light: '#fbe58a' }, eye: '#8e8a2a', eyeR: 0.2, dots: '#5a4a10' }
+  };
+  // the strewn flowers of the margins, drawn side-on as a Book of Hours border has them
+  function b2Strewn(g, kind, x, y, r, rot) {
+    var im = images['b2.margin.' + kind];   // a painted flower replaces the drawn one, fitted to the same circle
+    if (im) {
+      var k = 2 * r / Math.max(im.naturalWidth, im.naturalHeight);
+      g.save(); g.translate(x, y); g.rotate(rot * 0.5); g.drawImage(im, -im.naturalWidth * k / 2, -im.naturalHeight * k / 2, im.naturalWidth * k, im.naturalHeight * k); g.restore();
+      return;
+    }
+    var lw = Math.max(0.5, r * 0.07), i;
+    g.save(); g.translate(x, y); g.rotate(rot); g.lineJoin = 'round'; g.lineCap = 'round';
+    g.strokeStyle = INK2; g.lineWidth = lw;
+    if (kind === 'daisy') {
+      g.beginPath(); g.moveTo(0, r * 0.2); g.quadraticCurveTo(r * 0.25, r * 0.9, -r * 0.1, r * 1.6); g.stroke();
+      b2Flower(g, 0, 0, r * 0.8, FLOWERS.daisy, 0);
+    } else if (kind === 'columbine') {   // a nodding head of five spurred petals, in violet-blue
+      g.beginPath(); g.moveTo(0, -r * 1.5); g.quadraticCurveTo(r * 0.5, -r * 1.3, r * 0.25, -r * 0.45); g.stroke();
+      var col = ['#6b5cb8', '#3b2f7a', '#b7aeea'];
+      for (i = -2; i <= 2; i++) {
+        var a = i * 0.36, p = new Path2D(), sx = Math.sin(a) * r * 0.9, sy = r * 0.15;
+        p.moveTo(0, -r * 0.35); p.quadraticCurveTo(sx * 1.25 - r * 0.25, sy, sx, r * 0.75);
+        p.quadraticCurveTo(sx + r * 0.12, r * 0.95, sx + r * 0.2, r * 0.7); p.quadraticCurveTo(sx * 1.25 + r * 0.25, sy, 0, -r * 0.35);
+        g.fillStyle = Math.abs(i) === 2 ? col[1] : col[0]; g.fill(p); g.stroke(p);
+        g.strokeStyle = 'rgba(255,255,255,0.65)'; g.lineWidth = lw * 0.8; g.beginPath(); g.moveTo(sx * 0.3, -r * 0.1); g.lineTo(sx * 0.85, r * 0.5); g.stroke();
+        g.strokeStyle = INK2; g.lineWidth = lw;
+      }
+      g.fillStyle = '#e8c84a'; g.beginPath(); g.arc(0, r * 0.62, r * 0.12, 0, 6.283); g.fill(); g.stroke();
+    } else if (kind === 'strawberry') {   // a berry and a white blossom on one stalk
+      g.beginPath(); g.moveTo(-r * 0.9, r * 1.2); g.quadraticCurveTo(-r * 0.3, 0, r * 0.15, -r * 0.6); g.moveTo(-r * 0.35, r * 0.2); g.quadraticCurveTo(-r * 0.8, -r * 0.3, -r * 1.05, -r * 0.5); g.stroke();
+      var b = new Path2D(); b.moveTo(r * 0.15, -r * 0.55); b.bezierCurveTo(r * 0.85, -r * 0.6, r * 0.75, r * 0.4, r * 0.3, r * 0.75); b.bezierCurveTo(-r * 0.2, r * 0.35, -r * 0.45, -r * 0.5, r * 0.15, -r * 0.55);
+      var gd = g.createRadialGradient(r * 0.1, -r * 0.2, 0, r * 0.25, 0, r * 0.8); gd.addColorStop(0, '#f0705a'); gd.addColorStop(1, '#a3181a');
+      g.fillStyle = gd; g.fill(b); g.stroke(b);
+      g.fillStyle = '#f2d36a'; for (i = 0; i < 7; i++) { g.beginPath(); g.arc(r * (0.05 + (i % 3) * 0.2), r * (-0.25 + (i >> 1) * 0.22), Math.max(0.4, r * 0.045), 0, 6.283); g.fill(); }
+      g.fillStyle = '#5f8a4a'; g.beginPath(); for (i = 0; i < 4; i++) { var aa = -1.9 + i * 0.5; g.moveTo(r * 0.15, -r * 0.55); g.lineTo(r * 0.15 + Math.cos(aa) * r * 0.42, -r * 0.55 + Math.sin(aa) * r * 0.42); g.lineTo(r * 0.15 + Math.cos(aa + 0.25) * r * 0.15, -r * 0.55 + Math.sin(aa + 0.25) * r * 0.15); } g.fill(); g.stroke();
+      b2Flower(g, -r * 1.05, -r * 0.55, r * 0.42, { n: 5, shape: 'round', col: { base: '#fbf8ef', dark: '#d8ccc0', light: '#ffffff' }, eye: '#e6c040' }, 0.3);
+    } else {   // a pea pod split open on its tendrilled stalk
+      g.beginPath(); g.moveTo(-r * 1.25, -r * 0.2); g.quadraticCurveTo(-r * 1.6, -r * 0.9, -r * 1.05, -r * 1.0); g.quadraticCurveTo(-r * 0.7, -r * 0.95, -r * 0.9, -r * 0.65); g.stroke();
+      var pd = new Path2D(); pd.moveTo(-r * 1.25, -r * 0.1); pd.quadraticCurveTo(0, -r * 0.75, r * 1.3, r * 0.05); pd.quadraticCurveTo(0, r * 0.5, -r * 1.25, -r * 0.1);
+      g.fillStyle = '#7fa25a'; g.fill(pd); g.stroke(pd);
+      g.fillStyle = '#a9c97a'; for (i = 0; i < 4; i++) { g.beginPath(); g.arc(-r * 0.7 + i * r * 0.5, -r * 0.12 + i * r * 0.02, r * 0.2, 0, 6.283); g.fill(); g.stroke(); }
+      g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = lw * 0.8; g.beginPath(); g.moveTo(-r * 0.9, -r * 0.3); g.quadraticCurveTo(0, -r * 0.6, r * 1.0, -r * 0.05); g.stroke();
+    }
+    g.restore();
+  }
+  // a small gold ivy leaf (three points) on a short stalk, the vine's commonest ornament
+  function goldLeaf(g, x, y, r, a) {
+    var im = images['b2.margin.leaf'];
+    if (im) {
+      var k = 2 * r / Math.max(im.naturalWidth, im.naturalHeight);
+      g.save(); g.translate(x, y); g.rotate(a); g.drawImage(im, -im.naturalWidth * k / 2, -im.naturalHeight * k / 2, im.naturalWidth * k, im.naturalHeight * k); g.restore();
+      return;
+    }
+    var c = Math.cos(a), s = Math.sin(a), p = new Path2D();
+    function T(u, v) { return [x + c * u - s * v, y + s * u + c * v]; }
+    var P0 = T(0, 0), A = T(r * 0.55, -r * 0.75), B = T(r * 0.7, -r * 0.3), C = T(r * 1.35, 0), D = T(r * 0.7, r * 0.3), E = T(r * 0.55, r * 0.75);
+    var k1 = T(r * 0.15, -r * 0.55), k2 = T(r * 0.9, -r * 0.5), k3 = T(r * 0.9, r * 0.5), k4 = T(r * 0.15, r * 0.55);
+    p.moveTo(P0[0], P0[1]); p.quadraticCurveTo(k1[0], k1[1], A[0], A[1]); p.lineTo(B[0], B[1]); p.quadraticCurveTo(k2[0], k2[1], C[0], C[1]);
+    p.quadraticCurveTo(k3[0], k3[1], D[0], D[1]); p.lineTo(E[0], E[1]); p.quadraticCurveTo(k4[0], k4[1], P0[0], P0[1]);
+    g.fillStyle = '#d4a845'; g.fill(p);
+    var h = T(r * 0.45, -r * 0.18); g.fillStyle = 'rgba(255,240,180,0.85)'; g.beginPath(); g.arc(h[0], h[1], r * 0.18, 0, 6.283); g.fill();
+    g.stroke(p);
+  }
+  // Book II's margins: hairline black vines along the edges, broken wherever the board, text or buttons sit,
+  // set with small gold ivy leaves and curls, and flowers strewn in the open vellum
+  function b2Margin(ctx, W, H, seed, avoid, opt) {
+    var narrow = !!(opt && opt.narrow), R = rand(seed), U = 4, gw = Math.ceil(W / U), gh = Math.ceil(H / U), occ = new Uint8Array(gw * gh);
+    function mark(x0, y0, x1, y1) {
+      var j1 = Math.min(gh - 1, Math.floor(y1 / U)), i1 = Math.min(gw - 1, Math.floor(x1 / U));
+      for (var j = Math.max(0, Math.floor(y0 / U)); j <= j1; j++) for (var i = Math.max(0, Math.floor(x0 / U)); i <= i1; i++) occ[j * gw + i] = 1;
+    }
+    function busy(x, y, r) {
+      if (x - r < 1 || y - r < 1 || x + r > W - 1 || y + r > H - 1) return true;
+      for (var j = Math.floor((y - r) / U); j <= Math.floor((y + r) / U); j++) for (var i = Math.floor((x - r) / U); i <= Math.floor((x + r) / U); i++) if (occ[j * gw + i]) return true;
+      return false;
+    }
+    (avoid || []).forEach(function (r) { var p = r[4] ? r[4] * (narrow ? 0.9 : 1.6) + 2 : 4; mark(r[0] - p, r[1] - p, r[0] + r[2] + p, r[1] + r[3] + p); });
+    var unit = Math.min(W, H), d = Math.max(9, Math.min(24, unit * 0.032)), lr = Math.max(2.4, Math.min(5, unit * 0.008));
+    ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    var vine = new Path2D(), leaves = [], curls = [], drawn = [];
+    // a vine along each edge, a gentle wave d in from it
+    [0, 1, 2, 3].forEach(function (side) {
+      var horiz = side % 2 === 0, span = horiz ? W : H, ph = R() * 6.283, lam = 40 + R() * 20, run = [], step = 2.5;
+      function at(s) {
+        var o = d + d * 0.22 * Math.sin(s / lam * 6.283 + ph);
+        return side === 0 ? [s, o] : side === 1 ? [W - o, s] : side === 2 ? [s, H - o] : [o, s];
+      }
+      function flush() {
+        if (run.length * step > 24) {
+          vine.moveTo(run[0][0], run[0][1]); run.forEach(function (p) { vine.lineTo(p[0], p[1]); });
+          drawn.push(run.slice());
+          for (var k = 3; k < run.length - 3; k += Math.round((14 + R() * 6) / step)) {
+            var p0 = run[k - 1], p1 = run[k + 1], a = Math.atan2(p1[1] - p0[1], p1[0] - p0[0]), sd = (k / 7 | 0) % 2 ? 1 : -1;
+            if (R() < 0.12) curls.push([run[k][0], run[k][1], a + sd * 1.1, sd]); else leaves.push([run[k][0], run[k][1], a + sd * 1.05]);
+          }
+        }
+        run = [];
+      }
+      for (var s = d * 0.7; s <= span - d * 0.7; s += step) { var p = at(s); if (busy(p[0], p[1], 2)) flush(); else run.push(p); }
+      flush();
+    });
+    ctx.strokeStyle = INK2; ctx.lineWidth = Math.max(0.6, unit * 0.0016); ctx.stroke(vine);
+    drawn.forEach(function (run) { run.forEach(function (p) { mark(p[0] - 3, p[1] - 3, p[0] + 3, p[1] + 3); }); });
+    ctx.lineWidth = Math.max(0.5, unit * 0.0013);
+    curls.forEach(function (c) {   // a hairline tendril curling to a small gold bead
+      ctx.beginPath(); var x = c[0], y = c[1], a = c[2], st = lr * 0.45;
+      ctx.moveTo(x, y);
+      for (var k = 0; k < 18; k++) { a += c[3] * (0.08 + k * 0.022); x += Math.cos(a) * st; y += Math.sin(a) * st; ctx.lineTo(x, y); }
+      ctx.stroke(); bezant(ctx, x, y, lr * 0.35);
+      mark(c[0] - lr * 3, c[1] - lr * 3, c[0] + lr * 3, c[1] + lr * 3);
+    });
+    leaves.forEach(function (l) {
+      var sx = l[0] + Math.cos(l[2]) * lr * 0.9, sy = l[1] + Math.sin(l[2]) * lr * 0.9;
+      ctx.beginPath(); ctx.moveTo(l[0], l[1]); ctx.lineTo(sx, sy); ctx.stroke();
+      goldLeaf(ctx, sx, sy, lr, l[2]);
+      mark(sx - lr * 1.6, sy - lr * 1.6, sx + lr * 1.6, sy + lr * 1.6);
+    });
+    // flowers strewn in the open vellum near the edges, turned through the four kinds
+    var kinds = ['columbine', 'daisy', 'strawberry', 'pea'], want = narrow ? 5 : 9, got = 0, fr = Math.max(6, Math.min(14, unit * 0.024)), band = unit * 0.2;
+    for (var k = kinds.length - 1; k > 0; k--) { var j = Math.floor(R() * (k + 1)), t = kinds[k]; kinds[k] = kinds[j]; kinds[j] = t; }
+    for (var tries = 0; tries < 400 && got < want; tries++) {
+      var x = R() * W, y = R() * H, e = Math.min(x, y, W - x, H - y), r = fr * (0.85 + R() * 0.3);
+      if (e > band || e < d * 0.4 || busy(x, y, r * 1.8)) continue;
+      b2Strewn(ctx, kinds[got % 4], x, y, r, (R() - 0.5) * 1.2);
+      mark(x - r * 2.2, y - r * 2.2, x + r * 2.2, y + r * 2.2); got++;
+    }
+    ctx.restore();
+    return true;
+  }
   // lays the painted ivy for one page into ctx (the cached page background): a spray in each corner that has
   // room, a run along some sides, a few loose sprigs near the edges. avoid: [x, y, w, h] boxes kept clear
   // (board, text, drollery, buttons). The same seed and layout always give the same ivy. False when not loaded.
   // opt.narrow (the portrait layout): ivyNarrow's packing instead. A box's fifth entry is the board's frame width:
   // on a narrow page the ivy may tuck a little under that frame, as ivy behind a frame would
   function ivyPage(ctx, W, H, seed, avoid, opt) {
+    if (BOOK === 2) return b2Margin(ctx, W, H, seed, avoid, opt);
     var C = ivyList('corner'), RU = ivyList('run'), SP = ivyList('sprig');
     if (!C.length) return false;
     var narrow = !!(opt && opt.narrow);
@@ -1931,6 +2469,9 @@
     }
   }
 
+  // the slots ART.draw sends to their b2. counterparts in Book II, and Book I's pictures Book II never loads
+  var B2ALIAS = { knot: 1, twinFrame: 1, twinEmblem: 1, beastHead: 1, beastTail: 1, border: 1 };
+  var B1ONLY = /^(border|knot|twinFrame|twinEmblem|ivy\.|mark\.|beast\.|initial\.)/;
   var ART = {
     // the painted ivy on a page's vellum (false when its PNGs are not loaded)
     ivyPage: ivyPage,
@@ -1938,7 +2479,30 @@
     // the board's enamel look: RIB colours, the cached panel (ground, filigree, gilded frame, ivy) and
     // layered gold-edged ribbon strokes
     RIB: RIB, HAIR: HAIR, hairOf: hairOf, GILT: GILT, MADDER: MADDER, makePanel: makePanel, ribLayers: ribLayers, ribMix: ribMix,
-    setPen: function (m) { PEN = m; }, rampAt: function (rib, x) { return rampAt(rib, x); },
+    setPen: function (m) { PEN = m; },
+    // Book II (a Book of Hours, about 1450): grisaille ribbons edged in ink, diaper grounds, gilt-bar frames,
+    // strewn-flower margins and the b2.* slots; called once, before the board or the manifest load
+    setBook: function (n) {
+      if (n !== 2 || BOOK === 2) return;
+      BOOK = 2; BP = 'b2.'; RH = RG = INK2; RL = '#f4f2ec';
+      var bare = RIB.bare;
+      bare.base = '#e2e0da'; bare.dark = '#8f8b84'; bare.light = '#f8f7f3'; bare.edge = '#aaa59c'; bare.name = 'bare vellum';
+      ART.HAIR = INK2; ART.GILT = INK2; ART.book = 2;
+    },
+    book: 1,
+    // Book II's gilded twins: a red silk thread sagging from tile to tile through pts ([[x,y]...])
+    twinThread: function (g, pts, S, glow) {
+      if (!pts || pts.length < 2) return;
+      g.save(); g.lineCap = 'round'; g.lineJoin = 'round';
+      var path = new Path2D(); path.moveTo(pts[0][0], pts[0][1]);
+      for (var i = 1; i < pts.length; i++) {
+        var a = pts[i - 1], b = pts[i], d = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        path.quadraticCurveTo((a[0] + b[0]) / 2, (a[1] + b[1]) / 2 + d * 0.08, b[0], b[1]);
+      }
+      g.strokeStyle = 'rgba(60,6,10,0.7)'; g.lineWidth = Math.max(1.6, S * 0.035); g.stroke(path);
+      g.strokeStyle = mix('#c0303a', '#ff9a8a', glow || 0); g.lineWidth = Math.max(1, S * 0.022); g.stroke(path);
+      g.restore();
+    }, rampAt: function (rib, x) { return rampAt(rib, x); },
     // the page's panel ground (a GROUND name, from the level) and the jewels that contrast with it
     GROUND: GROUND, groundName: groundName, ground: function (name) { return GROUND[name] || GROUND.madder; }, jewelsFor: jewelsFor,
     rib: function (name) { return RIB[name] || RIB.gold; },
@@ -1947,12 +2511,14 @@
     pigment: function (name) { return PIG[name] || PIG.gold; },
     // asking after a picture that is held back for later (see load) sends for it: book.js only asks for the
     // Colophon once the book is finished, and for every drollery when the Bestiary is in view
-    has: function (slot) { if (images[slot]) return true; if (status[slot] === 0) want(slot); return false; },
+    has: function (slot) {
+      if (BOOK === 2 && (B2ALIAS[slot] || /^(initial|mark)\./.test(slot))) slot = 'b2.' + slot;
+      if (images[slot]) return true; if (status[slot] === 0) want(slot); return false; },
     // where the board's ribbon stops on a painted beast's tile (tile frame, side 1, entry at -0.5), or null
     // where the board's ribbon gives way to the painted knot (tiles from the centre), or null when drawn
-    knotStop: function () { return images.knot ? KNOT.stop : null; },
+    knotStop: function () { return images[BP + 'knot'] ? KNOT.stop : null; },
     beastStop: function (kind, band) {
-      var sl = kind === 'tail' ? 'beast.tail' : 'beast.headShut';
+      var sl = kind === 'tail' ? BP + 'beast.tail' : BP + 'beast.headShut';
       if (!beastReady(kind) || !prepBeast(sl)) return null;
       return beastGeom(kind, band || BEAST_BAND).stop;
     },
@@ -1967,8 +2533,13 @@
     },
     draw: function (ctx, slot, x, y, w, h, t, opts) {
       opts = opts || {};
+      if (BOOK === 2) {
+        // Book II draws its own slots: a mark is a painted flower (b2.mark.<pigment> when that PNG is loaded)
+        if (slot === 'mark') slot = opts.pigment && images['b2.mark.' + opts.pigment] ? 'b2.mark.' + opts.pigment : 'b2.mark';
+        else if (B2ALIAS[slot] || slot.indexOf('initial.') === 0) slot = 'b2.' + slot;
+      }
       // a pigment mark draws its painted gem (mark.<pigment>) when that PNG is loaded
-      if (slot === 'mark' && opts.pigment && images['mark.' + opts.pigment]) slot = 'mark.' + opts.pigment;
+      else if (slot === 'mark' && opts.pigment && images['mark.' + opts.pigment]) slot = 'mark.' + opts.pigment;
       var img = slot === 'page' || SELF[slot] ? null : images[slot], m = metas[slot];   // these lay their PNG themselves
       ctx.save();
       if (img && m && m.crisp && !opts.angle) drawCrisp(ctx, slot, img, x, y, w, h);
@@ -1986,8 +2557,9 @@
         if (opts.angle) { ctx.translate(x + w / 2, y + h / 2); ctx.rotate(opts.angle); ctx.drawImage(img, -w / 2, -h / 2, w, h); }
         else ctx.drawImage(img, x, y, w, h);
       } else {
-        var fn = DRAW[slot] || (slot.indexOf('drollery') === 0 ? DRAW.drollery : null) || (slot.indexOf('initial') === 0 ? DRAW.initial : null);
-        if (fn) fn(ctx, x, y, w, h, t || 0, Object.assign({ id: slot.split('.')[1] }, opts));
+        var parts = slot.split('.'), b2 = parts[0] === 'b2';
+        var fn = b2 ? DRAW[slot] || DRAW['b2.' + parts[1]] : DRAW[slot] || (slot.indexOf('drollery') === 0 ? DRAW.drollery : null) || (slot.indexOf('initial') === 0 ? DRAW.initial : null);
+        if (fn) fn(ctx, x, y, w, h, t || 0, Object.assign({ id: parts[b2 ? 2 : 1] }, opts));
       }
       ctx.restore();
     },
@@ -2006,6 +2578,7 @@
         keys.forEach(function (slot, i) {
           var e = typeof m[slot] === 'string' ? { file: m[slot] } : (m[slot] || {});
           if (!e.file) return;
+          if (BOOK === 2 && B1ONLY.test(slot)) return;   // Book I's own pictures never appear in Book II
           order[slot] = i; status[slot] = 0;
           var r = +rank(slot); if (r !== r) r = 0;
           all.push({ slot: slot, e: e, r: r });
