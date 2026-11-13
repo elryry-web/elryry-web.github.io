@@ -1062,9 +1062,13 @@
     if (typeof slot !== 'string') { drawSmooth(pg, slot, x, y, w, h); return; }
     ART.draw(pg, slot, x, y, w, h, 0, angle ? { angle: angle } : {});
   }
-  function drawMounted(g, slot, x, y, w, h, angle) {
-    var name = typeof slot === 'string' ? slot : slot.slot;
-    var dpr = Math.min(2, window.devicePixelRatio || 1), key = [name, typeof slot !== 'string' || ART.has(slot), w, h, angle || 0, dpr].join('|');
+  // the shadow tones a fitting presses into its ground (deepest last): Book I's red leather, Book II's blue velvet
+  // (the first four for a fitting set in, drawMounted; the last three for a strap laid on, claspPiece)
+  var DARK = { leather: ['22,7,3', '18,5,2', '12,4,1', '6,2,0', '8,2,1', '10,3,1', '22,8,3'],
+    velvet: ['5,9,28', '4,7,22', '2,5,16', '1,2,9', '2,4,14', '3,5,18', '24,8,10'] };
+  function drawMounted(g, slot, x, y, w, h, angle, dark) {
+    var name = typeof slot === 'string' ? slot : slot.slot, D = dark || DARK.leather;
+    var dpr = Math.min(2, window.devicePixelRatio || 1), key = [name, typeof slot !== 'string' || ART.has(slot), w, h, angle || 0, dpr, D[0]].join('|');
     var c = mountCache[key];
     if (!c) {
       var p = Math.ceil(Math.min(w, h) * 0.14), S = Math.min(w, h) * dpr,
@@ -1079,10 +1083,10 @@
       c = document.createElement('canvas'); c.width = W; c.height = H;
       var cg = c.getContext('2d'), OFF = W + H + 100;
       // each shadow pass draws the piece far off the canvas and lets only its shadow land
-      [['rgba(22,7,3,0.5)', S * 0.07, 0, 0],                         // the pressed, darkened leather
-       ['rgba(18,5,2,0.4)', S * 0.018, 0, 0],                        // ...deepest in the piercings
-       ['rgba(12,4,1,0.55)', S * 0.03, -S * 0.008, S * 0.022],       // the soft drop shadow
-       ['rgba(6,2,0,0.75)', Math.max(1, S * 0.006), -dpr * 0.5, dpr] // the contact shadow at the rim
+      [['rgba(' + D[0] + ',0.5)', S * 0.07, 0, 0],                         // the pressed, darkened leather
+       ['rgba(' + D[1] + ',0.4)', S * 0.018, 0, 0],                        // ...deepest in the piercings
+       ['rgba(' + D[2] + ',0.55)', S * 0.03, -S * 0.008, S * 0.022],       // the soft drop shadow
+       ['rgba(' + D[3] + ',0.75)', Math.max(1, S * 0.006), -dpr * 0.5, dpr] // the contact shadow at the rim
       ].forEach(function (d) {
         cg.shadowColor = d[0]; cg.shadowBlur = d[1]; cg.shadowOffsetX = OFF + d[2]; cg.shadowOffsetY = d[3];
         cg.drawImage(pc, -OFF, 0);
@@ -1189,9 +1193,13 @@
   // right and a little down, SHEAR) and darker on that side face. Unfastened (open true): the same strap
   // turned over about the middle of the block's edge (ex + t/2), lying out to the right with the hook
   // pointing away, darkest where it comes from the board
+  // B.src (with its cache name B.name) is another painted strap in place of the clasp (Book II's ties);
+  // B.tail draws what the strap has past the block (a tie's knot and tassel) lying beyond it at the back
+  // board's level, in the book's shadow; B.dark gives the shadows' tones (DARK)
   var SHEAR = 0.45, pieceCache = {}, pieceN = 0;
   function claspPiece(B, open) {
-    var dpr = Math.min(2, window.devicePixelRatio || 1), key = [B.painted, open, B.cw, B.ch, B.ex, B.t, dpr].join('|'), c = pieceCache[key];
+    var D = B.dark || DARK.leather;
+    var dpr = Math.min(2, window.devicePixelRatio || 1), key = [B.name || 'clasp', B.painted, open, B.cw, B.ch, B.ex, B.t, dpr, !!B.tail, D[0]].join('|'), c = pieceCache[key];
     if (c) return c;
     var cw = B.cw, ch = B.ch, ex = B.ex, t = B.t, p = Math.ceil(ch * 0.4), S = ch * dpr;
     var PW = 2 * ex + t, PH = ch + t * SHEAR, W = Math.ceil((PW + 2 * p) * dpr), H = Math.ceil((PH + 2 * p) * dpr);
@@ -1199,7 +1207,7 @@
     var ac = document.createElement('canvas'); ac.width = W; ac.height = H;
     var ag = ac.getContext('2d'); ag.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (B.painted) {
-      var nat = claspNative();
+      var nat = B.src || claspNative();
       drawSmooth(ag, nat, p, p, cw, ch);
       ag.setTransform(1, 0, 0, 1, 0, 0);
       ag.globalCompositeOperation = 'multiply'; ag.fillStyle = 'rgb(255,248,226)'; ag.fillRect(0, 0, W, H);
@@ -1233,6 +1241,15 @@
       sd.addColorStop(0, 'rgba(14,3,2,0.38)'); sd.addColorStop(0.75, 'rgba(14,3,2,0.46)'); sd.addColorStop(1, 'rgba(14,3,2,0.75)');
       pg.fillStyle = sd; pg.fillRect(e, 0, t, HH);
       pg.restore();
+      if (B.tail) {   // past the block: on down at the back board's level, where the book's shadow falls
+        pg.save(); pg.beginPath(); pg.rect(e + t, 0, W / dpr, HH); pg.clip();
+        pg.translate(0, SHEAR * t);
+        pg.drawImage(ac, 0, 0, W / dpr, H / dpr);
+        pg.setTransform(dpr, 0, 0, dpr, 0, 0);
+        pg.globalCompositeOperation = 'source-atop';
+        pg.fillStyle = 'rgba(14,3,2,0.24)'; pg.fillRect(e + t, 0, W / dpr, HH);
+        pg.restore();
+      }
     } else {
       pg.save(); pg.beginPath(); pg.rect(e, 0, PW, HH); pg.clip();
       pg.transform(-1, 0, 0, 1, 2 * e + t, 0);                        // box x -> 2ex + t - x
@@ -1246,9 +1263,9 @@
     }
     c = document.createElement('canvas'); c.width = W; c.height = H;
     var cg = c.getContext('2d'), OFF = W + H + 100;
-    [['rgba(8,2,1,0.42)', S * 0.16, -S * 0.07, S * 0.17],      // the cast shadow on the leather (and the page edges)
-     ['rgba(10,3,1,0.5)', S * 0.04, -S * 0.025, S * 0.07],     // ...darker where it is close
-     ['rgba(22,8,3,0.95)', Math.max(1, S * 0.012), -S * 0.012, S * 0.035]           // the strap's and plate's thickness
+    [['rgba(' + D[4] + ',0.42)', S * 0.16, -S * 0.07, S * 0.17],      // the cast shadow on the leather (and the page edges)
+     ['rgba(' + D[5] + ',0.5)', S * 0.04, -S * 0.025, S * 0.07],      // ...darker where it is close
+     ['rgba(' + D[6] + ',0.95)', Math.max(1, S * 0.012), -S * 0.012, S * 0.035]           // the strap's and plate's thickness
     ].forEach(function (d) {
       cg.shadowColor = d[0]; cg.shadowBlur = d[1]; cg.shadowOffsetX = OFF + d[2]; cg.shadowOffsetY = d[3];
       cg.drawImage(pc, -OFF, 0);
@@ -1260,8 +1277,72 @@
     pieceCache[key] = c;
     return c;
   }
+  // Book I's painted title, tooled into the leather: the letters sit in a pressed impression (the leather
+  // darkened round them, a light lower lip, the upper wall's shadow falling on the gilt), and the gilt is a
+  // little matte and worn through to the leather on its high (brightest) points. Built once per size at the
+  // canvas's own resolution; the wear is seeded, so every render (the shelf, the flip) is the same
+  var tooledCache = {}, tooledN = 0;
+  function shadeOnly(q, src, color, blur, dx, dy) {   // only the shadow of src (device px, identity transform)
+    var BIG = src.width + 200;
+    q.save(); q.setTransform(1, 0, 0, 1, 0, 0);
+    q.shadowColor = color; q.shadowBlur = blur; q.shadowOffsetX = BIG + dx; q.shadowOffsetY = dy;
+    q.drawImage(src, -BIG, 0); q.restore();
+  }
+  function tooledTitle(g, x, y, tw, th) {
+    var m = g.getTransform ? g.getTransform() : null, sc = (m && m.a) || Math.min(2, window.devicePixelRatio || 1);
+    var p = Math.ceil(th * 0.06), key = Math.round(tw * 10) + '|' + Math.round(th * 10) + '|' + Math.round(sc * 100);
+    var c = tooledCache[key];
+    if (!c) {
+      var W = Math.max(1, Math.round((tw + 2 * p) * sc)), H = Math.max(1, Math.round((th + 2 * p) * sc)), U = th * 0.01 * sc;
+      var mk = function () { var k = document.createElement('canvas'); k.width = W; k.height = H; return k; };
+      var gilt = mk(), gg = gilt.getContext('2d');
+      gg.setTransform(sc, 0, 0, sc, 0, 0); ART.draw(gg, 'cover.title', p, p, tw, th, 0, {}); gg.setTransform(1, 0, 0, 1, 0, 0);
+      var inv = mk(), ig = inv.getContext('2d');   // everything but the letters
+      ig.fillStyle = '#000'; ig.fillRect(0, 0, W, H); ig.globalCompositeOperation = 'destination-out'; ig.drawImage(gilt, 0, 0);
+      var sil = mk(), sg = sil.getContext('2d');   // the letters' shape, filled with the leather at the impression's floor
+      sg.drawImage(gilt, 0, 0); sg.globalCompositeOperation = 'source-in'; sg.fillStyle = 'rgb(62,17,11)'; sg.fillRect(0, 0, W, H);
+      // the gilt, a little matte, worn through on its high points
+      var gl = mk(), lg = gl.getContext('2d');
+      if ('filter' in lg) lg.filter = 'saturate(0.8) contrast(0.86) brightness(0.9)';
+      lg.drawImage(gilt, 0, 0); lg.filter = 'none';
+      var px = null;
+      try { px = gg.getImageData(0, 0, W, H).data; } catch (e) { px = null; }
+      if (px) {
+        var R = ART.rand(613), n = Math.round(W * H / 70);
+        lg.globalCompositeOperation = 'destination-out';
+        for (var i = 0; i < n; i++) {
+          var sx = R() * W, sy = R() * H, o = ((sy | 0) * W + (sx | 0)) * 4;
+          var lum = (px[o] + px[o + 1] + px[o + 2]) / 3;
+          if (px[o + 3] < 200 || lum < 170 || R() > (lum - 170) / 60) continue;
+          var r = U * (0.25 + R() * 0.9);
+          lg.fillStyle = 'rgba(0,0,0,' + (0.3 + R() * 0.45) + ')';
+          lg.beginPath(); lg.ellipse(sx, sy, r * (1 + R() * 1.6), r, R() * Math.PI, 0, 2 * Math.PI); lg.fill();
+        }
+        lg.globalCompositeOperation = 'source-over';
+      }
+      lg.globalCompositeOperation = 'source-atop';
+      shadeOnly(lg, inv, 'rgba(28,7,4,0.72)', 1.6 * U, 0, 1.1 * U);           // the upper wall's shadow on the gilt
+      shadeOnly(lg, inv, 'rgba(255,226,170,0.22)', 1.0 * U, 0, -0.7 * U);     // the lower wall catching the light
+      lg.globalCompositeOperation = 'source-over';
+      c = mk(); var og = c.getContext('2d');
+      shadeOnly(og, gilt, 'rgba(14,3,2,0.55)', 2.6 * U, 0, 0.2 * U);          // the leather darkened where it was pressed
+      var lip = mk(), pg = lip.getContext('2d');   // the impression's light lower lip, only below the letters
+      shadeOnly(pg, gilt, 'rgba(232,168,136,0.34)', 0.6 * U, 0, 1.4 * U);
+      pg.globalCompositeOperation = 'destination-out';
+      pg.drawImage(gilt, 0, 0); pg.drawImage(gilt, 0, -0.6 * U); pg.drawImage(gilt, 0, -1.2 * U);
+      og.drawImage(lip, 0, 0);
+      shadeOnly(og, gilt, 'rgba(10,2,1,0.55)', 0.8 * U, 0, -0.9 * U);         // ...and its shadowed upper edge
+      og.drawImage(sil, 0, 0);
+      og.drawImage(gl, 0, 0);
+      c.pad = p;
+      if (++tooledN > 6) { tooledCache = {}; tooledN = 1; }
+      tooledCache[key] = c;
+    }
+    g.drawImage(c, x - c.pad, y - c.pad, tw + 2 * c.pad, th + 2 * c.pad);
+  }
   function renderPaintedCover(g, w, h) {
     var P = PAINTED, cx = w * (P.px0 + P.px1) / 2, pw = w * (P.px1 - P.px0), y0 = h * P.py0, y1 = h * P.py1;
+    drawSpine(g, 'cover.leather', w, h, spineWidth(w));   // the board's part of the spine (the rest is bk_wrap)
     // brass corners on the board's corners (right of the spine strip); the PNG points top-left
     var cs = Math.min(w, h) * 0.2, lx = w * P.spine;
     [[lx, 0, 0], [w - cs, 0, 1], [w - cs, h - cs, 2], [lx, h - cs, 3]].forEach(function (c) {
@@ -1279,7 +1360,7 @@
       tw = pw * 1.02;
       th = tw / ART.meta('cover.title').aspect;
       if (th > (y1 - y0) * 0.36) { th = (y1 - y0) * 0.36; tw = th * ART.meta('cover.title').aspect; }
-      ART.draw(g, 'cover.title', cx - tw / 2, ty, tw, th, 0, {});
+      tooledTitle(g, cx - tw / 2, ty, tw, th);
     } else {
       th = (y1 - y0) * 0.3;
       ART.draw(g, 'cover.title', cx - tw / 2, ty, tw, th, 0, { text: 'Vellum\n& Vermilion' });
@@ -1380,26 +1461,129 @@
       ART.draw(g, 'cover.spine', 0, 0, sw, ph + 2 * ext, 0, {});
       el.spine.style.display = '';
     } else el.spine.style.display = 'none';
+    // shut, the spine is the cover's own leather carried round past the board's edge (drawSpine; the
+    // part on the board is drawn with the cover). It gives way to the spine above while the book opens
+    if (ART.has('cover.leather')) {
+      var ws = spineWidth(pw), wb = ws * 1.2;
+      var wg = placeCanvas(el.wrap, hinge - wb, 0, wb + 1, ph);
+      wg.translate(wb, 0); drawSpine(wg, 'cover.leather', pw, ph, ws);
+      el.wrap.style.display = '';
+    } else el.wrap.style.display = 'none';
     // the page block: the leaves' edge just proud of the closed cover, below and to the right
     var on = ART.has('cover.pages');
     el.leaf.classList.toggle('painted', on);
     if (on) {
       var t = clamp(ph * 0.014, 5, 11);
-      var bg = placeCanvas(el.block, hinge, 0, pw + t, ph + t);
-      bg.fillStyle = '#3e100b';   // the back board's leather edge, under the pages
-      bg.fillRect(t * 0.6, ph - t * 0.2, pw + t * 0.4, t * 1.2); bg.fillRect(pw - t * 0.2, t * 0.6, t * 1.2, ph + t * 0.4);
-      bg.save(); bg.beginPath(); bg.rect(t * 0.4, ph - 3, pw - 3 + t * 0.4, t * 0.85 + 3); bg.clip();
-      ART.draw(bg, 'cover.pages', t * 0.4, ph - 3, pw - 3 + t * 0.4, t * 0.85 + 3, 0, {});   // the foot of the block
-      bg.restore();
-      bg.save(); bg.beginPath(); bg.rect(pw - 3, t * 0.4, t * 0.85 + 3, ph - 3 + t * 0.4); bg.clip();
-      bg.translate(pw + t * 0.85, t * 0.4); bg.rotate(Math.PI / 2);   // the fore-edge: the same strip turned
-      ART.draw(bg, 'cover.pages', 0, 0, ph - 3 + t * 0.4, t * 0.85 + 3, 0, {});
-      bg.restore();
+      drawBlock(placeCanvas(el.block, hinge, 0, pw + t, ph + t), pw, ph, t, '#3e100b');   // the back board's leather edge
       el.block.style.display = '';
     } else el.block.style.display = 'none';
     drawClasps();
   }
-  function blockAlpha(a) { el.block.style.opacity = String(a); }
+  // the page block under a closed board of pw x ph (origin at the board's top left), t deep: the back
+  // board's edge (colour edge) under the pages, the foot of the block and the fore-edge (the same strip turned)
+  function drawBlock(bg, pw, ph, t, edge) {
+    bg.fillStyle = edge;
+    bg.fillRect(t * 0.6, ph - t * 0.2, pw + t * 0.4, t * 1.2); bg.fillRect(pw - t * 0.2, t * 0.6, t * 1.2, ph + t * 0.4);
+    bg.save(); bg.beginPath(); bg.rect(t * 0.4, ph - 3, pw - 3 + t * 0.4, t * 0.85 + 3); bg.clip();
+    ART.draw(bg, 'cover.pages', t * 0.4, ph - 3, pw - 3 + t * 0.4, t * 0.85 + 3, 0, {});
+    bg.restore();
+    bg.save(); bg.beginPath(); bg.rect(pw - 3, t * 0.4, t * 0.85 + 3, ph - 3 + t * 0.4); bg.clip();
+    bg.translate(pw + t * 0.85, t * 0.4); bg.rotate(Math.PI / 2);
+    ART.draw(bg, 'cover.pages', 0, 0, ph - 3 + t * 0.4, t * 0.85 + 3, 0, {});
+    bg.restore();
+  }
+  // the block's edge fades as the book opens (and back as it shuts); the shut spine with it, the open one in its place
+  function blockAlpha(a) {
+    el.block.style.opacity = String(a);
+    el.wrap.style.opacity = String(a); el.spine.style.opacity = String(1 - a);
+  }
+
+  /* ================= the spine of a shut book =================
+     Seen from the front, the spine is the board's own covering carried round past its left edge. Each
+     painted board (SPINE, fractions of its width) has a strip of spine left of its hinge groove: seam to s1
+     is clean leather (or velvet), left of seam the painting's dark edge, which this paints over. The wrap
+     continues that strip leftwards (the strip tiled back and forth, so its grain runs on unbroken), shaded
+     darker toward the outer edge for the curve away from the light; four raised bands cross it and the
+     strip as far as the groove, each lit on top with its shadow below (Book I's with a gilt fillet either
+     side), standing a little proud of the outline; the caps end flush with the board's top and bottom. A
+     soft groove is pressed where the spine meets the board. Drawn in the board's frame (board at 0..w),
+     the wrap at x -ws..0: called once on the cover (which keeps x >= 0) and once on the wrap's canvas */
+  var SPINE = {
+    'cover.leather': { seam: 0.02, s1: 0.054, groove: 0.06, gilt: true, dark: '20,5,4', lite: '255,214,186' },
+    'b2.cover.velvet': { seam: 0.011, s1: 0.036, groove: 0.044, gilt: false, dark: '4,8,26', lite: '205,222,255' }
+  };
+  var SPINE_BANDS = [0.205, 0.385, 0.565, 0.745], spineCache = {};
+  function spineWidth(pw) { return clamp(pw * 0.026, 5, 15); }
+  function spineStrip(slot, w, h, x0, a) {
+    var dpr = Math.min(2, window.devicePixelRatio || 1), key = [slot, w, h, dpr].join('|');
+    if (spineCache[key]) return spineCache[key];
+    var c = document.createElement('canvas'); c.width = Math.max(1, Math.ceil(a * dpr)); c.height = Math.max(1, Math.ceil(h * dpr));
+    var cg = c.getContext('2d'); cg.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ART.draw(cg, slot, -x0, 0, w, h, 0, {});
+    if (Object.keys(spineCache).length > 5) spineCache = {};
+    spineCache[key] = c;
+    return c;
+  }
+  function drawSpine(g, slot, w, h, ws) {
+    var S = SPINE[slot];
+    if (!S || !ART.has(slot) || !(ws > 0)) return;
+    var x0 = S.seam * w, a = (S.s1 - S.seam) * w, gx = S.groove * w, sc = spineStrip(slot, w, h, x0, a);
+    var bh = h * 0.019, bp = ws * 0.18, r = Math.min(ws * 0.6, h * 0.02);
+    var yb = SPINE_BANDS.map(function (f) { return h * f; });
+    g.save();
+    // the outline: square on the board, rounded at the back's corners, a bump where each band stands proud
+    g.beginPath(); g.moveTo(gx, 0); g.lineTo(-ws + r, 0); g.quadraticCurveTo(-ws, 0, -ws, r);
+    yb.forEach(function (y) {
+      g.lineTo(-ws, y - bh * 0.7);
+      g.bezierCurveTo(-ws - bp, y - bh * 0.55, -ws - bp, y + bh * 0.55, -ws, y + bh * 0.7);
+    });
+    g.lineTo(-ws, h - r); g.quadraticCurveTo(-ws, h, -ws + r, h); g.lineTo(gx, h); g.closePath();
+    g.clip();
+    // the covering: the clean strip drawn out over the painted edge and round (its grain runs lengthwise)
+    g.drawImage(sc, -ws - bp - 1, 0, x0 + ws + bp + 1, h);
+    // the raised bands: lit along the top, shadowed underneath, casting a little shadow down the spine
+    var D = 'rgba(' + S.dark + ',', Lt = 'rgba(' + S.lite + ',', x1 = -ws - bp - 1, bw = gx - x1;
+    yb.forEach(function (y) {
+      var t0 = y - bh / 2, t1 = y + bh / 2;
+      var cs = g.createLinearGradient(0, t1, 0, t1 + bh * 0.9);
+      cs.addColorStop(0, D + '0.55)'); cs.addColorStop(1, D + '0)');
+      g.fillStyle = cs; g.fillRect(x1, t1, bw, bh * 0.9);
+      var bd = g.createLinearGradient(0, t0, 0, t1);
+      bd.addColorStop(0, D + '0.6)'); bd.addColorStop(0.1, Lt + '0.22)'); bd.addColorStop(0.28, Lt + '0.55)'); bd.addColorStop(0.46, Lt + '0.2)');
+      bd.addColorStop(0.66, D + '0.2)'); bd.addColorStop(0.88, D + '0.62)'); bd.addColorStop(1, D + '0.85)');
+      g.fillStyle = bd; g.fillRect(x1, t0, bw, bh);
+      var ln = Math.max(0.6, bh * 0.07);   // its crisp edges, where it rises from the spine
+      g.fillStyle = D + '0.45)'; g.fillRect(x1, t0 - ln * 0.5, bw, ln);
+      g.fillStyle = D + '0.7)'; g.fillRect(x1, t1 - ln * 0.5, bw, ln);
+      if (S.gilt) [t0 - bh * 0.42, t1 + bh * 0.42].forEach(function (fy) {   // the gilt fillets either side
+        var lw = Math.max(0.8, bh * 0.13);
+        g.fillStyle = D + '0.55)'; g.fillRect(x1, fy - lw * 0.5 + lw * 0.6, bw, lw);
+        g.fillStyle = 'rgba(222,178,86,0.85)'; g.fillRect(x1, fy - lw * 0.5, bw, lw);
+      });
+    });
+    // the curve: darker toward the outer edge, with a faint sheen where it starts to turn
+    var cv = g.createLinearGradient(x0, 0, -ws - bp, 0), f0 = x0 / (x0 + ws + bp);
+    cv.addColorStop(0, D + '0)'); cv.addColorStop(f0, D + '0.18)'); cv.addColorStop(f0 + (1 - f0) * 0.5, D + '0.52)');
+    cv.addColorStop(f0 + (1 - f0) * 0.85, D + '0.78)'); cv.addColorStop(1, D + '0.92)');
+    g.fillStyle = cv; g.fillRect(-ws - bp - 1, 0, x0 + ws + bp + 1, h);
+    var sh = g.createLinearGradient(0, 0, -ws * 0.5, 0);
+    sh.addColorStop(0, Lt + '0)'); sh.addColorStop(0.5, Lt + '0.07)'); sh.addColorStop(1, Lt + '0)');
+    g.fillStyle = sh; g.fillRect(-ws * 0.5, 0, ws * 0.5, h);
+    // the caps: the covering turned in at the head and the tail
+    [[0, 1], [h, -1]].forEach(function (c) {
+      var cg = g.createLinearGradient(0, c[0], 0, c[0] + c[1] * Math.max(2, h * 0.006));
+      cg.addColorStop(0, D + '0.55)'); cg.addColorStop(1, D + '0)');
+      g.fillStyle = cg; g.fillRect(-ws - bp - 1, Math.min(c[0], c[0] + c[1] * h * 0.006) - 1, gx + ws + bp + 1, Math.max(2, h * 0.006) + 2);
+    });
+    g.restore();
+    // the hinge groove: its spine side catches the light, the board's edge falls into shadow
+    var gw = w * 0.012, hl = g.createLinearGradient(gx - gw * 0.5, 0, gx, 0);
+    hl.addColorStop(0, Lt + '0)'); hl.addColorStop(1, Lt + '0.12)');
+    g.fillStyle = hl; g.fillRect(gx - gw * 0.5, 0, gw * 0.5, h);
+    var gs = g.createLinearGradient(gx, 0, gx + gw, 0);
+    gs.addColorStop(0, D + '0.34)'); gs.addColorStop(1, D + '0)');
+    g.fillStyle = gs; g.fillRect(gx, 0, gw, h);
+  }
 
   /* the clasps' layer (see claspBoxes). CL.s is the straps' swing about the block's fore-edge: 1 fastened
      over the closed cover, -1 turned out past it (hook outward), passing edge-on at 0; z is the layer's
@@ -1675,10 +1859,7 @@
       el.coverUI2.style.cssText = 'left:0;right:0';
       el.shelfNav.style.top = Math.round(bx.cy + bx.h / 2 + 14) + 'px';
     }
-    var cs = el.c2.style;
-    cs.left = Math.round(bx.cxB - bx.w / 2) + 'px'; cs.top = Math.round(bx.cy - bx.h / 2) + 'px';
-    cs.width = Math.round(bx.w) + 'px'; cs.height = Math.round(bx.h) + 'px';
-    drawShelfCover();
+    drawShelfCover();   // places bk_c2 too
     // Book II's button: Open, or Continue where its own save left off
     var b = b2Save() || {}, L2 = window.LEVELS2 || [], l2 = L2[(b.current || 1) - 1];
     if (b2Any() && l2) { el.open2.textContent = 'Continue: ' + l2.rubric; el.open2.className = 'cont'; }
@@ -1690,34 +1871,184 @@
     void el.volA.offsetWidth;
     el.volA.classList.remove('drag'); el.volB.classList.remove('drag');
   }
+  // Book II's two ties (b2-cover-tie.png: gilt tab, ribbon, knot, tassel along 755 px), built as Book I's
+  // straps are (claspPiece): the gilt tab tacked to the front board, the ribbon flat to the fore-edge and down
+  // over the page edges, and the knot and tassel (from 555 px on) lying just past the block in the book's shadow
+  var TIE = { W: 755, knot: 555 }, tieCv = null;
+  function tieNative() {
+    if (tieCv) return tieCv;
+    var c = document.createElement('canvas'); c.width = TIE.W; c.height = Math.round(TIE.W / ART.meta('b2.cover.tie').aspect);
+    ART.draw(c.getContext('2d'), 'b2.cover.tie', 0, 0, c.width, c.height, 0, {});
+    return (tieCv = c);
+  }
+  function tieBoxes(w, h) {
+    if (!ART.has('b2.cover.tie')) return null;
+    var cw = w * 0.27, ch = cw / ART.meta('b2.cover.tie').aspect, t = clamp(h * 0.014, 5, 11), ex = cw * TIE.knot / TIE.W - t;
+    return { painted: true, name: 'b2.tie', src: tieNative(), tail: true, dark: DARK.velvet,
+      cw: cw, ch: ch, x0: w - ex, ex: ex, t: t, over: cw - ex, ys: [0.42, 0.78].map(function (f) { return h * f - ch / 2; }) };
+  }
+  // Book II's title as such books carried one: a slip of vellum written in brown-black ink (a red initial),
+  // under a thin leaf of horn, in a brass frame (the corners' brass) nailed to the velvet with four gilt
+  // nails. The frame presses the pile down round it and casts a small shadow. Drawn in the board's frame
+  // (g scaled to the screen); w, h are the board's size, for the vellum's texture scale
+  function roundRectPath(g, x, y, w, h, r) {
+    g.beginPath();
+    if (g.roundRect) g.roundRect(x, y, w, h, r); else g.rect(x, y, w, h);
+  }
+  function titleLabel(g, cx, cy, lw, lh, bw, bh) {
+    var m = g.getTransform ? g.getTransform() : null, s = (m && m.a) || 1;   // board units -> device px (shadows)
+    var x0 = cx - lw / 2, y0 = cy - lh / 2, u = lh * 0.02, f = lh * 0.15, rr = u * 1.2;
+    var wx = x0 + f, wy = y0 + f, ww = lw - 2 * f, wh = lh - 2 * f;
+    var BR = ['#fce8a8', '#edd088', '#d2af64', '#b08b50', '#926d3d', '#674421'];   // the corners' brass, light to dark
+    // the velvet pressed down round the frame, its pile standing a little proud just beyond
+    g.save();
+    g.shadowColor = 'rgba(2,4,18,0.7)'; g.shadowBlur = 5 * u * s;
+    roundRectPath(g, x0 - u, y0 - u, lw + 2 * u, lh + 2 * u, rr * 2); g.fillStyle = 'rgba(3,6,22,0.45)'; g.fill();
+    g.restore();
+    g.save();
+    g.strokeStyle = 'rgba(190,210,255,0.09)'; g.lineWidth = 1.6 * u;
+    roundRectPath(g, x0 - 4 * u, y0 - 4 * u, lw + 8 * u, lh + 8 * u, rr * 4); g.stroke();
+    g.restore();
+    // the frame, with its shadow on the velvet
+    var bg = g.createLinearGradient(0, y0, 0, y0 + lh);
+    bg.addColorStop(0, BR[1]); bg.addColorStop(0.12, BR[2]); bg.addColorStop(0.45, BR[3]); bg.addColorStop(0.7, BR[2]); bg.addColorStop(0.92, BR[4]); bg.addColorStop(1, BR[5]);
+    g.save();
+    g.shadowColor = 'rgba(0,0,6,0.6)'; g.shadowBlur = 2.6 * u * s; g.shadowOffsetX = 0.9 * u * s; g.shadowOffsetY = 1.8 * u * s;
+    roundRectPath(g, x0, y0, lw, lh, rr); g.fillStyle = bg; g.fill();
+    g.restore();
+    g.save(); roundRectPath(g, x0, y0, lw, lh, rr); g.clip();
+    var R = ART.rand(2417), i;
+    for (i = 0; i < 380; i++) {   // the brass's wear and tarnish
+      g.fillStyle = R() < 0.62 ? 'rgba(90,60,20,' + (0.1 + R() * 0.2) + ')' : 'rgba(255,240,190,' + (0.08 + R() * 0.15) + ')';
+      g.fillRect(x0 + R() * lw, y0 + R() * lh, u * (0.3 + R() * 1.4), u * (0.2 + R() * 0.5));
+    }
+    var hl = g.createLinearGradient(x0, 0, x0 + lw, 0);   // a soft lengthwise sheen
+    hl.addColorStop(0, 'rgba(255,240,190,0)'); hl.addColorStop(0.3, 'rgba(255,240,190,0.18)'); hl.addColorStop(0.55, 'rgba(255,240,190,0)'); hl.addColorStop(1, 'rgba(60,35,10,0.15)');
+    g.fillStyle = hl; g.fillRect(x0, y0, lw, lh);
+    g.restore();
+    function bevel(x, y, w, h, r, lite, dark, lw2) {   // top and left in one tone, bottom and right in the other
+      g.save(); g.lineWidth = lw2;
+      g.strokeStyle = lite; g.beginPath(); g.moveTo(x, y + h - r); g.lineTo(x, y + r); g.quadraticCurveTo(x, y, x + r, y); g.lineTo(x + w - r, y); g.stroke();
+      g.strokeStyle = dark; g.beginPath(); g.moveTo(x + w, y + r); g.lineTo(x + w, y + h - r); g.quadraticCurveTo(x + w, y + h, x + w - r, y + h); g.lineTo(x + r, y + h); g.stroke();
+      g.restore();
+    }
+    bevel(x0 + 0.5 * u, y0 + 0.5 * u, lw - u, lh - u, rr, 'rgba(255,244,200,0.75)', 'rgba(60,36,8,0.75)', u);
+    // an incised line round the frame's middle
+    var gi = f * 0.42;
+    bevel(x0 + gi, y0 + gi, lw - 2 * gi, lh - 2 * gi, rr * 0.5, 'rgba(70,44,12,0.6)', 'rgba(255,236,180,0.45)', 0.7 * u);
+    // the window: the vellum slip
+    g.save(); g.beginPath(); g.rect(wx, wy, ww, wh); g.clip();
+    g.fillStyle = '#e4d3ac'; g.fillRect(wx, wy, ww, wh);
+    var pm = ART.meta('page');
+    if (pm) { var pw2 = bw * 0.9, ph2 = pw2 / pm.aspect; ART.draw(g, 'page', cx - pw2 / 2, cy - ph2 / 2, pw2, ph2, 0, {}); }
+    g.fillStyle = 'rgba(150,105,55,0.14)'; g.fillRect(wx, wy, ww, wh);   // aged under the horn
+    // the title in brown-black ink, its T in vermilion
+    var fs = fitFont(g, 'The Hours', FRAK, wh * 0.82, ww * 0.84, '', 8);
+    var wT = g.measureText('T').width, wR = g.measureText('he Hours').width, tx = cx - (wT + wR) / 2, ty = cy + fs * 0.3;
+    g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+    g.fillStyle = 'rgba(176,44,26,0.95)'; g.fillText('T', tx, ty);
+    g.fillStyle = 'rgba(38,24,14,0.94)'; g.fillText('he Hours', tx + wT, ty);
+    // the horn: warm, a little cloudy, one soft highlight
+    g.fillStyle = 'rgba(196,148,78,0.15)'; g.fillRect(wx, wy, ww, wh);
+    for (i = 0; i < 8; i++) {
+      var bx = wx + R() * ww, by = wy + R() * wh, br = wh * (0.3 + R() * 0.5), cg = g.createRadialGradient(bx, by, 0, bx, by, br);
+      cg.addColorStop(0, 'rgba(255,240,212,' + (0.07 + R() * 0.09) + ')'); cg.addColorStop(1, 'rgba(255,240,212,0)');
+      g.fillStyle = cg; g.fillRect(bx - br, by - br, 2 * br, 2 * br);
+    }
+    for (i = 0; i < 5; i++) {   // the horn's faint laminae
+      var ly = wy + R() * wh;
+      g.strokeStyle = 'rgba(255,236,200,' + (0.04 + R() * 0.05) + ')'; g.lineWidth = u * (0.4 + R() * 0.6);
+      g.beginPath(); g.moveTo(wx, ly); g.bezierCurveTo(wx + ww * 0.3, ly + (R() - 0.5) * wh * 0.3, wx + ww * 0.7, ly + (R() - 0.5) * wh * 0.3, wx + ww, ly + (R() - 0.5) * wh * 0.2); g.stroke();
+    }
+    g.save();
+    g.translate(wx + ww * 0.3, wy + wh * 0.34); g.rotate(-0.22); g.scale(1, 0.3);
+    var hg = g.createRadialGradient(0, 0, 0, 0, 0, ww * 0.3);
+    hg.addColorStop(0, 'rgba(255,251,238,0.55)'); hg.addColorStop(0.45, 'rgba(255,251,238,0.2)'); hg.addColorStop(1, 'rgba(255,251,238,0)');
+    g.fillStyle = hg; g.fillRect(-ww * 0.3, -ww * 0.3, ww * 0.6, ww * 0.6);
+    g.restore();
+    // the frame's lip shading the horn along its top and left
+    g.save();
+    g.shadowColor = 'rgba(40,24,6,0.6)'; g.shadowBlur = 2 * u * s; g.shadowOffsetX = 0.6 * u * s; g.shadowOffsetY = 1.1 * u * s;
+    g.beginPath(); g.rect(wx - lw, wy - lh, ww + 2 * lw, wh + 2 * lh); g.rect(wx, wy, ww, wh);
+    g.fillStyle = '#000'; g.fill('evenodd');
+    g.restore();
+    g.restore();
+    bevel(wx - 0.5 * u, wy - 0.5 * u, ww + u, wh + u, 0, 'rgba(60,36,8,0.7)', 'rgba(255,240,195,0.6)', u);
+    // four gilt nails
+    var nr = f * 0.3;
+    [[x0 + f / 2, y0 + f / 2], [x0 + lw - f / 2, y0 + f / 2], [x0 + lw - f / 2, y0 + lh - f / 2], [x0 + f / 2, y0 + lh - f / 2]].forEach(function (q) {
+      g.save();
+      g.shadowColor = 'rgba(30,18,4,0.7)'; g.shadowBlur = 0.9 * u * s; g.shadowOffsetX = 0.3 * u * s; g.shadowOffsetY = 0.6 * u * s;
+      var ng = g.createRadialGradient(q[0] - nr * 0.35, q[1] - nr * 0.4, nr * 0.05, q[0], q[1], nr);
+      ng.addColorStop(0, '#fff6d0'); ng.addColorStop(0.3, BR[1]); ng.addColorStop(0.7, BR[3]); ng.addColorStop(1, BR[5]);
+      g.fillStyle = ng; g.beginPath(); g.arc(q[0], q[1], nr, 0, 2 * Math.PI); g.fill();
+      g.restore();
+    });
+  }
+  // Book II on the shelf: its own canvas, drawn as Book I's closed cover is (in the same unscaled frame,
+  // L.pw x L.ph, then scaled to Book I's size), with room round the board for the spine, the page block,
+  // the board's shadow and the ties. Shown one at a time (a phone), it is made a little smaller where its
+  // tassels would leave the screen
   function drawShelfCover() {
     if (!SH.on || !SH.box) return;
-    var w = Math.round(SH.box.w), h = Math.round(SH.box.h);
-    if (!(w > 0 && h > 0)) return;
+    var w = L.pw, h = L.ph, k = SH.box.w / w;
+    if (!(w > 0 && h > 0 && k > 0)) return;
     if (!SH.fontAsked && document.fonts && document.fonts.load) {   // the blackletter title waits for its face
       SH.fontAsked = true;
       document.fonts.load('40px "UnifrakturMaguntia"').then(function () { if (mode === 'closed') drawShelfCover(); }, function () {});
     }
-    var g = prep(el.c2, w, h);
+    var painted = ART.has('b2.cover.velvet'), ws = painted ? spineWidth(w) : 0, T = tieBoxes(w, h);
+    var t = ART.has('cover.pages') ? clamp(h * 0.014, 5, 11) : 0;
+    var outL = ws * 1.2, outR = Math.max(t, T ? T.over + 2 : 0);   // what stands out left and right of the board
+    var bl = SH.box.cxB - w * k / 2;
+    if (SH.on && !SH.two) {
+      var W = L.W, need = (outL + w + outR) * k;
+      if (need > W - 12) { k = (W - 12) / (outL + w + outR); bl = SH.box.cxB - w * k / 2; }
+      bl = Math.min(Math.max(bl, 6 + outL * k), W - 6 - (w + outR) * k);
+    }
+    var bt = SH.box.cy - h * k / 2;
+    var pL = Math.ceil(outL + 4), pT = 22, pR = Math.ceil(Math.max(outR, 0) + (T ? T.ch * 0.5 : 0) + 40), pB = Math.ceil(t + 44);
+    var cssW = (pL + w + pR) * k, cssH = (pT + h + pB) * k, st = el.c2.style;
+    st.left = (bl - pL * k) + 'px'; st.top = (bt - pT * k) + 'px'; st.width = cssW + 'px'; st.height = cssH + 'px';
+    var g = prep(el.c2, cssW, cssH), dpr = Math.min(2, window.devicePixelRatio || 1);
+    g.scale(k, k); g.translate(pL, pT);
+    // the page block under the board (and the back board's edge), as Book I's
+    if (t) drawBlock(g, w, h, t, '#141c3e');
+    // the board, with Book I's shadow (its CSS box-shadow) and corners
+    function board() {
+      g.beginPath();
+      if (g.roundRect) g.roundRect(0, 0, w, h, [2, 7, 7, 2]); else g.rect(0, 0, w, h);
+    }
+    g.save();
+    g.shadowColor = 'rgba(0,0,0,0.65)'; g.shadowBlur = 26 * k * dpr; g.shadowOffsetX = 8 * k * dpr; g.shadowOffsetY = 12 * k * dpr;
+    board(); g.fillStyle = '#0c1433'; g.fill();
+    g.restore();
+    g.save(); board(); g.clip();
     ART.draw(g, 'b2.cover.velvet', 0, 0, w, h, 0, {});
-    var m = Math.min(w, h), b = m * 0.045, cs = m * 0.2;
-    [[b, b, 0], [w - b - cs, b, 1], [w - b - cs, h - b - cs, 2], [b, h - b - cs, 3]].forEach(function (c) {
-      ART.draw(g, 'b2.cover.corner', c[0], c[1], cs, cs, 0, { angle: c[2] * Math.PI / 2 });
-    });
+    g.restore();
+    drawSpine(g, 'b2.cover.velvet', w, h, ws);
+    g.save(); board(); g.clip();
+    var cs = Math.min(w, h) * 0.2;
+    if (painted) {   // brass corners flush on the board's corners (right of the spine strip), set in as Book I's are
+      var lx = w * SPINE['b2.cover.velvet'].groove;
+      [[lx, 0, 0], [w - cs, 0, 1], [w - cs, h - cs, 2], [lx, h - cs, 3]].forEach(function (c) {
+        drawMounted(g, 'b2.cover.corner', c[0], c[1], cs, cs, c[2] * Math.PI / 2, DARK.velvet);
+      });
+    } else {
+      var b = Math.min(w, h) * 0.045;
+      [[b, b, 0], [w - b - cs, b, 1], [w - b - cs, h - b - cs, 2], [b, h - b - cs, 3]].forEach(function (c) {
+        ART.draw(g, 'b2.cover.corner', c[0], c[1], cs, cs, 0, { angle: c[2] * Math.PI / 2 });
+      });
+    }
     var R = Math.min(w * 0.25, h * 0.16);
     ART.draw(g, 'b2.cover.roundel', w / 2 - R, h * 0.62 - R, 2 * R, 2 * R, 0, {});
-    // the painted title fitted between the corners, centred on the upper third; else the drawn one
-    var tm = ART.meta('b2.cover.title');
-    if (tm) {
-      var tw = Math.min(w * 0.72, h * 0.2 * tm.aspect), th = tw / tm.aspect;
-      ART.draw(g, 'b2.cover.title', (w - tw) / 2, h * 0.27 - th / 2, tw, th, 0, {});
-    } else ART.draw(g, 'b2.cover.title', w * 0.17, h * 0.15, w * 0.66, h * 0.3, 0, { text: 'Vellum\n& Vermilion\nBook the Second' });
-    // the two ties: the painted strap's gilt tab on the velvet, its tassel at the fore-edge
-    var im = ART.meta('b2.cover.tie');
-    [im ? 0.42 : 0.32, im ? 0.78 : 0.68].forEach(function (f, i) {   // the painted ties clear of the title
-      if (im) { var lw = w * 0.24, lh = lw / im.aspect; ART.draw(g, 'b2.cover.tie', w * 0.995 - lw, h * f - lh / 2, lw, lh, 0, { i: i }); }
-      else ART.draw(g, 'b2.cover.tie', w * 0.8, h * (f - 0.08), w * 0.2, h * 0.16, 0, { i: i });
-    });
+    // the title on a label nailed to the velvet, centred in the upper third
+    var lw = w * 0.5;
+    titleLabel(g, w / 2, h * 0.245, lw, lw * 0.3, w, h);
+    g.restore();
+    // the two ties, tied round the fore-edge below the title
+    if (T) T.ys.forEach(function (y) { var c = claspPiece(T, false); g.drawImage(c, T.x0 - c.pad, y - c.pad, c.cw, c.ch); });
+    else [0.32, 0.68].forEach(function (f, i) { ART.draw(g, 'b2.cover.tie', w * 0.8, h * (f - 0.08), w * 0.2, h * 0.16, 0, { i: i }); });
   }
   function openB2() {
     if (mode !== 'closed' || busy() || shelfQuiet()) return;
@@ -2013,6 +2344,8 @@
       el.spine = $('bk_spine'); el.block = $('bk_block');
       el.clasp = document.createElement('canvas'); el.clasp.className = 'bind'; el.clasp.id = 'bk_clasp';
       el.block.parentNode.insertBefore(el.clasp, el.block.nextSibling);
+      el.wrap = document.createElement('canvas'); el.wrap.className = 'bind'; el.wrap.id = 'bk_wrap'; el.wrap.style.zIndex = '1';
+      el.block.parentNode.insertBefore(el.wrap, el.block);
       el.fly = document.createElement('canvas'); el.fly.className = 'fly';
       bindInput();
     },

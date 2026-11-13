@@ -124,8 +124,7 @@
   body:not(.bkClosed) #bk_volA { transform: none !important; transition: none; }
   #bk_volA.drag, #bk_volB.drag { transition: none; }
   #bk_volB { pointer-events: none; }
-  #bk_c2 { position: absolute; display: block; cursor: pointer; pointer-events: auto; border-radius: 2px 7px 7px 2px;
-    box-shadow: 2px 2px 0 #efe2c2, 4px 4px 0 #d9c69c, 5px 6px 0 #c3ab7c, 8px 12px 26px rgba(0,0,0,0.65); }
+  #bk_c2 { position: absolute; display: block; cursor: pointer; pointer-events: auto; }   /* book.js draws its block, spine and shadow */
   #coverUI2 { position: absolute; bottom: max(22px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; align-items: center; gap: 10px; pointer-events: auto; }
   #coverUI2 button { font-family: "Uncial Antiqua", serif; font-size: 19px; min-width: 220px; color: #f3e6c6; background: #1d2d5a; border-color: #0d1530; }
   #coverUI2 button.cont { font-size: 16px; }
@@ -211,15 +210,15 @@
 </div>
 
 <script src="js/levels.js?v=6"></script>
-<script src="js/levels2.js?v=2"></script>
+<script src="js/levels2.js?v=3"></script>
 <script src="js/puzzle.js?v=4"></script>
-<script src="js/art.js?v=30"></script>
+<script src="js/art.js?v=33"></script>
 <script src="js/drolleries.js?v=3"></script>
 <script src="js/audio.js?v=3"></script>
-<script src="js/board.js?v=20"></script>
-<script src="js/book.js?v=23"></script>
+<script src="js/board.js?v=22"></script>
+<script src="js/book.js?v=27"></script>
 <script src="js/book2.js?v=1"></script>
-<script src="js/main.js?v=19"></script>
+<script src="js/main.js?v=20"></script>
 <script src="js/music.js?v=3"></script>
 </body>
 </html>

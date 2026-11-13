@@ -47,7 +47,15 @@
     pageCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ART.draw(pageCtx, 'page', 0, 0, w, h, 0, { scale: dpr, margin: 'right', variant: cur ? cur.n : 0 });
     // the painted ivy grows on the vellum round everything laid out on it (drawn once per page and size)
-    if (cur) ART.ivyPage(pageCtx, w, h, cur.n * 977 + 13, ivyAvoid(), { narrow: !document.body.classList.contains('wide') });
+    if (cur) {
+      var op = { narrow: !document.body.classList.contains('wide') };
+      // Book II: the acanthus sprays at the board's frame corners grow out over the page's vellum
+      if (ART.book === 2 && ART.b2Sprays && board.M && board.S) {
+        var br = $('board').getBoundingClientRect();
+        if (br.width > 0) op.sprays = ART.b2Sprays(board.M, board.S, board.pad, board.band, board.isInitial, br.left, br.top);
+      }
+      ART.ivyPage(pageCtx, w, h, cur.n * 977 + 13, ivyAvoid(), op);
+    }
     pageFor = cur ? cur.n : 0;
   }
   // the boxes the ivy keeps clear of: the board's cells and gilded frame, the text (its own extent), the drollery, buttons.

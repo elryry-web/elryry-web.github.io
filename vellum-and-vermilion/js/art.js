@@ -387,7 +387,10 @@
   function inMouth(B, x, y) { var m = B.mouthBox; return B.mouth && (m ? x >= m[0] && x <= m[2] && y >= m[1] && y <= m[3] : x < 175 && y > 125); }
   // mod: [x0, x1] along the axis, where the ribbon's modelling (shadow band, tint) eases off over the head or the
   // tail's curl; pen: where the lead-white penwork tapers to a point. Both in source px from the cut (negative)
-  var BEAST_BAND = 0.36, BEAST_MARGIN = 0.02;   // the art band's share of a tile: the board's ribbon body, so the gilt meets
+  var BEAST_BAND = 0.36, BEAST_MARGIN = 0.02;
+  // Book II's crane is drawn a little broader, nearly the width of the cream ribbon body, so only a fine band
+  // of the body and the ribbon's ink line ring it
+  function beastBand() { return BOOK === 2 ? 0.42 : BEAST_BAND; }   // the art band's share of a tile: the board's ribbon body, so the gilt meets
   var beastPrep = {}, beastCache = {}, beastCacheN = 0, beastBad = {};
   function sstep(a, b, x) { var t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); }
   // once per PNG: what each pixel is (cream body to retint, or ink, tongue, teeth and eye to keep),
@@ -440,7 +443,7 @@
     // for modelling the beast as the ribbon is modelled: the distance in from its outline as drawn (the art is
     // squeezed along its axis by r to fit a tile), in source px across. Only transparent pixels count as
     // outside, so the neck runs on past the image's right edge
-    var r = Math.min(1, (1 - BEAST_MARGIN) / B.len / (BEAST_BAND / B.band)), INF = 1e10, f2 = new Float64Array(N), x, y;
+    var r = Math.min(1, (1 - BEAST_MARGIN) / B.len / (beastBand() / B.band)), INF = 1e10, f2 = new Float64Array(N), x, y;
     for (i = 0; i < N; i++) f2[i] = d[i * 4 + 3] < 128 ? 0 : INF;
     var mxn = Math.max(W, H), fb = new Float64Array(mxn), db = new Float64Array(mxn), vb = new Int32Array(mxn), zb = new Float64Array(mxn + 1);
     for (y = 0; y < H; y++) { for (x = 0; x < W; x++) fb[x] = f2[y * W + x]; edt1(fb, W, r, db, vb, zb); for (x = 0; x < W; x++) f2[y * W + x] = db[x]; }
@@ -653,7 +656,13 @@
         }
         g2.globalAlpha = 0.42; g2.drawImage(shc, 0, 0); g2.globalAlpha = 1;
       }
-      [[rim[0], HAIR], [rim[1], GILT], [rim[2], GILT_L]].forEach(function (st) {
+      var rcols = [HAIR, GILT, GILT_L];
+      if (rim[4] === 'b2') {   // Book II: a fine ink line, then the strand's own body colour, deepening outward
+        var rb2 = ramp.key === 'bare' ? [RIB.bare.edge, RIB.bare.base] : ramp.gilt ? [B2LEAF.edge, B2LEAF.base] : [mix(ramp.bd, ramp.sh, 0.12), ramp.bd];
+        rcols = [B2INK, rb2[0], mix(rb2[0], rb2[1], 0.6)];
+      }
+      [[rim[0], rcols[0]], [rim[1], rcols[1]], [rim[2], rcols[2]]].forEach(function (st) {
+        if (!(st[0] > 0)) return;
         sl.globalCompositeOperation = 'source-over'; sl.clearRect(0, 0, tw, th); sl.drawImage(art, 0, 0);
         sl.globalCompositeOperation = 'source-in'; sl.fillStyle = st[1]; sl.fillRect(0, 0, tw, th);
         var R0 = st[0], steps = Math.max(12, Math.ceil(R0 * 5));
@@ -717,10 +726,15 @@
     if (!beastReady(kind)) return false;
     var slot = kind === 'tail' ? BP + 'beast.tail' : (o.snap > 0.06 && o.snap < 0.85 && images[BP + 'beast.headOpen'] && !beastBad[BP + 'beast.headOpen'] ? BP + 'beast.headOpen' : BP + 'beast.headShut');
     var B = BEAST[slot], S = Math.min(w, h), gilt = !!o.gilt;
-    var Gm = beastGeom(kind, gilt ? BEAST_BAND : (o.band || 0.33)), dev = devScale(ctx);
+    var Gm = beastGeom(kind, gilt ? beastBand() : (o.band || 0.33)), dev = devScale(ctx);
     var kc = Gm.kl * S * dev;
     var rim = null;
-    if (gilt) {
+    if (gilt && BOOK === 2) {   // Book II: the ribbon's ink line at the ribbon's own edge, its body between
+      var E2 = Math.max(1, S * 0.042), px2 = 1 / Math.max(1, dev), out = Math.max(0, (0.36 - beastBand()) / 2 * S + E2 + hairOf(S, px2));
+      var ink2 = inkOf(S, px2), sp2 = Math.max(1.5 * px2, S * 0.018);
+      rim = [out * dev, Math.max(0, out - ink2) * dev, Math.max(0, out - ink2) * 0.45 * dev, (out + sp2) * dev, 'b2']
+        .map(function (v) { return typeof v === 'number' ? Math.round(v * 4) / 4 : v; });
+    } else if (gilt) {
       var E = Math.max(1, S * 0.042), HL = hairOf(S, 1 / Math.max(1, dev)), bandGap = (0.36 - BEAST_BAND) / 2 * S;
       rim = [(E + HL + bandGap) * dev, (E + bandGap) * dev, (E * 0.45 + bandGap) * dev,
         (E + HL + bandGap + Math.max(2 / Math.max(1, dev), S * 0.05)) * dev].map(function (v) { return Math.round(v * 4) / 4; });
@@ -1228,33 +1242,67 @@
     acanthusLeaf(g, c.x, c.y, da - 0.3, L * 0.95, L * 0.5, 1.5, col, lw);
     bezant(g, c.x, c.y, Math.max(1.2, b * 0.17));
   }
-  // the thin gilt bar round the board with the vellum showing between it and the ground, sprays at the corners
+  // the thin gilt bar round the board, laid straight on the ground's edge; the painted acanthus sprays at its
+  // corners grow on the page's vellum (b2Margin), drawn here only when the painted ones are missing
+  function b2Bar(b) { var t = b * 0.28 + 2 * Math.max(0.6, b * 0.045); return { t: t, off: b * 0.3 + t / 2 - Math.max(0.5, b * 0.02) }; }
   function b2Frame(g, G, b, box, room) {
-    var bw = b * 0.28, off = b * 0.64, hl = Math.max(0.6, b * 0.045), bar = images['b2.border'];
+    var bb = b2Bar(b), off = bb.off, t = bb.t, bar = images['b2.border'];
     g.lineJoin = 'round'; g.lineCap = 'butt';
-    g.strokeStyle = INK2; g.lineWidth = Math.max(0.7, b * 0.05); g.stroke(G.path(b * 0.3));
-    if (bar) paintedBar(g, G, off, bw + 2 * hl, bar);
+    if (bar) paintedBar(g, G, off, t, bar);
     else {
-      var gold = burnish(g, box[0], box[1], box[2], box[3]);
-      g.strokeStyle = INK2; g.lineWidth = bw + 2 * hl; g.stroke(G.path(off));
+      var bw = b * 0.28, gold = burnish(g, box[0], box[1], box[2], box[3]);
+      g.strokeStyle = INK2; g.lineWidth = t; g.stroke(G.path(off));
       g.strokeStyle = gold; g.lineWidth = bw; g.stroke(G.path(off));
       g.strokeStyle = 'rgba(255,250,228,0.9)'; g.lineWidth = Math.max(0.5, b * 0.04); g.stroke(G.path(off - bw * 0.22));
       g.strokeStyle = 'rgba(95,58,12,0.55)'; g.lineWidth = Math.max(0.5, b * 0.03); g.stroke(G.path(off + bw * 0.28));
     }
-    G.corners(off, true).forEach(function (c, i) {
-      var im = images['b2.frame.corner.' + (i + 1)];
-      if (!im) { acanthusSpray(g, c, b, room, i); return; }
-      // the painted spray: its knot (at about 12% across, 11% down) on the bar's corner, the leaves out into the margin
-      var sw = Math.max(b * 1.1, room * 1.05), sh = sw * im.naturalHeight / im.naturalWidth;
-      g.save(); g.translate(c.x, c.y); g.scale(c.nx, c.ny);
-      g.drawImage(im, -sw * 0.125, -sh * 0.113, sw, sh);
-      g.restore();
-    });
+    if (!images['b2.frame.corner.1']) G.corners(off, true).forEach(function (c, i) { acanthusSpray(g, c, b, room, i); });
   }
-  // the painted gilt bar laid along each edge of the frame's outline at offset off, t thick: each edge
-  // clipped to its mitred quad, the strip tiled along it unstretched, its lit top edge towards the board
+  // where the painted sprays go on the page: the bar's outer corners (page px) and the spray's width, about
+  // 0.3 of the board's short side. M, S, pad, band, isInitial as the board has them; x0, y0 the board's corner
+  function b2Sprays(M, S, pad, band, initial, x0, y0) {
+    var inm = M.kinds.map(function (k) { return k !== ' '; }), rect = inm.every(Boolean);
+    if (initial && M.level && M.level.initial) { inm = inm.map(function () { return true; }); rect = true; }
+    var G = frameGeom(M.w, M.h, inm, S, x0 + pad, y0 + pad, rect ? 0 : S * (initial ? 0.3 : 0.18)), bb = b2Bar(band);
+    return { size: Math.max(80, Math.min(240, 0.3 * Math.min(M.w, M.h) * S)), pts: G.corners(bb.off + bb.t / 2, true) };
+  }
+  // the painted gilt bar laid along each edge of the frame's outline at offset off, t thick: the painting
+  // averaged along its length into one cross-section, stretched along each edge (clipped to its mitred quad,
+  // its lit top edge towards the board), with a fine burnished grain over it that never repeats on a board
+  var barProf = {}, barGrain = null;
+  function barProfile(im) {
+    if (barProf[im.src]) return barProf[im.src];
+    var iw = im.naturalWidth, ih = im.naturalHeight, cv = document.createElement('canvas');
+    cv.width = 4; cv.height = ih;
+    var g = cv.getContext('2d');
+    try {
+      var s = document.createElement('canvas'); s.width = iw; s.height = ih;
+      var sg = s.getContext('2d'); sg.drawImage(im, 0, 0);
+      var d = sg.getImageData(0, 0, iw, ih).data, od = g.createImageData(4, ih);
+      for (var y = 0; y < ih; y++) {
+        var r = 0, gg = 0, bl = 0, a = 0;
+        for (var x = 0; x < iw; x++) { var i = (y * iw + x) * 4, w = d[i + 3]; r += d[i] * w; gg += d[i + 1] * w; bl += d[i + 2] * w; a += w; }
+        for (var k = 0; k < 4; k++) { var o = (y * 4 + k) * 4; od.data[o] = a ? r / a : 0; od.data[o + 1] = a ? gg / a : 0; od.data[o + 2] = a ? bl / a : 0; od.data[o + 3] = a / iw; }
+      }
+      g.putImageData(od, 0, 0);
+    } catch (e) { g.drawImage(im, 0, 0, Math.min(iw, 200), ih, 0, 0, 4, ih); }   // a tainted canvas (file://)
+    return (barProf[im.src] = cv);
+  }
+  function grain() {
+    if (barGrain) return barGrain;
+    var W = 2048, H = 64, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    var g = cv.getContext('2d'), id = g.createImageData(W, H), d = id.data, R = rand(911), row = new Float32Array(W);
+    for (var y = 0; y < H; y++) {
+      // streaks along the bar: each row a smoothed random walk, a little of the row above mixed in
+      var v = 0;
+      for (var x = 0; x < W; x++) { v = v * 0.82 + (R() - 0.5) * 0.9; row[x] = row[x] * 0.35 + v * 0.65; }
+      for (x = 0; x < W; x++) { var o = (y * W + x) * 4, c = 128 + Math.max(-1, Math.min(1, row[x])) * 90 + (R() - 0.5) * 30; d[o] = d[o + 1] = d[o + 2] = c; d[o + 3] = 255; }
+    }
+    g.putImageData(id, 0, 0);
+    return (barGrain = cv);
+  }
   function paintedBar(g, G, off, t, im) {
-    var iw = im.naturalWidth, ih = im.naturalHeight, k = t / ih;
+    var prof = barProfile(im), gr = grain(), R = rand(37);
     G.loops.forEach(function (L) {
       var I = G.pts(L, off - t / 2), O = G.pts(L, off + t / 2), C = G.pts(L, off), n = L.length;
       for (var i = 0; i < n; i++) {
@@ -1263,12 +1311,17 @@
         g.save();
         g.beginPath(); g.moveTo(I[i][0], I[i][1]); g.lineTo(I[j][0], I[j][1]); g.lineTo(O[j][0], O[j][1]); g.lineTo(O[i][0], O[i][1]); g.closePath(); g.clip();
         g.translate(ax, ay); g.rotate(Math.atan2(dy, dx)); g.scale(1, -1);
-        var x = -t, end = len + t, sx = (i * 397) % Math.max(1, iw - 200);
-        while (x < end) {
-          var sw = Math.min(iw - sx, (end - x) / k);
-          g.drawImage(im, sx, 0, sw, ih, x, -t / 2, sw * k, t);
-          x += sw * k; sx = 0;
-        }
+        g.imageSmoothingEnabled = true;
+        g.drawImage(prof, 0, 0, 4, prof.height, -t, -t / 2, len + 2 * t, t);
+        // the grain: soft-light, so it lifts and sinks the gold without greying it; a long slow sheen with it
+        var pt = g.createPattern(gr, 'repeat'), kx = Math.max(0.6, t / 16), ky = t / 40;
+        if (pt.setTransform && window.DOMMatrix) pt.setTransform(new DOMMatrix([kx, 0, 0, ky, -R() * 2048 * kx, -R() * 64 * ky]));
+        g.globalCompositeOperation = 'soft-light'; g.globalAlpha = 0.55;
+        g.fillStyle = pt; g.fillRect(-t, -t / 2, len + 2 * t, t);
+        var sh = g.createLinearGradient(-t, 0, len + t, 0), m = 3 + Math.floor(R() * 3);
+        for (var s = 0; s <= m; s++) { var v = R(); sh.addColorStop(s / m, v < 0.5 ? 'rgba(80,50,10,' + (0.5 - v) * 0.5 + ')' : 'rgba(255,240,200,' + (v - 0.5) * 0.6 + ')'); }
+        g.globalAlpha = 1; g.fillStyle = sh; g.fillRect(-t, -t / 2, len + 2 * t, t);
+        g.globalCompositeOperation = 'source-over';
         g.restore();
       }
     });
@@ -1348,7 +1401,6 @@
         } else diaper(g, box[0], box[1], box[2], box[3], S, GR, R);
         g.globalAlpha = 0.22 + 0.24 * calm; g.fillStyle = GR.base; g.fill(gp); g.globalAlpha = 1;
       }
-      g.strokeStyle = 'rgba(' + GR.deep + ',0.5)'; g.lineWidth = b * 0.6; g.stroke(G.path(b * 0.1));
       g.restore();
     }
     b2Frame(g, FG, b, box, room);
@@ -1400,8 +1452,100 @@
   // the dark hairline outside a ribbon's gold edge (css px, px: one device pixel): never under a device pixel
   // and a half, so the ribbon's outline stays crisp on a phone. board.js (_edges) and the beasts' rim match it
   function hairOf(S, px) { return Math.max(0.7, 1.6 * (px || 1), S * 0.016); }
+  // Book II's ink line round a board ribbon: a fine dark-brown pen line, never under a device pixel and a bit
+  function inkOf(S, px) { return Math.max(1.2 * (px || 1), 0.7, S * 0.011); }
+  var B2INK = '#2e1f14';
+  // a Book II board ribbon: a soft umber shadow on the ground, a fine ink line, and a flat body of warm vellum
+  // with a pale line along its lit edge. The body fills the gold edge Book I has, so the ribbon keeps Book I's
+  // footprint
+  function b2Ribbon(ctx, path, w, S, rib, edges, dash, fx, px) {
+    var E = Math.max(1, S * 0.042), HL = hairOf(S, px), ink = inkOf(S, px), Wb = w + 2 * (E + HL - ink);
+    ctx.lineCap = 'butt'; ctx.lineJoin = 'round';
+    function st(col, wid) { ctx.strokeStyle = col; ctx.lineWidth = wid; ctx.beginPath(); path(ctx); ctx.stroke(); }
+    if (edges) {
+      // the shadow: a few wide faint strokes falling off from the line (and, from the over ribbon, on the
+      // under one at a crossing), then a closer, darker one so a crossing parts cleanly
+      // (multiplied, so on gold or blue it darkens the colour under it rather than greying it)
+      var o = Wb + 2 * ink, sp = Math.max(3 * px, S * 0.075);
+      ctx.globalCompositeOperation = 'multiply';
+      if (!fx.mini) for (var k = 8; k >= 1; k--) st('rgba(96,60,30,0.056)', o + 2 * sp * k / 8);
+      st('rgba(96,60,30,0.4)', o + 2 * Math.max(1.5 * px, S * 0.018));
+      ctx.globalCompositeOperation = 'source-over';
+      st(B2INK, o);
+    }
+    if (!rib) return;
+    if (dash) ctx.setLineDash(dash);
+    if (rib.nmm) { b2Gild(ctx, path, Wb, rib, dash, fx, px); if (dash) ctx.setLineDash([]); return; }
+    if (rib.sh) { paintBody(ctx, path, Wb, S, rib, dash, fx); if (dash) ctx.setLineDash([]); return; }
+    // a flat painted band of warm vellum: level across, softening to a deeper tone only over its outer
+    // eighth (fine strokes about a pixel apart, each an equal step of colour, so no band shows)
+    var n = fx.mini ? 2 : Math.max(5, Math.min(18, Math.round(Wb * 0.07 / px))), inner = Wb * 0.86;
+    for (var i = 0; i < n; i++) {
+      var t = i / n, e = t * t * (3 - 2 * t);
+      st(mix(rib.edge, rib.base, e), Wb * (1 - 0.14 * t));
+    }
+    if (!fx.mini) {   // the light catches one edge: a fine pale line left between the body and a copy moved
+      // toward the light (top left), so it lies along the lit edge and thins away where that edge turns from it
+      var sh = b2Shift(ctx, path, fx, dash);
+      ctx.globalAlpha = 0.9; sh(rib.light, inner, Math.max(1.3 * px, Wb * 0.045)); ctx.globalAlpha = 1;
+    }
+    st(rib.base, inner);
+    if (dash) ctx.setLineDash([]);
+  }
+  // a stroker that moves the path toward the page's light (top left, whatever the tile's turn) by d
+  function b2Shift(ctx, path, fx, dash) {
+    var ang = fx.ang || 0, ext = fx.ext || 0, vx = -0.7071, vy = -0.7071;
+    var ux = vx * Math.cos(ang) + vy * Math.sin(ang), uy = -vx * Math.sin(ang) + vy * Math.cos(ang);
+    return function (col, wid, d) {
+      ctx.strokeStyle = col; ctx.lineWidth = wid;
+      ctx.save(); ctx.translate(ux * d, uy * d); if (dash) ctx.lineDashOffset = -ext;
+      ctx.beginPath(); path(ctx, ext); ctx.stroke(); ctx.restore();
+      if (dash) ctx.lineDashOffset = 0;
+    };
+  }
+  // Book II's gold: flat burnished leaf laid on the band, as in a Book of Hours. A warm gold body that deepens
+  // a little over its outer fifth, a broad paler edge toward the light, soft burnish glints that slant across
+  // the whole board (one sheen for every strand, fixed to the page, so they line up from tile to tile) and a
+  // faint row of punched dots down the middle. The ribbon's own fine ink line outlines it
+  var B2LEAF = { edge: '#a9792b', base: '#d2a345', lit: '#e6c068', dot: 'rgba(104,64,18,0.3)' };
+  function b2Sheen(ctx) {
+    var m = ctx.getTransform(), cv = ctx.canvas, D = Math.max(cv.width, cv.height), q = m.inverse();
+    function loc(x, y) { return [q.a * x + q.c * y + q.e, q.b * x + q.d * y + q.f]; }
+    var p0 = loc(0, 0), p1 = loc(D, D * 0.6), gr = ctx.createLinearGradient(p0[0], p0[1], p1[0], p1[1]), N = 7;
+    gr.addColorStop(0, 'rgba(255,238,184,0)');
+    for (var k = 0; k < N; k++) {
+      var c = (k + 0.5 + 0.3 * Math.sin(k * 2.7)) / N, hw = 0.022 + 0.012 * ((k * 5) % 3), a = 0.22 + 0.12 * ((k * 3) % 2);
+      gr.addColorStop(Math.max(0, c - 2 * hw), 'rgba(255,238,184,0)');
+      gr.addColorStop(c, 'rgba(255,238,184,' + a + ')');
+      gr.addColorStop(Math.min(1, c + 2 * hw), 'rgba(255,238,184,0)');
+    }
+    gr.addColorStop(1, 'rgba(255,238,184,0)');
+    return gr;
+  }
+  function b2Gild(ctx, path, w, rib, dash, fx, px) {
+    function st(col, wid) { ctx.strokeStyle = col; ctx.lineWidth = wid; ctx.beginPath(); path(ctx); ctx.stroke(); }
+    ctx.lineCap = 'butt';
+    var n = fx.mini ? 2 : Math.max(5, Math.min(20, Math.round(w * 0.1 / px))), inner = w * 0.8;
+    for (var i = 0; i < n; i++) {
+      var t = i / n, e = t * t * (3 - 2 * t);
+      st(mix(B2LEAF.edge, B2LEAF.base, e), w * (1 - 0.2 * t));
+    }
+    if (fx.mini) { st(B2LEAF.base, inner); return; }
+    var sh = b2Shift(ctx, path, fx, dash);
+    ctx.globalAlpha = 0.8; sh(B2LEAF.lit, inner, Math.max(1.5 * px, w * 0.07)); ctx.globalAlpha = 1;
+    st(B2LEAF.base, inner);
+    if (ctx.getTransform && window.DOMMatrix) st(b2Sheen(ctx), w * 0.9);
+    if (!dash && fx.len) {   // punched dots, spaced evenly along each tile's length
+      var sp = Math.max(5 * px, w * 0.5), k = Math.max(1, Math.round(fx.len / sp));
+      sp = fx.len / k;
+      ctx.save(); ctx.lineCap = 'round'; ctx.setLineDash([0.01, sp]); ctx.lineDashOffset = -sp / 2;
+      st(B2LEAF.dot, Math.max(1.4 * px, w * 0.075));
+      ctx.restore();
+    }
+  }
   function ribLayers(ctx, path, w, S, rib, edges, dash, stripe, fx) {
     var tm = ctx.getTransform ? ctx.getTransform() : { a: 1, b: 0 }, px = 1 / Math.max(1, Math.hypot(tm.a, tm.b));
+    if (BOOK === 2 && fx && fx.ext != null) { b2Ribbon(ctx, path, w, S, rib, edges, dash, fx, px); return; }
     var E = Math.max(1, S * 0.042), HL = hairOf(S, px);
     ctx.lineCap = 'butt'; ctx.lineJoin = 'round';
     if (edges) {
@@ -2325,69 +2469,124 @@
     var h = T(r * 0.45, -r * 0.18); g.fillStyle = 'rgba(255,240,180,0.85)'; g.beginPath(); g.arc(h[0], h[1], r * 0.18, 0, 6.283); g.fill();
     g.stroke(p);
   }
-  // Book II's margins: hairline black vines along the edges, broken wherever the board, text or buttons sit,
-  // set with small gold ivy leaves and curls, and flowers strewn in the open vellum
+  // Book II's margins, as a Book of Hours border has them: a hairline vine a little in from each edge, broken
+  // wherever the board, text or buttons sit, set with small gold ivy leaves and curls and, at a steady pace,
+  // flowers on hairline stems turned in towards the page; the painted acanthus sprays at the board's corners.
+  // All of it scales with the page. opt.sprays: b2Sprays' corners and size (page px)
+  var B2STEM = { columbine: [0.03, 0.17], daisy: [0.7, 1], strawberry: [0.28, 1], pea: [0.02, 0.63] };
   function b2Margin(ctx, W, H, seed, avoid, opt) {
     var narrow = !!(opt && opt.narrow), R = rand(seed), U = 4, gw = Math.ceil(W / U), gh = Math.ceil(H / U), occ = new Uint8Array(gw * gh);
-    function mark(x0, y0, x1, y1) {
+    function markIn(o, x0, y0, x1, y1) {
       var j1 = Math.min(gh - 1, Math.floor(y1 / U)), i1 = Math.min(gw - 1, Math.floor(x1 / U));
-      for (var j = Math.max(0, Math.floor(y0 / U)); j <= j1; j++) for (var i = Math.max(0, Math.floor(x0 / U)); i <= i1; i++) occ[j * gw + i] = 1;
+      for (var j = Math.max(0, Math.floor(y0 / U)); j <= j1; j++) for (var i = Math.max(0, Math.floor(x0 / U)); i <= i1; i++) o[j * gw + i] = 1;
     }
+    function mark(x0, y0, x1, y1) { markIn(occ, x0, y0, x1, y1); }
+    function hit(o, x, y) { return x < 1 || y < 1 || x > W - 1 || y > H - 1 || o[Math.floor(y / U) * gw + Math.floor(x / U)] === 1; }
     function busy(x, y, r) {
       if (x - r < 1 || y - r < 1 || x + r > W - 1 || y + r > H - 1) return true;
       for (var j = Math.floor((y - r) / U); j <= Math.floor((y + r) / U); j++) for (var i = Math.floor((x - r) / U); i <= Math.floor((x + r) / U); i++) if (occ[j * gw + i]) return true;
       return false;
     }
     (avoid || []).forEach(function (r) { var p = r[4] ? r[4] * (narrow ? 0.9 : 1.6) + 2 : 4; mark(r[0] - p, r[1] - p, r[0] + r[2] + p, r[1] + r[3] + p); });
-    var unit = Math.min(W, H), d = Math.max(9, Math.min(24, unit * 0.032)), lr = Math.max(2.4, Math.min(5, unit * 0.008));
+    var unit = Math.min(W, H), d = Math.max(9, unit * 0.032), lr = Math.max(2.4, unit * 0.0075), hair = Math.max(0.6, unit * 0.0014);
     ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    var vine = new Path2D(), leaves = [], curls = [], drawn = [];
+    // the sprays first, so the vine breaks round them: the knot on the bar's outer corner, the leaves out into
+    // the vellum; smaller where the text, drollery or page edge is near (the board's own frame may sit under the knot)
+    var SP = opt && opt.sprays;
+    if (SP && images['b2.frame.corner.1']) {
+      var occ2 = new Uint8Array(gw * gh);
+      (avoid || []).forEach(function (r) { var p = r[4] ? -r[4] * 0.3 : (narrow ? 3 : 8); markIn(occ2, r[0] - p, r[1] - p, r[0] + r[2] + p, r[1] + r[3] + p); });
+      SP.pts.forEach(function (c, i) {
+        var slot = 'b2.frame.corner.' + (i + 1), im = images[slot];
+        if (!im) return;
+        var O = ivyPoints(slot), iw = im.naturalWidth, ih = im.naturalHeight;
+        // the fan may swing about its knot (down a side, along a top) before it is made smaller
+        [1, 0.86, 0.74, 0.62, 0.52, 0.44, 0.37, 0.31].some(function (t) {
+          return [0, 0.25, -0.25, 0.5, -0.5, 0.75, -0.75, 1, -1, 1.25, -1.25].some(function (th) {
+            var sw = SP.size * t, k = sw / iw, ax = -iw * 0.125, ay = -ih * 0.113, P = [], n, cs = Math.cos(th), sn = Math.sin(th), em = O.st * k * 0.6 + 2;
+            for (n = 0; n < O.pts.length; n++) {
+              var u0 = (O.pts[n][0] + ax) * k, v0 = (O.pts[n][1] + ay) * k, u = u0 * cs - v0 * sn, v = u0 * sn + v0 * cs, x = c.x + u * c.nx, y = c.y + v * c.ny;
+              if (x < em || y < em || x > W - em || y > H - em || (Math.hypot(u, v) > sw * 0.16 && hit(occ2, x, y))) return false;
+              P.push(x, y);
+            }
+            ctx.save(); ctx.translate(c.x, c.y); ctx.scale(c.nx, c.ny); ctx.rotate(th); ctx.scale(k, k); ctx.drawImage(im, ax, ay); ctx.restore();
+            var rr = O.st * k * 0.6 + 2;
+            for (n = 0; n < P.length; n += 2) mark(P[n] - rr, P[n + 1] - rr, P[n] + rr, P[n + 1] + rr);
+            return true;
+          });
+        });
+      });
+    }
+    var vine = new Path2D(), runs = [];
     // a vine along each edge, a gentle wave d in from it
     [0, 1, 2, 3].forEach(function (side) {
-      var horiz = side % 2 === 0, span = horiz ? W : H, ph = R() * 6.283, lam = 40 + R() * 20, run = [], step = 2.5;
+      var horiz = side % 2 === 0, span = horiz ? W : H, ph = R() * 6.283, lam = Math.max(40, unit * 0.055) * (1 + R() * 0.5), run = [], step = Math.max(2.5, unit * 0.003);
       function at(s) {
         var o = d + d * 0.22 * Math.sin(s / lam * 6.283 + ph);
         return side === 0 ? [s, o] : side === 1 ? [W - o, s] : side === 2 ? [s, H - o] : [o, s];
       }
       function flush() {
-        if (run.length * step > 24) {
-          vine.moveTo(run[0][0], run[0][1]); run.forEach(function (p) { vine.lineTo(p[0], p[1]); });
-          drawn.push(run.slice());
-          for (var k = 3; k < run.length - 3; k += Math.round((14 + R() * 6) / step)) {
-            var p0 = run[k - 1], p1 = run[k + 1], a = Math.atan2(p1[1] - p0[1], p1[0] - p0[0]), sd = (k / 7 | 0) % 2 ? 1 : -1;
-            if (R() < 0.12) curls.push([run[k][0], run[k][1], a + sd * 1.1, sd]); else leaves.push([run[k][0], run[k][1], a + sd * 1.05]);
-          }
-        }
+        if (run.length * step > Math.max(24, unit * 0.03)) { vine.moveTo(run[0][0], run[0][1]); run.forEach(function (p) { vine.lineTo(p[0], p[1]); }); runs.push({ side: side, pts: run, step: step }); }
         run = [];
       }
       for (var s = d * 0.7; s <= span - d * 0.7; s += step) { var p = at(s); if (busy(p[0], p[1], 2)) flush(); else run.push(p); }
       flush();
     });
-    ctx.strokeStyle = INK2; ctx.lineWidth = Math.max(0.6, unit * 0.0016); ctx.stroke(vine);
-    drawn.forEach(function (run) { run.forEach(function (p) { mark(p[0] - 3, p[1] - 3, p[0] + 3, p[1] + 3); }); });
-    ctx.lineWidth = Math.max(0.5, unit * 0.0013);
+    ctx.strokeStyle = INK2; ctx.lineWidth = hair; ctx.stroke(vine);
+    // flowers on hairline stems at a steady pace along each run, turned in towards the page, the four kinds in turn
+    var kinds = ['columbine', 'daisy', 'strawberry', 'pea'], fh = Math.max(22, unit * 0.075), gap = fh * 2.1, ki = Math.floor(R() * 4), stems = [];
+    var inward = [Math.PI / 2, Math.PI, -Math.PI / 2, 0];
+    runs.forEach(function (rn) {
+      var P = rn.pts, len = P.length * rn.step, nf = Math.floor((len - fh * 0.6) / gap);
+      if (nf < 1) return;
+      var lead = (len - (nf - 1) * gap) / 2;
+      for (var f = 0; f < nf; f++) {
+        var at0 = lead + f * gap;
+        [0, 0.22, -0.22].some(function (sh) {
+          var idx = Math.round((at0 + sh * gap) / rn.step);
+          if (idx < 2 || idx > P.length - 3) return false;
+          var kind = kinds[ki % 4], im = images['b2.margin.' + kind];
+          var tilt = (f % 2 ? 1 : -1) * (0.3 + R() * 0.15), phi = inward[rn.side] + tilt, ls = fh * 0.3;
+          var bx = P[idx][0], by = P[idx][1], ex = bx + Math.cos(phi) * ls, ey = by + Math.sin(phi) * ls;
+          var cx = ex + Math.cos(phi) * fh * 0.5, cy = ey + Math.sin(phi) * fh * 0.5;
+          if (busy(cx, cy, fh * 0.52)) return false;
+          // the stem: a hairline bowing a little against the tilt
+          var bow = tilt > 0 ? 1 : -1, mx = (bx + ex) / 2 - Math.sin(phi) * ls * 0.25 * bow, my = (by + ey) / 2 + Math.cos(phi) * ls * 0.25 * bow;
+          ctx.strokeStyle = INK2; ctx.lineWidth = hair; ctx.beginPath(); ctx.moveTo(bx, by); ctx.quadraticCurveTo(mx, my, ex, ey); ctx.stroke();
+          if (im) {
+            var iw = im.naturalWidth, ih = im.naturalHeight, k = fh / Math.max(iw, ih), B = B2STEM[kind];
+            var th0 = Math.atan2(ih / 2 - B[1] * ih, iw / 2 - B[0] * iw);
+            ctx.save(); ctx.translate(ex, ey); ctx.rotate(phi - th0); ctx.scale(k, k); ctx.drawImage(im, -B[0] * iw, -B[1] * ih); ctx.restore();
+          } else b2Strewn(ctx, kind, cx, cy, fh * 0.45, phi - Math.PI / 2);
+          mark(cx - fh * 0.55, cy - fh * 0.55, cx + fh * 0.55, cy + fh * 0.55);
+          stems.push([bx, by]); ki++;
+          return true;
+        });
+      }
+    });
+    runs.forEach(function (rn) { rn.pts.forEach(function (p) { mark(p[0] - 3, p[1] - 3, p[0] + 3, p[1] + 3); }); });
+    function nearStem(x, y) { return stems.some(function (s) { return Math.abs(s[0] - x) + Math.abs(s[1] - y) < lr * 3; }); }
+    var leaves = [], curls = [];
+    runs.forEach(function (rn) {
+      var run = rn.pts, step = rn.step;
+      for (var k = 3; k < run.length - 3; k += Math.max(2, Math.round(lr * (3.2 + R() * 1.2) / step))) {
+        if (nearStem(run[k][0], run[k][1])) continue;
+        var p0 = run[k - 1], p1 = run[k + 1], a = Math.atan2(p1[1] - p0[1], p1[0] - p0[0]), sd = (k / 7 | 0) % 2 ? 1 : -1;
+        if (R() < 0.12) curls.push([run[k][0], run[k][1], a + sd * 1.1, sd]); else leaves.push([run[k][0], run[k][1], a + sd * 1.05]);
+      }
+    });
+    ctx.lineWidth = hair * 0.85; ctx.strokeStyle = INK2;
     curls.forEach(function (c) {   // a hairline tendril curling to a small gold bead
       ctx.beginPath(); var x = c[0], y = c[1], a = c[2], st = lr * 0.45;
       ctx.moveTo(x, y);
       for (var k = 0; k < 18; k++) { a += c[3] * (0.08 + k * 0.022); x += Math.cos(a) * st; y += Math.sin(a) * st; ctx.lineTo(x, y); }
       ctx.stroke(); bezant(ctx, x, y, lr * 0.35);
-      mark(c[0] - lr * 3, c[1] - lr * 3, c[0] + lr * 3, c[1] + lr * 3);
     });
     leaves.forEach(function (l) {
       var sx = l[0] + Math.cos(l[2]) * lr * 0.9, sy = l[1] + Math.sin(l[2]) * lr * 0.9;
       ctx.beginPath(); ctx.moveTo(l[0], l[1]); ctx.lineTo(sx, sy); ctx.stroke();
       goldLeaf(ctx, sx, sy, lr, l[2]);
-      mark(sx - lr * 1.6, sy - lr * 1.6, sx + lr * 1.6, sy + lr * 1.6);
     });
-    // flowers strewn in the open vellum near the edges, turned through the four kinds
-    var kinds = ['columbine', 'daisy', 'strawberry', 'pea'], want = narrow ? 5 : 9, got = 0, fr = Math.max(6, Math.min(14, unit * 0.024)), band = unit * 0.2;
-    for (var k = kinds.length - 1; k > 0; k--) { var j = Math.floor(R() * (k + 1)), t = kinds[k]; kinds[k] = kinds[j]; kinds[j] = t; }
-    for (var tries = 0; tries < 400 && got < want; tries++) {
-      var x = R() * W, y = R() * H, e = Math.min(x, y, W - x, H - y), r = fr * (0.85 + R() * 0.3);
-      if (e > band || e < d * 0.4 || busy(x, y, r * 1.8)) continue;
-      b2Strewn(ctx, kinds[got % 4], x, y, r, (R() - 0.5) * 1.2);
-      mark(x - r * 2.2, y - r * 2.2, x + r * 2.2, y + r * 2.2); got++;
-    }
     ctx.restore();
     return true;
   }
@@ -2552,7 +2751,7 @@
     INK: INK, PIG: PIG, ribbon: ribbon, mix: mix, rand: rand, maskShape: maskShape, makePage: makePage, sheet: drawSheet,
     // the board's enamel look: RIB colours, the cached panel (ground, filigree, gilded frame, ivy) and
     // layered gold-edged ribbon strokes
-    RIB: RIB, HAIR: HAIR, hairOf: hairOf, GILT: GILT, MADDER: MADDER, makePanel: makePanel, ribLayers: ribLayers, ribMix: ribMix,
+    RIB: RIB, HAIR: HAIR, hairOf: hairOf, inkOf: inkOf, GILT: GILT, MADDER: MADDER, makePanel: makePanel, b2Sprays: b2Sprays, ribLayers: ribLayers, ribMix: ribMix,
     setPen: function (m) { PEN = m; },
     // Book II (a Book of Hours, about 1450): grisaille ribbons edged in ink, diaper grounds, gilt-bar frames,
     // strewn-flower margins and the b2.* slots; called once, before the board or the manifest load
@@ -2560,8 +2759,8 @@
       if (n !== 2 || BOOK === 2) return;
       BOOK = 2; BP = 'b2.'; RH = RG = INK2; RL = '#f4f2ec';
       var bare = RIB.bare;
-      bare.base = '#e2e0da'; bare.dark = '#8f8b84'; bare.light = '#f8f7f3'; bare.edge = '#aaa59c'; bare.name = 'bare vellum';
-      ART.HAIR = INK2; ART.GILT = INK2; ART.book = 2;
+      bare.base = '#ede2c6'; bare.dark = '#9a8562'; bare.light = '#fffaee'; bare.edge = '#cdb990'; bare.name = 'bare vellum';
+      ART.HAIR = B2INK; ART.GILT = INK2; ART.book = 2;
     },
     book: 1,
     // Book II's gilded twins: a red silk thread sagging from tile to tile through pts ([[x,y]...])
@@ -2594,7 +2793,15 @@
     beastStop: function (kind, band) {
       var sl = kind === 'tail' ? BP + 'beast.tail' : BP + 'beast.headShut';
       if (!beastReady(kind) || !prepBeast(sl)) return null;
-      return beastGeom(kind, band || BEAST_BAND).stop;
+      return beastGeom(kind, band || beastBand()).stop;
+    },
+    // the depths into the tile (side 1, from the entry edge) where a painted beast's neck is fully painted (f0)
+    // and where it has faded away (f1), and where the board's ribbon stops under it; null when not drawn
+    beastNeck: function (kind) {
+      var sl = kind === 'tail' ? BP + 'beast.tail' : BP + 'beast.headShut';
+      if (!beastReady(kind) || !prepBeast(sl)) return null;
+      var G = beastGeom(kind, beastBand());
+      return { f0: -G.B.f0 * G.ka, f1: -G.B.f1 * G.ka, stop: G.stop + 0.5 };
     },
     // a loaded PNG's shape: aspect = width / height, stem = where its vine meets the bottom edge (0..1)
     meta: function (slot) { if (images[slot]) return metas[slot]; if (status[slot] === 0) want(slot); return null; },

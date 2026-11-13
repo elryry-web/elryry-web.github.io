@@ -711,6 +711,31 @@
 
   // a broad enamel ribbon: hairline, gold edges, cream gouache body; the strand's colour floods along it
   // fx: {ang, cell} for the painted modelling (see ART.ribLayers)
+  // draw part of a tile's ribbon through a layer and fade it out between depths d0 and d1 (tile frame, side 1,
+  // entering at the top): only the slab between them is laid on the board
+  B._fadeEnd = function (g, S, d0, d1, draw) {
+    var h = S / 2, m = S * 0.2, T = g.getTransform();
+    var xs = [], ys = [];
+    [[-h - m, -h - m], [h + m, -h - m], [h + m, h + m], [-h - m, h + m]].forEach(function (q) {
+      xs.push(T.a * q[0] + T.c * q[1] + T.e); ys.push(T.b * q[0] + T.d * q[1] + T.f);
+    });
+    var x0 = Math.floor(Math.min.apply(null, xs)), y0 = Math.floor(Math.min.apply(null, ys));
+    var w = Math.ceil(Math.max.apply(null, xs)) - x0, hh = Math.ceil(Math.max.apply(null, ys)) - y0;
+    if (w < 2 || hh < 2) return;
+    var L = this._fadeL || (this._fadeL = document.createElement('canvas'));
+    if (L.width < w || L.height < hh) { L.width = Math.max(L.width, w); L.height = Math.max(L.height, hh); }
+    var lg = L.getContext('2d');
+    lg.setTransform(1, 0, 0, 1, 0, 0); lg.globalAlpha = 1; lg.globalCompositeOperation = 'source-over'; lg.clearRect(0, 0, L.width, L.height);
+    lg.setTransform(T.a, T.b, T.c, T.d, T.e - x0, T.f - y0);
+    lg.save(); lg.beginPath(); lg.rect(-h - m, -h + d0 * S, S + 2 * m, (d1 - d0) * S); lg.clip();
+    draw(lg);
+    lg.restore();
+    var gr = lg.createLinearGradient(0, -h + d0 * S, 0, -h + d1 * S);
+    gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(0.5, 'rgba(0,0,0,0.5)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    lg.globalCompositeOperation = 'destination-in'; lg.fillStyle = gr; lg.fillRect(-h - m, -h - m, S + 2 * m, S + 2 * m);
+    lg.globalCompositeOperation = 'source-over'; lg.setTransform(1, 0, 0, 1, 0, 0);
+    g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(L, 0, 0, w, hh, x0, y0, w, hh); g.restore();
+  };
   B._strokeRibbon = function (g, path, len, w, col, fx) {
     var bare = ART.RIB.bare, body = col.drain ? ART.ribMix(col.drain.rib, bare, col.drain.k) : bare;
     var full = col.fill && col.frac >= 1 && !col.drain;
@@ -744,6 +769,12 @@
     g.save(); g.beginPath();
     if (horiz) g.rect(-h, -half, 2 * h, 2 * half); else g.rect(-half, -h, 2 * half, 2 * h);
     g.clip();
+    if (this.M.b2) {   // Book II: no wash of ground; the over ribbon's soft shadow falls on the under one, kept
+      // to the under ribbon's own width (the clip), deepest at the over one's ink line and fading a little way out
+      g.globalCompositeOperation = 'multiply'; g.lineCap = 'butt'; g.strokeStyle = 'rgba(96,60,30,0.05)';
+      for (var k = 8; k >= 1; k--) { g.lineWidth = 2 * half + 2 * S * 0.012 * k; g.beginPath(); overPath(g); g.stroke(); }
+      g.restore(); return;
+    }
     var gr = horiz ? g.createLinearGradient(-h, 0, h, 0) : g.createLinearGradient(0, -h, 0, h);
     var a = (half + S * 0.03) / S, sh = 'rgba(' + this.ground.deep + ',';
     gr.addColorStop(0, sh + '0)'); gr.addColorStop(clamp(0.5 - a - 0.14, 0, 1), sh + '0)');
@@ -864,8 +895,9 @@
       flList.forEach(function (q) { self._drawTile(g, q, t); });
       this._drawCarets(g, t);
     }
-    // faint glow where ends have met but the strand isn't whole yet
-    if (!this.solved) {
+    // faint glow where ends have met but the strand isn't whole yet (Book I only: on Book II's pale strands it
+    // read as a yellow stain, and its ribbons show a met end plainly)
+    if (!this.solved && !M.b2) {
       var tr = this.tr;
       for (c = 0; c < M.n; c++) {
         for (var d = 1; d <= 2; d++) {
@@ -1093,19 +1125,30 @@
         g.beginPath(); piecePath(g, a, b, h, false); g.stroke();
         g.scale(1 + 0.1 * lift, 1 + 0.1 * lift);
       }
-      if (inked) {
-        var ie = this._edges();
-        g.strokeStyle = 'rgba(30,18,8,0.95)'; g.lineWidth = rw + 2 * (ie.E + ie.HL) + Math.max(2, S * 0.08); g.lineCap = 'butt';
+      if (inked) {   // Book II: the fine ink line drawn again outside itself, so it reads twice as firm
+        var ie = this._edges(), iw = M.b2 ? 2 * ART.inkOf(S, 1 / Math.max(1, this.dpr || 1)) : Math.max(2, S * 0.08);
+        g.strokeStyle = M.b2 ? ART.HAIR : 'rgba(30,18,8,0.95)'; g.lineWidth = rw + 2 * (ie.E + ie.HL) + iw; g.lineCap = 'butt';
         g.beginPath(); piecePath(g, a, b, h, false); g.stroke();
       }
       // a painted beast takes over from the ribbon short of the tile's centre
       // (and a painted knot takes over a little short of it)
       var bst = b < 0 && (M.beast[c] === 'h' || M.beast[c] === 't') ? ART.beastStop(M.beast[c] === 'h' ? 'head' : 'tail') : b < 0 ? ART.knotStop() : null;
-      if (bst != null) { g.save(); g.beginPath(); g.rect(-h - 2, -h - 2, S + 4, (bst + 0.5) * S + 2); g.clip(); }
+      // Book II: the ribbon fades out under the neck rather than ending in a cut, so where the neck bends off
+      // the ribbon's line no square corner shows
+      var bnk = M.b2 && bst != null && (M.beast[c] === 'h' || M.beast[c] === 't') && g.getTransform ? ART.beastNeck(M.beast[c] === 'h' ? 'head' : 'tail') : null;
+      var bfd = bnk ? bnk.f1 + 0.7 * (bnk.f0 - bnk.f1) : 0;
+      if (bst != null) { g.save(); g.beginPath(); g.rect(-h - 2, -h - 2, S + 4, (bnk ? bfd : bst + 0.5) * S + 2); g.clip(); }
       (function (a, b) {
         self._strokeRibbon(g, function (gg, rev, x) { piecePath(gg, a, b, h, rev, x); }, len, rw, col, { ang: ang, cell: c, piece: p });
+        if (bnk) {
+          g.restore();
+          self._fadeEnd(g, S, bfd, bnk.stop, function (lg) {
+            self._strokeRibbon(lg, function (gg, rev, x) { piecePath(gg, a, b, h, rev, x); }, len, rw, col, { ang: ang, cell: c, piece: p });
+          });
+          g.save();
+        }
       })(a, b);
-      if (col.fill && col.frac >= 1 && !col.drain && !col.dull && !this.mini && S >= 24) this._sliver(g, c, p, a, b, h, rw);
+      if (col.fill && col.frac >= 1 && !col.drain && !col.dull && !this.mini && !M.b2 && S >= 24) this._sliver(g, c, p, a, b, h, rw);
       if (bst != null) g.restore();
       if (lifting) g.restore();
       // loose ends get a gold cap so they read as cut ribbon
@@ -1115,6 +1158,12 @@
         var cw = Math.max(1.4, S * 0.04), back = cw / 2 + ed.HL;
         var x0 = m[0] - P.DX[en] * back, y0 = m[1] - P.DY[en] * back;
         g.lineCap = 'butt';
+        if (M.b2) {   // Book II: the ribbon's own fine ink line closes the end
+          var iw = ART.inkOf(S, 1 / Math.max(1, self.dpr || 1)), xi = m[0] - P.DX[en] * iw / 2, yi = m[1] - P.DY[en] * iw / 2;
+          g.strokeStyle = ART.HAIR; g.lineWidth = iw;
+          g.beginPath(); g.moveTo(xi + px * hw, yi + py * hw); g.lineTo(xi - px * hw, yi - py * hw); g.stroke();
+          return;
+        }
         g.strokeStyle = ART.HAIR; g.lineWidth = cw + 2 * ed.HL;
         g.beginPath(); g.moveTo(x0 + px * hw, y0 + py * hw); g.lineTo(x0 - px * hw, y0 - py * hw); g.stroke();
         g.strokeStyle = ART.GILT; g.lineWidth = cw;
