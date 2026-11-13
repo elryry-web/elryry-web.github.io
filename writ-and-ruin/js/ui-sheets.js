@@ -491,7 +491,8 @@
     return '<div class="screen end-screen"><h1>' + esc(E.ageTitle(s.ageNo)) + ' is over</h1>' +
       '<div class="banner ' + (w === 'player' ? 'won' : 'lost') + '">' + (w ? stamp(w, 48) : '') + '<div><h2>' + esc(head) + '</h2><p>' + esc(howWords(c, w, s.winType, s.endRound || s.round, s)) + '</p></div></div>' +
       '<div class="mapframe small">' + M.svg(s, {}) + '</div>' +
-      '<p>' + (w ? 'Now the Reckoning: the winner may ruin or restore a site, changes the world deck, and writes a law for the ages to come.' : 'With no winner there is no Reckoning to make. The age goes into the Annals as it stands.') + '</p>' +
+      '<p>' + (w === 'player' ? 'Now the Reckoning. You may ruin or restore a site. Then you change the world deck and write a law for the ages to come.' :
+        w ? 'Now the Reckoning. ' + esc(c.houses[w].name) + ' may ruin or restore a site. Then it changes the world deck and writes a law for the ages to come.' : 'With no winner there is no Reckoning to make. The age goes into the Annals as it stands.') + '</p>' +
       '<div class="row">' + btn(w ? 'Begin the Reckoning' : 'Write it in the Annals', function () {
         E.beginReckoning(c); U.rk = null; H.save(); U.go(H.screenFor(c));
       }, { cls: 'go big' }) + '</div></div>';
