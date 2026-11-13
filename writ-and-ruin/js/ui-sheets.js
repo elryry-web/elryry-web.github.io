@@ -13,23 +13,8 @@
   function ordinal(n) { return (D.ORDINALS[n - 1] || String(n)).toLowerCase(); }
 
   // ---------------------------------------------------------------- odds of winning an assault
-  // the attacker draws first, then the defender; a tie goes to the defender. Tide and Witch are not counted.
-  function winOdds(s, att, def, peek) {
-    var deck = s.fortune.slice(), full = N.fortune.slice(), p = 0;
-    function without(arr, i) { var c = arr.slice(); c.splice(i, 1); return c; }
-    function over(As, dFor) {
-      As.forEach(function (ac, i) {
-        var Ds = dFor(i), w = 0;
-        Ds.forEach(function (dc) { if (att + ac > def + dc) w++; });
-        p += (1 / As.length) * (w / Ds.length);
-      });
-    }
-    if (peek != null) { p = 0; var Ds = deck.length >= 2 ? deck.slice(1) : full, w = 0; Ds.forEach(function (dc) { if (att + peek > def + dc) w++; }); return w / Ds.length; }
-    if (deck.length >= 2) over(deck, function (i) { return without(deck, i); });
-    else if (deck.length === 1) over(deck, function () { return full; });
-    else over(full, function (i) { return without(full, i); });
-    return p;
-  }
+  // the maths lives in the engine (E.assaultOdds), which counts Tide Reader and Heron Witch as an assault draws them
+  function winOdds(s, a) { return E.assaultOdds(s, a); }
   function oddsWords(p) {
     if (p >= 0.995) return 'certain';
     if (p <= 0.005) return 'no chance';
@@ -92,7 +77,10 @@
     var n = max;
     function build() {
       var a = { type: 'assault', house: 'player', from: from, to: to, count: n };
-      var m = E.check(s, a), pv = E.battlePreview(s, a), p = winOdds(s, pv.attack, pv.defence, pv.peek);
+      var m = E.check(s, a), pv = E.battlePreview(s, a), o = winOdds(s, a), p = o.p, extra = [];
+      if (o.tide) extra.push('Your Tide Reader draws two cards for you. You keep the higher.');
+      if (o.attWitch) extra.push('Your Heron Witch can redraw your card once if you are losing.');
+      if (o.defWitch) extra.push(who(o.defWitch) + "'s Heron Witch can redraw their card once if they are losing.");
       var left = E.fortuneLeft(s), broke = E.pactsBrokenBy(s, 'player', pv.defender);
       var g = s.regions[to], defBands = pv.defender ? E.bandsAt(s, pv.defender, to) : g.folk;
       return '<h2>Assault ' + rn(to) + '</h2><p>From ' + rn(from) + '. ' + (pv.defender ? 'Held by <b>' + who(pv.defender) + '</b> with ' + plural(defBands, 'warband') + '.' : 'Defended by ' + plural(g.folk, 'band') + ' of free folk.') + '</p>' +
@@ -106,7 +94,8 @@
         (pv.peek != null ? '<p class="note"><b>Star Reader:</b> the next fortune card is a <b>' + pv.peek + '</b>. You will draw it.</p>' : '') +
         '<p class="fortune-line"><span class="lbl">Fortune left</span> ' + [0, 1, 2, 3].map(function (v) { return '<span class="fc"><b>' + v + '</b>×' + (left[v] || 0) + '</span>'; }).join('') +
         (s.fortune.length ? '' : ' <span class="muted">(the deck reshuffles first)</span>') + '</p>' +
-        '<p class="odds">Chance to win: <b>' + oddsWords(p) + '</b> <span class="muted">(not counting Tide or Witch cards)</span></p>' +
+        '<p class="odds">Chance to win: <b>' + oddsWords(p) + '</b></p>' +
+        (extra.length ? '<p class="note">' + esc(extra.join(' ')) + ' That is counted in the chance.</p>' : '') +
         '<p>Costs ' + plural(E.assaultHours(s, 'player', to), 'moon') + '.</p>' +
         (broke.length ? '<p class="warn">This breaks your ' + broke.map(function (pc) { return pc.type === 'foe' ? 'common cause' : pc.type; }).join(' and ') + ' with ' + whoLow(pv.defender) + '. They will hold a grudge.</p>' : '') +
         (m ? '<p class="warn">' + esc(plain(m)) + '</p>' : '') +
@@ -126,8 +115,8 @@
     var head = mine ? (e.winner === 'attacker' ? 'You took ' + rn(e.to) + '!' : 'Your assault on ' + rn(e.to) + ' failed.') :
       (e.winner === 'attacker' ? who(e.house) + ' took ' + rn(e.to) + ' from you.' : 'You held ' + rn(e.to) + ' against ' + who(e.house) + '.');
     var notes = [];
-    if (e.tideCard != null) notes.push('Tide Reader: ' + (mine ? 'you' : whoLow(e.house)) + ' drew two cards, kept the ' + e.attCard + ' and set aside a ' + e.tideCard + '.');
-    if (e.witch) notes.push(who(e.witch.house) + "'s Witch threw away a " + e.witch.discarded + ' and drew a ' + e.witch.card + '.');
+    var fn = U.fortuneNotes(e, s);
+    if (fn) notes.push(fn);
     if (e.lastStand) notes.push('Last stand: +' + N.lastStand + ' to the defence.');
     var loss = [];
     if (e.attLoss) loss.push((mine ? 'You' : who(e.house)) + ' lost ' + plural(e.attLoss, 'warband') + '.');

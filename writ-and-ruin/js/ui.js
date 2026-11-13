@@ -132,6 +132,16 @@
     if (o.type === 'foe') return 'common cause against ' + whoLow(o.foe, s);
     return o.type;
   }
+  // the Tide Reader and Heron Witch draws of a battle, in plain sentences, or ''
+  function fortuneNotes(ev, s) {
+    function poss(h) { return h === 'player' ? 'Your' : who(h, s) + "'s"; }
+    var out = [];
+    if (ev.tideCard != null) out.push(poss(ev.house) + ' Tide Reader drew two cards: a ' + ev.tideCard + ' and a ' + (ev.witch && ev.witch.house === ev.house ? ev.witch.discarded : ev.attCard) + '. ' +
+      who(ev.house, s) + ' kept the higher.');
+    if (ev.witch) out.push(poss(ev.witch.house) + ' Heron Witch redrew a ' + ev.witch.discarded + ' as a ' + ev.witch.card + '.');
+    return out.join(' ');
+  }
+  U.fortuneNotes = fortuneNotes;
   // one event as a line of the log, or null
   function describe(ev, s) {
     var h = ev.house, W = who(h, s);
@@ -150,8 +160,9 @@
       case 'muster': return W + ' mustered ' + ev.count + ' in ' + rn(ev.region) + (ev.silver ? ' for ' + ev.silver + ' silver' : '') + '.';
       case 'battle': {
         var d = ev.defender ? whoLow(ev.defender, s) : 'the free folk';
-        return W + ' assaulted ' + rn(ev.to) + ' (' + d + '): ' + ev.attTotal + ' against ' + ev.defTotal + '. ' +
-          (ev.winner === 'attacker' ? W + ' took it.' : 'The assault failed.');
+        var fn = fortuneNotes(ev, s);
+        return W + ' assaulted ' + rn(ev.to) + ' (' + d + '): ' + ev.attack + ' + ' + ev.attCard + ' against ' + ev.defence + ' + ' + ev.defCard + '. ' +
+          (ev.winner === 'attacker' ? W + ' took it.' : 'The assault failed.') + (fn ? ' ' + fn : '');
       }
       case 'assaultCollapsed': return W + "'s assault on " + rn(ev.to) + ' came to nothing.';
       case 'pactBroken': return W + ' broke ' + (PACT_NAME[ev.pact.type] || 'a pact') + ' with ' + whoLow(ev.wronged, s) + '.';

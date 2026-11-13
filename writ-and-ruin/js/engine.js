@@ -206,6 +206,38 @@
     if (!s.fortune.length) return null;   // reshuffle pending: unknown
     return s.fortune[0];
   }
+  // The exact chance that assault a wins, drawing as doAssault does: the attacker's card (two with an unused
+  // Tide Reader, keeping the higher), the defender's card, then one Heron Witch redraw (attacker's if losing,
+  // else defender's if losing). Cards come from what is left in the deck; an empty deck reshuffles all ten.
+  // Returns { p, tide, attWitch, defWitch } (defWitch is the defending house, or null).
+  function assaultOdds(s, a) {
+    var h = a.house, hs = s.houses[h], pv = battlePreview(s, a), d = pv.defender, att = pv.attack, def = pv.defence;
+    var tide = has(s, h, 'tideReader') && !hs.flags.tide;
+    var attW = has(s, h, 'heronWitch') && !hs.once.witch;
+    var defW = d && has(s, d, 'heronWitch') && !s.houses[d].once.witch ? d : null;
+    var full = [0, 0, 0, 0]; N.fortune.forEach(function (v) { full[v]++; });
+    var deck = [0, 0, 0, 0]; s.fortune.forEach(function (v) { deck[v]++; });
+    // draw one card from counts c, then carry on with k(card, counts after); returns the chance of a win
+    function draw(c, k) {
+      var tot = c[0] + c[1] + c[2] + c[3];
+      if (!tot) { c = full; tot = N.fortune.length; }
+      var p = 0;
+      for (var v = 0; v < 4; v++) if (c[v]) { var c2 = c.slice(); c2[v]--; p += c[v] / tot * k(v, c2); }
+      return p;
+    }
+    function afterDefence(ac, dc, c) {
+      var win = att + ac > def + dc;
+      if (!win && attW) return draw(c, function (ac2) { return att + ac2 > def + dc ? 1 : 0; });
+      if (win && defW) return draw(c, function (dc2) { return att + ac > def + dc2 ? 1 : 0; });
+      return win ? 1 : 0;
+    }
+    function afterAttack(ac, c) { return draw(c, function (dc, c2) { return afterDefence(ac, dc, c2); }); }
+    function first(ac, c) { return tide ? draw(c, function (x, c2) { return afterAttack(Math.max(ac, x), c2); }) : afterAttack(ac, c); }
+    var p;
+    if (pv.peek != null) { var c0 = deck.slice(); c0[pv.peek]--; p = first(pv.peek, c0); }
+    else p = draw(deck, first);
+    return { p: p, tide: tide, attWitch: attW, defWitch: defW };
+  }
 
   // ---------------------------------------------------------------- costs
   function marchFree(s, h, from) {
@@ -1207,7 +1239,7 @@
     income: income, hoursFor: hoursFor, heldBy: heldBy, nHeld: nHeld, bandsAt: bandsAt, totalBands: totalBands,
     has: has, hasAt: hasAt, holds: holds, adjacent: adjacent, slotsOf: slotsOf, siteOn: siteOn, law: law, truce: truce,
     prophecyProgress: prophecyProgress, progress: progress, threat: threat, checkVictory: checkVictory, claimStanding: claimStanding, departNeeds: departNeeds,
-    endChances: endChances, fortuneLeft: fortuneLeft, peekFortune: peekFortune,
+    endChances: endChances, fortuneLeft: fortuneLeft, peekFortune: peekFortune, assaultOdds: assaultOdds,
     battlePreview: battlePreview, attackBonus: attackBonus, defenceOf: defenceOf, lastStand: lastStand, returnSpots: returnSpots,
     marchDests: marchDests, enterMode: enterMode, emptyOfOthers: emptyOfOthers,
     musterCost: musterCost, musterMax: musterMax, recruitCost: recruitCost, searchSilver: searchSilver, assaultHours: assaultHours,
