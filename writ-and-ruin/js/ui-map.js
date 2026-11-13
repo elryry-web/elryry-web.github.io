@@ -79,9 +79,14 @@
       '<text x="' + cx + '" y="' + f1(ny + 2.2) + '" text-anchor="middle" class="rname">' + esc(nm) + '</text>';
     // site glyph in a paper roundel, residents as little suit cards
     var sx = cx - 15, sy = cy - 14;
-    out += '<circle cx="' + sx + '" cy="' + sy + '" r="12.5" fill="' + P.paper + '" stroke="' + P.ink + '" stroke-width="2"/>' +
-      '<g transform="translate(' + (sx - 9) + ' ' + (sy - 9) + ')">' + A.siteGlyph(r, 18).replace(/<svg[^>]*>/, '<svg x="0" y="0" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="' + P.ink + '">') + '</g>';
-    if (g.ruined) out += '<path d="M' + (sx - 11) + ' ' + (sy - 11) + 'L' + (sx + 11) + ' ' + (sy + 11) + 'M' + (sx + 11) + ' ' + (sy - 11) + 'L' + (sx - 11) + ' ' + (sy + 11) + '" stroke="' + P.rust + '" stroke-width="3.4"/>';
+    // an undeveloped site: a dashed, empty roundel with its build cost in silver
+    if (E.siteOn(s, r)) {
+      out += '<circle cx="' + sx + '" cy="' + sy + '" r="12.5" fill="' + P.paper + '" stroke="' + P.ink + '" stroke-width="2"/>' +
+        '<g transform="translate(' + (sx - 9) + ' ' + (sy - 9) + ')">' + A.siteGlyph(r, 18).replace(/<svg[^>]*>/, '<svg x="0" y="0" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="' + P.ink + '">') + '</g>';
+    } else {
+      out += '<g class="unbuilt"><circle cx="' + sx + '" cy="' + sy + '" r="12.5" fill="' + P.bone + '" stroke="' + P.ink + '" stroke-width="1.4" stroke-dasharray="3 3"/>' +
+        '<text x="' + sx + '" y="' + f1(sy + 4) + '" text-anchor="middle" class="tiny">' + E.buildCost(r) + 's</text></g>';
+    }
     var slots = E.slotsOf(s, r);
     for (var i = 0; i < slots; i++) {
       var id = g.residents[i], x = cx + 2 + i * 13, y = sy - 9;

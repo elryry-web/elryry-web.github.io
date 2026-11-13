@@ -170,6 +170,10 @@ body.sheet-up { overflow: hidden; }
 .rhead h2 { margin: 0; }
 .rhead p { margin: 0; }
 .sitebox { flex: none; width: 52px; height: 52px; display: grid; place-items: center; border: var(--line) solid var(--ink); background: var(--bone); box-shadow: 2px 2px 0 var(--ochre); }
+/* an undeveloped region: its structure shown faded and dashed until someone builds it */
+.sitebox.unbuilt { border-style: dashed; box-shadow: none; }
+.sitebox.unbuilt svg { opacity: 0.4; filter: grayscale(1); }
+.map .unbuilt .tiny { opacity: 0.8; }
 .sitetext { border-left: 4px solid var(--moss); padding-left: 8px; }
 .facts { font-size: .92rem; line-height: 1.55; }
 .facts svg { display: inline-block; vertical-align: -3px; }

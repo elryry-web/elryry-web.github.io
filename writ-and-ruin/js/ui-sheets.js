@@ -214,6 +214,9 @@
     // With Muster chosen from the bar, a held region goes straight to the muster count.
     if (U.mode && U.mode.kind === 'muster' && r !== 'camp' && H.isMyTurn(s) && E.holds(s, 'player', r) &&
         !cand({ type: 'muster', region: r, count: 1 })) { U.selected = r; musterSheet(r); U.render(); return; }
+    // With Station chosen from a retinue card, a held region with an empty slot takes the resident at once.
+    if (U.mode && U.mode.kind === 'station' && r !== 'camp' && H.isMyTurn(s) &&
+        !cand({ type: 'station', region: r, card: U.mode.card })) { U.doAction({ type: 'station', region: r, card: U.mode.card }); return; }
     U.openSheet(function () { return regionHtml(r); }, { wide: true, onClose: function () { U.selected = null; } });
     U.render();
   };
@@ -221,11 +224,12 @@
   function regionHtml(r) {
     var s = age(), hs = me(), my = H.isMyTurn(s), legal = H.legalNow(s), mode = U.mode && U.mode.kind;
     if (r === 'camp') return campHtml(s, hs, my, legal);
-    var g = s.regions[r], R = REG[r], owner = g.owner;
+    var g = s.regions[r], R = REG[r], owner = g.owner, built = E.siteOn(s, r);
     var out = [];
-    out.push('<header class="rhead"><span class="sitebox">' + A.art('site/' + r, { size: 40 }) + '</span><div><h2>' + esc(R.name) + '</h2><p class="muted">' +
-      (owner ? 'Held by ' + who(owner) : 'Free folk: ' + plural(g.folk, 'band')) + (g.ruined ? ' · the site is ruined' : '') + '</p></div></header>');
-    out.push('<p class="sitetext"><b>' + esc(R.site) + '.</b> ' + (g.ruined ? 'Ruined: the site gives nothing and has one slot fewer.' : esc(R.siteText)) + '</p>');
+    out.push('<header class="rhead"><span class="sitebox' + (built ? '' : ' unbuilt') + '">' + A.art('site/' + r, { size: 40 }) + '</span><div><h2>' + esc(R.name) + '</h2><p class="muted">' +
+      (owner ? 'Held by ' + who(owner) : 'Free folk: ' + plural(g.folk, 'band')) + (R.landmark ? ' · a landmark' : built ? '' : ' · undeveloped') + '</p></div></header>');
+    out.push('<p class="sitetext"><b>' + esc(R.site) + '.</b> ' + (built ? esc(R.siteText) + (R.landmark ? ' It is a landmark. It always stands.' : ' It works for whoever holds the region.') :
+      'Not built yet. The region has no effect, no site income and 1 slot. Whoever holds it may build the ' + esc(R.site) + ' for ' + E.buildCost(r) + ' silver and 1 moon. Built, it gives: ' + esc(R.siteText)) + '</p>');
     var defAgainst = owner === 'player' ? s.order.filter(function (k) { return k !== 'player'; })[0] : 'player';
     var facts = [];
     var bandList = Object.keys(g.bands).filter(function (k) { return g.bands[k] > 0; });
@@ -261,6 +265,11 @@
     if (E.holds(s, 'player', r)) {
       var mm = cand({ type: 'muster', region: r, count: 1 });
       acts.push(['muster', btn('Muster here… <small>' + E.musterCost(s, 'player', r, 1) + 's each</small>', function () { musterSheet(r); }, { off: mm })]);
+      if (!built) acts.push(['build', btn('Build the ' + esc(R.site) + ' <small>' + E.buildCost(r) + 's, 1 moon</small>', function () { U.doAction({ type: 'build', region: r }); }, { cls: 'go', off: cand({ type: 'build', region: r }) })]);
+      if (!hs.flags.returnDue) hs.retinue.forEach(function (id) {
+        if (D.CARDS[id].relic) return;
+        acts.push(['station', btn('Station ' + esc(D.CARDS[id].name) + ' here <small>1 moon</small>', function () { U.doAction({ type: 'station', region: r, card: id }); }, { cls: mode === 'station' ? 'go' : '', off: cand({ type: 'station', region: r, card: id }) })]);
+      });
     }
     var mine = E.bandsAt(s, 'player', r);
     if (mine > 0) {
@@ -280,7 +289,7 @@
         acts.push(['assault', btn('Assault ' + rn(to) + '…', function () { assaultSheet(r, to); }, { cls: 'red', off: m })]);
       });
       var ms = cand({ type: 'search', region: r });
-      acts.push(['search', btn('Search here <small>' + E.searchSilver(s, 'player') + 's, 1h</small>', function () { U.doAction({ type: 'search', region: r }); }, { off: ms })]);
+      acts.push(['search', btn('Search here <small>' + E.searchSilver(s, 'player') + 's, 1 moon</small>', function () { U.doAction({ type: 'search', region: r }); }, { off: ms })]);
     }
     // into here from elsewhere
     var into = {};
@@ -336,7 +345,11 @@
         (mine ? 'Your house' : esc(cap(hs.temper)) + ' temper') + (s.ruler === h ? ' · ruled at the start of the age' : '') + '</p></div></header>');
       out.push('<p class="facts">' + hs.silver + ' silver · ' + plural(E.nHeld(s, h), 'region') + ' · ' + plural(E.totalBands ? E.totalBands(s, h) : 0, 'warband') + ' · ' +
         plural(hs.hours && s.order[s.turn] === h ? hs.hours : E.hoursFor(s, h), 'moon') + ' a turn' + (hs.camp ? ' · ' + hs.camp + ' camped' : '') +
-        '<br>Income ' + E.income(s, h) + ' silver a turn · upkeep ' + E.upkeep(s, h) + ' silver a turn</p>');
+        '<br>Income ' + E.income(s, h) + ' silver a turn · upkeep ' + E.upkeep(s, h) + ' silver a turn' +
+        (function () {
+          var st = D.REGION_IDS.filter(function (r) { return E.holds(s, h, r) && E.siteOn(s, r); }).map(function (r) { return REG[r].site; });
+          return '<br>Structures: ' + (st.length ? esc(listAnd(st)) : 'none');
+        })() + '</p>');
       out.push('<div class="progress">' + ['seize', 'foretell', 'depart', 'seat'].map(function (k) {
         var words = { seize: 'Seize: hold ' + N.seizeRegions + ' regions', foretell: 'Foretell: fulfil the prophecy', depart: 'Depart by the Far Pass', seat: 'Seat: hold the Crown hold when the age ends' }[k];
         return '<div class="prow"><span>' + words + '</span><span class="pbar b-' + k + '"><i style="width:' + Math.round(Math.min(1, p[k]) * 100) + '%"></i></span></div>';
@@ -439,7 +452,15 @@
         '<li><span><b>Foretell.</b> Fulfil your secret prophecy. It is claimed the same way.</span></li>' +
         '<li><span><b>Depart.</b> From the ' + ordinal(N.departFrom) + ' round, hold the Far Pass with enough warbands since the start of your turn and carry the relics it needs, then depart.</span></li>' +
         '<li><span><b>Seat.</b> If the age ends with no other winner, the house holding the Crown hold wins.</span></li></ul>' +
-        '<h3>Your turn</h3><p>You get moons each turn to spend on actions. March (1 moon), muster (1 moon and silver), assault (2 moons), recruit, search and treat. Tap a region to see what you can do there.</p>' +
+        '<h3>Your turn</h3><p>You get moons each turn to spend on actions. March (1 moon), muster (1 moon and silver), assault (2 moons), recruit, search and treat. ' +
+          'Build a structure in a region you hold (1 moon and silver). Station a resident from your retinue in an empty slot of a region you hold (1 moon). Tap a region to see what you can do there.</p>' +
+        '<h3>Structures</h3><p>The Citadel and the Waystone are landmarks. They stand from the start and can never be razed. ' +
+          'The other six regions start undeveloped: no effect, no site income and 1 slot. In the first age the Toll Bridge and the Charcoal Kilns already stand. ' +
+          'A built structure gives its effect and a second slot. ' +
+          'It works for whoever holds the region, and it stands into the ages that follow.</p>' +
+        '<h3>Holdfasts</h3><p>When an age ends, each house records its holdfast: the region where it had the most warbands. ' +
+          'Next age it starts there. If the ruler or another house has it, the house starts beside it instead. ' +
+          'The ruler starts in the Crown hold, with the neighbours of the Crown hold it held at the end of the last age.</p>' +
         '<h3>Silver</h3><p>Each turn starts with income from your regions and sites. Then you pay upkeep: 1 silver for every ' + N.upkeepPer + ' warbands on the board. ' +
         'Each silver you cannot pay disbands 1 warband from your largest stack.</p>' +
         '<h3>The first round</h3><p>No assaults in the first round. You may march only into your own regions, or into a region no one holds or guards.</p>' +
@@ -501,8 +522,8 @@
     return '<div class="screen end-screen"><h1>' + esc(E.ageTitle(s.ageNo)) + ' is over</h1>' +
       '<div class="banner ' + (w === 'player' ? 'won' : 'lost') + '">' + (w ? stamp(w, 48) : '') + '<div><h2>' + esc(head) + '</h2><p>' + esc(howWords(c, w, s.winType, s.endRound || s.round, s)) + '</p></div></div>' +
       '<div class="mapframe small">' + M.svg(s, {}) + '</div>' +
-      '<p>' + (w === 'player' ? 'Now the Reckoning. You may ruin or restore a site. Then you change the world deck and write a law for the ages to come.' :
-        w ? 'Now the Reckoning. ' + esc(c.houses[w].name) + ' may ruin or restore a site. Then it changes the world deck and writes a law for the ages to come.' : 'With no winner there is no Reckoning to make. The age goes into the Annals as it stands.') + '</p>' +
+      '<p>' + (w === 'player' ? 'Now the Reckoning. You may build or raze a structure. Then you change the world deck and write a law for the ages to come.' :
+        w ? 'Now the Reckoning. ' + esc(c.houses[w].name) + ' may build or raze a structure. Then it changes the world deck and writes a law for the ages to come.' : 'With no winner there is no Reckoning to make. The age goes into the Annals as it stands.') + '</p>' +
       '<div class="row">' + btn(w ? 'Begin the Reckoning' : 'Write it in the Annals', function () {
         E.beginReckoning(c); U.rk = null; H.save(); U.go(H.screenFor(c));
       }, { cls: 'go big' }) + '</div></div>';
@@ -511,24 +532,24 @@
   // ---------------------------------------------------------------- the Reckoning
   function describeAiChoice(c, o, ch) {
     var W = cap(c.houses[c.reckoning.winner].short);
-    if (o.step === 'ruin') {
-      if (!ch || ch.kind === 'none') return W + ' leaves every site as it stands.';
-      return W + (ch.kind === 'ruin' ? ' ruins the site at ' : ' restores the site at ') + rn(ch.region) + '.';
+    if (o.step === 'build') {
+      if (!ch || ch.kind === 'none') return W + ' leaves the valley as it stands.';
+      return W + (ch.kind === 'raze' ? ' razes the ' : ' builds the ') + REG[ch.region].site + ' at ' + rn(ch.region) + '.';
     }
     if (o.step === 'banish') return W + ' banishes ' + listAnd((ch.banish || []).map(cardName)) + ' from the world, and admits ' + listAnd((ch.admit || []).map(cardName)) + '.';
     if (o.step === 'law') return W + ' writes the law of ' + D.LAW[ch.law].name + ': ' + D.LAW[ch.law].text;
     return '';
   }
-  var STEP_NAME = { ruin: 'I. Ruin or restore', banish: 'II. The world deck', law: 'III. The law' };
+  var STEP_NAME = { build: 'I. Build or raze', banish: 'II. The world deck', law: 'III. The law' };
   U.renderReckoning = function () {
     var c = U.c, R = c.reckoning, o = E.reckoningOptions(c), w = R.winner, mine = w === 'player';
     var out = ['<div class="screen reckon-screen"><h1>The Reckoning</h1><p class="muted">' + esc(howWords(c, w, R.how, R.round, c.age)) + '</p>',
-      '<ol class="steps">' + ['ruin', 'banish', 'law'].map(function (k) { return '<li class="' + (k === o.step ? 'now' : (['ruin', 'banish', 'law'].indexOf(k) < ['ruin', 'banish', 'law'].indexOf(o.step) ? 'done' : '')) + '">' + STEP_NAME[k] + '</li>'; }).join('') + '</ol>'];
+      '<ol class="steps">' + ['build', 'banish', 'law'].map(function (k) { return '<li class="' + (k === o.step ? 'now' : (['build', 'banish', 'law'].indexOf(k) < ['build', 'banish', 'law'].indexOf(o.step) ? 'done' : '')) + '">' + STEP_NAME[k] + '</li>'; }).join('') + '</ol>'];
     if (!mine) {
       var ch = U.rkAi && U.rkAi.step === o.step ? U.rkAi.choice : null;
       if (!ch) { ch = AI.reckoningChoice(c); U.rkAi = { step: o.step, choice: ch }; }
       out.push('<section class="panel">' + stamp(w, 36) + '<h2>' + STEP_NAME[o.step] + '</h2><p class="bigtext">' + esc(describeAiChoice(c, o, ch)) + '</p>');
-      if (o.step === 'ruin' && ch && ch.region) out.push('<p class="rkart">' + A.art('site/' + ch.region, { size: 64 }) + '<b>' + esc(REG[ch.region].site) + '</b> at ' + rn(ch.region) + '</p>');
+      if (o.step === 'build' && ch && ch.region) out.push('<p class="rkart">' + A.art('site/' + ch.region, { size: 64 }) + '<b>' + esc(REG[ch.region].site) + '</b> at ' + rn(ch.region) + '</p>');
       if (o.step === 'banish' && ch) {
         if ((ch.banish || []).length) out.push('<h3>Banished</h3><div class="cards">' + ch.banish.map(function (id) { return A.card(id, ''); }).join('') + '</div>');
         if ((ch.admit || []).length) out.push('<h3>Admitted</h3><div class="cards">' + ch.admit.map(function (id) { return A.card(id, ''); }).join('') + '</div>');
@@ -548,11 +569,11 @@
   function playerRk(c, o) {
     U.rk = U.rk && U.rk.step === o.step ? U.rk : { step: o.step, pick: null, banish: [], admit: [] };
     var rk = U.rk, out = ['<section class="panel"><h2>' + STEP_NAME[o.step] + '</h2>'];
-    if (o.step === 'ruin') {
-      out.push('<p>You may ruin one site (its region gives nothing and has one slot fewer in the ages to come) or restore one that is ruined. Or leave the valley as it is.</p><div class="actlist">');
+    if (o.step === 'build') {
+      out.push('<p>You may build one structure for free, or raze one that stands. It stays that way in the ages to come. The Citadel and the Waystone are landmarks: they always stand. Or leave the valley as it is.</p><div class="actlist">');
       o.options.forEach(function (op) {
-        var lbl = op.kind === 'none' ? 'Leave every site as it is' : (op.kind === 'ruin' ? 'Ruin ' : 'Restore ') + REG[op.region].site + ' <small>' + rn(op.region) + '</small>';
-        out.push(btn((op.region ? A.art('site/' + op.region, { size: 20 }) + ' ' : '') + lbl, function () { applyRk(op); }, { cls: op.kind === 'ruin' ? 'red' : (op.kind === 'none' ? 'go' : '') }));
+        var lbl = op.kind === 'none' ? 'Leave the valley as it is' : (op.kind === 'raze' ? 'Raze the ' : 'Build the ') + REG[op.region].site + ' <small>' + rn(op.region) + '</small>';
+        out.push(btn((op.region ? A.art('site/' + op.region, { size: 20 }) + ' ' : '') + lbl, function () { applyRk(op); }, { cls: op.kind === 'raze' ? 'red' : (op.kind === 'none' ? 'go' : '') }));
       });
       out.push('</div>');
     } else if (o.step === 'banish') {
@@ -598,7 +619,8 @@
     if (done) {
       var R = c.reckoning, seat = (R.events || []).filter(function (e) { return e.type === 'reckonSeat'; })[0];
       if (seat) out.push('<section class="panel"><h3>The next age</h3><p>' + (seat.ruler ? who(seat.ruler) + (seat.ruler === 'player' ? ' begin' : ' begins') + ' in the Crown hold.' : 'The Crown hold begins empty.') +
-        ' Your rivals: ' + listAnd(seat.rivals.map(function (h) { return c.houses[h].name.replace(/^The /, 'the '); })) + '.' + (seat.freeHold ? ' ' + (seat.freeHold === 'player' ? 'Your' : c.houses[seat.freeHold].name + "'s") + ' free hold stands at the Far Pass.' : '') + '</p>' +
+        ' Your rivals: ' + listAnd(seat.rivals.map(function (h) { return c.houses[h].name.replace(/^The /, 'the '); })) + '.' + (seat.freeHold ? ' ' + (seat.freeHold === 'player' ? 'Your' : c.houses[seat.freeHold].name + "'s") + ' free hold stands at the Far Pass.' : '') +
+        (seat.ruler !== 'player' && seat.freeHold !== 'player' && c.holdfast && c.holdfast.player ? ' Your holdfast is ' + (c.holdfast.player === 'farpass' ? 'the ' : '') + rn(c.holdfast.player) + '. You begin there if it is free.' : '') + '</p>' +
         (c.world.laws.length ? '<p class="muted">Laws: ' + c.world.laws.map(function (id) { return D.LAW[id].name; }).join(', ') + '.</p>' : '') + '</section>');
       out.push('<div class="row">' + btn('Begin ' + E.ageTitle(c.ageNo + 1).replace(/^The/, 'the'), function () { U.nextAge(); }, { cls: 'go big' }) + '</div>');
     }

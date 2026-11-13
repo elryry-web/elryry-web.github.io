@@ -9,23 +9,26 @@
   'use strict';
 
   // ---------------------------------------------------------------- the valley
+  // Each region has one structure (site). Landmarks (Citadel, Waystone) stand from the start and cannot be razed.
+  // The others begin undeveloped: no effect, no site income, one resident slot. Building one (buildCost silver,
+  // 1 moon, or free at the Reckoning) gives its effect and a second slot to whoever holds the region.
   var REGIONS = [
     { id: 'crown', name: 'Crown hold', site: 'Citadel', siteText: '+2 defence. Whoever holds it holds the Seat.',
-      adj: ['saltmarsh', 'ashwood', 'riverford', 'stonefields'], siteDef: 2, siteIncome: 0 },
+      adj: ['saltmarsh', 'ashwood', 'riverford', 'stonefields'], siteDef: 2, siteIncome: 0, landmark: true },
     { id: 'saltmarsh', name: 'Saltmarsh', site: 'Saltworks', siteText: '+2 income.',
-      adj: ['crown', 'riverford', 'oldbarrow'], siteDef: 0, siteIncome: 2 },
+      adj: ['crown', 'riverford', 'oldbarrow'], siteDef: 0, siteIncome: 2, buildCost: 3 },
     { id: 'riverford', name: 'Riverford', site: 'Toll Bridge', siteText: '+1 income. March out of here costs 0 moons once per turn.',
-      adj: ['crown', 'saltmarsh', 'ashwood'], siteDef: 0, siteIncome: 1 },
+      adj: ['crown', 'saltmarsh', 'ashwood'], siteDef: 0, siteIncome: 1, buildCost: 2 },
     { id: 'ashwood', name: 'Ashwood', site: 'Charcoal Kilns', siteText: 'Muster here costs 1 silver less (per action).',
-      adj: ['crown', 'riverford', 'highpasture'], siteDef: 0, siteIncome: 0 },
+      adj: ['crown', 'riverford', 'highpasture'], siteDef: 0, siteIncome: 0, buildCost: 2 },
     { id: 'highpasture', name: 'High Pasture', site: 'Horse Fair', siteText: 'March from here may move two regions.',
-      adj: ['ashwood', 'stonefields', 'farpass'], siteDef: 0, siteIncome: 0 },
+      adj: ['ashwood', 'stonefields', 'farpass'], siteDef: 0, siteIncome: 0, buildCost: 3 },
     { id: 'stonefields', name: 'Stonefields', site: 'Standing Stones', siteText: 'Search here: draw 4, keep 1.',
-      adj: ['crown', 'highpasture', 'oldbarrow', 'farpass'], siteDef: 0, siteIncome: 0 },
+      adj: ['crown', 'highpasture', 'oldbarrow', 'farpass'], siteDef: 0, siteIncome: 0, buildCost: 3 },
     { id: 'oldbarrow', name: 'Old Barrow', site: 'Barrow', siteText: 'Search here: relics drawn are kept as well as your pick.',
-      adj: ['saltmarsh', 'stonefields'], siteDef: 0, siteIncome: 0 },
+      adj: ['saltmarsh', 'stonefields'], siteDef: 0, siteIncome: 0, buildCost: 3 },
     { id: 'farpass', name: 'Far Pass', site: 'Waystone', siteText: 'Depart from here. +1 defence.',
-      adj: ['highpasture', 'stonefields'], siteDef: 1, siteIncome: 0 }
+      adj: ['highpasture', 'stonefields'], siteDef: 1, siteIncome: 0, landmark: true }
   ];
   var REGION_IDS = REGIONS.map(function (r) { return r.id; });
   var REGION = {};
@@ -156,7 +159,9 @@
     { id: 'moss', name: 'The Moss Kin', short: 'the Moss Kin', temperament: 'wild' }
   ];
   var FIRST_AGE = { ruler: 'thorne', rivals: ['thorne', 'varrow', 'synod'],
-    rulerRegions: ['crown', 'riverford', 'ashwood'] };
+    rulerRegions: ['crown', 'riverford', 'ashwood'],
+    // structures standing when the campaign begins: the ruler's two starting regions
+    built: ['riverford', 'ashwood'] };
 
   // ---------------------------------------------------------------- numbers
   var NUM = {
@@ -166,7 +171,7 @@
     musterMax: 3, searchDraw: 3, searchSilver: 1,
     departBands: 4, departRelics: 2,
     seizeRegions: 6,
-    retinueMax: 3, slots: 2,
+    retinueMax: 3, slots: 2, slotsUndeveloped: 1,
     pactRounds: 3,
     lastRound: 8,
     // end-of-age draws: after round r, the age ends with chance 1 in n

@@ -68,7 +68,6 @@
     'not your region': 'You do not hold that region.',
     'not your turn': 'It is not your turn.',
     'not enough warbands': 'You do not have that many warbands there.',
-    'the Waystone is ruined': 'The Waystone is ruined: no one can depart.',
     'not landless': 'You still hold land.',
     'not a free region': 'Warbands stand there: you cannot return there.',
     'no empty slot': 'The site has no empty slot.',
@@ -79,7 +78,12 @@
     'no Poisoner': 'You have no Poisoner to use.',
     'no Bell Seer': 'You have no Bell Seer to use.',
     'bad count': 'You cannot muster that many.',
-    'stays at its site': 'This resident works only at its site. It cannot join a retinue.'
+    'stays at its site': 'This resident works only at its site. It cannot join a retinue.',
+    'a landmark': 'This is a landmark. It always stands.',
+    'already built': 'It is already built.',
+    'relics stay with you': 'A relic stays with you. It cannot be stationed.',
+    'not in your retinue': 'That card is not in your retinue.',
+    'no such region': 'There is no such region.'
   };
   function plain(m) {
     if (!m) return '';
@@ -177,6 +181,8 @@
       case 'judge': return who(ev.house, s) + "'s Hanging Judge cost " + whoLow(ev.breaker, s) + ' ' + ev.lost.length + ' warbands.';
       case 'oath': return 'The Broken Word cost ' + whoLow(h, s) + ' ' + ev.lost.length + ' warbands.';
       case 'recruit': return W + ' recruited ' + cardName(ev.card) + ' at ' + rn(ev.region) + '.';
+      case 'build': return W + ' built the ' + REG[ev.region].site + ' at ' + rn(ev.region) + ' for ' + ev.silver + ' silver.';
+      case 'station': return W + ' stationed ' + cardName(ev.card) + ' at ' + rn(ev.region) + '.';
       case 'search': return W + ' searched ' + rn(ev.region) + ' and drew ' + plural(ev.drew, 'card') + '.' +
         (ev.barrowRelics && ev.barrowRelics.length ? ' The barrow gave up ' + listAnd(ev.barrowRelics.map(cardName)) + '.' : '');
       case 'keep':
@@ -215,7 +221,7 @@
       else if (e.type === 'battle') {
         U.flash = { from: e.from, to: e.to, house: e.house, region: e.to };
         if (e.defender === 'player') U.reports.push(e);
-      } else if (e.type === 'muster' || e.type === 'search' || e.type === 'recruit') U.flash = { region: e.region, house: e.house };
+      } else if (e.type === 'muster' || e.type === 'search' || e.type === 'recruit' || e.type === 'build' || e.type === 'station') U.flash = { region: e.region, house: e.house };
       else if (e.type === 'return') U.flash = { region: e.camp ? null : e.region, house: e.house };
       else if (e.type === 'turnStart') { U.flash = null; if (e.house === 'player') U.yourTurn = true; }
       if (e.type === 'search' && e.house === 'player') U.lastSearch = e;
@@ -238,19 +244,53 @@
     window.scrollTo(0, 0);
     if (screen === 'age') pump();
   }
+  // where each house begins this age, and why: the player first, then the others in turn order
+  function startLines(s) {
+    var st = s.starts || {}, out = [];
+    function rn(r) { return (r === 'crown' || r === 'farpass' ? 'the ' : '') + REG[r].name; }
+    function line(h) {
+      var x = st[h];
+      if (!x) return null;
+      var you = h === 'player', W = who(h, s), its = you ? 'your' : 'its', verb = you ? ' begin' : ' begins';
+      if (x.why === 'ruler') {
+        var add = x.regions.filter(function (r) { return r !== 'crown'; }), kept = x.kept || [];
+        var t = W + (you ? ' hold' : ' holds') + ' the Crown hold, with ' + listAnd(add.map(rn));
+        if (s.ageNo > 1 && kept.length === add.length) return t + ' from the last age.';
+        if (!kept.length) return t + '.';
+        var fresh = add.filter(function (r) { return kept.indexOf(r) < 0; });
+        return W + (you ? ' hold' : ' holds') + ' the Crown hold, with ' + listAnd(kept.map(rn)) + ' from the last age. ' + W + (you ? ' also take ' : ' also takes ') + listAnd(fresh.map(rn)) + '.';
+      }
+      if (x.why === 'freehold') return W + verb + ' at ' + its + ' free hold in the Far Pass. ' + (you ? 'You' : W) + (you ? ' also hold ' : ' also holds ') + rn(x.also) + '.';
+      if (x.why === 'holdfast') return you ? 'You begin in ' + rn(x.region) + ', where your banners stood when the last age ended.' : W + ' begins in ' + rn(x.region) + ', its holdfast.';
+      if (x.why === 'near') {
+        var by = s.regions[x.holdfast].owner;
+        return W + verb + ' in ' + rn(x.region) + ', beside ' + its + ' old holdfast of ' + rn(x.holdfast) + '.' + (you && by ? ' ' + who(by, s) + (by === 'player' ? ' hold' : ' holds') + ' ' + rn(x.holdfast) + ' now.' : '');
+      }
+      if (x.holdfast) return W + verb + ' in ' + rn(x.region) + '.' + (you ? ' Your old holdfast of ' + rn(x.holdfast) + ' and the lands beside it are taken.' : '');
+      return W + verb + ' in ' + rn(x.region) + (D.EDGE_STARTS.indexOf(x.region) >= 0 ? ', at the edge of the valley.' : '.');
+    }
+    ['player'].concat(s.order.filter(function (h) { return h !== 'player'; })).forEach(function (h) { var t = line(h); if (t) out.push({ h: h, text: t }); });
+    return out;
+  }
+  function logStart() {
+    var s = U.c.age;
+    logLine(E.ageTitle(s.ageNo) + ' begins.', null, 'round');
+    // the log shows the newest line first: log the player's line last so it sits on top
+    startLines(s).reverse().forEach(function (l) { logLine(l.text, l.h); });
+  }
   function newCampaign(name) {
     var seed = ((Date.now() % 4294967296) ^ Math.floor(Math.random() * 4294967296)) >>> 0;
     U.c = E.newCampaign(seed, name || 'Your house');
     U.log = []; U.reports = [];
     E.startAge(U.c);
-    logLine(E.ageTitle(U.c.age.ageNo) + ' begins.', null, 'round');
+    logStart();
     save();
     go('age');
   }
   function nextAge() {
     E.startAge(U.c);
     U.log = []; U.reports = [];
-    logLine(E.ageTitle(U.c.age.ageNo) + ' begins.', null, 'round');
+    logStart();
     save();
     go('age');
   }
@@ -384,7 +424,7 @@
     if (m.kind === 'return') { var sp = E.returnSpots(s, 'player'); return sp.length ? sp : ['camp']; }
     var out = [];
     legal.forEach(function (a) {
-      if (a.type !== m.kind) return;
+      if (a.type !== m.kind || (m.card && a.card !== m.card)) return;
       var r = a.type === 'assault' ? a.to : (a.from || a.region);
       if (r && out.indexOf(r) < 0) out.push(r);
     });
@@ -483,7 +523,14 @@
   }
   function retinuePanel(s) {
     var hs = me(s);
-    var cards = hs.retinue.map(function (id) { return A.card(id); }).join('');
+    var my = isMyTurn(s) && !s.pending && !hs.flags.returnDue;
+    var cards = hs.retinue.map(function (id) {
+      if (!my) return A.card(id);
+      // station: 1 moon to leave the resident at an empty slot in a region you hold
+      var where = E.legalActions(s, 'player').filter(function (a) { return a.type === 'station' && a.card === id; });
+      var off = hs.hours < 1 ? 'no hours' : (where.length ? null : 'No region you hold has an empty slot.');
+      return A.card(id, '<div class="row">' + btn('Station at a site <small>1 moon</small>', function () { stationPick(id, where); }, { cls: 'small', off: off }) + '</div>');
+    }).join('');
     var rel = hs.relics.map(function (id) { return A.card(id); }).join('');
     var p = hs.prophecy ? E.prophecyProgress(s, 'player', hs.prophecy) : null;
     return '<section class="panel"><h3>Your house</h3>' +
@@ -521,7 +568,8 @@
     }
     if (U.mode) {
       var words = { march: 'Choose a region to march from.', muster: 'Choose one of your regions to muster in.', assault: 'Choose a region to assault.',
-        recruit: 'Choose a region with a resident to recruit.', search: 'Choose a region to search.' }[U.mode.kind] || '';
+        recruit: 'Choose a region with a resident to recruit.', search: 'Choose a region to search.',
+        station: 'Choose one of your regions with an empty slot to station ' + (U.mode.card ? cardName(U.mode.card) : 'the resident') + ' in.' }[U.mode.kind] || '';
       return '<div class="hint pickhint"><span>' + words + '</span>' + btn('Cancel', function () { U.mode = null; render(); }, { cls: 'small' }) + '</div>';
     }
     return '<div class="hint mine"><span><b>Your turn.</b> ' + plural(hs.hours, 'moon') + ' left, ' + hs.silver + ' silver. Tap a region for its actions.' +
@@ -572,6 +620,12 @@
     if (have.seeProphecy) out.push(btn('Bell Seer', function () { U.seerSheet(); }));
     out.push(btn('End turn', function () { U.endTurnConfirm(); }, { cls: 'end' }));
     return '<div class="abar">' + out.join('') + '</div>';
+  }
+  // station a retinue card: one eligible region goes straight there, more are picked on the map
+  function stationPick(id, where) {
+    if (where.length === 1) { doAction({ type: 'station', region: where[0].region, card: id }); return; }
+    U.mode = { kind: 'station', card: id };
+    render();
   }
   function pickKind(k) {
     var s = age();

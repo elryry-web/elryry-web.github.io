@@ -41,8 +41,34 @@
     return 0.6 + c.cost * 0.15 + (t.suit[c.suit] || 0);
   }
   function regionWorth(s, r) {
-    return 1 + (E.siteOn(s, r) ? REG[r].siteIncome * 0.4 : 0) + (r === 'crown' ? 1 : 0);
+    return 1 + (E.siteOn(s, r) ? REG[r].siteIncome * 0.4 + (REG[r].landmark ? 0 : 0.3) : 0) + (r === 'crown' ? 1 : 0);
   }
+  // ---------------------------------------------------------------- structures
+  // what a built structure is worth each turn to whoever holds it (in evaluate's units), before temperament
+  var STRUCT = { saltmarsh: 0.5, riverford: 0.35, ashwood: 0.22, highpasture: 0.16, stonefields: 0.14, oldbarrow: 0.14 };
+  // how much each temperament likes each structure: income for the greedy, the Kilns for musterers, and so on
+  var STRUCT_LIKE = {
+    warlord: { ashwood: 1.5, highpasture: 1.2, saltmarsh: 0.9, stonefields: 0.6, oldbarrow: 0.6 },
+    mystic: { stonefields: 1.6, oldbarrow: 1.3, ashwood: 0.7, highpasture: 0.7 },
+    wanderer: { highpasture: 1.6, oldbarrow: 1.5, stonefields: 1.2, ashwood: 0.6 },
+    steward: { saltmarsh: 1.3, riverford: 1.2, ashwood: 1.3, stonefields: 0.7, oldbarrow: 0.7 },
+    schemer: { saltmarsh: 1.4, riverford: 1.4, ashwood: 0.8 },
+    wild: { oldbarrow: 1.3, highpasture: 1.2, saltmarsh: 0.9 },
+    player: {}
+  };
+  // a held structure as part of a position (its income is already counted in evaluate)
+  function structWorth(s, h, t, r) {
+    var per = STRUCT[r] || 0;
+    if (r === 'stonefields' || r === 'oldbarrow') per *= 0.5 + 0.5 * t.search;
+    return (per + 0.15) * ((STRUCT_LIKE[s.houses[h].temper] || {})[r] || 1) * BUILD.held;
+  }
+  // what building pays back over the rounds left in the age
+  function buildPayback(s, h, t, r) {
+    var left = Math.max(0, N.lastRound - (s.planRound || s.round));
+    return structWorth(s, h, t, r) / BUILD.held * left * BUILD.payback;
+  }
+  // tuning: held scales a standing structure in a position; payback scales its worth per round left when building
+  var BUILD = { held: 0.8, payback: 1.6 };
   // biggest force another house could bring against region r next turn
   function pressure(s, h, r) {
     var best = 0, by = {};
@@ -250,6 +276,7 @@
     var bands = E.totalBands(s, h) - (hs.camp || 0);   // the camp breaks up at the end of the turn
     v += bands * t.bands + Math.min(hs.silver, 10) * t.silver + Math.max(0, hs.silver - 10) * 0.05;
     v += E.income(s, h) * 0.35 + held.length * 0.6;
+    held.forEach(function (r) { if (!REG[r].landmark && E.siteOn(s, r)) v += structWorth(s, h, t, r); });
     v -= E.upkeep(s, h, bands) * t.silver * 2;   // upkeep owed over the next turns or so
     hs.retinue.forEach(function (c) { v += cardValue(t, c); });
     v += hs.relics.length * 0.6;
@@ -326,6 +353,16 @@
     }
     c = tryApply(s, a);
     if (c.pending && c.pending.type === 'search') c.pending = null;
+    // a structure pays only while the region stays held: discount it by how exposed the region is
+    if (a.type === 'build') {
+      var gap = pressure(s, h, a.region) + 1 - E.defenceOf(s, a.region, null);
+      return evaluate(c, h) + buildPayback(s, h, t, a.region) * (gap > 0 ? Math.max(0, 1 - gap * 0.3) : 1);
+    }
+    // stationing keeps the resident working for the region's holder and frees a retinue place
+    if (a.type === 'station') {
+      var full = s.houses[h].retinue.length >= N.retinueMax, sg = pressure(s, h, a.region) + 1 - E.defenceOf(s, a.region, null);
+      return evaluate(c, h) + cardValue(t, a.card) * (sg > 0 ? 0.4 : 0.8) + (full ? 0.3 + 0.4 * t.search : -0.3);
+    }
     // never muster into an upkeep next turn's silver cannot pay
     if (a.type === 'muster' && E.upkeep(c, h) > E.upkeep(s, h) &&
         c.houses[h].silver + E.income(c, h) < E.upkeep(c, h)) return -1e4;
@@ -783,8 +820,13 @@
   }
 
   // ---------------------------------------------------------------- the Reckoning
-  var HATED_SITE = { warlord: 'ashwood', mystic: 'stonefields', wanderer: 'farpass', steward: 'crown', schemer: 'riverford', wild: 'oldbarrow', player: 'saltmarsh' };
-  var LOVED_SITE = { warlord: 'crown', mystic: 'stonefields', wanderer: 'farpass', steward: 'crown', schemer: 'saltmarsh', wild: 'oldbarrow', player: 'saltmarsh' };
+  // the structure each temperament would raze from a foe, and the ones it would build, best first (never a landmark)
+  var HATED_SITE = { warlord: 'ashwood', mystic: 'stonefields', wanderer: 'highpasture', steward: 'saltmarsh', schemer: 'riverford', wild: 'oldbarrow', player: 'saltmarsh' };
+  var LOVED_SITES = {
+    warlord: ['ashwood', 'highpasture', 'saltmarsh'], mystic: ['stonefields', 'oldbarrow', 'saltmarsh'],
+    wanderer: ['highpasture', 'oldbarrow', 'stonefields'], steward: ['saltmarsh', 'riverford', 'ashwood'],
+    schemer: ['saltmarsh', 'riverford', 'stonefields'], wild: ['oldbarrow', 'highpasture', 'saltmarsh'], player: ['saltmarsh', 'riverford', 'ashwood']
+  };
   var LAW_PREF = {
     warlord: ['levy', 'crownsDue', 'tolls', 'wildYear', 'shortReign', 'charter', 'openRoads', 'titheOfLore', 'oathOfArms', 'longPeace'],
     mystic: ['titheOfLore', 'longPeace', 'oathOfArms', 'charter', 'shortReign', 'wildYear', 'openRoads', 'tolls', 'levy', 'crownsDue'],
@@ -797,24 +839,20 @@
   function reckoningChoice(c) {
     var R = c.reckoning, w = R.winner, t = T[temperOf(c, w)] || T.player, tn = temperOf(c, w);
     var o = E.reckoningOptions(c);
-    if (o.step === 'ruin') {
-      var ruined = Object.keys(c.world.ruined);
-      var love = LOVED_SITE[tn];
-      if (c.world.ruined[love]) return { kind: 'restore', region: love };
-      // ruin what the strongest grudge-holder against us would use most
+    if (o.step === 'build') {
+      var loves = LOVED_SITES[tn] || LOVED_SITES.player, built = c.world.built;
+      if (!built[loves[0]]) return { kind: 'build', region: loves[0] };
+      // raze what the strongest grudge-holder against us would use most
       var foe = null, fg = -1;
       Object.keys(c.memory).forEach(function (k) {
         if (k === w) return;
         var g = c.memory[k][w].grudge + (c.next && c.next.rivals && c.next.rivals.indexOf(k) >= 0 ? 1 : 0);
         if (g > fg) { fg = g; foe = k; }
       });
-      var site = HATED_SITE[temperOf(c, foe)];
-      if (site === love || (site === 'crown' && R.how !== 'depart')) site = null;
-      if (!site || ruined.length >= 3 || c.world.ruined[site]) {
-        if (ruined.length) { var r0 = ruined.filter(function (r) { return r !== HATED_SITE[tn]; })[0]; if (r0) return { kind: 'restore', region: r0 }; }
-        return { kind: 'none' };
-      }
-      return { kind: 'ruin', region: site };
+      var site = foe ? HATED_SITE[temperOf(c, foe)] : null;
+      if (site && built[site] && loves.indexOf(site) < 0 && fg > 0) return { kind: 'raze', region: site };
+      var next = loves.filter(function (r) { return !built[r]; })[0];
+      return next ? { kind: 'build', region: next } : { kind: 'none' };
     }
     if (o.step === 'banish') {
       var deck = o.deck.slice().sort(function (x, y) { return selfValue(t, tn, x) - selfValue(t, tn, y); });
@@ -838,6 +876,6 @@
     decide: decide, whoActs: whoActs, run: run, act: act, respond: respond, reckoningChoice: reckoningChoice,
     evaluate: evaluate, odds: odds, planIntent: planIntent, snapshot: snapshot, replan: replan, ahead: ahead, pactScore: pactScore, chooseProphecy: chooseProphecy,
     dangers: function (s, h) { setGuess(s, h); return dangers(s, h); },
-    TEMPERAMENTS: T, AIM: AIM
+    TEMPERAMENTS: T, AIM: AIM, BUILD: BUILD
   };
 });

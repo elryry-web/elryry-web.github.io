@@ -13,6 +13,7 @@
   'use strict';
 
   var N = D.NUM, IDS = D.REGION_IDS, REG = D.REGION, CARDS = D.CARDS;
+  var SAVE_VERSION = 2;
 
   // ---------------------------------------------------------------- rng (mulberry32, state in obj.rng)
   function rnd(o) {
@@ -35,7 +36,9 @@
   // ---------------------------------------------------------------- small queries
   function law(s, id) { return s.laws.indexOf(id) >= 0; }
   function isRelic(id) { return !!(CARDS[id] && CARDS[id].relic); }
-  function siteOn(s, r) { return !s.regions[r].ruined; }
+  // a site works when its structure stands: landmarks always, the others once built
+  function siteOn(s, r) { return !!(REG[r].landmark || s.regions[r].built); }
+  function buildCost(r) { return REG[r].buildCost || 0; }
   function holds(s, h, r) { return s.regions[r].owner === h; }
   function heldBy(s, h) { var o = []; for (var i = 0; i < IDS.length; i++) if (s.regions[IDS[i]].owner === h) o.push(IDS[i]); return o; }
   function nHeld(s, h) { var n = 0; for (var i = 0; i < IDS.length; i++) if (s.regions[IDS[i]].owner === h) n++; return n; }
@@ -54,7 +57,7 @@
   function returnSpots(s, h) {
     return IDS.filter(function (r) { var g = s.regions[r]; return !(g.owner && g.bands[g.owner] > 0) && !othersPresent(s, h, r); });
   }
-  function slotsOf(s, r) { return s.regions[r].ruined ? N.slots - 1 : N.slots; }
+  function slotsOf(s, r) { return siteOn(s, r) ? N.slots : N.slotsUndeveloped; }
   // a house's effects: its retinue and relics, plus residents at sites of regions it holds
   function has(s, h, id) {
     var hs = s.houses[h];
@@ -526,6 +529,26 @@
         if (!opts.ignoreHours && hs.silver < recruitCost(s, h, a.card)) return err('not enough silver');
         return null;
       }
+      case 'build': {
+        g = s.regions[a.region];
+        if (!g) return err('no such region');
+        if (REG[a.region].landmark) return err('a landmark');
+        if (siteOn(s, a.region)) return err('already built');
+        if (!holds(s, h, a.region)) return err('not your region');
+        if (hours < 1) return err('no hours');
+        if (!opts.ignoreHours && hs.silver < buildCost(a.region)) return err('not enough silver');
+        return null;
+      }
+      case 'station': {
+        g = s.regions[a.region];
+        if (!g) return err('no such region');
+        if (isRelic(a.card)) return err('relics stay with you');
+        if (hs.retinue.indexOf(a.card) < 0) return err('not in your retinue');
+        if (!holds(s, h, a.region)) return err('not your region');
+        if (g.residents.length >= slotsOf(s, a.region)) return err('no empty slot');
+        if (hours < 1) return err('no hours');
+        return null;
+      }
       case 'search': {
         if (!s.regions[a.region] || bandsAt(s, h, a.region) < 1) return err('no warbands there');
         if (!s.deck.length) return err('the world deck is empty');
@@ -551,7 +574,6 @@
         return err('no such pact');
       }
       case 'depart': {
-        if (!siteOn(s, 'farpass')) return err('the Waystone is ruined');
         var dfrom = N.departFrom;
         if (s.round < dfrom) return err('the Waystone opens in the ' + D.ORDINALS[dfrom - 1] + ' round');
         if (!holds(s, h, 'farpass')) return err('not at the Far Pass');
@@ -636,6 +658,8 @@
           cs = afford > 1 ? [afford, 1] : [1];
         }
         cs.forEach(function (c) { add({ type: 'muster', region: r, count: c }); });
+        if (!siteOn(s, r)) add({ type: 'build', region: r });
+        if (s.regions[r].residents.length < slotsOf(s, r)) hs.retinue.forEach(function (c) { add({ type: 'station', region: r, card: c }); });
       }
     });
     if (!hs.flags.treated) {
@@ -712,6 +736,20 @@
         g.residents.splice(g.residents.indexOf(a.card), 1);
         hs.retinue.push(a.card);
         ev.push({ type: 'recruit', house: h, region: a.region, card: a.card, silver: rc });
+        break;
+      }
+      case 'build': {
+        var bc = buildCost(a.region);
+        hs.silver -= bc; hs.hours -= 1;
+        s.regions[a.region].built = true;
+        ev.push({ type: 'build', house: h, region: a.region, silver: bc });
+        break;
+      }
+      case 'station': {
+        hs.hours -= 1;
+        hs.retinue.splice(hs.retinue.indexOf(a.card), 1);
+        s.regions[a.region].residents.push(a.card);
+        ev.push({ type: 'station', house: h, region: a.region, card: a.card });
         break;
       }
       case 'search': doSearch(s, a, ev); break;
@@ -1055,10 +1093,11 @@
 
   function newCampaign(seed, playerHouseName) {
     seed = (seed >>> 0) || 1;
-    var c = { version: 1, seed: seed, rng: seed, ageNo: 0, player: 'player', houses: {}, memory: {},
-      world: { ruined: {}, deck: [], vault: [], lost: [], laws: [], freeHold: null },
-      next: { ruler: D.FIRST_AGE.ruler, rivals: D.FIRST_AGE.rivals.slice(), rulerRegions: rulerSpread(D.FIRST_AGE.rulerRegions) },
-      annals: [], age: null, reckoning: null };
+    var c = { version: SAVE_VERSION, seed: seed, rng: seed, ageNo: 0, player: 'player', houses: {}, memory: {},
+      world: { built: {}, deck: [], vault: [], lost: [], laws: [], freeHold: null },
+      next: { ruler: D.FIRST_AGE.ruler, rivals: D.FIRST_AGE.rivals.slice(), rulerRegions: rulerSpread(D.FIRST_AGE.rulerRegions), rulerHeld: [] },
+      holdfast: {}, annals: [], age: null, reckoning: null };
+    (D.FIRST_AGE.built || []).forEach(function (r) { if (!REG[r].landmark) c.world.built[r] = true; });
     c.houses.player = { id: 'player', name: playerHouseName || 'Your house', short: playerHouseName || 'Your house', temperament: 'player', isPlayer: true };
     D.HOUSES.forEach(function (H) { c.houses[H.id] = { id: H.id, name: H.name, short: H.short, temperament: H.temperament }; });
     var ids = Object.keys(c.houses);
@@ -1068,13 +1107,47 @@
     return c;
   }
 
-  function richestNeighbours(ruined) {
-    return D.CROWN_NEIGHBOURS.slice().sort(function (x, y) {
-      var ix = ruined[x] ? 0 : REG[x].siteIncome, iy = ruined[y] ? 0 : REG[y].siteIncome;
+  // the Crown hold's neighbours, richest structure first; skip leaves some out
+  function richestNeighbours(built, skip) {
+    skip = skip || [];
+    return D.CROWN_NEIGHBOURS.filter(function (r) { return skip.indexOf(r) < 0; }).slice().sort(function (x, y) {
+      var ix = built[x] ? REG[x].siteIncome : 0, iy = built[y] ? REG[y].siteIncome : 0;
       if (ix !== iy) return iy - ix;
+      // between unbuilt regions, the one whose structure would pay most
+      if (REG[x].siteIncome !== REG[y].siteIncome) return REG[y].siteIncome - REG[x].siteIncome;
       var ex = D.EDGE_STARTS.indexOf(x) >= 0 ? 1 : 0, ey = D.EDGE_STARTS.indexOf(y) >= 0 ? 1 : 0;
       if (ex !== ey) return ex - ey;
       return D.CROWN_NEIGHBOURS.indexOf(x) - D.CROWN_NEIGHBOURS.indexOf(y);
+    }).slice(0, 2 - skip.length);
+  }
+
+  // steps from each region to the Crown hold
+  var CROWN_STEPS = (function () {
+    var d = { crown: 0 }, q = ['crown'];
+    while (q.length) { var r = q.shift(); REG[r].adj.forEach(function (n) { if (d[n] === undefined) { d[n] = d[r] + 1; q.push(n); } }); }
+    return d;
+  })();
+  // a house's holdfast: where it has the most warbands; ties go to a built structure, then nearer the Crown hold, then region order
+  function holdfastOf(s, h) {
+    var here = IDS.filter(function (r) { return (s.regions[r].bands[h] || 0) > 0; });
+    here.sort(function (x, y) {
+      var bx = s.regions[x].bands[h], by = s.regions[y].bands[h];
+      if (bx !== by) return by - bx;
+      var sx = siteOn(s, x) ? 1 : 0, sy = siteOn(s, y) ? 1 : 0;
+      if (sx !== sy) return sy - sx;
+      if (CROWN_STEPS[x] !== CROWN_STEPS[y]) return CROWN_STEPS[x] - CROWN_STEPS[y];
+      return IDS.indexOf(x) - IDS.indexOf(y);
+    });
+    return here[0] || null;
+  }
+  // the regions bordering the Crown hold that the ruler held when the age ended, most warbands first (at most two)
+  function rulerKept(s, ruler) {
+    return D.CROWN_NEIGHBOURS.filter(function (r) { return s.regions[r].owner === ruler; }).sort(function (x, y) {
+      var bx = s.regions[x].bands[ruler] || 0, by = s.regions[y].bands[ruler] || 0;
+      if (bx !== by) return by - bx;
+      var sx = siteOn(s, x) ? 1 : 0, sy = siteOn(s, y) ? 1 : 0;
+      if (sx !== sy) return sy - sx;
+      return IDS.indexOf(x) - IDS.indexOf(y);
     }).slice(0, 2);
   }
 
@@ -1092,8 +1165,8 @@
         hours: 0, turns: 0, flags: {}, once: {}, known: {}, intent: null, intent2: null, then: null, warned: null, warned2: null, camp: 0 };
     });
     IDS.forEach(function (r) {
-      var ruined = !!c.world.ruined[r];
-      s.regions[r] = { owner: null, bands: {}, folk: law(s, 'charter') ? Math.max(2, N.folk) : (r === 'crown' ? N.folkCrown : N.folk), residents: [], ruined: ruined };
+      var built = !!(REG[r].landmark || c.world.built[r]);
+      s.regions[r] = { owner: null, bands: {}, folk: law(s, 'charter') ? Math.max(2, N.folk) : (r === 'crown' ? N.folkCrown : N.folk), residents: [], built: built };
     });
     function place(h, r, n) { s.regions[r].owner = h; s.regions[r].folk = 0; s.regions[r].bands[h] = n; }
     var ruler = s.ruler && s.houses[s.ruler] ? s.ruler : null;
@@ -1104,12 +1177,33 @@
     }
     var fh = s.freeHold && s.houses[s.freeHold] && s.freeHold !== ruler ? s.freeHold : null;
     if (fh && !s.regions.farpass.owner) place(fh, 'farpass', N.freeHoldBands);
+    // where each house begins, and why: ruler, freehold, holdfast, near (beside a covered holdfast), edge
+    s.starts = {};
+    if (ruler) s.starts[ruler] = { why: 'ruler', region: 'crown', regions: Object.keys(c.next.rulerRegions), kept: (c.next.rulerHeld || []).slice() };
     var others = shuffle(s, inAge.filter(function (h) { return h !== ruler; }));
-    var spots = D.EDGE_STARTS.filter(function (r) { return !s.regions[r].owner; });
-    ['stonefields', 'ashwood', 'riverford', 'farpass', 'highpasture', 'saltmarsh', 'oldbarrow'].forEach(function (r) {
-      if (!s.regions[r].owner && spots.indexOf(r) < 0) spots.push(r);
+    var hf = c.holdfast || {};
+    function open(r) { return r !== 'crown' && !s.regions[r].owner; }
+    var edgeOrder = D.EDGE_STARTS.concat(['stonefields', 'ashwood', 'riverford', 'farpass', 'highpasture', 'saltmarsh', 'oldbarrow'].filter(function (r) { return D.EDGE_STARTS.indexOf(r) < 0; }));
+    // houses with a holdfast go first: on it, or on a free neighbour of it (an edge start preferred)
+    var rest = [];
+    others.forEach(function (h) {
+      var home = hf[h];
+      if (!home || h === fh || !REG[home]) { rest.push(h); return; }
+      if (open(home)) { place(h, home, N.startBands); s.starts[h] = { why: 'holdfast', region: home }; return; }
+      var nb = REG[home].adj.filter(open).sort(function (x, y) {
+        var ex = D.EDGE_STARTS.indexOf(x) >= 0 ? 0 : 1, ey = D.EDGE_STARTS.indexOf(y) >= 0 ? 0 : 1;
+        return ex !== ey ? ex - ey : IDS.indexOf(x) - IDS.indexOf(y);
+      });
+      if (nb.length) { place(h, nb[0], N.startBands); s.starts[h] = { why: 'near', region: nb[0], holdfast: home }; return; }
+      rest.push(h);
     });
-    others.forEach(function (h, i) { place(h, spots[i], N.startBands); });
+    // everyone else takes an edge start, or failing that any free region
+    rest.forEach(function (h) {
+      var at = edgeOrder.filter(open)[0];
+      place(h, at, N.startBands);
+      if (h === fh) s.starts[h] = { why: 'freehold', region: 'farpass', also: at };
+      else s.starts[h] = hf[h] ? { why: 'edge', region: at, holdfast: hf[h] } : { why: 'edge', region: at };
+    });
     s.order = (ruler ? [ruler] : []).concat(shuffle(s, others.slice()));
     // deal the world deck: residents to sites, relics stay in the deck
     var deck = shuffle(s, c.world.deck.slice()), aside = [];
@@ -1138,7 +1232,9 @@
   function beginReckoning(c) {
     var s = c.age;
     if (!s || s.phase !== 'over') throw new Error('the age is not over');
-    var R = { winner: s.winner, how: s.winType, round: s.endRound, step: 'ruin', ruin: null, banished: [], admitted: [], law: null, lapsed: null,
+    // structures built during the age stand into the next
+    IDS.forEach(function (r) { if (!REG[r].landmark && s.regions[r].built) c.world.built[r] = true; });
+    var R = { winner: s.winner, how: s.winType, round: s.endRound, step: 'build', site: null, banished: [], admitted: [], law: null, lapsed: null,
       vaultOffer: c.world.vault.slice(0, 4), lawOffer: s.winner ? drawLaws(c, s.winType) : [], events: [] };
     c.reckoning = R;
     if (!s.winner) finishReckoning(c);
@@ -1147,22 +1243,24 @@
   function reckoningOptions(c) {
     var R = c.reckoning;
     if (!R) return null;
-    if (R.step === 'ruin') {
+    if (R.step === 'build') {
       var o = [{ kind: 'none' }];
-      IDS.forEach(function (r) { o.push({ kind: c.world.ruined[r] ? 'restore' : 'ruin', region: r }); });
-      return { step: 'ruin', options: o };
+      IDS.forEach(function (r) { if (!REG[r].landmark) o.push({ kind: c.world.built[r] ? 'raze' : 'build', region: r }); });
+      return { step: 'build', options: o };
     }
     if (R.step === 'banish') return { step: 'banish', deck: c.world.deck.slice(), banish: 2, offer: R.vaultOffer.slice(), admit: Math.min(2, R.vaultOffer.length) };
     if (R.step === 'law') return { step: 'law', options: R.lawOffer.slice(), standing: c.world.laws.slice(), max: D.MAX_LAWS };
     return { step: R.step };
   }
-  // choice: ruin {kind, region}; banish {banish:[id,id], admit:[id,id]}; law {law:id}
+  // choice: build {kind: 'build'|'raze'|'none', region}; banish {banish:[id,id], admit:[id,id]}; law {law:id}
   function reckoningChoose(c, choice) {
     var R = c.reckoning, ev = [];
-    if (R.step === 'ruin') {
-      if (choice && choice.kind === 'ruin' && !c.world.ruined[choice.region]) { c.world.ruined[choice.region] = true; R.ruin = choice; }
-      else if (choice && choice.kind === 'restore' && c.world.ruined[choice.region]) { delete c.world.ruined[choice.region]; R.ruin = choice; }
-      ev.push({ type: 'reckonRuin', choice: R.ruin });
+    if (R.step === 'build') {
+      var cr = choice && choice.region && REG[choice.region];
+      if (cr && cr.landmark) throw new Error('a landmark cannot be razed');
+      if (cr && choice.kind === 'build' && !c.world.built[choice.region]) { c.world.built[choice.region] = true; R.site = { kind: 'build', region: choice.region }; }
+      else if (cr && choice.kind === 'raze' && c.world.built[choice.region]) { delete c.world.built[choice.region]; R.site = { kind: 'raze', region: choice.region }; }
+      ev.push({ type: 'reckonSite', choice: R.site });
       R.step = 'banish';
     } else if (R.step === 'banish') {
       var ban = (choice.banish || []).filter(function (id, i, a) { return c.world.deck.indexOf(id) >= 0 && a.indexOf(id) === i; }).slice(0, 2);
@@ -1191,10 +1289,15 @@
     var ruler;
     if (R.how === 'depart') { c.world.freeHold = R.winner; ruler = s.regions.crown.owner; }
     else ruler = R.winner || s.regions.crown.owner;
-    var rr = {}, need = [], fill;
+    // holdfasts: where each house of this age had the most warbands; a house with none keeps its old one
+    c.holdfast = c.holdfast || {};
+    Object.keys(s.houses).forEach(function (h) { var r = holdfastOf(s, h); if (r) c.holdfast[h] = r; });
+    var rr = {}, fill, kept = [];
     if (ruler) {
-      var nb = richestNeighbours(c.world.ruined);
-      rr = rulerSpread(["crown", nb[0], nb[1]]);
+      // the ruler keeps the Crown hold's neighbours it held, most warbands first; the richest fill the rest
+      kept = rulerKept(s, ruler);
+      var nb = kept.concat(richestNeighbours(c.world.built, kept));
+      rr = rulerSpread(['crown', nb[0], nb[1]]);
     }
     // rivals: the ruler and the winner if they are rivals, then the strongest grudges against the winner, then at random
     var pool = D.HOUSES.map(function (H) { return H.id; });
@@ -1209,7 +1312,7 @@
     }
     fill = shuffle(c, pool.filter(function (h) { return rivals.indexOf(h) < 0; }));
     while (rivals.length < 3) rivals.push(fill.shift());
-    c.next = { ruler: ruler || null, rivals: rivals, rulerRegions: rr };
+    c.next = { ruler: ruler || null, rivals: rivals, rulerRegions: rr, rulerHeld: kept };
     ev.push({ type: 'reckonSeat', ruler: ruler || null, freeHold: c.world.freeHold, rivals: rivals });
     // 5. memory: carried forward, every grudge and debt fades a step
     c.memory = clone(s.memory);
@@ -1247,9 +1350,9 @@
     }
     var back = w && (s.history.returns || []).filter(function (x) { return x.house === R.winner; })[0];
     if (back) out.push(cap(w.short) + ' lost every region and came back in the ' + (D.ROUND_WORDS[back.round - 1] || 'early') + ' round.');
-    if (R.ruin) {
-      var site = REG[R.ruin.region].site;
-      out.push(R.ruin.kind === 'ruin' ? 'The ' + site + ' fell to ruin.' : 'The ' + site + (/(ns|es)$/.test(site) ? ' were' : ' was') + ' restored.');
+    if (R.site) {
+      var site = REG[R.site.region].site, were = /(ns|es)$/.test(site) ? ' were' : ' was';
+      out.push('The ' + site + were + (R.site.kind === 'raze' ? ' razed.' : ' built.'));
     }
     if (R.banished.length) out.push(cap(listAnd(R.banished.map(function (id) { return the(CARDS[id].name); }))) + (R.banished.length > 1 ? ' were lost.' : ' was lost.'));
     if (R.admitted.length) out.push(cap(listAnd(R.admitted.map(function (id) { return the(CARDS[id].name); }))) + ' came into the world.');
@@ -1259,10 +1362,35 @@
 
   // ---------------------------------------------------------------- save / load
   function save(c) { return JSON.stringify(c); }
+  // version 1 saves had every site standing unless ruined; version 2 starts sites undeveloped and builds them
   function load(str) {
     var c = typeof str === 'string' ? JSON.parse(str) : str;
-    if (!c || c.version !== 1 || !c.world || !c.houses) throw new Error('not a Writ & Ruin save');
+    if (!c || !(c.version === 1 || c.version === SAVE_VERSION) || !c.world || !c.houses) throw new Error('not a Writ & Ruin save');
+    if (c.version === 1) migrate1(c);
+    // saves from before holdfasts: no house has one yet
+    if (!c.holdfast) c.holdfast = {};
     return c;
+  }
+  // ruined -> undeveloped, standing -> built; landmarks always stand
+  function migrate1(c) {
+    var ruined = c.world.ruined || {};
+    c.world.built = {};
+    IDS.forEach(function (r) { if (!REG[r].landmark && !ruined[r]) c.world.built[r] = true; });
+    delete c.world.ruined;
+    if (c.age && c.age.regions) IDS.forEach(function (r) {
+      var g = c.age.regions[r];
+      if (!g) return;
+      g.built = !!(REG[r].landmark || !g.ruined);
+      delete g.ruined;
+    });
+    var R = c.reckoning;
+    if (R) {
+      if (R.step === 'ruin') R.step = 'build';
+      var old = R.ruin;
+      R.site = old && old.region && !REG[old.region].landmark ? { kind: old.kind === 'ruin' ? 'raze' : 'build', region: old.region } : null;
+      delete R.ruin;
+    }
+    c.version = SAVE_VERSION;
   }
 
   return {
@@ -1274,6 +1402,7 @@
     legalActions: legalActions, check: check, applyAction: applyAction, currentHouse: currentHouse,
     // queries for the screen and the AI
     income: income, hoursFor: hoursFor, heldBy: heldBy, nHeld: nHeld, bandsAt: bandsAt, totalBands: totalBands,
+    buildCost: buildCost, SAVE_VERSION: SAVE_VERSION, holdfastOf: holdfastOf, rulerKept: rulerKept, richestNeighbours: richestNeighbours,
     has: has, hasAt: hasAt, siteAt: siteAt, siteOnly: siteOnly, upkeep: upkeep, boardBands: boardBands, holds: holds, adjacent: adjacent, slotsOf: slotsOf, siteOn: siteOn, law: law, truce: truce,
     prophecyProgress: prophecyProgress, progress: progress, threat: threat, checkVictory: checkVictory, claimStanding: claimStanding, departNeeds: departNeeds,
     endChances: endChances, fortuneLeft: fortuneLeft, peekFortune: peekFortune, assaultOdds: assaultOdds,
