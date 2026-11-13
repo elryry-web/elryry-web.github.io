@@ -464,8 +464,51 @@
     return out;
   }
 
+  // ---------------------------------------------------------------- folding panels
+  // Each side panel folds to its heading and a one-line summary. The open state lives in U.panels
+  // (saved under PANELKEY), not in the DOM, so a redraw never snaps a panel shut. A panel the player
+  // has not touched starts shut on a phone and open on a wide screen.
+  var PANELKEY = 'writ-and-ruin-panels';
+  function panelStore() {
+    if (U.panels) return U.panels;
+    var o = null;
+    try { o = JSON.parse(localStorage.getItem(PANELKEY) || 'null'); } catch (e) { o = null; }
+    U.panels = o && typeof o === 'object' ? o : {};
+    return U.panels;
+  }
+  function narrow() {
+    try { return !!(root.matchMedia && root.matchMedia('(max-width: 700px)').matches); } catch (e) { return false; }
+  }
+  function panelOpen(id) {
+    var p = panelStore();
+    return typeof p[id] === 'boolean' ? p[id] : !narrow();
+  }
+  function setPanel(id, open) {
+    var p = panelStore();
+    p[id] = !!open;
+    try { localStorage.setItem(PANELKEY, JSON.stringify(p)); } catch (e) { /* storage blocked: remember for this visit only */ }
+  }
+  // fold(id, title, summary html, body html, extra section class, extra summary class)
+  function fold(id, title, sum, body, cls, sumCls) {
+    var open = panelOpen(id);
+    return '<section class="panel fold' + (cls ? ' ' + cls : '') + (open ? ' open' : ' shut') + '">' +
+      '<h3 class="fold-h"><button type="button" class="fold-head" aria-expanded="' + open + '" aria-controls="pb-' + id + '" data-k="' +
+      K(function () { setPanel(id, !panelOpen(id)); render(); }) + '">' +
+      '<span class="fold-title">' + title + '</span><span class="chev" aria-hidden="true">' + (open ? '▾' : '▸') + '</span>' +
+      (open ? '' : '<span class="fold-sum' + (sumCls ? ' ' + sumCls : '') + '">' + sum + '</span>') + '</button></h3>' +
+      '<div class="fold-body" id="pb-' + id + '"' + (open ? '' : ' hidden') + '>' + body + '</div></section>';
+  }
+  // a claim that newly stands opens "Who is close to winning", even if the player had shut it
+  function watchClaims(s) {
+    var now = [];
+    s.order.forEach(function (h) { var cs = E.claimStanding(s, h); if (cs) now.push(s.ageNo + ':' + h + ':' + cs.kind); });
+    var was = U.claimsSeen || [];
+    if (now.some(function (k) { return was.indexOf(k) < 0; })) setPanel('danger', true);
+    U.claimsSeen = now;
+  }
+
   // ---------------------------------------------------------------- the age screen
-  var WIN_KIND = { seize: 'Seize', foretell: 'Foretell', depart: 'Depart', seat: 'Seat' };
+  var WIN_KIND ={ seize: 'Seize', foretell: 'Foretell', depart: 'Depart', seat: 'Seat' };
   function bars(p) {
     return '<div class="bars">' + ['seize', 'foretell', 'depart', 'seat'].map(function (k) {
       var v = Math.round(Math.min(1, p[k]) * 100);
@@ -528,7 +571,38 @@
         ' <span class="urg"><i style="width:' + Math.round(Math.min(1, d.urgency) * 100) + '%"></i></span></span></li>');
     });
     if (!rows.length) rows.push('<li class="muted">No house is close to winning yet.</li>');
-    return '<section class="panel danger"><h3>Who is close to winning</h3><ul class="rows">' + rows.join('') + '</ul></section>';
+    var sm = dangerSummary(s);
+    return fold('danger', 'Who is close to winning', esc(sm.text), '<ul class="rows">' + rows.join('') + '</ul>', 'danger', sm.cls);
+  }
+  // one line for the folded danger panel: a standing claim first (a rival's before yours), else the house nearest a win
+  function dangerSummary(s) {
+    var claims = [];
+    s.order.forEach(function (h) { var cs = E.claimStanding(s, h); if (cs) claims.push({ h: h, kind: cs.kind }); });
+    claims.sort(function (a, b) { return (a.h === 'player') - (b.h === 'player'); });
+    if (claims.length) {
+      var c = claims[0], mine = c.h === 'player';
+      var t = 'Claim: ' + whoLow(c.h, s) + (c.kind === 'seize' ? (mine ? ' hold ' : ' holds ') + D.NUMBER_WORDS[N.seizeRegions] + ' regions' :
+        (mine ? ' have fulfilled your' : ' has fulfilled its') + ' prophecy');
+      return { text: t + (claims.length > 1 ? ' · ' + (claims.length - 1) + ' more' : ''), cls: mine && claims.length === 1 ? 'good' : 'warn' };
+    }
+    // the chips' threat bars, as counts
+    var best = null;
+    s.order.forEach(function (h) {
+      var p = E.progress(s, h);
+      ['seize', 'foretell', 'depart', 'seat'].forEach(function (k) {
+        if (p[k] > 0 && (!best || p[k] > best.v)) best = { h: h, k: k, v: p[k] };
+      });
+    });
+    if (!best) return { text: 'No house is close to winning yet.', cls: '' };
+    var h = best.h, hs = s.houses[h], how;
+    if (best.k === 'seize') how = E.nHeld(s, h) + ' of ' + N.seizeRegions + ' regions';
+    else if (best.k === 'foretell') { var pp = E.prophecyProgress(s, h, hs.prophecy); how = pp.have + ' of ' + pp.need + ' for ' + (h === 'player' ? 'your' : 'its') + ' prophecy'; }
+    else if (best.k === 'depart') {
+      var dn = E.departNeeds(s, h);
+      how = Math.min(hs.relics.length, dn.relics) + ' of ' + dn.relics + ' relics, ' +
+        Math.min(E.holds(s, h, 'farpass') ? E.bandsAt(s, h, 'farpass') : 0, dn.bands) + ' of ' + dn.bands + ' warbands at the Far Pass';
+    } else how = (h === 'player' ? 'you hold' : 'holds') + ' the Crown hold';
+    return { text: who(h, s) + (h === 'player' ? ' are' : ' is') + ' nearest: ' + WIN_KIND[best.k] + ', ' + how, cls: '' };
   }
   // "Varrow: march 2 to Saltmarsh", or for a later move "Varrow, then: march 2 to Saltmarsh"
   function planLabel(s, x) {
@@ -538,9 +612,10 @@
   function intentPanel(s) {
     var it = intents(s);
     if (!it.length) return '';
-    return '<section class="panel"><h3>Rival plans</h3><ul class="rows">' + it.map(function (x) {
+    var sum = esc(planLabel(s, it[0])) + (it.length > 1 ? ' · ' + (it.length - 1) + ' more' : '');
+    return fold('plans', 'Rival plans', sum, '<ul class="rows">' + it.map(function (x) {
       return '<li>' + stamp(x.house, 18) + '<span>' + (x.intent.revised ? '<b class="newplan">New plan.</b> ' : '') + esc(planLabel(s, x)) + (x.owl ? ' <em>(seen by the Owl)</em>' : '') + '</span></li>';
-    }).join('') + '</ul></section>';
+    }).join('') + '</ul>');
   }
   function retinuePanel(s) {
     var hs = me(s);
@@ -554,22 +629,24 @@
     }).join('');
     var rel = hs.relics.map(function (id) { return A.card(id); }).join('');
     var p = hs.prophecy ? E.prophecyProgress(s, 'player', hs.prophecy) : null;
-    return '<section class="panel"><h3>Your house</h3>' +
+    var sum = [hs.prophecy ? 'Prophecy ' + p.have + '/' + p.need : '', 'Retinue ' + hs.retinue.length + '/' + N.retinueMax,
+      hs.relics.length ? plural(hs.relics.length, 'relic') : ''].filter(Boolean).join(' · ');
+    return fold('house', 'Your house', esc(sum),
       (hs.prophecy ? '<p class="prophecy"><span class="lbl">Prophecy</span> “' + esc(D.PROPHECIES[hs.prophecy - 1].text) + '” <b>' + p.have + '/' + p.need + '</b></p>' : '') +
       '<p class="lbl">Retinue ' + hs.retinue.length + '/' + N.retinueMax + '</p>' + (cards || '<p class="muted">No one yet. Recruit residents where your warbands stand.</p>') +
-      (rel ? '<p class="lbl">Relics</p>' + rel : '') + '</section>';
+      (rel ? '<p class="lbl">Relics</p>' + rel : ''));
   }
   function lawPanel(s) {
-    if (!s.laws.length) return '';
-    return '<section class="panel"><h3>Laws in force</h3><ul class="rows">' + s.laws.map(function (id) {
+    var sum = s.laws.length ? s.laws.map(function (id) { return esc(D.LAW[id].name); }).join(' · ') : 'None';
+    return fold('laws', 'Laws in force', sum, s.laws.length ? '<ul class="rows">' + s.laws.map(function (id) {
       return '<li><span><b>' + esc(D.LAW[id].name) + '.</b> ' + esc(D.LAW[id].text) + '</span></li>';
-    }).join('') + '</ul></section>';
+    }).join('') + '</ul>' : '<p class="muted">No law is in force this age.</p>');
   }
   function logPanel() {
-    var s = age();
-    return '<section class="panel log"><h3>The tale of this age</h3><ol class="loglist">' + U.log.filter(function (l) { return !s || l.a === s.ageNo; }).slice(0, 60).map(function (l) {
+    var s = age(), lines = U.log.filter(function (l) { return !s || l.a === s.ageNo; });
+    return fold('log', 'The tale of this age', lines.length ? esc(lines[0].t) : 'Nothing yet.', '<ol class="loglist">' + lines.slice(0, 60).map(function (l) {
       return '<li class="' + l.c + '">' + (l.h ? stamp(l.h, 16) : '') + '<span>' + esc(l.t) + '</span></li>';
-    }).join('') + '</ol></section>';
+    }).join('') + '</ol>', 'log');
   }
   function hint(s, legal) {
     var hs = me(s);
@@ -667,6 +744,7 @@
     var s = age(), legal = legalNow(s);
     var view = { selected: U.selected, picks: picks(s, legal), flash: U.flash, intents: intents(s) };
     var turnH = s.phase === 'play' ? s.order[s.turn] : null;
+    watchClaims(s);
     return '<div class="age">' +
       '<header class="topbar"><div class="title"><h1>' + esc(E.ageTitle(s.ageNo)) + '</h1><span class="sub">' +
       (s.phase === 'prophecy' ? 'Choosing prophecies' : 'Round ' + s.round + ' of ' + N.lastRound + (turnH ? ' · ' + (turnH === 'player' ? 'your turn' : who(turnH, s) + "'s turn") : '')) + '</span></div>' +

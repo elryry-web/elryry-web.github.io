@@ -124,6 +124,22 @@ svg { display: block; }
 .panel { position: relative; border: var(--line) solid var(--ink); padding: 6px 10px 8px; background: var(--paper); }
 .panel > h3:first-child, .panel > h2:first-child { margin-top: .1em; }
 .panel.danger { border-color: var(--rust); border-width: 3px; }
+/* folding panels: the heading is a full-width button; shut, it shows a one-line summary under the title */
+.panel.fold.shut { padding-bottom: 4px; }
+.panel > h3.fold-h { margin: 0; padding: 0; border: 0; font-size: 1.1rem; }
+.fold-head {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; align-content: center; column-gap: 8px; width: 100%; min-height: 44px;
+  margin: 0; padding: 4px 0; background: none; border: 0; color: var(--ink); font: inherit; text-align: left; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.fold-head:focus-visible { outline: 3px dashed var(--ochre); outline-offset: 2px; }
+.fold-title { font-family: var(--head); line-height: 1.12; }
+.panel.open > h3.fold-h { border-bottom: var(--line) solid var(--ink); margin-bottom: 2px; }
+.chev { grid-column: 2; grid-row: 1 / span 2; font: 1.35rem/1 var(--body); padding: 4px 2px; color: var(--ink); }
+.panel.open .chev { grid-row: 1; }
+.fold-sum { grid-column: 1; font: .86rem/1.3 var(--body); color: var(--peat); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fold-sum.warn { color: var(--rust); font-weight: 700; }
+.fold-sum.good { color: var(--moss); font-weight: 700; }
 .rows { list-style: none; padding: 0; margin: 4px 0; }
 .rows li { display: flex; align-items: flex-start; gap: 6px; padding: 5px 0; border-bottom: 1px solid rgba(23, 20, 15, .25); font-size: .92rem; }
 .rows li:last-child { border-bottom: 0; }
