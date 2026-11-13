@@ -2540,6 +2540,7 @@
       var cand = [], el = Math.hypot(D[0] * 0.55 + O[0], D[1] * 0.55 + O[1]), E = [(D[0] * 0.55 + O[0]) / el, (D[1] * 0.55 + O[1]) / el];
       runs.forEach(function (rn) {
         for (var i = 3; i < rn.pts.length - 3; i += 2) {
+          if (rn.under && rn.under[i]) continue;
           var p = rn.pts[i], dx = p[0] - S0[0], dy = p[1] - S0[1], dd = Math.hypot(dx, dy);
           if (dd > reach || dx * E[0] + dy * E[1] < -0.1 * dd || dx * O[0] + dy * O[1] < -0.1 * dd) continue;
           cand.push([dd, p, rn.side]);
@@ -2676,7 +2677,7 @@
     // sprays, one hugging the outside of each arm of the bar, their roots in a gilt calyx the bar runs into.
     // One size for the page, the largest every corner that takes a spray has room for (the text, drollery and
     // page edge kept clear); a corner with no room for even a small one gets a hairline tendril alone
-    var SP = opt && opt.sprays, sprays = [], bare = [], occ2 = null;
+    var SP = opt && opt.sprays, sprays = [], bare = [], occ2 = null, occS = new Uint8Array(gw * gh);
     if (SP && images['b2.frame.corner.1']) {
       occ2 = new Uint8Array(gw * gh);
       (avoid || []).forEach(function (r) { var p = r[4] ? -r[4] * 0.3 : (narrow ? 3 : 8); markIn(occ2, r[0] - p, r[1] - p, r[0] + r[2] + p, r[1] + r[3] + p); });
@@ -2717,11 +2718,54 @@
         var e = L.filter(function (e) { return e.f[si]; })[0];
         if (!e) { bare.push(L[0].c); return; }
         var f = e.f[si], rr = Math.max(f.arms[0].art.st * f.arms[0].k, f.arms[1].art.st * f.arms[1].k) * 0.6 + 2;
-        for (var n = 0; n < f.P.length; n += 2) mark(f.P[n] - rr, f.P[n + 1] - rr, f.P[n] + rr, f.P[n + 1] + rr);
+        for (var n = 0; n < f.P.length; n += 2) { mark(f.P[n] - rr, f.P[n + 1] - rr, f.P[n] + rr, f.P[n + 1] + rr); markIn(occS, f.P[n] - rr, f.P[n + 1] - rr, f.P[n] + rr, f.P[n + 1] + rr); }
         sprays.push(f);
       });
     }
     var vine = new Path2D(), runs = [];
+    // a narrow (phone) page: one unbroken frame round all four sides, scaled to the page's long side so the line,
+    // gilt and flowers keep their desktop proportions. The top run sits just under the button bar. Where a box
+    // comes near, the line eases out towards the page edge; where the board itself is in the way it passes
+    // behind it. It never crosses the buttons, the text, the drollery or the next-folio button
+    if (narrow) {
+      var fu = Math.max(W, H * 0.6), fd = Math.max(16, fu * 0.032), occH = new Uint8Array(gw * gh), occB = new Uint8Array(gw * gh), hudB = 0;
+      (avoid || []).forEach(function (r) {
+        if (r[4]) { markIn(occB, r[0] - 1, r[1] - 1, r[0] + r[2] + 1, r[1] + r[3] + 1); return; }
+        markIn(occH, r[0] - 2, r[1] - 2, r[0] + r[2] + 2, r[1] + r[3] + 2);
+        if (r[1] < H * 0.1 && r[3] < 70) hudB = Math.max(hudB, r[1] + r[3]);
+      });
+      var yT = Math.max(fd, hudB + fd * 0.75);
+      var hardAt = function (x, y) { return x < 2 || y < 2 || x > W - 2 || y > H - 2 || hit(occH, x, y); };
+      [0, 1, 2, 3].forEach(function (side) {
+        var horiz = side % 2 === 0, ph = R() * 6.283, lam = Math.max(40, fu * 0.055) * (1 + R() * 0.5), oDes = side === 0 ? yT : fd;
+        var lo = side === 0 ? hudB + 3 : 4.5;
+        // each side runs a little past the two it crosses, as on a wide page; the sides start just under the bar
+        var s0 = horiz ? fd * 0.55 : yT - Math.min(fd * 0.5, Math.max(0, yT - hudB - 8)), s1 = (horiz ? W : H) - fd * 0.55;
+        var pos = function (s, o) { return side === 0 ? [s, o] : side === 1 ? [W - o, s] : side === 2 ? [s, H - o] : [o, s]; };
+        var N = Math.max(2, Math.ceil((s1 - s0) / 2.5)), step = (s1 - s0) / N, S = [], Wv = [], raw = [], under = [], i, t, p;
+        for (i = 0; i <= N; i++) {
+          var s = s0 + step * i, w = oDes + fd * 0.2 * Math.sin(s / lam * 6.283 + ph), o = null, u = 0;
+          for (t = w; t >= lo - 0.01 && o === null; t -= 1) { p = pos(s, t); if (!hardAt(p[0], p[1]) && !hit(occB, p[0], p[1])) o = t; }
+          for (t = w; t >= lo - 0.01 && o === null; t -= 1) { p = pos(s, t); if (!hardAt(p[0], p[1])) { o = t; u = 1; } }
+          if (o === null) { o = w; u = 1; }
+          S.push(s); Wv.push(w); raw.push(o); under.push(u);
+        }
+        // ease into and out of every inset: the widest inset within reach, then averaged, so the line bends
+        // away well before a box rather than stepping round it
+        var dev = raw.map(function (o, k) { return Wv[k] - o; }), R2 = Math.max(4, Math.round(fd * 2.2 / step)), mx = [], sm = [];
+        for (i = 0; i <= N; i++) { var m = 0; for (t = Math.max(0, i - R2); t <= Math.min(N, i + R2); t++) m = Math.max(m, dev[t]); mx.push(m); }
+        for (i = 0; i <= N; i++) { var a = 0, c = 0; for (t = Math.max(0, i - R2); t <= Math.min(N, i + R2); t++) { a += mx[t]; c++; } sm.push(a / c); }
+        var pts = [];
+        for (i = 0; i <= N; i++) {
+          p = pos(S[i], Math.max(lo, Wv[i] - sm[i]));
+          if (hardAt(p[0], p[1])) p = pos(S[i], raw[i]);
+          if (hit(occB, p[0], p[1]) || hit(occS, p[0], p[1])) under[i] = 1;
+          pts.push(p);
+        }
+        vine.moveTo(pts[0][0], pts[0][1]); pts.forEach(function (q) { vine.lineTo(q[0], q[1]); });
+        runs.push({ side: side, pts: pts, step: step, under: under });
+      });
+    } else
     // a vine along each edge, a gentle wave d in from it
     [0, 1, 2, 3].forEach(function (side) {
       var horiz = side % 2 === 0, span = horiz ? W : H, ph = R() * 6.283, lam = Math.max(40, unit * 0.055) * (1 + R() * 0.5), run = [], step = Math.max(2.5, unit * 0.003);
@@ -2745,8 +2789,17 @@
       if (!narrow && r[0] >= bx1 - 1) fx = Math.min(fx, r[0] - lr * 2);
       if (narrow && r[1] >= by1 - 1) fy = Math.min(fy, r[1] - lr * 2);
     });
+    // on a narrow page the frame goes down first, so the sprays and their tendrils lie over it; from there on the
+    // frame's own gilt and flowers take the frame's scale (the sprays keep theirs)
+    if (narrow) {
+      ctx.strokeStyle = INK2; ctx.lineWidth = Math.max(1, fu * 0.0016); ctx.stroke(vine);
+    }
     if (sprays.length || bare.length) b2SprayDraw(ctx, sprays, bare, runs, function (x, y) { return x > fx || y > fy || hit(occ, x, y); }, W, H, d, lr, hair, mark);
-    ctx.strokeStyle = INK2; ctx.lineWidth = hair; ctx.stroke(vine);
+    if (narrow) { unit = fu; lr = Math.max(4.2, fu * 0.0075); hair = Math.max(1, fu * 0.0016); }
+    else { ctx.strokeStyle = INK2; ctx.lineWidth = hair; ctx.stroke(vine); }
+    // a leaf, curl or flower on a narrow page's frame only where it's clear of the board, the sprays and the text
+    var occF = new Uint8Array(gw * gh);
+    function clearAt(x, y) { return !(x < 2 || y < 2 || x > W - 2 || y > H - 2 || hit(occH, x, y) || hit(occB, x, y) || hit(occS, x, y) || hit(occF, x, y)); }
     // flowers on hairline stems at a steady pace along each run, turned in towards the page, the four kinds in turn
     var kinds = ['columbine', 'daisy', 'strawberry', 'pea'], fh = Math.max(22, unit * 0.075), gap = fh * 2.1, ki = Math.floor(R() * 4), stems = [];
     var inward = [Math.PI / 2, Math.PI, -Math.PI / 2, 0];
@@ -2756,9 +2809,9 @@
       var lead = (len - (nf - 1) * gap) / 2;
       for (var f = 0; f < nf; f++) {
         var at0 = lead + f * gap;
-        [0, 0.22, -0.22].some(function (sh) {
+        (narrow ? [0, 0.22, -0.22, 0.44, -0.44] : [0, 0.22, -0.22]).some(function (sh) {
           var idx = Math.round((at0 + sh * gap) / rn.step);
-          if (idx < 2 || idx > P.length - 3) return false;
+          if (idx < 2 || idx > P.length - 3 || (rn.under && rn.under[idx])) return false;
           var kind = kinds[ki % 4], im = images['b2.margin.' + kind];
           var tilt = (f % 2 ? 1 : -1) * (0.3 + R() * 0.15), phi = inward[rn.side] + tilt, ls = fh * 0.3;
           var bx = P[idx][0], by = P[idx][1], ex = bx + Math.cos(phi) * ls, ey = by + Math.sin(phi) * ls;
@@ -2772,7 +2825,7 @@
             var th0 = Math.atan2(ih / 2 - B[1] * ih, iw / 2 - B[0] * iw);
             ctx.save(); ctx.translate(ex, ey); ctx.rotate(phi - th0); ctx.scale(k, k); ctx.drawImage(im, -B[0] * iw, -B[1] * ih); ctx.restore();
           } else b2Strewn(ctx, kind, cx, cy, fh * 0.45, phi - Math.PI / 2);
-          mark(cx - fh * 0.55, cy - fh * 0.55, cx + fh * 0.55, cy + fh * 0.55);
+          mark(cx - fh * 0.55, cy - fh * 0.55, cx + fh * 0.55, cy + fh * 0.55); markIn(occF, cx - fh * 0.45, cy - fh * 0.45, cx + fh * 0.45, cy + fh * 0.45);
           stems.push([bx, by]); ki++;
           return true;
         });
@@ -2786,6 +2839,21 @@
       for (var k = 3; k < run.length - 3; k += Math.max(2, Math.round(lr * (3.2 + R() * 1.2) / step))) {
         if (nearStem(run[k][0], run[k][1])) continue;
         var p0 = run[k - 1], p1 = run[k + 1], a = Math.atan2(p1[1] - p0[1], p1[0] - p0[0]), sd = (k / 7 | 0) % 2 ? 1 : -1;
+        if (narrow) {
+          // behind the board or a spray: nothing. Hemmed in: the leaf goes to whichever side has room, or is left out
+          if (rn.under[k]) continue;
+          var x0 = run[k][0], y0 = run[k][1], cu = R() < 0.12, ok = [sd, -sd].filter(function (q) {
+            var b = a + q * (cu ? 1.1 : 1.05), r1 = lr * 0.9, r2 = lr * 1.9;
+            if (!clearAt(x0 + Math.cos(b) * r1, y0 + Math.sin(b) * r1) || !clearAt(x0 + Math.cos(b) * r2, y0 + Math.sin(b) * r2)) return false;
+            if (!cu) return true;
+            for (var j = 0, x = x0, y = y0, c = b, st = lr * 0.45; j < 18; j++) { c += q * (0.08 + j * 0.022); x += Math.cos(c) * st; y += Math.sin(c) * st; if (!clearAt(x, y)) return false; }
+            return true;
+          });
+          if (!ok.length) continue;
+          sd = ok[0];
+          if (cu) curls.push([x0, y0, a + sd * 1.1, sd]); else leaves.push([x0, y0, a + sd * 1.05]);
+          continue;
+        }
         if (R() < 0.12) curls.push([run[k][0], run[k][1], a + sd * 1.1, sd]); else leaves.push([run[k][0], run[k][1], a + sd * 1.05]);
       }
     });
