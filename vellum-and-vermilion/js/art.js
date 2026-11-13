@@ -982,7 +982,15 @@
     }
     // the four outermost convex corners (one per diagonal), where the ivy grows
     // (facing: prefer a corner whose own outward diagonal is d, so a stepped mask gets one spray per diagonal)
-    function corners(off, facing) {
+    // the outermost convex corner towards each diagonal (facing: preferring corners that face it); with tol,
+    // every corner facing that diagonal no more than tol short of the outermost, outermost first, as a list
+    function corners(off, facing, tol) {
+      if (tol != null) return [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(function (d) {
+        var all = [];
+        V.forEach(function (L) { L.forEach(function (v) { if (v.convex && v.nx === d[0] && v.ny === d[1]) all.push([d[0] * v.x + d[1] * v.y, v]); }); });
+        all.sort(function (a, b) { return b[0] - a[0]; });
+        return all.filter(function (e) { return e[0] >= all[0][0] - tol; }).map(function (e) { var v = e[1]; return { x: v.x + v.nx * off, y: v.y + v.ny * off, u1: v.u1, u2: v.u2, nx: v.nx, ny: v.ny }; });
+      });
       return [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(function (d) {
         var best = null, bs = -1e9;
         V.forEach(function (L) { L.forEach(function (v) { if (!v.convex) return; var s = d[0] * v.x + d[1] * v.y + (facing && v.nx === d[0] && v.ny === d[1] ? 1e6 : 0); if (s > bs + 0.5) { bs = s; best = v; } }); });
@@ -1264,7 +1272,10 @@
     var inm = M.kinds.map(function (k) { return k !== ' '; }), rect = inm.every(Boolean);
     if (initial && M.level && M.level.initial) { inm = inm.map(function () { return true; }); rect = true; }
     var G = frameGeom(M.w, M.h, inm, S, x0 + pad, y0 + pad, rect ? 0 : S * (initial ? 0.3 : 0.18)), bb = b2Bar(band);
-    return { size: Math.max(80, Math.min(240, 0.3 * Math.min(M.w, M.h) * S)), pts: G.corners(bb.off + bb.t / 2, true) };
+    // cands: for each diagonal, the corners facing it on the shape's outer edge (a stepped or cross-shaped board
+    // has several within a cell or so of each other); b2Margin takes the one with the most room
+    return { size: Math.max(80, Math.min(240, 0.3 * Math.min(M.w, M.h) * S)), pts: G.corners(bb.off + bb.t / 2, true),
+      cands: rect ? null : G.corners(bb.off + bb.t / 2, true, S * 1.6) };
   }
   // the painted gilt bar laid along each edge of the frame's outline at offset off, t thick: the painting
   // averaged along its length into one cross-section, stretched along each edge (clipped to its mitred quad,
@@ -2474,6 +2485,177 @@
   // flowers on hairline stems turned in towards the page; the painted acanthus sprays at the board's corners.
   // All of it scales with the page. opt.sprays: b2Sprays' corners and size (page px)
   var B2STEM = { columbine: [0.03, 0.17], daisy: [0.7, 1], strawberry: [0.28, 1], pea: [0.02, 0.63] };
+  // a painted corner spray with its gold knot taken out (a gilt calyx at the bar's corner covers the hole): the
+  // canvas, the knot's centre and radius in its pixels, and the points it covers
+  var b2SprayArts = {}, B2SU = 1.12, B2SV = 0.7, B2S2 = 0.6;   // each spray drawn long along its arm of the bar and low off it;
+  // the one on the upright arm smaller (B2S2), so a corner reads as one spray with a lesser second
+  function b2SprayArt(n) {
+    var slot = 'b2.frame.corner.' + n, im = images[slot];
+    if (!im) return null;
+    if (b2SprayArts[slot]) return b2SprayArts[slot];
+    var iw = im.naturalWidth, ih = im.naturalHeight, kx = iw * 0.125, ky = ih * 0.113, kr = iw * 0.1;
+    var cv = document.createElement('canvas'); cv.width = iw; cv.height = ih;
+    var g = cv.getContext('2d'); g.drawImage(im, 0, 0);
+    g.globalCompositeOperation = 'destination-out';
+    var rg = g.createRadialGradient(kx, ky, kr * 0.72, kx, ky, kr * 1.05);
+    rg.addColorStop(0, 'rgba(0,0,0,1)'); rg.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = rg; g.fillRect(0, 0, iw, ih);
+    g.fillStyle = '#000'; g.fillRect(0, 0, kx, ky);
+    var st = Math.max(4, Math.min(iw, ih, 360) / 16), pts = [], i, j;
+    try {
+      var cw = Math.ceil(iw / st), chh = Math.ceil(ih / st), sc = document.createElement('canvas');
+      sc.width = cw; sc.height = chh;
+      var sg = sc.getContext('2d'); sg.drawImage(cv, 0, 0, cw, chh);
+      var dd = sg.getImageData(0, 0, cw, chh).data;
+      for (j = 0; j < chh; j++) for (i = 0; i < cw; i++) if (dd[(j * cw + i) * 4 + 3] > 24) pts.push([(i + 0.5) * iw / cw, (j + 0.5) * ih / chh]);
+    } catch (e) { pts = []; for (j = 0; j <= 10; j++) for (i = 0; i <= 10; i++) pts.push([iw * i / 10, ih * j / 10]); }
+    return (b2SprayArts[slot] = { cv: cv, iw: iw, ih: ih, kx: kx, ky: ky, kr: kr, pts: pts, st: st });
+  }
+  // the gilt calyx at the bar's outer corner the sprays grow from: a sepal along each arm curling out, and a
+  // leaf on the diagonal over the join, burnished like the bar (hr: the knot hole's radius, page px)
+  function b2Root(g, c, A, B, hr, lw) {
+    var nx = -(A[0] + B[0]), ny = -(A[1] + B[1]), nl = Math.hypot(nx, ny) || 1;
+    nx /= nl; ny /= nl;
+    var gd = g.createLinearGradient(c.x - hr * 2, c.y - hr * 2, c.x + hr * 2, c.y + hr * 2);
+    gd.addColorStop(0, '#f4e0a0'); gd.addColorStop(0.45, '#dcb662'); gd.addColorStop(1, '#b68a3c');
+    var gold = { base: gd, dark: '#94702e' };
+    [[A, B], [B, A]].forEach(function (p) {
+      var D = p[0], O = [-p[1][0], -p[1][1]], cr = D[0] * O[1] - D[1] * O[0] > 0 ? 1 : -1;
+      acanthusLeaf(g, c.x - nx * hr * 0.35 - O[0] * hr * 0.15, c.y - ny * hr * 0.35 - O[1] * hr * 0.15, Math.atan2(D[1], D[0]) + cr * 0.2, hr * 2.4, hr * 1.1, cr * 0.9, gold, lw);
+    });
+    acanthusLeaf(g, c.x - nx * hr * 0.5, c.y - ny * hr * 0.5, Math.atan2(ny, nx) - 0.35, hr * 2.4, hr * 1.5, 0.9, gold, lw);
+  }
+  // draws Book II's corner sprays (b2Margin lays them out), each into its own layer and then onto the vellum
+  // with the drolleries' soft drop shadow, and from each a hairline tendril with small gold leaves that runs on
+  // to join the margin vine (or reaches towards it, ending in a curl, where the vine is far off or kept away)
+  function b2SprayDraw(ctx, sprays, bare, runs, busyAt, W, H, d, lr, hair, mark) {
+    var dpr = ctx.getTransform ? ctx.getTransform().a : 1, inward = [[0, 1], [-1, 0], [0, -1], [1, 0]], unit = Math.min(W, H);
+    function bez(P0, P1, P2, P3, t) {
+      var s = 1 - t, a = s * s * s, b = 3 * s * s * t, c = 3 * s * t * t, e = t * t * t;
+      return [a * P0[0] + b * P1[0] + c * P2[0] + e * P3[0], a * P0[1] + b * P1[1] + c * P2[1] + e * P3[1]];
+    }
+    // a tendril joins the vine only where the vine lies within reach (about one and a half sprays); otherwise
+    // it is a short one ending in a curl close by. Past its first stretch inside the spray, every point clear
+    function route(S0, D, O, reach, short) {
+      var cand = [], el = Math.hypot(D[0] * 0.55 + O[0], D[1] * 0.55 + O[1]), E = [(D[0] * 0.55 + O[0]) / el, (D[1] * 0.55 + O[1]) / el];
+      runs.forEach(function (rn) {
+        for (var i = 3; i < rn.pts.length - 3; i += 2) {
+          var p = rn.pts[i], dx = p[0] - S0[0], dy = p[1] - S0[1], dd = Math.hypot(dx, dy);
+          if (dd > reach || dx * E[0] + dy * E[1] < -0.1 * dd || dx * O[0] + dy * O[1] < -0.1 * dd) continue;
+          cand.push([dd, p, rn.side]);
+        }
+      });
+      cand.sort(function (a, b) { return a[0] - b[0]; });
+      var tried = [];
+      for (var j = 0; j < cand.length && tried.length < 16; j++) {
+        var c = cand[j];
+        if (tried.some(function (q) { return Math.hypot(q[0] - c[1][0], q[1] - c[1][1]) < 20; })) continue;
+        tried.push(c[1]);
+        var T = c[1], Lr = c[0], nIn = inward[c[2]];
+        // a gentle S: out along the arm first, then swinging back to meet the vine square on
+        var P1 = [S0[0] + E[0] * Lr * 0.4 + D[0] * Lr * 0.25, S0[1] + E[1] * Lr * 0.4 + D[1] * Lr * 0.25];
+        var P2 = [T[0] + nIn[0] * Lr * 0.4 - D[0] * Lr * 0.25, T[1] + nIn[1] * Lr * 0.4 - D[1] * Lr * 0.25];
+        var pts = [], free = false, bad = false, N = Math.max(16, Math.round(Lr / 3));
+        for (var k = 0; k <= N; k++) {
+          var p = bez(S0, P1, P2, T, k / N), b = busyAt(p[0], p[1]);
+          pts.push(p);
+          if (!free) { if (!b) free = true; else if (k > N * 0.5) { bad = true; break; } }
+          else if (b && k < N - 2) { bad = true; break; }
+        }
+        if (bad || !free) continue;
+        return { pts: pts, join: true };
+      }
+      // no vine near enough: a short tendril bending gently out from the spray, all of it clear
+      for (var tw = 0; tw < 5; tw++) {
+        var ang = Math.atan2(E[1], E[0]) + [0, 0.35, -0.35, 0.7, -0.7][tw], P = [S0], x = S0[0], y = S0[1], fr = 0, bend = (tw % 2 ? -1 : 1) * 0.012, ok = true;
+        // (its first stretch lies under the spray's own leaves; the length counts from where it comes out)
+        for (var q = 0; q < 160 && fr * 3 < short; q++) {
+          ang += bend; x += Math.cos(ang) * 3; y += Math.sin(ang) * 3;
+          if (busyAt(x, y)) { if (fr || q * 3 > short * 1.5) { ok = false; break; } } else fr++;
+          P.push([x, y]);
+        }
+        if (ok && fr * 3 >= short * 0.6) return { pts: P, join: false };
+      }
+      return null;
+    }
+    // the curl at a free tendril's end, turning to side sd; null if it runs into anything
+    function curl(P, sd) {
+      var end = P[P.length - 1], prev = P[P.length - 2], a = Math.atan2(end[1] - prev[1], end[0] - prev[0]), x = end[0], y = end[1], st = lr * 0.4, C = [];
+      for (var i = 0; i < 18; i++) { a += sd * (0.09 + i * 0.024); x += Math.cos(a) * st; y += Math.sin(a) * st; if (busyAt(x, y)) return null; C.push([x, y]); }
+      return C;
+    }
+    function tendril(tr, side0) {
+      var P = tr.pts, i, len = [0], C = null;
+      if (!tr.join) { C = curl(P, side0); if (!C) { side0 = -side0; C = curl(P, side0); } if (!C) return; }
+      for (i = 1; i < P.length; i++) len.push(len[i - 1] + Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]));
+      var L = len[len.length - 1];
+      ctx.strokeStyle = INK2; ctx.lineWidth = hair; ctx.beginPath(); ctx.moveTo(P[0][0], P[0][1]);
+      for (i = 1; i < P.length; i++) ctx.lineTo(P[i][0], P[i][1]);
+      if (C) C.forEach(function (p) { ctx.lineTo(p[0], p[1]); });
+      ctx.stroke();
+      if (C) bezant(ctx, C[C.length - 1][0], C[C.length - 1][1], lr * 0.35);
+      // small gold leaves on short stalks, side to side, all along it (the vine's own gilt leaves), and a gold
+      // dot where a leaf has no room
+      var gap = lr * 2.9, sd = side0, end = L - (C ? lr * 0.6 : lr * 2);
+      ctx.lineWidth = hair * 0.85;
+      for (var at = lr * 1.2; at < end; at += gap) {
+        for (i = 1; i < len.length - 1 && len[i] < at; i++);
+        if (busyAt(P[i][0], P[i][1])) continue;   // still inside the spray
+        var q0 = P[i - 1], q1 = P[i + 1] || P[i], ta = Math.atan2(q1[1] - q0[1], q1[0] - q0[0]) + sd * 1.05;
+        var sx = P[i][0] + Math.cos(ta) * lr * 0.9, sy = P[i][1] + Math.sin(ta) * lr * 0.9;
+        if (busyAt(sx, sy) || busyAt(sx + Math.cos(ta) * lr, sy + Math.sin(ta) * lr)) {
+          var ox = P[i][0] - Math.cos(ta) * lr * 0.9, oy = P[i][1] - Math.sin(ta) * lr * 0.9;
+          if (busyAt(ox, oy) || busyAt(ox - Math.cos(ta) * lr, oy - Math.sin(ta) * lr)) { bezant(ctx, P[i][0], P[i][1], lr * 0.3); continue; }
+          ta += Math.PI; sx = ox; sy = oy; sd = -sd;
+        }
+        ctx.beginPath(); ctx.moveTo(P[i][0], P[i][1]); ctx.lineTo(sx, sy); ctx.stroke();
+        goldLeaf(ctx, sx, sy, lr, ta);
+        mark(sx - lr, sy - lr, sx + lr, sy + lr);
+        sd = -sd;
+      }
+      P.concat(C || []).forEach(function (p) { mark(p[0] - 3, p[1] - 3, p[0] + 3, p[1] + 3); });
+    }
+    ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    // the tendrils first, so each spray covers where its own starts
+    sprays.forEach(function (f) {
+      f.arms.forEach(function (a) {
+        var sw = f.sw * (a.sc || 1), S0 = [f.c.x + a.D[0] * sw * 0.74 + a.O[0] * sw * 0.14, f.c.y + a.D[1] * sw * 0.74 + a.O[1] * sw * 0.14];
+        var tr = route(S0, a.D, a.O, sw * 1.5, Math.max(lr * 9, sw * 0.42));
+        if (tr) tendril(tr, a.D[0] * a.O[1] - a.D[1] * a.O[0] > 0 ? 1 : -1);
+      });
+    });
+    // a corner with no room for a spray: a short hairline tendril out of the bar's corner
+    bare.forEach(function (c) {
+      var nx = c.nx / Math.SQRT2, ny = c.ny / Math.SQRT2, L = Math.max(10, d * 0.7), x = c.x, y = c.y, a = Math.atan2(ny, nx), st = lr * 0.45, P = [];
+      for (var i = 0; i < 8; i++) { x += nx * L / 8; y += ny * L / 8; P.push([x, y]); }
+      for (i = 0; i < 18; i++) { a += 0.08 + i * 0.022; x += Math.cos(a) * st; y += Math.sin(a) * st; P.push([x, y]); }
+      if (P.slice(3).some(function (p) { return busyAt(p[0], p[1]); })) return;
+      ctx.strokeStyle = INK2; ctx.lineWidth = hair; ctx.beginPath(); ctx.moveTo(c.x, c.y);
+      P.forEach(function (p) { ctx.lineTo(p[0], p[1]); }); ctx.stroke();
+      bezant(ctx, x, y, lr * 0.35);
+      P.forEach(function (p) { mark(p[0] - 3, p[1] - 3, p[0] + 3, p[1] + 3); });
+    });
+    // the sprays and their gilt roots, each laid into a layer and set down with a soft shadow
+    sprays.forEach(function (f) {
+      var x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9, n, pad = f.sw * 0.12 + 4;
+      for (n = 0; n < f.P.length; n += 2) { x0 = Math.min(x0, f.P[n]); x1 = Math.max(x1, f.P[n]); y0 = Math.min(y0, f.P[n + 1]); y1 = Math.max(y1, f.P[n + 1]); }
+      x0 = Math.floor(Math.min(x0, f.c.x) - pad); y0 = Math.floor(Math.min(y0, f.c.y) - pad); x1 = Math.ceil(Math.max(x1, f.c.x) + pad); y1 = Math.ceil(Math.max(y1, f.c.y) + pad);
+      var cv = document.createElement('canvas'); cv.width = Math.max(1, Math.round((x1 - x0) * dpr)); cv.height = Math.max(1, Math.round((y1 - y0) * dpr));
+      var g = cv.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+      g.setTransform(dpr, 0, 0, dpr, -x0 * dpr, -y0 * dpr);
+      f.arms.forEach(function (a) {
+        g.save(); g.transform(a.D[0] * B2SU, a.D[1] * B2SU, a.O[0] * B2SV, a.O[1] * B2SV, f.c.x, f.c.y); g.scale(a.k, a.k);
+        g.drawImage(a.art.cv, -a.art.kx, -a.art.ky); g.restore();
+      });
+      var big = f.arms[0].k >= f.arms[1].k ? f.arms[0] : f.arms[1];
+      b2Root(g, f.c, f.arms[0].D, f.arms[1].D, big.art.kr * big.k * 1.2, Math.max(0.5, f.sw * 0.007));
+      ctx.save();
+      ctx.shadowColor = 'rgba(16,6,2,0.55)'; ctx.shadowBlur = Math.max(1.5, f.sw * 0.05) * dpr; ctx.shadowOffsetY = Math.max(0.6, f.sw * 0.025) * dpr;
+      ctx.drawImage(cv, x0, y0, x1 - x0, y1 - y0);
+      ctx.restore();
+    });
+    ctx.restore();
+  }
   function b2Margin(ctx, W, H, seed, avoid, opt) {
     var narrow = !!(opt && opt.narrow), R = rand(seed), U = 4, gw = Math.ceil(W / U), gh = Math.ceil(H / U), occ = new Uint8Array(gw * gh);
     function markIn(o, x0, y0, x1, y1) {
@@ -2490,31 +2672,53 @@
     (avoid || []).forEach(function (r) { var p = r[4] ? r[4] * (narrow ? 0.9 : 1.6) + 2 : 4; mark(r[0] - p, r[1] - p, r[0] + r[2] + p, r[1] + r[3] + p); });
     var unit = Math.min(W, H), d = Math.max(9, unit * 0.032), lr = Math.max(2.4, unit * 0.0075), hair = Math.max(0.6, unit * 0.0014);
     ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    // the sprays first, so the vine breaks round them: the knot on the bar's outer corner, the leaves out into
-    // the vellum; smaller where the text, drollery or page edge is near (the board's own frame may sit under the knot)
-    var SP = opt && opt.sprays;
+    // the sprays first, so the vine breaks round them. Each grows out of the gilt bar's outer corner: two painted
+    // sprays, one hugging the outside of each arm of the bar, their roots in a gilt calyx the bar runs into.
+    // One size for the page, the largest every corner that takes a spray has room for (the text, drollery and
+    // page edge kept clear); a corner with no room for even a small one gets a hairline tendril alone
+    var SP = opt && opt.sprays, sprays = [], bare = [], occ2 = null;
     if (SP && images['b2.frame.corner.1']) {
-      var occ2 = new Uint8Array(gw * gh);
+      occ2 = new Uint8Array(gw * gh);
       (avoid || []).forEach(function (r) { var p = r[4] ? -r[4] * 0.3 : (narrow ? 3 : 8); markIn(occ2, r[0] - p, r[1] - p, r[0] + r[2] + p, r[1] + r[3] + p); });
-      SP.pts.forEach(function (c, i) {
-        var slot = 'b2.frame.corner.' + (i + 1), im = images[slot];
-        if (!im) return;
-        var O = ivyPoints(slot), iw = im.naturalWidth, ih = im.naturalHeight;
-        // the fan may swing about its knot (down a side, along a top) before it is made smaller
-        [1, 0.86, 0.74, 0.62, 0.52, 0.44, 0.37, 0.31].some(function (t) {
-          return [0, 0.25, -0.25, 0.5, -0.5, 0.75, -0.75, 1, -1, 1.25, -1.25].some(function (th) {
-            var sw = SP.size * t, k = sw / iw, ax = -iw * 0.125, ay = -ih * 0.113, P = [], n, cs = Math.cos(th), sn = Math.sin(th), em = O.st * k * 0.6 + 2;
-            for (n = 0; n < O.pts.length; n++) {
-              var u0 = (O.pts[n][0] + ax) * k, v0 = (O.pts[n][1] + ay) * k, u = u0 * cs - v0 * sn, v = u0 * sn + v0 * cs, x = c.x + u * c.nx, y = c.y + v * c.ny;
-              if (x < em || y < em || x > W - em || y > H - em || (Math.hypot(u, v) > sw * 0.16 && hit(occ2, x, y))) return false;
-              P.push(x, y);
-            }
-            ctx.save(); ctx.translate(c.x, c.y); ctx.scale(c.nx, c.ny); ctx.rotate(th); ctx.scale(k, k); ctx.drawImage(im, ax, ay); ctx.restore();
-            var rr = O.st * k * 0.6 + 2;
-            for (n = 0; n < P.length; n += 2) mark(P[n] - rr, P[n + 1] - rr, P[n] + rr, P[n + 1] + rr);
-            return true;
-          });
+      var arts = [1, 2, 3, 4].map(b2SprayArt);
+      var fit = function (c, ci, sw) {
+        var A = [-c.u1[0], -c.u1[1]], B = [c.u2[0], c.u2[1]], out = { c: c, sw: sw, arms: [], P: [] };
+        var ok = [[A, [-B[0], -B[1]], arts[(2 * ci) % 4]], [B, [-A[0], -A[1]], arts[(2 * ci + 1) % 4]]].every(function (arm) {
+          var D = arm[0], O = arm[1], art = arm[2];
+          if (!art) return false;
+          var sc = Math.abs(D[0]) >= Math.abs(D[1]) ? 1 : B2S2, k = sw * sc / art.iw, em = art.st * k * 0.6 + 2;
+          for (var n = 0; n < art.pts.length; n++) {
+            var u = (art.pts[n][0] - art.kx) * k * B2SU, v = (art.pts[n][1] - art.ky) * k * B2SV, x = c.x + u * D[0] + v * O[0], y = c.y + u * D[1] + v * O[1];
+            // the leaves lying on the bar itself don't count (a cell of the grid either side, so a small spray isn't
+            // refused for touching the frame it grows from)
+            if (x < em || y < em || x > W - em || y > H - em) return false;
+            if (v > Math.max(sw * sc * 0.05, U * 1.6) && Math.hypot(u, v) > sw * sc * 0.12 && hit(occ2, x, y)) return false;
+            out.P.push(x, y);
+          }
+          out.arms.push({ D: D, O: O, art: art, k: k, sc: sc });
+          return true;
         });
+        return ok ? out : null;
+      };
+      var steps = [1, 0.88, 0.77, 0.67, 0.58, 0.5, 0.43, 0.37], base = SP.size * 0.74, pts = SP.pts.slice();
+      // per diagonal, every corner that could take a spray (a stepped or cross-shaped board has several) and the
+      // sizes each has room for; then the page's one size is the largest that the most diagonals can take, and
+      // each diagonal uses its roomiest corner that fits it (the outermost on a tie). The two smallest sizes only
+      // when nothing larger fits anywhere: two good sprays read better than four crammed against the page edge
+      var grid = pts.map(function (c, ci) {
+        var L = [c].concat((SP.cands && SP.cands[ci] || []).filter(function (o) { return Math.hypot(o.x - c.x, o.y - c.y) > 1; }));
+        return L.map(function (o) { return { c: o, f: steps.map(function (st) { return fit(o, ci, base * st); }) }; })
+          .map(function (e, i) { e.i = i; e.b = e.f.findIndex(Boolean); if (e.b < 0) e.b = 99; return e; })
+          .sort(function (a, b) { return a.b - b.b || a.i - b.i; });
+      });
+      var si = 0, cnt = -1;
+      steps.forEach(function (st, s) { var k = grid.filter(function (L) { return L.some(function (e) { return e.f[s]; }); }).length; if (k > cnt && (s < 6 || cnt < 1)) { cnt = k; si = s; } });
+      grid.forEach(function (L) {
+        var e = L.filter(function (e) { return e.f[si]; })[0];
+        if (!e) { bare.push(L[0].c); return; }
+        var f = e.f[si], rr = Math.max(f.arms[0].art.st * f.arms[0].k, f.arms[1].art.st * f.arms[1].k) * 0.6 + 2;
+        for (var n = 0; n < f.P.length; n += 2) mark(f.P[n] - rr, f.P[n + 1] - rr, f.P[n] + rr, f.P[n + 1] + rr);
+        sprays.push(f);
       });
     }
     var vine = new Path2D(), runs = [];
@@ -2532,6 +2736,16 @@
       for (var s = d * 0.7; s <= span - d * 0.7; s += step) { var p = at(s); if (busy(p[0], p[1], 2)) flush(); else run.push(p); }
       flush();
     });
+    // the tendrils keep to the board's side of the page: none crosses the gap to the text column (right of the
+    // board on a wide page, below it on a narrow one) or runs over its heading
+    var fx = 1e9, fy = 1e9, bx1 = -1e9, by1 = -1e9;
+    (avoid || []).forEach(function (r) { if (r[4]) { bx1 = Math.max(bx1, r[0] + r[2]); by1 = Math.max(by1, r[1] + r[3]); } });
+    if (bx1 > -1e9) (avoid || []).forEach(function (r) {
+      if (r[4]) return;
+      if (!narrow && r[0] >= bx1 - 1) fx = Math.min(fx, r[0] - lr * 2);
+      if (narrow && r[1] >= by1 - 1) fy = Math.min(fy, r[1] - lr * 2);
+    });
+    if (sprays.length || bare.length) b2SprayDraw(ctx, sprays, bare, runs, function (x, y) { return x > fx || y > fy || hit(occ, x, y); }, W, H, d, lr, hair, mark);
     ctx.strokeStyle = INK2; ctx.lineWidth = hair; ctx.stroke(vine);
     // flowers on hairline stems at a steady pace along each run, turned in towards the page, the four kinds in turn
     var kinds = ['columbine', 'daisy', 'strawberry', 'pea'], fh = Math.max(22, unit * 0.075), gap = fh * 2.1, ki = Math.floor(R() * 4), stems = [];
