@@ -36,6 +36,9 @@
   start();
   ART.load('art/').then(function () { ART.repaintAll(); }, function () { /* procedural art stays */ });
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { ART.repaintAll(); PLAY.layout(); });
+  // the web-font stylesheet loads without blocking (index.html), so the fonts can land after 'ready' has settled:
+  // redraw the canvas lettering and grid labels in them when they do
+  if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener('loadingdone', function () { ART.repaintAll(); PLAY.layout(); });
 
   window.TT = {
     load: function (id) { SCREENS.show('puzzle', { id: id }); return !!(PLAY.state() && PLAY.state().id === id); },

@@ -27,11 +27,15 @@
   SCREENS.register('title', {
     el: $('scr-title'),
     enter: function () {
-      var box = $('scr-title'); box.innerHTML = '';
+      var box = $('scr-title');
+      // index.html's static title, on screen while the scripts load: replace it without fading in again
+      // (a reload into another screen hides it, .tt-resume, so the title fades in as usual when it's next opened)
+      var shell = !!box.querySelector('.shell') && !document.documentElement.classList.contains('tt-resume');
+      box.innerHTML = '';
       ['tl', 'tr', 'bl', 'br'].forEach(function (at) {
         var c = ART.canvas('corner', 70, 70, { at: at }); c.className += ' tcorner ' + at; box.appendChild(c);
       });
-      var page = el('div', 'titlepage');
+      var page = el('div', shell ? 'titlepage nofade' : 'titlepage');
       var head = el('div', 'tline');
       var big = window.innerWidth >= 700;
       var cap = ART.canvas('titlecap', big ? 128 : 92, big ? 128 : 92, { letter: 'T' }); cap.className += ' tcap';

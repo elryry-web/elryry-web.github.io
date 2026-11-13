@@ -671,17 +671,34 @@
     load: function (base) {
       base = base || 'art/';
       if (typeof fetch === 'undefined') return Promise.resolve();
-      return fetch(base + 'manifest.json?v=23', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : {}; }).then(function (m) {
-        return Promise.all(Object.keys(m || {}).map(function (slot) {
+      // the procedural art is already on screen, so nothing waits on this. The slots drawn on the screen showing
+      // now load first, each repainting its own canvases as it lands; the rest (map, portraits, other drop caps,
+      // about 3 MB) follow once those are in, so they never compete with the title page's art
+      function slotOf(c) { var a = c._art; return a.slot === 'dropcap' ? (a.opts.letter ? 'dropcap-' + a.opts.letter : null) : a.slot; }
+      function repaintSlot(slot) {
+        Array.prototype.forEach.call(document.querySelectorAll('canvas.art'), function (c) { if (c._art && slotOf(c) === slot) ART.paint(c); });
+      }
+      function fetchAll(m, slots) {
+        return Promise.all(slots.map(function (slot) {
           var e = typeof m[slot] === 'string' ? { file: m[slot] } : (m[slot] || {});
           if (!e.file) return null;
           return new Promise(function (res) {
             var img = new Image();
-            img.onload = function () { images[slot] = img; res(); };
+            img.onload = function () { images[slot] = img; repaintSlot(slot); res(); };
             img.onerror = function () { res(); };
             img.src = base + e.file + (e.v != null ? '?v=' + e.v : '');
           });
         }));
+      }
+      return fetch(base + 'manifest.json?v=24', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : {}; }).then(function (m) {
+        m = m || {};
+        var onScreen = [];
+        Array.prototype.forEach.call(document.querySelectorAll('canvas.art'), function (c) {
+          var s = c._art && slotOf(c); if (s && m[s] && onScreen.indexOf(s) < 0) onScreen.push(s);
+        });
+        return fetchAll(m, onScreen).then(function () {
+          return fetchAll(m, Object.keys(m).filter(function (s) { return onScreen.indexOf(s) < 0; }));
+        });
       }).then(function () { ART.repaintAll(); }).catch(function () {});
     },
     slots: function () { return Object.keys(DRAW); },
