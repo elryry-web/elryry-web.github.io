@@ -5,7 +5,7 @@
   --head: 'IM Fell English', 'Alegreya', Georgia, 'Times New Roman', serif;
   --body: 'Alegreya', Georgia, 'Times New Roman', serif;
   --line: 2.5px;
-  --off: 1.5px;      /* misregistration of the colour block: it covers all but 1px of the right and bottom line */
+  --off: 1px;        /* misregistration of the colour block: it covers 1px of the 2.5px right and bottom line */
   --gap: 10px;
   --bar-h: 64px;
 }
