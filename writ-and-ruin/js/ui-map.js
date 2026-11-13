@@ -48,6 +48,16 @@
     return [p[0] + dx * best, p[1] + dy * best];
   }
 
+  // roads whose two regions all but touch on the board take a roundabout course instead, so the link can be seen.
+  // Keyed 'lo|hi' (the names in alphabetical order); the road runs from lo to hi as a cubic through ctrl, and
+  // each end leaves its blob on the ray from the region's centre toward its aim point (default: the nearer control).
+  var DETOUR = {
+    // out of the wood's east side, round under the mountains, into the pasture from the north-east
+    'ashwood|highpasture': { aim: [[390, 150], [404, 240]], ctrl: [[386, 136], [404, 240]] },
+    // out of the Crown's south-west, down and round below the gap, up into the marsh from the south-east
+    'crown|saltmarsh': { aim: [[150, 296], [124, 312]], ctrl: [[160, 338], [118, 340]] }
+  };
+
   // ---------------------------------------------------------------- the fixed carving: sky bands, roads, blob shapes
   var cache = null;
   function base() {
@@ -67,15 +77,22 @@
     });
     // roads between neighbours, from blob edge to blob edge (each end tucked just under the outline)
     var seen = {}, roads = [];
+    var tuck = function (pt, c) { var ux = c[0] - pt[0], uy = c[1] - pt[1], l = Math.sqrt(ux * ux + uy * uy) || 1; return [pt[0] - ux / l * 3, pt[1] - uy / l * 3]; };
     D.REGION_IDS.forEach(function (a) {
       D.REGION[a].adj.forEach(function (b) {
         var k = a < b ? a + b : b + a;
         if (seen[k]) return; seen[k] = 1;
+        var lo = a < b ? a : b, hi = a < b ? b : a, dt = DETOUR[lo + '|' + hi];
+        if (dt) {
+          var c1 = dt.ctrl[0], c2 = dt.ctrl[1], m0 = dt.aim ? dt.aim[0] : c1, m1 = dt.aim ? dt.aim[1] : c2;
+          var e0 = tuck(edgePoint(lo, m0[0], m0[1]), c1), e1 = tuck(edgePoint(hi, m1[0], m1[1]), c2);
+          roads.push('M' + f1(e0[0]) + ' ' + f1(e0[1]) + 'C' + f1(c1[0]) + ' ' + f1(c1[1]) + ' ' + f1(c2[0]) + ' ' + f1(c2[1]) + ' ' + f1(e1[0]) + ' ' + f1(e1[1]));
+          return;
+        }
         var p = POS[a], q = POS[b], mx = (p[0] + q[0]) / 2, my = (p[1] + q[1]) / 2;
         var dx = q[0] - p[0], dy = q[1] - p[1], len = Math.sqrt(dx * dx + dy * dy), bend = (A.rng(A.hash(k))() - 0.5) * 30;
         var cx = mx - dy / len * bend, cy = my + dx / len * bend;
         var s0 = edgePoint(a, cx, cy), s1 = edgePoint(b, cx, cy);
-        var tuck = function (pt, c) { var ux = c[0] - pt[0], uy = c[1] - pt[1], l = Math.sqrt(ux * ux + uy * uy) || 1; return [pt[0] - ux / l * 3, pt[1] - uy / l * 3]; };
         s0 = tuck(s0, [cx, cy]); s1 = tuck(s1, [cx, cy]);
         // re-aim the control point so the curve keeps its bend between the new ends
         var ccx = (s0[0] + s1[0]) / 2 + (cx - mx), ccy = (s0[1] + s1[1]) / 2 + (cy - my);
