@@ -133,6 +133,11 @@
       '<text x="' + f1(x) + '" y="' + f1(y + 4.6) + '" text-anchor="middle" class="cnt" fill="' + A.textOn(col) + '">' + n + '</text></g>';
   }
   function stampAt(h, x, y, size) {
+    var url = A.paintedUrl('house-' + h);
+    if (url) {   // the painted banner, bottom-aligned in the drawn stamp's 40 x 44 box
+      var w = size * A.bannerScale(h), ht = size * 1.24;
+      return '<image href="' + url + '" x="' + f1(x - w / 2) + '" y="' + f1(y - size * 0.55 + size * 1.1 - ht) + '" width="' + f1(w) + '" height="' + f1(ht) + '" preserveAspectRatio="xMidYMax meet"/>';
+    }
     return '<g transform="translate(' + f1(x - size / 2) + ' ' + f1(y - size * 0.55) + ') scale(' + f1(size / 40) + ')">' +
       A.stamp(h, 40).replace(/<svg[^>]*>|<\/svg>/g, '') + '</g>';
   }

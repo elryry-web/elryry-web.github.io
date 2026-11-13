@@ -1,5 +1,12 @@
 {
  "board": "art/board.jpg",
+ "house-gullwing": "art/house-gullwing.png",
+ "house-lantern": "art/house-lantern.png",
+ "house-moss": "art/house-moss.png",
+ "house-player": "art/house-player.png",
+ "house-synod": "art/house-synod.png",
+ "house-thorne": "art/house-thorne.png",
+ "house-varrow": "art/house-varrow.png",
  "site-ashwood": "art/site-ashwood.jpg",
  "site-crown": "art/site-crown.jpg",
  "site-farpass": "art/site-farpass.jpg",
