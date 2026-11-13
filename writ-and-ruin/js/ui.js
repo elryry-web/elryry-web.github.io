@@ -29,7 +29,7 @@
   // a house's: "Your" / "your" for the player, never "You's"
   function whose(h, s) { return h === 'player' ? 'Your' : who(h, s) + "'s"; }
   function whoseLow(h, s) { return h === 'player' ? 'your' : whoLow(h, s) + "'s"; }
-  function rn(r) { return r === 'camp' ? 'the Far Pass camp' : (REG[r] ? REG[r].name : r); }
+  function rn(r) { return r === 'camp' ? 'the Far Pass camp' : REG[r] ? (r === 'crown' || r === 'farpass' ? 'the ' : '') + REG[r].name : r; }
   function cardName(id) { return D.CARDS[id] ? D.CARDS[id].name : id; }
   function listAnd(a) { return a.length <= 1 ? (a[0] || '') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1]; }
   function plural(n, one, many) { return n + ' ' + (n === 1 ? one : (many || one + 's')); }
@@ -451,18 +451,23 @@
     if (!u.length) return '';
     return listAnd(u.map(rn)) + (u.length === 1 ? ' is unguarded: march in to take it (1 moon).' : ' are unguarded: march in to take them (1 moon each).');
   }
+  // each rival's shown moves in the order it will make them: the first is its next move, the rest come after that
   function intents(s) {
     var out = [], owl = E.has(s, 'player', 'owl');
     if (s.phase !== 'play') return out;
     s.order.forEach(function (h) {
       var hs = s.houses[h];
       if (!hs.ai) return;
-      if (hs.intent) out.push({ house: h, intent: hs.intent });
-      if (hs.then) out.push({ house: h, intent: hs.then, second: 1 });
-      if (owl && hs.intent2) out.push({ house: h, intent: hs.intent2, second: hs.then ? 2 : 1, owl: true });
+      var mine = [];
+      if (hs.intent) mine.push({ house: h, intent: hs.intent });
+      if (hs.then) mine.push({ house: h, intent: hs.then });
+      if (owl && hs.intent2) mine.push({ house: h, intent: hs.intent2, owl: true });
+      mine.forEach(function (x, i) { x.second = i; out.push(x); });   // second: 0 for the next move, 1, 2 for later ones (the map dashes those)
     });
     return out;
   }
+  // 'Varrow: march 2 to Saltmarsh' -> 'Varrow next: march 2 to Saltmarsh', or for a later move 'Varrow after that: ...'
+  function planWhen(label, later) { return label.replace(/^([^:]+): /, '$1 ' + (later ? 'after that' : 'next') + ': '); }
 
   // ---------------------------------------------------------------- folding panels
   // Each side panel folds to its heading and a one-line summary. The open state lives in U.panels
@@ -542,12 +547,15 @@
       '; always after round ' + N.lastRound + '.';
     return '<div class="ends"><span class="lbl">Age ends</span> ' + cap(t) + '</div>';
   }
-  function dangerPanel(s) {
-    var rows = [];
-    s.order.forEach(function (h) {
-      var cs = E.claimStanding(s, h);
-      if (!cs) return;
-      var mine = h === 'player';
+  // the rows of "Who is close to winning", each as html and a short plain line for the folded summary:
+  // standing claims (a rival's before yours), then the rival wins the AI sees coming, then the house nearest a win
+  // (which may be you) unless a claim row already names it. The summary is always the first row's short line.
+  function dangerRows(s) {
+    var rows = [], claims = [];
+    s.order.forEach(function (h) { var cs = E.claimStanding(s, h); if (cs) claims.push({ h: h, cs: cs }); });
+    claims.sort(function (a, b) { return (a.h === 'player') - (b.h === 'player'); });
+    claims.forEach(function (c) {
+      var h = c.h, cs = c.cs, mine = h === 'player';
       var wait = cs.waiting.map(function (k) { return whoLow(k, s); });
       var how = cs.kind === 'seize' ? 'holds six regions' : 'has fulfilled ' + (mine ? 'your' : 'its') + ' prophecy';
       var text;
@@ -559,7 +567,10 @@
         text = (cs.kind === 'seize' ? (mine ? 'hold ' : 'holds ') + D.NUMBER_WORDS[N.seizeRegions] + ' regions now.' : (mine ? 'meet your' : 'meets its') + ' prophecy now.') +
           ' ' + (mine ? 'You' : 'It') + ' can win from the ' + D.ROUND_WORDS[N.claimFrom - 1] + ' round if ' + (mine ? 'you still do.' : 'it still does.');
       }
-      rows.push('<li class="claim' + (mine ? ' good' : '') + '">' + stamp(h, 18) + '<span><b>' + who(h, s) + '</b> ' + text + '</span></li>');
+      rows.push({ house: h, claim: true,
+        html: '<li class="claim' + (mine ? ' good' : '') + '">' + stamp(h, 18) + '<span><b>' + who(h, s) + '</b> ' + text + '</span></li>',
+        text: 'Claim: ' + whoLow(h, s) + (cs.kind === 'seize' ? (mine ? ' hold ' : ' holds ') + D.NUMBER_WORDS[N.seizeRegions] + ' regions' :
+          (mine ? ' have fulfilled your' : ' has fulfilled its') + ' prophecy') });
     });
     var dz = [];
     try { dz = AI.dangers(s, 'player'); } catch (e) { dz = []; }
@@ -567,25 +578,21 @@
       if (d.urgency < 0.15) return;
       var kind = { seize: 'could seize the valley', foretell: 'is near its prophecy', depart: 'could depart by the Far Pass', seat: 'holds the Crown hold' }[d.kind] || d.kind;
       var where = d.regions && d.regions.length ? ' Stop it at ' + listAnd(d.regions.map(rn)) + '.' : '';
-      rows.push('<li>' + stamp(d.house, 18) + '<span><b>' + who(d.house, s) + '</b> ' + kind + '.' + where +
-        ' <span class="urg"><i style="width:' + Math.round(Math.min(1, d.urgency) * 100) + '%"></i></span></span></li>');
+      rows.push({ house: d.house,
+        html: '<li>' + stamp(d.house, 18) + '<span><b>' + who(d.house, s) + '</b> ' + kind + '.' + where +
+          ' <span class="urg"><i style="width:' + Math.round(Math.min(1, d.urgency) * 100) + '%"></i></span></span></li>',
+        text: who(d.house, s) + ' ' + kind });
     });
-    if (!rows.length) rows.push('<li class="muted">No house is close to winning yet.</li>');
-    var sm = dangerSummary(s);
-    return fold('danger', 'Who is close to winning', esc(sm.text), '<ul class="rows">' + rows.join('') + '</ul>', 'danger', sm.cls);
-  }
-  // one line for the folded danger panel: a standing claim first (a rival's before yours), else the house nearest a win
-  function dangerSummary(s) {
-    var claims = [];
-    s.order.forEach(function (h) { var cs = E.claimStanding(s, h); if (cs) claims.push({ h: h, kind: cs.kind }); });
-    claims.sort(function (a, b) { return (a.h === 'player') - (b.h === 'player'); });
-    if (claims.length) {
-      var c = claims[0], mine = c.h === 'player';
-      var t = 'Claim: ' + whoLow(c.h, s) + (c.kind === 'seize' ? (mine ? ' hold ' : ' holds ') + D.NUMBER_WORDS[N.seizeRegions] + ' regions' :
-        (mine ? ' have fulfilled your' : ' has fulfilled its') + ' prophecy');
-      return { text: t + (claims.length > 1 ? ' · ' + (claims.length - 1) + ' more' : ''), cls: mine && claims.length === 1 ? 'good' : 'warn' };
+    var n = nearest(s);
+    if (n && !claims.some(function (c) { return c.h === n.house; })) {
+      rows.push({ house: n.house,
+        html: '<li>' + stamp(n.house, 18) + '<span><b>' + who(n.house, s) + '</b> ' + n.words + '.</span></li>',
+        text: who(n.house, s) + ' ' + n.words });
     }
-    // the chips' threat bars, as counts
+    return { rows: rows, cls: claims.length ? (claims.length === 1 && claims[0].h === 'player' ? 'good' : 'warn') : '' };
+  }
+  // the house nearest a win by the chips' threat bars, as counts: { house, words: 'are nearest: Foretell, 7 of 8 for your prophecy' }
+  function nearest(s) {
     var best = null;
     s.order.forEach(function (h) {
       var p = E.progress(s, h);
@@ -593,21 +600,31 @@
         if (p[k] > 0 && (!best || p[k] > best.v)) best = { h: h, k: k, v: p[k] };
       });
     });
-    if (!best) return { text: 'No house is close to winning yet.', cls: '' };
-    var h = best.h, hs = s.houses[h], how;
+    if (!best) return null;
+    var h = best.h, hs = s.houses[h], mine = h === 'player', how;
     if (best.k === 'seize') how = E.nHeld(s, h) + ' of ' + N.seizeRegions + ' regions';
-    else if (best.k === 'foretell') { var pp = E.prophecyProgress(s, h, hs.prophecy); how = pp.have + ' of ' + pp.need + ' for ' + (h === 'player' ? 'your' : 'its') + ' prophecy'; }
+    else if (best.k === 'foretell') { var pp = E.prophecyProgress(s, h, hs.prophecy); how = pp.have + ' of ' + pp.need + ' for ' + (mine ? 'your' : 'its') + ' prophecy'; }
     else if (best.k === 'depart') {
       var dn = E.departNeeds(s, h);
       how = Math.min(hs.relics.length, dn.relics) + ' of ' + dn.relics + ' relics, ' +
         Math.min(E.holds(s, h, 'farpass') ? E.bandsAt(s, h, 'farpass') : 0, dn.bands) + ' of ' + dn.bands + ' warbands at the Far Pass';
-    } else how = (h === 'player' ? 'you hold' : 'holds') + ' the Crown hold';
-    return { text: who(h, s) + (h === 'player' ? ' are' : ' is') + ' nearest: ' + WIN_KIND[best.k] + ', ' + how, cls: '' };
+    } else how = (mine ? 'you hold' : 'holds') + ' the Crown hold';
+    return { house: h, words: (mine ? 'are' : 'is') + ' nearest: ' + WIN_KIND[best.k] + ', ' + how };
   }
-  // "Varrow: march 2 to Saltmarsh", or for a later move "Varrow, then: march 2 to Saltmarsh"
+  // the folded line: the first row's short form, and how many more rows there are
+  function dangerSummary(s, d) {
+    d = d || dangerRows(s);
+    if (!d.rows.length) return { text: 'No house is close to winning yet.', cls: '' };
+    return { text: d.rows[0].text + (d.rows.length > 1 ? ' · ' + (d.rows.length - 1) + ' more' : ''), cls: d.cls };
+  }
+  function dangerPanel(s) {
+    var d = dangerRows(s), sm = dangerSummary(s, d);
+    var body = d.rows.length ? d.rows.map(function (r) { return r.html; }).join('') : '<li class="muted">No house is close to winning yet.</li>';
+    return fold('danger', 'Who is close to winning', esc(sm.text), '<ul class="rows">' + body + '</ul>', 'danger', sm.cls);
+  }
+  // "Varrow next: march 2 to Saltmarsh", or for a later move "Varrow after that: march 2 to Saltmarsh"
   function planLabel(s, x) {
-    var l = E.intentLabel(s, x.house, x.intent);
-    return x.second ? l.replace(/^([^:]+): /, '$1, then: ') : l;
+    return planWhen(E.intentLabel(s, x.house, x.intent), x.second > 0);
   }
   function intentPanel(s) {
     var it = intents(s);
@@ -808,7 +825,7 @@
   }
 
   // exports for ui-sheets.js and for tests
-  U.h = { esc: esc, cap: cap, age: age, me: me, who: who, whoLow: whoLow, whose: whose, whoseLow: whoseLow, rn: rn, cardName: cardName, listAnd: listAnd, plural: plural,
+  U.h = { esc: esc, cap: cap, age: age, me: me, who: who, whoLow: whoLow, whose: whose, whoseLow: whoseLow, rn: rn, cardName: cardName, planWhen: planWhen, dangerRows: dangerRows, dangerSummary: dangerSummary, intents: intents, planLabel: planLabel, listAnd: listAnd, plural: plural,
     stamp: stamp, btn: btn, K: K, plain: plain, toast: toast, save: save, hasSave: hasSave, logLine: logLine, describe: describe,
     pactWords: pactWords, screenFor: screenFor, isMyTurn: isMyTurn, legalNow: legalNow, bars: bars, unguarded: unguarded };
   U.go = go; U.render = render; U.pump = pump; U.skipAhead = skip; U.doAction = doAction; U.newCampaign = newCampaign; U.nextAge = nextAge;

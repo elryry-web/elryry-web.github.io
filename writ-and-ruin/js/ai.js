@@ -656,7 +656,11 @@
     s._ahead = key;
     s.order.forEach(function (h) {
       if (h === 'player') return;
-      var hs = s.houses[h], p = aheadPlans(s, h, hs.intent);
+      var hs = s.houses[h];
+      // a rival declares its plan as it ends a turn, so one that has not yet had a turn this age (seated after you in
+      // the first round) has none: plan its next move now, by the rules of the round it falls in, so it shows first
+      if (!hs.intent) hs.intent = planIntent(s, h).intent;
+      var p = aheadPlans(s, h, hs.intent);
       hs.then = p.then; hs.intent2 = p.intent2;
     });
     return true;

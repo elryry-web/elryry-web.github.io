@@ -310,7 +310,7 @@
   // a later move (a second move, or one the Owl shows) is drawn dashed and dimmer
   function intentMark(s, h, it, second) {
     var m = intentMark1(s, h, it, second);
-    return m && second ? '<g class="later" opacity="0.6"><title>Then</title>' + m + '</g>' : m;
+    return m && second ? '<g class="later" opacity="0.6"><title>After that</title>' + m + '</g>' : m;
   }
   function intentMark1(s, h, it, second) {
     if (!it) return '';

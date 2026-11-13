@@ -956,9 +956,9 @@
     ev.push({ type: 'tribute', house: p.payer, to: p.payee, silver: amt });
   }
 
-  // 'Varrow: assault Saltmarsh with 4'
+  // 'Varrow: assault Saltmarsh with 4', 'Varrow: march 2 to the Crown hold' (the region names that take an article get it here)
   function intentLabel(s, h, it) {
-    var who = cap(s.houses[h].short), R = function (r) { return REG[r] ? REG[r].name : r; };
+    var who = cap(s.houses[h].short), R = function (r) { return REG[r] ? (r === 'crown' || r === 'farpass' ? 'the ' : '') + REG[r].name : r; };
     if (!it) return who + ': no plan';
     var w = it.why && s.houses[it.why.house], base = intentBase(it, who, R);
     if (!w) return base;

@@ -219,7 +219,7 @@
         !cand({ type: 'station', region: r, card: U.mode.card })) { U.doAction({ type: 'station', region: r, card: U.mode.card }); return; }
     // With Assault chosen from the bar, an unguarded rival region is taken by marching, not by assault: say so.
     if (U.mode && U.mode.kind === 'assault' && r !== 'camp' && H.isMyTurn(s) && H.unguarded(s, r) &&
-        H.legalNow(s).some(function (a) { return a.type === 'march' && a.to === r; })) toast(rn(r) + ' is unguarded: march in to take it (1 moon).');
+        H.legalNow(s).some(function (a) { return a.type === 'march' && a.to === r; })) toast(cap(rn(r)) + ' is unguarded: march in to take it (1 moon).');
     U.openSheet(function () { return regionHtml(r); }, { wide: true, onClose: function () { U.selected = null; } });
     U.render();
   };
@@ -387,8 +387,9 @@
         var t = pc.type === 'truce' ? 'Truce with ' + whoLow(other) : pc.type === 'tribute' ? who(pc.payer) + ' pays ' + whoLow(pc.payee) + ' tribute' : 'Common cause with ' + whoLow(other) + ' against ' + whoLow(pc.foe);
         return '<li><span>' + esc(t) + (pc.until < 99 ? ' (to the end of round ' + pc.until + ')' : ' (until the age ends)') + '</span></li>';
       }).join('') + '</ul>' : '<p class="muted">None.</p>'));
-      if (!mine && hs.intent) out.push('<h3>Plan</h3><p>' + esc(E.intentLabel(s, h, hs.intent)) + '.</p>');
-      if (!mine && hs.then) out.push('<p>' + esc(E.intentLabel(s, h, hs.then).replace(/^([^:]+): /, '$1, then: ')) + '.</p>');
+      // its shown moves in order: the first is its next move, the second comes after that
+      var plan = mine ? [] : [hs.intent, hs.then].filter(Boolean);
+      plan.forEach(function (it, i) { out.push((i ? '' : '<h3>Plan</h3>') + '<p>' + esc(H.planWhen(E.intentLabel(s, h, it), i > 0)) + '.</p>'); });
       if (!mine) {
         var mem = s.memory[h] && s.memory[h].player;
         if (mem && (mem.grudge || mem.debt)) out.push('<p class="muted">' + (mem.grudge ? 'Holds a grudge against you (' + mem.grudge + '). ' : '') + (mem.debt ? 'Owes you a debt (' + mem.debt + ').' : '') + '</p>');
@@ -648,7 +649,7 @@
       var R = c.reckoning, seat = (R.events || []).filter(function (e) { return e.type === 'reckonSeat'; })[0];
       if (seat) out.push('<section class="panel"><h3>The next age</h3><p>' + (seat.ruler ? who(seat.ruler) + (seat.ruler === 'player' ? ' begin' : ' begins') + ' in the Crown hold.' : 'The Crown hold begins empty.') +
         ' Your rivals: ' + listAnd(seat.rivals.map(function (h) { return c.houses[h].name.replace(/^The /, 'the '); })) + '.' + (seat.freeHold ? ' ' + (seat.freeHold === 'player' ? 'Your' : c.houses[seat.freeHold].name + "'s") + ' free hold stands at the Far Pass.' : '') +
-        (seat.ruler !== 'player' && seat.freeHold !== 'player' && c.holdfast && c.holdfast.player ? ' Your holdfast is ' + (c.holdfast.player === 'farpass' ? 'the ' : '') + rn(c.holdfast.player) + '. You begin there if it is free.' : '') + '</p>' +
+        (seat.ruler !== 'player' && seat.freeHold !== 'player' && c.holdfast && c.holdfast.player ? ' Your holdfast is ' + rn(c.holdfast.player) + '. You begin there if it is free.' : '') + '</p>' +
         (c.world.laws.length ? '<p class="muted">Laws: ' + c.world.laws.map(function (id) { return D.LAW[id].name; }).join(', ') + '.</p>' : '') + '</section>');
       out.push('<div class="row">' + btn('Begin ' + E.ageTitle(c.ageNo + 1).replace(/^The/, 'the'), function () { U.nextAge(); }, { cls: 'go big' }) + '</div>');
     }
