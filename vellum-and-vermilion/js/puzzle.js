@@ -70,7 +70,36 @@
     M.groups.forEach(function (g, gi) { g.forEach(function (c) { M.groupOf[c] = gi; }); });
     M.turnables = [];
     for (var c = 0; c < n; c++) if (turnable(M.kinds[c])) M.turnables.push(c);
+    if (level.book === 2) prepare2(M, level);
     return M;
+  }
+  /* Book II: level.kinds and level.sol are the solution; the loose leaves start elsewhere (startPos), so
+     M.kinds is the starting arrangement (the board swaps it in place) and M.solKinds the finished page.
+     M.start and M.startWeave are indexed by the cell a tile starts on. Over/under: ws[c] = 0 puts the
+     N–S ribbon of the crossing on top, 1 the E–W one (for a crossing at rotation 0, as all are). */
+  function prepare2(M, level) {
+    var n = M.n, c;
+    M.b2 = true;
+    M.solKinds = M.kinds.slice();
+    M.loose = (level.loose || []).slice();
+    M.isLoose = new Uint8Array(n);
+    M.loose.forEach(function (q) { M.isLoose[q] = 1; });
+    M.inked = new Uint8Array(n);
+    (level.inked || []).forEach(function (q) { M.inked[q] = 1; });
+    M.solWeave = weaveDigits(level.weave, n);
+    var sk = M.solKinds.slice(), sw = new Int8Array(n).fill(-1);
+    for (c = 0; c < n; c++) if (!M.isLoose[c]) sw[c] = M.solWeave[c];
+    M.loose.forEach(function (q, i) { var to = level.startPos ? level.startPos[i] : q; sk[to] = M.solKinds[q]; sw[to] = M.solWeave[q]; });
+    M.startKinds = sk;
+    M.kinds = sk.slice();
+    M.startWeave = level.wstart ? weaveDigits(level.wstart, n) : sw;
+    M.turnables = [];
+    for (c = 0; c < n; c++) if (turnable(M.kinds[c])) M.turnables.push(c);
+  }
+  function weaveDigits(s, n) {
+    var out = new Int8Array(n).fill(-1);
+    for (var c = 0; s && c < n; c++) if (s[c] === '0' || s[c] === '1') out[c] = +s[c];
+    return out;
   }
   function digits(s) { return s.split('').map(function (ch) { return ch === ' ' || ch === '.' ? 0 : +ch; }); }
 
@@ -256,11 +285,192 @@
     return out;
   }
 
+  /* ---------- Book II: over and under, loose leaves ---------- */
+  // the model as it is when finished (Book I: the model itself)
+  function solModel(M) {
+    if (!M.b2) return M;
+    var S = Object.create(M); S.kinds = M.solKinds; return S;
+  }
+  function withKinds(M, kinds) { var S = Object.create(M); S.kinds = kinds; return S; }
+  // does piece p of the crossing at c lie on top? (h = 1 when the piece runs E–W)
+  function over(M, rots, ws, c, p) { return ((p + (rots[c] | 0) + ws[c]) & 1) === 0; }
+  function xVisits(M, s) { return s.pieces.filter(function (q) { return M.kinds[q.c] === 'x'; }); }
+  // consecutive crossing visits along a strand (round the loop when it closes); a strand that crosses
+  // itself visits the same cell twice, once on each piece
+  function visitPairs(M, s) {
+    var v = xVisits(M, s), out = [], lim = s.loop ? (v.length >= 2 ? v.length : 0) : v.length - 1;
+    for (var i = 0; i < lim; i++) out.push([v[i], v[(i + 1) % v.length]]);
+    return out;
+  }
+  /* Where each strand's weave breaks: for strand i, out[i] = the crossing cells (deduped, in strand
+     order) of every consecutive pair of visits that are both over or both under. */
+  function weaveBreaks(M, tr, rots, ws) {
+    return tr.strands.map(function (s) {
+      var cells = [], seen = {};
+      visitPairs(M, s).forEach(function (pr) {
+        var a = pr[0], b = pr[1];
+        if (over(M, rots, ws, a.c, a.p) !== over(M, rots, ws, b.c, b.p)) return;
+        [a.c, b.c].forEach(function (c) { if (!seen[c]) { seen[c] = 1; cells.push(c); } });
+      });
+      return cells;
+    });
+  }
+  /* The weave a finished arrangement allows: crossings linked along strands into components; each
+     component alternates one way or the other, or not at all; an inked crossing fixes its component.
+     Returns { ways (0, 1, 2, 4… capped at cap), ws (one alternating weave, inked values honoured),
+     comps: [[cells]], consistent }. */
+  function weaveSolve(M, tr, rots, cap) {
+    var n = M.n, adj = {}, out = new Int8Array(n).fill(-1), comps = [], ways = 1, consistent = true;
+    function link(a, b, par) { (adj[a] = adj[a] || []).push([b, par]); (adj[b] = adj[b] || []).push([a, par]); }
+    tr.strands.forEach(function (s) {
+      visitPairs(M, s).forEach(function (pr) {
+        var a = pr[0], b = pr[1];
+        var ha = (a.p + (rots[a.c] | 0)) & 1, hb = (b.p + (rots[b.c] | 0)) & 1;
+        link(a.c, b.c, 1 ^ ha ^ hb);   // over(a) != over(b)  ⇔  ws[a] ^ ws[b] = 1 ^ ha ^ hb
+      });
+    });
+    for (var c = 0; c < n; c++) {
+      if (M.kinds[c] !== 'x' || out[c] >= 0) continue;
+      out[c] = 0;
+      var comp = [c], queue = [c], ok = true;
+      while (queue.length) {
+        var u = queue.shift();
+        (adj[u] || []).forEach(function (e) {
+          var want = out[u] ^ e[1];
+          if (out[e[0]] < 0) { out[e[0]] = want; queue.push(e[0]); comp.push(e[0]); }
+          else if (out[e[0]] !== want) ok = false;
+        });
+      }
+      comps.push(comp);
+      if (!ok) { consistent = false; ways = 0; continue; }
+      var ink = M.inked ? comp.filter(function (q) { return M.inked[q] && !(M.isLoose && M.isLoose[q]); }) : [];
+      if (!ink.length) { ways = Math.min(cap || 1e9, ways * 2); continue; }
+      var flip = out[ink[0]] ^ M.solWeave[ink[0]];
+      comp.forEach(function (q) { out[q] ^= flip; });
+      if (ink.some(function (q) { return out[q] !== M.solWeave[q]; })) ways = 0;
+    }
+    return { ways: ways, ws: out, comps: comps, consistent: consistent };
+  }
+  /* Book II's solved: Book I's rule, every leaf where it belongs (identical leaves interchangeable),
+     and every strand alternating. */
+  function solved2(M, rots, ws, tr) {
+    tr = tr || trace(M, rots);
+    if (!tr.solved) return false;
+    for (var i = 0; i < M.loose.length; i++) if (M.kinds[M.loose[i]] !== M.solKinds[M.loose[i]]) return false;
+    return weaveBreaks(M, tr, rots, ws).every(function (b) { return !b.length; });
+  }
+  /* Is cell c as in the solution? A leaf: the right kind, turned right; a crossing that can be set: set right. */
+  function cellRight2(M, rots, ws, c) {
+    var k = M.kinds[c];
+    if (!isTile(k)) return true;
+    if (M.isLoose[c] && k !== M.solKinds[c]) return false;
+    if (turnable(k) && !sameState(k, rots[c], M.sol[c])) return false;
+    if (k === 'x' && !M.inked[c] && ws[c] !== M.solWeave[c]) return false;
+    return true;
+  }
+  function wrong2(M, rots, ws) {
+    var out = [];
+    for (var c = 0; c < M.n; c++) if (isTile(M.kinds[c]) && !(M.inked[c] && !M.isLoose[c]) &&
+      (turnable(M.kinds[c]) || M.kinds[c] === 'x' || M.isLoose[c]) && !cellRight2(M, rots, ws, c)) out.push(c);
+    return out;
+  }
+  /* Count Book II solutions up to `limit`: rotations as in solve(), the loose leaves in any arrangement
+     of their multiset (identical leaves count once), and every weave the inked crossings allow.
+     Returns {count, solutions:[{kinds, rots, ws}], nodes, aborted}. */
+  function solve2(M, limit, maxNodes) {
+    limit = limit || 2; maxNodes = maxNodes || 5e6;
+    var n = M.n, kk = M.solKinds.slice(), cnt = {}, kindList = [];
+    M.loose.forEach(function (c) {
+      var k = M.solKinds[c];
+      if (!cnt[k]) { cnt[k] = 0; kindList.push(k); }
+      cnt[k]++; kk[c] = '?';
+    });
+    kindList.sort();
+    var MM = withKinds(M, kk);
+    var rot = new Int8Array(n), known = new Uint8Array(n);
+    for (var c = 0; c < n; c++) if (kk[c] !== '?' && !turnable(kk[c])) known[c] = 1;
+    var vars = [], done = {};
+    for (c = 0; c < n; c++) {
+      if (kk[c] === '?') { vars.push({ cells: [c], loose: true }); continue; }
+      if (!turnable(kk[c])) continue;
+      var g = M.groupOf[c];
+      if (g >= 0) {
+        if (done['g' + g]) continue;
+        done['g' + g] = 1;
+        var L = 1;
+        M.groups[g].forEach(function (m) { L = lcm(L, period(kk[m])); });
+        vars.push({ cells: M.groups[g], states: L, group: true });
+      } else vars.push({ cells: [c], states: period(kk[c]), group: false });
+    }
+    var nodes = 0, count = 0, sols = [], aborted = false;
+    function ok(c) {
+      var m = maskOf(kk[c], rot[c]);
+      for (var d = 0; d < 4; d++) {
+        var nc = neighbor(M, c, d), nb;
+        if (nc < 0 || (kk[nc] !== '?' && !isTile(kk[nc]))) nb = 0;
+        else if (known[nc]) nb = (maskOf(kk[nc], rot[nc]) >> opp(d)) & 1;
+        else continue;
+        if (((m >> d) & 1) !== nb) return false;
+      }
+      return true;
+    }
+    function leaf() {
+      var tr = trace(MM, rot);
+      if (!tr.solved) return false;
+      var wv = weaveSolve(MM, tr, rot, limit);
+      if (!wv.ways) return false;
+      count += wv.ways;
+      sols.push({ kinds: kk.slice(), rots: Array.from(rot), ws: Array.from(wv.ws), ways: wv.ways });
+      return count >= limit;
+    }
+    function dfs(i) {
+      if (aborted) return true;
+      if (i === vars.length) return leaf();
+      var v = vars[i], j, s, cc;
+      if (v.loose) {
+        cc = v.cells[0];
+        for (var ki = 0; ki < kindList.length; ki++) {
+          var k = kindList[ki];
+          if (!cnt[k]) continue;
+          cnt[k]--; kk[cc] = k;
+          for (s = 0; s < period(k); s++) {
+            if (++nodes > maxNodes) { aborted = true; break; }
+            rot[cc] = s; known[cc] = 1;
+            if (ok(cc) && dfs(i + 1)) { known[cc] = 0; kk[cc] = '?'; cnt[k]++; return true; }
+            known[cc] = 0;
+          }
+          kk[cc] = '?'; cnt[k]++;
+          if (aborted) return true;
+        }
+        return false;
+      }
+      for (s = 0; s < v.states; s++) {
+        if (++nodes > maxNodes) { aborted = true; return true; }
+        var good = true;
+        for (j = 0; j < v.cells.length; j++) {
+          cc = v.cells[j];
+          rot[cc] = v.group ? (M.start[cc] + s) & 3 : s;
+          known[cc] = 1;
+        }
+        for (j = 0; j < v.cells.length && good; j++) good = ok(v.cells[j]);
+        if (good && dfs(i + 1)) { unset(v); return true; }
+        unset(v);
+      }
+      return false;
+    }
+    function unset(v) { v.cells.forEach(function (cc) { known[cc] = 0; }); }
+    dfs(0);
+    return { count: count, solutions: sols, nodes: nodes, aborted: aborted };
+  }
+
   return {
     DX: DX, DY: DY, DIRS: DIRS, KINDS: KINDS, PIGMENTS: PIGMENTS,
     rotDir: rotDir, opp: opp, isTile: isTile, turnable: turnable, period: period, singleRibbon: singleRibbon,
     maskOf: maskOf, piecesOf: piecesOf, sameState: sameState,
     prepare: prepare, neighbor: neighbor, trace: trace, isSolved: isSolved, solve: solve,
-    cellRight: cellRight, wrongCells: wrongCells, weave: weave
+    cellRight: cellRight, wrongCells: wrongCells, weave: weave,
+    // Book II
+    solModel: solModel, withKinds: withKinds, over: over, weaveBreaks: weaveBreaks, weaveSolve: weaveSolve,
+    solved2: solved2, cellRight2: cellRight2, wrong2: wrong2, solve2: solve2
   };
 });

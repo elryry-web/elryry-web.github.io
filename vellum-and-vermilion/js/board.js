@@ -21,6 +21,9 @@
   'use strict';
   var P = window.Puzzle, ART = window.ART;
   var TURN_MS = 170, PRESS_MS = 450, DRAIN_MS = 420, ILLUM_MS = 2500;
+  // Book II: a crossing's lift-and-swap, a loose leaf's slide home, a strand's fade to dull and back,
+  // the distance a finger moves a leaf before it is dragged rather than tapped
+  var XFX_MS = 180, SLIDE_MS = 180, DULL_MS = 300, DRAG_PX = 12, CARET_MS = 250;
 
   function easeOutBack(t) { var c1 = 1.5, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); }
   function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
@@ -46,27 +49,76 @@
   B.setLevel = function (level, saved) {
     saved = saved || {};
     var M = this.M = P.prepare(level);
-    this.weave = P.weave(M);
+    this.xfx = {}; this.slide = {}; this.drag = null; this.breakCells = []; this.caretAt = {}; this._leafPaths = {};
+    if (M.b2) this._restore2(saved); else this.weave = P.weave(M);
     this.isInitial = !!level.initial;
     this.groundName = ART.groundName(level); this.ground = ART.ground(this.groundName);
     this.rots = (saved.rots && saved.rots.length === M.n) ? saved.rots.slice() : M.start.slice();
     this.pins = new Uint8Array(M.n);
-    (saved.pins || []).forEach(function (c) { if (P.turnable(M.kinds[c])) this.pins[c] = 1; }, this);
+    (saved.pins || []).forEach(function (c) { if (this._pinnable(c)) this.pins[c] = 1; }, this);
     this.shown = this.rots.map(function (r) { return r * Math.PI / 2; });
     this.anim = {}; this.flood = {}; this.drain = {}; this.snap = {}; this.wig = {}; this.wagAt = {}; this.blinkAt = {};
     this.twinFx = {}; this.parts = [];
     this.solved = false; this.locked = false; this.illum = null;
     this._base = null;
     if (saved.solved) {
+      if (M.b2) {
+        for (var sc = 0; sc < M.n; sc++) M.kinds[sc] = M.solKinds[sc];
+        this.weave = Int8Array.from(M.solWeave); this._turnables();
+      }
       this.rots = M.sol.slice(); this.shown = this.rots.map(function (r) { return r * Math.PI / 2; });
     }
     this.tr = P.trace(M, this.rots);
     var t0 = saved.solved ? -1e9 : now() - 1e6;   // whole strands from a reload show already flooded
     this._jewels();
-    this.tr.strands.forEach(function (s) { if (s.whole) this.flood[s.key] = { t0: t0, origin: 0, color: s.color, disp: this._disp(s) }; }, this);
-    if (this.tr.solved) { this.solved = true; this.locked = true; this.illum = { t0: -1e9 }; }
+    var br = M.b2 ? P.weaveBreaks(M, this.tr, this.rots, this.weave) : null, bc = {};
+    this.tr.strands.forEach(function (s, si) {
+      if (!s.whole) return;
+      var f = this.flood[s.key] = { t0: t0, origin: 0, color: s.color, disp: this._disp(s) };
+      if (br) { f.dull = br[si].length > 0; f.dt0 = -1e9; br[si].forEach(function (c) { bc[c] = 1; }); }
+    }, this);
+    this.breakCells = Object.keys(bc).map(Number);
+    this.breakCells.forEach(function (c) { this.caretAt[c] = -1e9; }, this);
+    if (M.b2 ? P.solved2(M, this.rots, this.weave, this.tr) : this.tr.solved) { this.solved = true; this.locked = true; this.illum = { t0: -1e9 }; }
     this.letter = null;
     this.fit(this.fitW || 300, this.fitH || 300);
+  };
+  /* Book II: the arrangement and weave as the player left them. saved.k (the kinds, cell by cell) is
+     taken only if it differs from the start in the loose leaves alone, and holds the same leaves; saved.w
+     holds '0' / '1' for each crossing. Inked crossings always keep their ink. */
+  B._restore2 = function (saved) {
+    var M = this.M, n = M.n, c;
+    if (typeof saved.k === 'string' && saved.k.length === n) {
+      var k = saved.k.split(''), ok = true, a = [], b = [];
+      for (c = 0; c < n; c++) {
+        if (M.isLoose[c]) { a.push(k[c]); b.push(M.startKinds[c]); } else if (k[c] !== M.startKinds[c]) ok = false;
+      }
+      if (ok && a.sort().join('') === b.sort().join('')) for (c = 0; c < n; c++) M.kinds[c] = k[c];
+    }
+    var w = typeof saved.w === 'string' && saved.w.length === n ? saved.w : null;
+    this.weave = new Int8Array(n).fill(-1);
+    for (c = 0; c < n; c++) {
+      if (M.kinds[c] !== 'x') continue;
+      if (M.inked[c]) this.weave[c] = M.solWeave[c];
+      else if (w && (w[c] === '0' || w[c] === '1')) this.weave[c] = +w[c];
+      else this.weave[c] = M.startWeave[c] >= 0 ? M.startWeave[c] : 0;
+    }
+    // each leaf keeps an identity (the cell it started on) for its deckled edge, wherever it is moved
+    this.leafId = new Int16Array(n).fill(-1);
+    M.loose.forEach(function (q) { this.leafId[q] = q; }, this);
+    this._turnables();
+  };
+  // a leaf moved in or out changes which cells turn
+  B._turnables = function () {
+    var M = this.M; M.turnables = [];
+    for (var c = 0; c < M.n; c++) if (P.turnable(M.kinds[c])) M.turnables.push(c);
+  };
+  // what a long-press can pin: a tile that turns (Book I); in Book II also a crossing that can be set,
+  // and any loose leaf
+  B._pinnable = function (c) {
+    var M = this.M, k = M.kinds[c];
+    if (P.turnable(k)) return true;
+    return !!M.b2 && ((k === 'x' && !M.inked[c]) || !!M.isLoose[c]);
   };
   // the jewel each mark pigment would be mistaken for, so a page with that mark never gives an unmarked
   // strand its near-twin (orpiment's twin, the burnished gold, is no longer a strand colour at all)
@@ -84,7 +136,7 @@
   B._jewels = function () {
     var M = this.M, c, marks = {}, any = false, gn = this.groundName; this.jewel = null;
     for (c = 0; c < M.n; c++) if (M.mark[c]) { marks[M.mark[c]] = 1; any = true; }
-    var st = P.trace(M, M.sol), cells = [], W = {}, JN, rot = ((M.level && M.level.n) || 1) % 3;
+    var st = P.trace(P.solModel(M), M.sol), cells = [], W = {}, JN, rot = ((M.level && M.level.n) || 1) % 3;
     if (!any) JN = ART.jewelsFor(gn);
     else {
       var clash = ((ART.GROUND[gn] || {}).clash) || [];
@@ -143,9 +195,14 @@
   B.getState = function () {
     var pins = [];
     for (var c = 0; c < this.M.n; c++) if (this.pins[c]) pins.push(c);
-    return { rots: this.rots.slice(), pins: pins, solved: this.solved };
+    var st = { rots: this.rots.slice(), pins: pins, solved: this.solved };
+    if (this.M.b2) {   // Book II: the kinds as arranged, and each crossing's weave ('.' elsewhere)
+      st.k = this.M.kinds.join('');
+      st.w = Array.prototype.map.call(this.weave, function (v) { return v < 0 ? '.' : String(v); }).join('');
+    }
+    return st;
   };
-  B.wrongCount = function () { return P.wrongCells(this.M, this.rots).length; };
+  B.wrongCount = function () { return this.M.b2 ? P.wrong2(this.M, this.rots, this.weave).length : P.wrongCells(this.M, this.rots).length; };
 
   /* ---------- layout ---------- */
   B.fit = function (maxW, maxH) {
@@ -157,7 +214,7 @@
     this.band = band; this.ivy = Math.round(band * 0.65); this.pad = band + this.ivy;
     S = Math.floor(Math.min((maxW - 2 * this.pad) / w, (maxH - 2 * this.pad) / h, 150));
     this.S = Math.max(16, S);
-    this.panel = null; this._base = null; this._still = null; this._onCv = false;
+    this.panel = null; this._base = null; this._still = null; this._onCv = false; this._leafPaths = {};
     this.cssW = w * this.S + 2 * this.pad; this.cssH = h * this.S + 2 * this.pad;
     // two device pixels per CSS pixel is as sharp as a phone shows these tiles; a third costs 2.25x the fill
     this.dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -173,7 +230,7 @@
     var self = this, M = this.M, gen = ++this._warmGen;
     if (this.mini || !M || this.S < 24 || !window.ART || !ART.draw) return;
     var jobs = [];
-    P.trace(M, M.sol).strands.forEach(function (s) {
+    P.trace(P.solModel(M), M.sol).strands.forEach(function (s) {
       var rb = null;
       s.pieces.forEach(function (q) {
         var b = M.beast[q.c]; if (b !== 'h' && b !== 't') return;
@@ -220,6 +277,7 @@
   B.rotate = function (c, steps, quiet) {
     var M = this.M; steps = steps === undefined ? 1 : steps;
     if (this.locked || !M) return false;
+    if (M.b2 && M.kinds[c] === 'x') return this._flipX(c, quiet);
     if (!P.turnable(M.kinds[c]) || this.members(c).some(function (m) { return this.pins[m]; }, this)) {
       this.wiggle(c); if (!quiet && this.cb.onWiggle) this.cb.onWiggle(c); return false;
     }
@@ -244,15 +302,120 @@
   };
   B.togglePin = function (c) {
     var M = this.M;
-    if (this.locked || !M || !P.turnable(M.kinds[c])) { if (M) { this.wiggle(c); if (this.cb.onWiggle) this.cb.onWiggle(c); } return; }
+    if (this.locked || !M || !this._pinnable(c)) { if (M) { this.wiggle(c); if (this.cb.onWiggle) this.cb.onWiggle(c); } return; }
     var v = this.pins[c] ? 0 : 1, self = this;
     this.members(c).forEach(function (m) { self.pins[m] = v; });
     var gi = M.groupOf[c]; if (gi >= 0) { this.twinFx[gi] = now(); this.busy(700); }
     this.kick();
     if (this.cb.onPin) this.cb.onPin(c, !!v);
   };
+  /* ---------- Book II moves ---------- */
+  // a tap on a crossing that can be set swaps which ribbon lies on top (an inked or pinned one wiggles)
+  B._flipX = function (c, quiet) {
+    var M = this.M;
+    if (M.inked[c] || this.pins[c]) { this.wiggle(c); if (!quiet && this.cb.onWiggle) this.cb.onWiggle(c); return false; }
+    this.weave[c] ^= 1; this.xfx[c] = now();
+    this.busy(XFX_MS + 80);
+    if (!quiet && this.cb.onTurn) this.cb.onTurn(c);
+    this._refresh(c);
+    return true;
+  };
+  // swap the loose leaves at a and b (each with its turn and weave); both slide to their new places.
+  // off: where the dragged leaf (from a) was let go, relative to a, so it slides on from there
+  B._swap = function (a, b, off) {
+    var M = this.M, S = this.S, t = now(), self = this;
+    function sw(arr) { var v = arr[a]; arr[a] = arr[b]; arr[b] = v; }
+    sw(M.kinds); sw(this.rots); sw(this.weave); sw(this.leafId);
+    [a, b].forEach(function (c) { delete self.anim[c]; delete self.wig[c]; delete self.xfx[c]; self.shown[c] = self.rots[c] * Math.PI / 2; });
+    var ax = a % M.w, ay = a / M.w | 0, bx = b % M.w, by = b / M.w | 0;
+    this.slide[b] = { dx: (ax - bx) * S + (off ? off[0] : 0), dy: (ay - by) * S + (off ? off[1] : 0), t0: t, dur: SLIDE_MS };
+    this.slide[a] = { dx: (bx - ax) * S, dy: (by - ay) * S, t0: t, dur: SLIDE_MS };
+    this._turnables();
+    this.busy(SLIDE_MS + 80);
+  };
+  B.swapLeaves = function (a, b, off, quiet) {
+    var M = this.M;
+    if (!M || !M.b2 || this.locked || a === b || !M.isLoose[a] || !M.isLoose[b] || this.pins[a] || this.pins[b]) return false;
+    this._swap(a, b, off);
+    if (!quiet && this.cb.onTurn) this.cb.onTurn(b);
+    this._refresh(b);
+    return true;
+  };
+  // set one cell as in the solution: its turn (and twins' turns) and, for a crossing, its weave
+  B._settle = function (c) {
+    var M = this.M, k = M.kinds[c], t = now(), self = this;
+    if (P.turnable(k)) {
+      var mem = this.members(c), steps = 0;
+      for (var s = 1; s < 4; s++) if (mem.every(function (m) { return P.sameState(M.kinds[m], self.rots[m] + s, M.sol[m]); })) { steps = s; break; }
+      if (!mem.every(function (m) { return P.sameState(M.kinds[m], self.rots[m], M.sol[m]); }) && steps) {
+        mem.forEach(function (m) {
+          var from = self._shownAngle(m, t);
+          self.rots[m] = (self.rots[m] + steps) & 3; self.shown[m] += steps * Math.PI / 2;
+          self.anim[m] = { from: from, to: self.shown[m], t0: t, dur: 260 };
+        });
+        var gi = M.groupOf[c]; if (gi >= 0) this.twinFx[gi] = t;
+      }
+    }
+    if (k === 'x' && !M.inked[c] && this.weave[c] !== M.solWeave[c]) { this.weave[c] = M.solWeave[c]; this.xfx[c] = t; }
+    this.busy(700);
+  };
+  // a hint: a leaf out of place is brought home first (taken from a place it doesn't belong either);
+  // otherwise a wrong tile or crossing next to tiles already right is set. The hinted cell is pinned.
+  B._hint2 = function () {
+    var M = this.M, self = this, target = -1, from = -1, i, j;
+    for (i = 0; i < M.loose.length && target < 0; i++) {
+      var c = M.loose[i]; if (M.kinds[c] === M.solKinds[c]) continue;
+      for (j = 0; j < M.loose.length; j++) {
+        var d = M.loose[j];
+        if (d !== c && M.kinds[d] === M.solKinds[c] && M.kinds[d] !== M.solKinds[d]) { target = c; from = d; break; }
+      }
+    }
+    if (target >= 0) {
+      this.pins[target] = 0; this.pins[from] = 0;
+      this._swap(from, target, null);
+    } else {
+      var wrong = P.wrong2(M, this.rots, this.weave);
+      if (!wrong.length) return false;
+      var bestScore = -1;
+      wrong.forEach(function (c) {
+        var sc = self.pins[c] ? 0 : 2;
+        for (var d = 0; d < 4; d++) { var nc = P.neighbor(M, c, d); if (nc >= 0 && P.isTile(M.kinds[nc]) && P.cellRight2(M, self.rots, self.weave, nc)) sc++; }
+        if (sc > bestScore) { bestScore = sc; target = c; }
+      });
+    }
+    var mem = this.members(target);
+    this._settle(target);
+    mem.forEach(function (m) { self.pins[m] = 1; });
+    this._refresh(target);
+    if (this.cb.onTurn) this.cb.onTurn(target);
+    if (this.cb.onPin) this.cb.onPin(target, true);
+    return target;
+  };
+  // Book II's reset and solution: the leaves go back (or home), each crossing to its start (or its weave)
+  B._arrange = function (kinds, rots, weave) {
+    var M = this.M, t = now(), self = this;
+    for (var c = 0; c < M.n; c++) {
+      if (!P.isTile(M.kinds[c])) continue;
+      if (M.kinds[c] !== kinds[c]) {   // a leaf changes place: it is laid there directly
+        M.kinds[c] = kinds[c]; this.rots[c] = rots[c]; this.shown[c] = rots[c] * Math.PI / 2; delete this.anim[c];
+        this.slide[c] = { dx: 0, dy: -this.S * 0.12, t0: t, dur: 260 };
+      } else if (P.turnable(M.kinds[c]) && !P.sameState(M.kinds[c], this.rots[c], rots[c])) {
+        var steps = (rots[c] - this.rots[c] + 4) & 3, from = this._shownAngle(c, t);
+        this.rots[c] = rots[c]; this.shown[c] += steps * Math.PI / 2;
+        this.anim[c] = { from: from, to: this.shown[c], t0: t, dur: 260 };
+      }
+      if (M.kinds[c] === 'x') {
+        var w = M.inked[c] ? M.solWeave[c] : (weave[c] >= 0 ? weave[c] : 0);
+        if (this.weave[c] !== w) { this.weave[c] = w; this.xfx[c] = t; }
+      } else this.weave[c] = -1;
+    }
+    M.loose.forEach(function (q) { self.leafId[q] = q; });
+    this._turnables();
+    this.busy(400);
+  };
   B.hint = function () {
     var M = this.M; if (this.locked || !M) return false;
+    if (M.b2) return this._hint2();
     var wrong = P.wrongCells(M, this.rots);
     if (!wrong.length) return false;
     // prefer an unpinned tile next to tiles already right, so the hint reads as progress
@@ -278,7 +441,9 @@
     if (!this.M) return;
     this.locked = false; this.solved = false; this.illum = null;
     var t = now(), self = this;
-    this.M.turnables.forEach(function (c) {
+    this.drag = null;
+    if (this.M.b2) this._arrange(this.M.startKinds, this.M.start, this.M.startWeave);
+    else this.M.turnables.forEach(function (c) {
       if (self.rots[c] !== self.M.start[c]) {
         var steps = (self.M.start[c] - self.rots[c] + 4) & 3;
         var from = self._shownAngle(c, t);
@@ -293,8 +458,9 @@
   B.applySolution = function () {
     if (!this.M) return;
     var M = this.M, t = now(), self = this;
-    this.locked = false;
-    M.turnables.forEach(function (c) {
+    this.locked = false; this.drag = null;
+    if (M.b2) this._arrange(M.solKinds, M.sol, M.solWeave);
+    else M.turnables.forEach(function (c) {
       if (!P.sameState(M.kinds[c], self.rots[c], M.sol[c])) {
         var steps = (M.sol[c] - self.rots[c] + 4) & 3;
         var from = self._shownAngle(c, t);
@@ -324,15 +490,37 @@
   B._refresh = function (origin) {
     var M = this.M, tr = this.tr = P.trace(M, this.rots), t = now(), self = this;
     var nowWhole = {}, bursts = 0;
-    tr.strands.forEach(function (s) {
+    // Book II: a whole strand whose weave breaks floods dull, with a caret on each breaking crossing
+    var br = M.b2 ? P.weaveBreaks(M, tr, this.rots, this.weave) : null, bc = {};
+    tr.strands.forEach(function (s, si) {
       if (!s.whole) return;
       nowWhole[s.key] = 1;
+      var dull = !!(br && br[si].length);
+      if (dull) br[si].forEach(function (c) { bc[c] = 1; });
+      var f0 = self.flood[s.key];
+      if (f0 && br && !!f0.dull !== dull) {   // the weave on a whole strand changed: fade to dull or burnish
+        f0.dull = dull; f0.dt0 = t; self.busy(DULL_MS + 100);
+        if (!dull) {
+          if (bursts++ < 6) self._burst(origin >= 0 ? origin : s.pieces[0].c, f0.disp, 12, 0);
+          if (self.cb.onStrandWhole) self.cb.onStrandWhole(s.color, s);
+        }
+      }
+      if (!f0 && dull) {   // a dull flood: the colour runs in without its bell or gold
+        var di = 0;
+        if (origin >= 0) s.pieces.forEach(function (q, i) { if (q.c === origin) di = i; });
+        else di = Math.floor(s.pieces.length / 2);
+        self.flood[s.key] = { t0: t, origin: di, color: s.color, disp: self._disp(s), dull: true, dt0: -1e9 };
+        s.pieces.forEach(function (q) { delete self.drain[q.c + ':' + q.p]; });
+        self.busy(Math.min(1400, s.pieces.length * 70) + 300);
+        return;
+      }
       if (!self.flood[s.key]) {
         var oi = 0;
         if (origin >= 0) s.pieces.forEach(function (q, i) { if (q.c === origin) oi = i; });
         else oi = Math.floor(s.pieces.length / 2);
         var disp = self._disp(s);
         self.flood[s.key] = { t0: t, origin: oi, color: s.color, disp: disp };
+        if (br) { self.flood[s.key].dull = false; self.flood[s.key].dt0 = -1e9; }
         s.pieces.forEach(function (q) { delete self.drain[q.c + ':' + q.p]; });
         var heads = s.pieces.filter(function (q) { return M.beast[q.c] === 'h'; });
         heads.forEach(function (q) { self.snap[q.c] = t + s.pieces.length * 30; });
@@ -348,9 +536,15 @@
       k.split(',').forEach(function (pk) { self.drain[pk] = { t0: t, color: f.color, disp: f.disp }; });
       delete self.flood[k];
       self.busy(DRAIN_MS + 50);
-      if (self.cb.onStrandBroken) self.cb.onStrandBroken(f.color);
+      if (self.cb.onStrandBroken && !f.dull) self.cb.onStrandBroken(f.color);
     });
-    if (tr.solved && !this.solved) {
+    if (br) {
+      var old = this.caretAt; this.caretAt = {};
+      this.breakCells = Object.keys(bc).map(Number);
+      this.breakCells.forEach(function (c) { self.caretAt[c] = old[c] !== undefined ? old[c] : t; });
+      if (this.breakCells.length) this.busy(CARET_MS + 50);
+    }
+    if ((br ? P.solved2(M, this.rots, this.weave, tr) : tr.solved) && !this.solved) {
       this.solved = true; this.locked = true;
       if (this.cb.onSolved) setTimeout(function () { self.cb.onSolved(); }, 260);
     }
@@ -487,6 +681,10 @@
         var per = Math.min(70, 1100 / Math.max(1, maxD + 1));
         res.frac = clamp((t - f.t0) / per - dist, 0, 1);
         res.fill = ART.rib(f.disp || f.color);
+        if (f.dull !== undefined) {   // Book II: a broken weave leaves the paint dull, half sunk into the vellum
+          var dk = clamp((t - f.dt0) / DULL_MS, 0, 1); if (!f.dull) dk = 1 - dk;
+          if (dk > 0) { res.fill = this._dullRib(f.disp || f.color, dk); res.dull = true; }
+        }
         var from = s.pieces[i].from;
         res.fromEnd = (forward || i === f.origin) ? from : 1 - from;
         if (i === f.origin) res.both = true;
@@ -499,6 +697,14 @@
       else if (!res.fill || res.frac < 1) res.drain = { rib: ART.rib(dr.disp || dr.color), k: k };
     }
     return res;
+  };
+  var DULL_MIX = 0.55;
+  B._dullRib = function (name, dk) {
+    if (dk >= 1) {
+      var C = this._dullC = this._dullC || {};
+      return C[name] || (C[name] = ART.ribMix(ART.rib(name), ART.RIB.bare, DULL_MIX));
+    }
+    return ART.ribMix(ART.rib(name), ART.RIB.bare, DULL_MIX * dk);
   };
 
   // a broad enamel ribbon: hairline, gold edges, cream gouache body; the strand's colour floods along it
@@ -559,6 +765,7 @@
   function anyKey(o) { for (var k in o) return true; return false; }
   B._settled = function (t) {
     if (this.parts.length || anyKey(this.twinFx) || anyKey(this.anim) || anyKey(this.wig) || anyKey(this.drain)) return false;
+    if (this.drag || anyKey(this.slide) || anyKey(this.xfx)) return false;
     for (var k in this.flood) if (t - this.flood[k].t0 < 1300) return false;   // floods run at most ~1.2 s
     return true;
   };
@@ -633,18 +840,35 @@
         bc.getContext('2d').drawImage(this.cv, 0, 0); this._base = bc;
       }
     }
-    for (var c = 0; c < M.n; c++) this._drawTile(g, c, t);
+    // Book II: loose leaves on the move (sliding home, or under the finger) are drawn above the rest
+    var fl = null, flList = [];
+    if (M.b2) {
+      fl = {};
+      for (var sk in this.slide) { fl[sk] = 1; flList.push(+sk); }
+      if (this.drag) { fl[this.drag.c] = 1; flList = flList.filter(function (q) { return q !== self.drag.c; }); flList.push(this.drag.c); }
+    }
+    for (var c = 0; c < M.n; c++) if (!fl || !fl[c]) this._drawTile(g, c, t);
     // twins' emblems sit in the top-left corner of each tile, above everything
     M.groups.forEach(function (grp, gi) {
       grp.forEach(function (m) { self._emblem(g, m, gi, t, Math.max(twinGlow[gi], twinK * 0.6)); });
     });
+    if (M.b2) {
+      if (this.drag && this.drag.target >= 0) {   // the leaf a drop would swap with
+        var tc = this.drag.target, tx = pad + (tc % M.w) * S, ty = pad + (tc / M.w | 0) * S, ins = S * 0.05;
+        g.fillStyle = 'rgba(255,224,140,0.16)'; g.fillRect(tx + ins, ty + ins, S - 2 * ins, S - 2 * ins);
+        g.strokeStyle = 'rgba(255,214,120,0.9)'; g.lineWidth = Math.max(2, S * 0.055); g.lineJoin = 'round';
+        g.strokeRect(tx + ins, ty + ins, S - 2 * ins, S - 2 * ins);
+      }
+      flList.forEach(function (q) { self._drawTile(g, q, t); });
+      this._drawCarets(g, t);
+    }
     // faint glow where ends have met but the strand isn't whole yet
     if (!this.solved) {
       var tr = this.tr;
       for (c = 0; c < M.n; c++) {
         for (var d = 1; d <= 2; d++) {
-          if (!tr.matched[c * 4 + d] || this.anim[c]) continue;
-          var nc = P.neighbor(M, c, d); if (this.anim[nc]) continue;
+          if (!tr.matched[c * 4 + d] || this.anim[c] || (fl && fl[c])) continue;
+          var nc = P.neighbor(M, c, d); if (this.anim[nc] || (fl && fl[nc])) continue;
           var si = this._strandAt(c, d);
           if (si < 0 || tr.strands[si].whole) continue;
           var gx = pad + (c % M.w + 0.5 + P.DX[d] * 0.5) * S, gy = pad + ((c / M.w | 0) + 0.5 + P.DY[d] * 0.5) * S;
@@ -672,6 +896,58 @@
     var M = this.M, S = this.S;
     ART.draw(g, 'twinEmblem', this.pad + (m % M.w) * S + S * 0.085, this.pad + (m / M.w | 0) * S + S * 0.085, S * 0.15, S * 0.15, t, { kind: gi, glow: glow });
   };
+  // Book II: the scribe's correction mark, a small upright vermilion caret on each crossing where a whole
+  // strand's weave breaks (it fades in, and follows a crossing leaf as it moves)
+  B._drawCarets = function (g, t) {
+    var M = this.M, S = this.S, self = this;
+    if (!this.breakCells.length || this.solved) return;
+    g.save(); g.lineJoin = 'miter'; g.lineCap = 'round';
+    this.breakCells.forEach(function (c) {
+      var k = clamp((t - (self.caretAt[c] || 0)) / CARET_MS, 0, 1), off = self._offset(c, t);
+      if (k < 1) self.busy(40);
+      var x = self.pad + (c % M.w + 0.5) * S + (off ? off[0] : 0), y = self.pad + ((c / M.w | 0) + 0.5) * S + (off ? off[1] : 0);
+      var u = S * (0.12 + 0.03 * (1 - k));
+      g.globalAlpha = k;
+      g.beginPath(); g.moveTo(x - u * 1.15, y + u * 0.75); g.lineTo(x, y - u * 0.95); g.lineTo(x + u * 1.15, y + u * 0.75);
+      g.strokeStyle = 'rgba(38,14,6,0.88)'; g.lineWidth = Math.max(3, S * 0.1); g.stroke();
+      g.strokeStyle = '#d8401f'; g.lineWidth = Math.max(1.6, S * 0.052); g.stroke();
+    });
+    g.restore(); g.globalAlpha = 1;
+  };
+  // where a loose leaf is drawn away from its cell: under the finger, or sliding home (null: in its cell)
+  B._offset = function (c, t) {
+    var d = this.drag;
+    if (d && d.c === c) return [d.x - d.x0, d.y - d.y0];
+    var s = this.slide[c]; if (!s) return null;
+    var k = (t - s.t0) / s.dur;
+    if (k >= 1) { delete this.slide[c]; return null; }
+    var e = 1 - Math.pow(1 - clamp(k, 0, 1), 3);
+    return [s.dx * (1 - e), s.dy * (1 - e)];
+  };
+  // a loose leaf's scrap of vellum: a square a little inside the tile with a torn (deckled) edge, the same
+  // for a leaf wherever it goes (the hash is of the cell it started on)
+  B._leafPath = function (id) {
+    var S = this.S, key = id + ':' + S, p = this._leafPaths[key];
+    if (p) return p;
+    var n = (this.M.level && this.M.level.n) || 0, r = S / 2 - S * 0.06, steps = Math.max(8, Math.round(S / 4.5)), i = 0;
+    // the tears are at least about a pixel deep, so the deckle stays crisp on 38 px tiles
+    var amp = Math.max(1.1, S * 0.032), slide = S / steps * 0.3;
+    p = new Path2D();
+    // four sides, each a run of small irregular tears outward and inward
+    var corners = [[-r, -r], [r, -r], [r, r], [-r, r]];
+    for (var sd = 0; sd < 4; sd++) {
+      var A = corners[sd], Bc = corners[(sd + 1) % 4], nx = (Bc[1] - A[1]) / (2 * r), ny = -(Bc[0] - A[0]) / (2 * r);
+      var tx = (Bc[0] - A[0]) / (2 * r), ty = (Bc[1] - A[1]) / (2 * r);
+      for (var j = 0; j < steps; j++, i++) {
+        var f = j / steps, jit = (hsh(n * 101 + id, i, 7) - 0.5) * 2 * amp, sl = j ? (hsh(n * 101 + id, i, 11) - 0.5) * slide : 0;
+        var x = A[0] + (Bc[0] - A[0]) * f + nx * jit + tx * sl, y = A[1] + (Bc[1] - A[1]) * f + ny * jit + ty * sl;
+        if (!sd && !j) p.moveTo(x, y); else p.lineTo(x, y);
+      }
+    }
+    p.closePath();
+    this._leafPaths[key] = p;
+    return p;
+  };
   // the panel, the great initial, the play grid and the twins' brackets; returns each twin group's glow
   B._drawBase = function (g, t, K) {
     var M = this.M, S = this.S, pad = this.pad, self = this;
@@ -682,7 +958,8 @@
     if (!this.panel) {
       var st = ART.status ? ART.status() : {}, nl = 0, nf = 0;
       for (var sk in st) { if (st[sk] === 1) nl++; else if (st[sk] === -1) nf++; }
-      var pk = [M.level.n, M.w, M.h, M.kinds.join(''), S, pad, this.band, this.ivy, this.cssW, this.cssH, this.dpr,
+      // (Book II's leaves move, so its key is the mask alone)
+      var pk = [M.level.n, M.w, M.h, M.b2 ? M.kinds.map(function (k) { return k === ' ' ? ' ' : '#'; }).join('') : M.kinds.join(''), S, pad, this.band, this.ivy, this.cssW, this.cssH, this.dpr,
         this.isInitial, this.groundName, nl, nf].join('|');
       var hit = null, pi;
       for (pi = 0; pi < this._panels.length; pi++) if (this._panels[pi].key === pk) { hit = this._panels.splice(pi, 1)[0]; break; }
@@ -750,6 +1027,8 @@
       return;
     }
     var cx = pad + (c % M.w + 0.5) * S, cy = pad + ((c / M.w | 0) + 0.5) * S;
+    var off = M.b2 ? this._offset(c, t) : null;
+    if (off) { cx += off[0]; cy += off[1]; }
     var ang = this._shownAngle(c, t);
     var w0 = this.wig[c];
     if (w0 !== undefined) {
@@ -757,6 +1036,22 @@
       if (wk >= 1) delete this.wig[c]; else ang += Math.sin(wk * Math.PI * 3) * 0.09 * (1 - wk);
     }
     g.save(); g.translate(cx, cy);
+    if (M.b2 && M.isLoose[c]) {
+      // a loose leaf: an opaque scrap of cream vellum pasted on, a touch paler and cooler than the page. A soft
+      // shadow falls down and right (deeper while it is lifted), and a thin umber line marks its torn edge
+      var lp = this._leafPath(this.leafId[c] >= 0 ? this.leafId[c] : c), lifted = this.drag && this.drag.c === c;
+      var px1 = 1 / this.dpr, lr = S / 2;
+      g.save(); g.translate(S * (lifted ? 0.09 : 0.05), S * (lifted ? 0.12 : 0.07)); g.rotate(ang);
+      g.fillStyle = lifted ? 'rgba(10,4,0,0.3)' : 'rgba(10,4,0,0.22)'; g.fill(lp); g.restore();
+      g.save(); g.translate(S * (lifted ? 0.05 : 0.025), S * (lifted ? 0.07 : 0.035)); g.rotate(ang);
+      g.fillStyle = 'rgba(14,6,2,0.5)'; g.fill(lp); g.restore();
+      g.save(); g.rotate(ang);
+      var lg = g.createLinearGradient(-lr, -lr, lr, lr);
+      lg.addColorStop(0, 'rgba(242,232,208,0.93)'); lg.addColorStop(1, 'rgba(226,212,184,0.93)');
+      g.fillStyle = lg; g.fill(lp);
+      g.strokeStyle = 'rgba(112,82,48,0.85)'; g.lineWidth = Math.max(px1 * 1.2, S * 0.022); g.stroke(lp);
+      g.restore();
+    }
     var qa = ang / (Math.PI / 2), d = this.dpr;
     if (Math.abs(qa - Math.round(qa)) < 1e-4) {
       // a tile at rest: clip on whole device pixels, so each pixel at a join is painted by one tile alone
@@ -769,13 +1064,35 @@
       g.beginPath(); g.rect(-h - 0.5, -h - 0.5, S + 1, S + 1); g.clip();   // half a pixel of overlap hides tile seams
     }
     var pieces = P.KINDS[k].pieces, order = [0, 1].slice(0, pieces.length);
-    if (k === 'x') { var over = this.weave[c] === 0 ? 0 : 1; order = [1 - over, over]; }
+    // Book II: a crossing being swapped lifts its top ribbon and lays the other over it; an inked
+    // crossing (fixed) has its ribbons outlined in firm dark ink
+    var lift = 0, inked = !!(M.b2 && k === 'x' && M.inked[c]);
+    if (k === 'x') {
+      var wv = this.weave[c], xf = M.b2 ? this.xfx[c] : undefined;
+      if (xf !== undefined) {
+        var xk = (t - xf) / XFX_MS;
+        if (xk >= 1) delete this.xfx[c]; else { lift = Math.sin(clamp(xk, 0, 1) * Math.PI); if (xk < 0.5) wv = 1 - wv; }
+      }
+      var over = wv === 0 ? 0 : 1; order = [1 - over, over];
+    }
     for (var oi = 0; oi < order.length; oi++) {
       var p = order[oi], a = pieces[p][0], b = pieces[p][1];
       var col = this._pieceColor(c, p, t);
       var len = pieceLen(a, b, h);
       if (k === 'x' && oi === 1) {
         (function (a, b) { self._weaveShade(g, order[0], h, rw, S, function (gg) { piecePath(gg, a, b, h, false); }); })(a, b);
+      }
+      var lifting = lift > 0 && oi === 1;
+      if (lifting) {   // the top ribbon rises a little off the page, its shadow spreading under it
+        g.save();
+        g.strokeStyle = 'rgba(0,0,0,' + (0.3 * lift) + ')'; g.lineWidth = rw + S * 0.22 * lift; g.lineCap = 'butt';
+        g.beginPath(); piecePath(g, a, b, h, false); g.stroke();
+        g.scale(1 + 0.1 * lift, 1 + 0.1 * lift);
+      }
+      if (inked) {
+        var ie = this._edges();
+        g.strokeStyle = 'rgba(30,18,8,0.95)'; g.lineWidth = rw + 2 * (ie.E + ie.HL) + Math.max(2, S * 0.08); g.lineCap = 'butt';
+        g.beginPath(); piecePath(g, a, b, h, false); g.stroke();
       }
       // a painted beast takes over from the ribbon short of the tile's centre
       // (and a painted knot takes over a little short of it)
@@ -784,8 +1101,9 @@
       (function (a, b) {
         self._strokeRibbon(g, function (gg, rev, x) { piecePath(gg, a, b, h, rev, x); }, len, rw, col, { ang: ang, cell: c, piece: p });
       })(a, b);
-      if (col.fill && col.frac >= 1 && !col.drain && !this.mini && S >= 24) this._sliver(g, c, p, a, b, h, rw);
+      if (col.fill && col.frac >= 1 && !col.drain && !col.dull && !this.mini && S >= 24) this._sliver(g, c, p, a, b, h, rw);
       if (bst != null) g.restore();
+      if (lifting) g.restore();
       // loose ends get a gold cap so they read as cut ribbon
       [a, b].forEach(function (en) {
         if (en < 0 || self.solved || self.tr.matched[c * 4 + P.rotDir(en, self.rots[c])]) return;
@@ -888,17 +1206,59 @@
       }, PRESS_MS);
     });
     cv.addEventListener('pointermove', function (e) {
-      if (press && e.pointerId === press.id && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 14) { clearTimeout(press.timer); press = null; }
+      if (!press || e.pointerId !== press.id) return;
+      if (self.drag) { self._dragMove(e.clientX, e.clientY); return; }
+      var dist = Math.hypot(e.clientX - press.x, e.clientY - press.y);
+      // Book II: a loose leaf moved more than a few pixels is picked up (a tap still turns it)
+      if (dist > DRAG_PX && !press.done && self._canDrag(press.c)) {
+        clearTimeout(press.timer);
+        try { cv.setPointerCapture(e.pointerId); } catch (er) {}
+        self._dragStart(press.c, press.x, press.y, e.clientX, e.clientY);
+        return;
+      }
+      if (dist > 14) { clearTimeout(press.timer); press = null; }
     });
     function end(e, cancel) {
       if (!press || e.pointerId !== press.id) return;
       clearTimeout(press.timer);
+      if (self.drag) { self._dragEnd(cancel ? -1 : self._dropAt(e.clientX, e.clientY)); press = null; return; }
       if (!press.done && !cancel) { var c = self.cellAt(e.clientX, e.clientY); if (c === press.c) self.rotate(c); }
       press = null;
     }
     cv.addEventListener('pointerup', function (e) { end(e, false); });
     cv.addEventListener('pointercancel', function (e) { end(e, true); });
-    cv.addEventListener('pointerleave', function (e) { end(e, true); });
+    cv.addEventListener('pointerleave', function (e) { if (!self.drag) end(e, true); });
+  };
+  /* Book II: dragging a loose leaf onto another to swap them */
+  B._canDrag = function (c) { var M = this.M; return !!(M && M.b2 && M.isLoose[c] && !this.pins[c] && !this.locked); };
+  B._dragStart = function (c, x0, y0, x, y) {
+    delete this.slide[c]; delete this.anim[c];
+    this.shown[c] = this.rots[c] * Math.PI / 2;
+    this.drag = { c: c, x0: x0, y0: y0, x: x, y: y, target: -1 };
+    this._dragMove(x, y);
+  };
+  B._dragMove = function (x, y) {
+    var d = this.drag; if (!d) return;
+    d.x = x; d.y = y;
+    var tc = this.cellAt(x, y);
+    d.target = tc >= 0 && tc !== d.c && this.M.isLoose[tc] && !this.pins[tc] ? tc : -1;
+    this.busy(150);
+  };
+  // the cell a leaf is dropped on (-1: back where it came from)
+  B._dropAt = function (x, y) {
+    var d = this.drag, tc = this.cellAt(x, y);
+    return d && tc >= 0 && tc !== d.c && this.M.isLoose[tc] ? tc : -1;
+  };
+  B._dragEnd = function (target) {
+    var d = this.drag; if (!d) return;
+    this.drag = null;
+    var off = [d.x - d.x0, d.y - d.y0];
+    if (target >= 0 && this.swapLeaves(d.c, target, off)) return true;
+    // dropped on nothing, on a pinned leaf or on a fixed tile: it slides back home
+    this.slide[d.c] = { dx: off[0], dy: off[1], t0: now(), dur: SLIDE_MS };
+    if (target >= 0) { this.wiggle(target); if (this.cb.onWiggle) this.cb.onWiggle(target); }
+    this.busy(SLIDE_MS + 80);
+    return false;
   };
 
   window.Board = Board;

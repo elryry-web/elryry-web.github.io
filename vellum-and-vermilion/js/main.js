@@ -1,7 +1,9 @@
 /* Vellum & Vermilion — page screen, HUD, save, test hooks. */
 (function () {
   'use strict';
-  var LEVELS = window.LEVELS, ART = window.ART, P = window.Puzzle;
+  // Book II (phase 1 test entry): index.html?book=2 plays window.LEVELS2 straight onto a page, with no book screen
+  var B2 = /[?&]book=2(&|$)/.test(location.search);
+  var LEVELS = B2 ? window.LEVELS2 : window.LEVELS, ART = window.ART, P = window.Puzzle;
   var KEY = 'vellum.v1';
   var $ = function (id) { return document.getElementById(id); };
 
@@ -12,11 +14,26 @@
     4: { title: 'The Gilded Twins', text: 'Tiles framed in gold turn together. Tap one and the others turn with it.' },
     5: { title: 'The Great Initials', text: 'These pages use all the rules so far.' }
   };
+  // Book II's cards (placeholders until phase 3 writes them)
+  if (B2) RULES = {
+    1: { title: 'Over and Under', text: 'Tap a crossing to swap which ribbon lies on top. Every ribbon must go over, then under, all the way round. Crossings drawn in firm ink stay as they are.' },
+    2: { title: 'Loose Leaves', text: 'Pale tiles with a torn edge are loose leaves. Drag one onto another to swap them. A tap still turns it.' },
+    3: { title: 'Sext', text: 'Both rules together. Some loose leaves are crossings.' },
+    4: { title: 'Vespers', text: 'The new rules with the pigments, the beasts and the gilded twins.' },
+    5: { title: 'Compline', text: 'Everything, on pages shaped like letters.' }
+  };
 
   /* ---------- save ---------- */
-  var save = { solved: {}, prog: {}, sound: true, current: 1, seen: {} };
-  try { var raw = localStorage.getItem(KEY); if (raw) save = Object.assign(save, JSON.parse(raw)); } catch (e) {}
-  function persist() { try { localStorage.setItem(KEY, JSON.stringify(save)); } catch (e) {} }
+  // root is the whole stored object. Book I's fields sit at its top level; Book II keeps its own in root.b2
+  // (solved, prog, seen, current, face). The sound setting is shared and stays on root.
+  var root = { solved: {}, prog: {}, sound: true, current: 1, seen: {} };
+  try { var raw = localStorage.getItem(KEY); if (raw) root = Object.assign(root, JSON.parse(raw)); } catch (e) {}
+  var save = root;
+  if (B2) {
+    save = root.b2 = Object.assign({ solved: {}, prog: {}, seen: {}, current: 1, face: 0 }, root.b2 || {});
+    Object.defineProperty(save, 'sound', { get: function () { return root.sound; }, set: function (v) { root.sound = v; }, enumerable: false });
+  }
+  function persist() { try { localStorage.setItem(KEY, JSON.stringify(root)); } catch (e) {} }
   function unlocked(n) { return n === 1 || !!save.solved[n - 1] || !!save.solved[n]; }
 
   /* ---------- page background ---------- */
@@ -67,6 +84,7 @@
     if (!cur || save.solved[cur.n]) return;   // a solved page being painted again keeps no progress: leaving reopens it finished
     var st = board.getState();
     save.prog[cur.n] = { r: st.rots.join(''), p: st.pins };
+    if (st.k) { save.prog[cur.n].k = st.k; save.prog[cur.n].w = st.w; }   // Book II: where the leaves lie, the weave
     persist();
   }
 
@@ -107,7 +125,9 @@
     endSequence();
     var pr = save.prog[n], solved = !!save.solved[n];
     var saved = { solved: solved };
-    if (!solved && pr && pr.r && pr.r.length === cur.w * cur.h) { saved.rots = pr.r.split('').map(Number); saved.pins = pr.p || []; }
+    if (!solved && pr && pr.r && pr.r.length === cur.w * cur.h) { saved.rots = pr.r.split('').map(Number); saved.pins = pr.p || [];
+      if (pr.k && pr.k.length === cur.w * cur.h) saved.k = pr.k;
+      if (pr.w && pr.w.length === cur.w * cur.h) saved.w = pr.w; }
     $('rubric').textContent = cur.rubric;
     $('pname').textContent = cur.name;
     setLines(0, false);
@@ -135,7 +155,7 @@
     seq.timers.push(setTimeout(function () { writeGrumble(); }, 1100));
     seq.timers.push(setTimeout(function () { droll.wakeT0 = performance.now(); startDroll(); }, 1800));
     // the last page done: the Colophon is next, so send for its painting (and the sunlit one) now
-    if (ART.want && LEVELS.every(function (L) { return save.solved[L.n]; })) { ART.want('colophon'); ART.want('colophon.sun'); }
+    if (!B2 && ART.want && LEVELS.every(function (L) { return save.solved[L.n]; })) { ART.want('colophon'); ART.want('colophon.sun'); }
     seq.timers.push(setTimeout(function () { if (seq) { seq.lit = true; maybeFinish(); } }, 2550));
   }
   function maybeFinish() { if (seq && seq.lit && seq.written) { endSequence(); showNext(); } }
@@ -314,8 +334,22 @@
     var g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, 200, 80);
     var gold = ART.PIG.gold.base, lap = ART.PIG.lapis.base;
     function loop(cx, cy, r, col) { ART.ribbon(g, function (gg) { gg.arc(cx, cy, r, 0, 6.283); }, 9, col); }
-    if (q === 1) { loop(70, 40, 24, gold); loop(130, 40, 24, gold); }
-    else if (q === 2) {
+    if (q === 1 && !B2) { loop(70, 40, 24, gold); loop(130, 40, 24, gold); }
+    else if (B2 && q <= 4) {
+      // Book II placeholders: two rings woven over and under (q 1, 3, 4), and a loose leaf (q 2, 3, 4)
+      if (q !== 2) {
+        ART.ribbon(g, function (gg) { gg.arc(78, 40, 24, 0, 6.283); }, 9, gold);
+        ART.ribbon(g, function (gg) { gg.arc(122, 40, 24, 0, 6.283); }, 9, lap);
+        ART.ribbon(g, function (gg) { gg.arc(78, 40, 24, -0.75, 0.75); }, 9, gold);
+      }
+      if (q !== 1) {
+        var lx = q === 2 ? 100 : 170, ly = 40;
+        g.save(); g.translate(lx, ly); g.rotate(-0.12);
+        g.fillStyle = 'rgba(60,30,10,0.25)'; g.fillRect(-14, -12, 30, 30);
+        g.fillStyle = '#f3e8cf'; g.strokeStyle = '#c9b48a'; g.lineWidth = 1; g.fillRect(-16, -16, 30, 30); g.strokeRect(-16, -16, 30, 30);
+        g.restore();
+      }
+    } else if (q === 2) {
       loop(60, 40, 24, lap); ART.draw(g, 'mark', 28, 32, 16, 16, 0, { pigment: 'lapis' });
       loop(140, 40, 24, ART.PIG.vermilion.base); ART.draw(g, 'mark', 156, 32, 16, 16, 0, { pigment: 'vermilion' });
     } else if (q === 3) {
@@ -341,12 +375,13 @@
         ART.draw(g, 'twinFrame', x, 12, 56, 56, 0, { lit: 0.4 });
         ART.draw(g, 'twinEmblem', x + 4.8, 16.8, 8.4, 8.4, 0, { kind: 1 });
       });
-    } else { ['L', 'U', 'M', 'E', 'N'].forEach(function (ch, i) {
+    } else { (B2 ? ['H', 'O', 'R', 'A', 'E'] : ['L', 'U', 'M', 'E', 'N']).forEach(function (ch, i) {
       g.font = '34px "Uncial Antiqua", serif'; g.fillStyle = i % 2 ? '#2b56a6' : '#a8261a'; g.fillText(ch, 18 + i * 36, 52); }); }
   }
 
   /* ---------- HUD ---------- */
-  $('bBook').onclick = function () { $('ruleModal').classList.remove('show'); Book.fromPlay(); };
+  // Book II has no book of its own yet: its Book button and its last page go back to Book I's index
+  $('bBook').onclick = function () { $('ruleModal').classList.remove('show'); if (B2) location.href = 'index.html'; else Book.fromPlay(); };
   $('bRule').onclick = openRule;
   $('ruleOk').onclick = function () { $('ruleModal').classList.remove('show'); };
   $('bHint').onclick = function () { board.hint(); };
@@ -380,7 +415,7 @@
   };
   function soundLabel() { $('bSound').innerHTML = save.sound ? '&#9835;' : '<s>&#9835;</s>'; $('bSound').title = save.sound ? 'Sound on' : 'Sound off'; }
   $('bSound').onclick = function () { save.sound = !save.sound; SFX.enabled = save.sound; persist(); soundLabel(); if (save.sound) { SFX.unlock(); SFX.pin(); } };
-  $('next').onclick = function () { if (cur.n < LEVELS.length) load(cur.n + 1); else Book.fromPlay(7); };   // the last page closes on the Colophon
+  $('next').onclick = function () { if (cur.n < LEVELS.length) load(cur.n + 1); else if (B2) location.href = 'index.html'; else Book.fromPlay(7); };   // the last page closes on the Colophon
   ['ruleModal', 'resetModal'].forEach(function (id) {
     $(id).addEventListener('click', function (e) { if (e.target === $(id)) $(id).classList.remove('show'); });
   });
@@ -401,6 +436,8 @@
         page: cur && cur.n, name: cur && cur.name, solved: board.solved, wrong: board.wrongCount(),
         strands: tr.strands.length, whole: tr.strands.filter(function (s) { return s.whole; }).length,
         tile: board.S, size: [board.cssW, board.cssH], rots: board.rots.join(''), pins: board.getState().pins,
+        b2: !!M.b2, k: M.b2 ? M.kinds.join('') : undefined, w: M.b2 ? board.getState().w : undefined,
+        breaks: M.b2 ? board.breakCells : undefined, root: B2 ? JSON.parse(JSON.stringify(root)) : undefined,
         saved: JSON.parse(JSON.stringify(save))
       };
     },
@@ -412,6 +449,13 @@
 
   /* ---------- the book (js/book.js) gets what it needs from the page screen ---------- */
   var Book = window.Book;
+  if (B2) {
+    // straight onto the page; book.js is never started, so it leaves Book I's book state alone
+    Book = { mode: function () { return 'hidden'; }, refresh: function () {}, fromPlay: function () {} };
+    if (window.VV) window.VV.book = null;
+    var bs = $('bk_scr'); if (bs) bs.style.display = 'none';
+    load(save.current || 1);
+  } else {
   Book.init({
     LEVELS: LEVELS, RULES: RULES, unlocked: unlocked, persist: persist,
     save: function () { return save; },
@@ -420,6 +464,7 @@
   });
   load(save.current || 1, { quiet: true });   // the page screen is ready behind the cover
   Book.boot();
+  }
 
   /* ---------- the painted art arrives a picture at a time ----------
      What the first screen shows loads first (ART.load ranks it), and each screen is redrawn as its pictures
