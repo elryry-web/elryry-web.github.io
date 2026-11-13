@@ -435,6 +435,20 @@
     });
     return out;
   }
+  // a region a rival holds with no warbands in it: it cannot be assaulted, but a march in takes it
+  function unguarded(s, r) {
+    var g = s.regions[r];
+    if (!g || !g.owner || g.owner === 'player') return false;
+    for (var k in g.bands) if (g.bands[k] > 0) return false;
+    return true;
+  }
+  // the unguarded rival regions you can march into now, as a sentence ('' when there are none)
+  function unguardedNote(s, legal) {
+    var u = [];
+    legal.forEach(function (a) { if (a.type === 'march' && unguarded(s, a.to) && u.indexOf(a.to) < 0) u.push(a.to); });
+    if (!u.length) return '';
+    return listAnd(u.map(rn)) + (u.length === 1 ? ' is unguarded: march in to take it (1 moon).' : ' are unguarded: march in to take them (1 moon each).');
+  }
   function intents(s) {
     var out = [], owl = E.has(s, 'player', 'owl');
     if (s.phase !== 'play') return out;
@@ -575,7 +589,8 @@
       var words = { march: 'Choose a region to march from.', muster: 'Choose one of your regions to muster in.', assault: 'Choose a region to assault.',
         recruit: 'Choose a region with a resident to recruit.', search: 'Choose a region to search.',
         station: 'Choose one of your regions with an empty slot to station ' + (U.mode.card ? cardName(U.mode.card) : 'the resident') + ' in.' }[U.mode.kind] || '';
-      return '<div class="hint pickhint"><span>' + words + '</span>' + btn('Cancel', function () { U.mode = null; render(); }, { cls: 'small' }) + '</div>';
+      if (U.mode.kind === 'assault') { var un = unguardedNote(s, legal); if (un) words += ' ' + un; }
+      return '<div class="hint pickhint"><span>' + esc(words) + '</span>' + btn('Cancel', function () { U.mode = null; render(); }, { cls: 'small' }) + '</div>';
     }
     return '<div class="hint mine"><span><b>Your turn.</b> ' + plural(hs.hours, 'moon') + ' left, ' + hs.silver + ' silver. Tap a region for its actions.' +
       (E.truce(s) ? ' ' + plain(E.truce(s)) : '') + '</span></div>';
@@ -596,7 +611,11 @@
     if (hs.hours < 1 && kind !== 'march') return 'no hours';
     if (kind === 'march') return hs.hours < 1 ? 'no hours' : 'None of your warbands can march anywhere.';
     if (kind === 'muster') return 'not enough silver';
-    if (kind === 'assault') return hs.hours < 2 && !(E.has(s, 'player', 'bannerClerk') && !hs.flags.clerk) ? 'assault costs 2 moons; have ' + hs.hours : 'None of your warbands stand next to a region you can assault.';
+    if (kind === 'assault') {
+      var why = hs.hours < 2 && !(E.has(s, 'player', 'bannerClerk') && !hs.flags.clerk) ? 'assault costs 2 moons; have ' + hs.hours : 'None of your warbands stand next to a region you can assault.';
+      var u = unguardedNote(s, legalNow(s));
+      return u ? plain(why) + ' ' + u : why;
+    }
     if (kind === 'recruit') {
       if (hs.retinue.length >= N.retinueMax) return 'retinue full';
       return 'No resident you can afford stands where your warbands are.';
@@ -711,7 +730,7 @@
   // exports for ui-sheets.js and for tests
   U.h = { esc: esc, cap: cap, age: age, me: me, who: who, whoLow: whoLow, rn: rn, cardName: cardName, listAnd: listAnd, plural: plural,
     stamp: stamp, btn: btn, K: K, plain: plain, toast: toast, save: save, hasSave: hasSave, logLine: logLine, describe: describe,
-    pactWords: pactWords, screenFor: screenFor, isMyTurn: isMyTurn, legalNow: legalNow, bars: bars };
+    pactWords: pactWords, screenFor: screenFor, isMyTurn: isMyTurn, legalNow: legalNow, bars: bars, unguarded: unguarded };
   U.go = go; U.render = render; U.pump = pump; U.skipAhead = skip; U.doAction = doAction; U.newCampaign = newCampaign; U.nextAge = nextAge;
   U.openSheet = openSheet; U.redrawSheet = redrawSheet; U.closeSheet = closeSheet; U.sheetIsOpen = sheetIsOpen; U.take = take;
   U.loadSave = loadSave; U.KEY = KEY;

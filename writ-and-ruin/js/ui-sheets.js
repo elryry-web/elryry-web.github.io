@@ -50,11 +50,11 @@
       intro: 'From ' + rn(from) + (dest.via ? ', by way of ' + rn(dest.via) : '') + '.',
       info: function (n) {
         var t = [];
-        t.push(owned ? 'You hold ' + rn(to) + '.' : (s.regions[to].owner ? 'Held by ' + whoLow(s.regions[to].owner) + '.' : 'No house holds it: you take it when you march in.'));
+        t.push(owned ? 'You hold ' + rn(to) + '.' : (s.regions[to].owner ? 'Held by ' + whoLow(s.regions[to].owner) + (H.unguarded(s, to) ? ', with no warbands there. You take it when you march in.' : '.') : 'No house holds it: you take it when you march in.'));
         if (mode === 'hermit') t.push('The Antlered Hermit lets you pass the free folk.');
         if (mode === 'smuggle') t.push('The Smuggler Queen slips you in past a lone warband.');
         t.push('Costs 1 moon' + (E.law(s, 'tolls') && !owned ? ' and 1 silver toll' : '') + '.');
-        if (from !== 'camp' && n === max && E.holds(s, 'player', from) && s.regions[from].owner === 'player') t.push('Leaving ' + rn(from) + ' empty: you will no longer hold it.');
+        if (from !== 'camp' && n === max && E.holds(s, 'player', from) && s.regions[from].owner === 'player') t.push('This leaves ' + rn(from) + ' unguarded. You still hold it, but any neighbour can march in and take it.');
         return '<p>' + t.join(' ') + '</p>';
       },
       action: function (n) { return { type: 'march', from: from, to: to, count: n }; },
@@ -217,6 +217,9 @@
     // With Station chosen from a retinue card, a held region with an empty slot takes the resident at once.
     if (U.mode && U.mode.kind === 'station' && r !== 'camp' && H.isMyTurn(s) &&
         !cand({ type: 'station', region: r, card: U.mode.card })) { U.doAction({ type: 'station', region: r, card: U.mode.card }); return; }
+    // With Assault chosen from the bar, an unguarded rival region is taken by marching, not by assault: say so.
+    if (U.mode && U.mode.kind === 'assault' && r !== 'camp' && H.isMyTurn(s) && H.unguarded(s, r) &&
+        H.legalNow(s).some(function (a) { return a.type === 'march' && a.to === r; })) toast(rn(r) + ' is unguarded: march in to take it (1 moon).');
     U.openSheet(function () { return regionHtml(r); }, { wide: true, onClose: function () { U.selected = null; } });
     U.render();
   };
@@ -229,6 +232,12 @@
     return '<figure class="sitebanner' + (built ? '' : ' unbuilt') + '"><span class="sb-clip"><img src="' + url + '" alt="' + esc(REG[r].site) +
       (built ? '' : ', not yet built') + '" loading="lazy" style="object-position:50% ' + (SITE_FOCUS[r] || 50) + '%"></span>' +
       (built ? '' : '<span class="sitetag">Not yet built</span>') + '</figure>';
+  }
+  // a march button's words: a rival region with no warbands in it is taken by the march, so say so
+  function marchLabel(s, to, via) {
+    var by = via ? 'via ' + rn(via) : '';
+    if (H.unguarded(s, to)) return 'Take ' + rn(to) + '… <small>unguarded' + (by ? ', ' + by : '') + '</small>';
+    return 'March to ' + rn(to) + (by ? ' <small>' + by + '</small>' : '') + '…';
   }
   function regionHtml(r) {
     var s = age(), hs = me(), my = H.isMyTurn(s), legal = H.legalNow(s), mode = U.mode && U.mode.kind;
@@ -245,6 +254,8 @@
     if (bandList.length) facts.push('Warbands: ' + bandList.map(function (k) { return stamp(k, 16) + ' ' + who(k) + ' ' + g.bands[k]; }).join(', '));
     facts.push('Defence ' + E.defenceOf(s, r, defAgainst) + (owner && E.lastStand(s, r) ? ' (with last stand)' : ''));
     if (owner && s.houses[owner].refuge === r) facts.push('<b>Safe:</b> ' + who(owner) + ' returned here and cannot be assaulted here until its next turn.');
+    if (owner && !bandList.length && s.houses[owner].refuge !== r) facts.push('<b>Unguarded:</b> ' + (owner === 'player' ? 'You have' : who(owner) + ' has') + ' no warbands here. ' +
+      (E.truce(s) ? 'Once ' + esc(E.truce(s)) + ' ends, any neighbour can march in and take it.' : 'Any neighbour can march in and take it.'));
     if (owner && E.has(s, owner, 'drownedBell')) facts.push('<b>Drowned Bell:</b> ' + (owner === 'player' ? "rivals' assaults on you" : 'assaults on ' + who(owner)) + ' cost 1 more moon.');
     facts.push('Neighbours: ' + R.adj.map(rn).join(', '));
     out.push('<p class="facts">' + facts.join('<br>') + '</p>');
@@ -287,13 +298,13 @@
       dests.forEach(function (d) {
         seen[d.to] = 1;
         var m = cand({ type: 'march', from: r, to: d.to, count: 1 });
-        acts.push(['march', btn('March to ' + rn(d.to) + (d.via ? ' <small>via ' + rn(d.via) + '</small>' : '') + '…', function () { marchSheet(r, d.to); }, { off: m })]);
+        acts.push(['march', btn(marchLabel(s, d.to, d.via), function () { marchSheet(r, d.to); }, { off: m })]);
       });
       R.adj.forEach(function (to) {
         var a = { type: 'assault', from: r, to: to, count: mine }, m = cand(a);
         if (E.holds(s, 'player', to)) return;
         if (E.emptyOfOthers(s, 'player', to)) {
-          if (!seen[to]) { var mq = cand({ type: 'march', from: r, to: to, count: 1 }); acts.push(['march', btn('March to ' + rn(to) + '…', function () { marchSheet(r, to); }, { off: mq || 'cannot march there' })]); }
+          if (!seen[to]) { var mq = cand({ type: 'march', from: r, to: to, count: 1 }); acts.push(['march', btn(marchLabel(s, to, null), function () { marchSheet(r, to); }, { off: mq || 'cannot march there' })]); }
           return;
         }
         acts.push(['assault', btn('Assault ' + rn(to) + '…', function () { assaultSheet(r, to); }, { cls: 'red', off: m })]);
@@ -307,7 +318,7 @@
       if ((a.type === 'march' || a.type === 'assault') && a.to === r && !into[a.type + a.from]) {
         into[a.type + a.from] = 1;
         var from = a.from;
-        if (a.type === 'march') acts.push(['march', btn('March in from ' + rn(from) + '…', function () { marchSheet(from, r); })]);
+        if (a.type === 'march') acts.push(['march', btn((H.unguarded(s, r) ? 'Take it: march in from ' + rn(from) : 'March in from ' + rn(from)) + '…', function () { marchSheet(from, r); })]);
         else acts.push(['assault', btn('Assault from ' + rn(from) + '…', function () { assaultSheet(from, r); }, { cls: 'red' })]);
       }
     });
