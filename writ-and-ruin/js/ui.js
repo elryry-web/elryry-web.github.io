@@ -45,7 +45,7 @@
 
   // ---------------------------------------------------------------- the engine's refusals in plain words
   var PLAIN = {
-    'no hours': 'You have no hours left this turn.',
+    'no hours': 'You have no moons left this turn.',
     'not enough silver': 'You need more silver.',
     'retinue full': 'Your retinue is full: three is the most.',
     'return first': 'You hold no region: return first.',
@@ -291,7 +291,7 @@
     if (U.yourTurn) {
       U.yourTurn = false;
       toast(hs.flags.returnDue ? 'Your turn. You hold no region: choose where to return.' :
-        'Your turn: ' + plural(hs.hours, 'hour') + ', ' + hs.silver + ' silver.');
+        'Your turn: ' + plural(hs.hours, 'moon') + ', ' + hs.silver + ' silver.');
     }
   }
   // the player's action: check, apply, report
@@ -391,7 +391,7 @@
         K(function () { U.houseSheet(h); }) + '" style="--house:' + A.houseCol(h) + '">' +
         '<span class="chip-top">' + stamp(h, 20) + '<span class="chip-name">' + esc(h === 'player' ? 'You' : cap(hs.short)) + '</span>' +
         (s.regions.crown.owner === h ? '<span class="crownmark" title="Holds the Crown hold">♛</span>' : '') + '</span>' +
-        '<span class="chip-nums"><span>' + hs.silver + '<small>s</small></span><span>' + hours + '<small>h</small></span><span>' + E.nHeld(s, h) + '<small>r</small></span></span>' +
+        '<span class="chip-nums"><span>' + hs.silver + '<small>s</small></span><span>' + hours + '<small>m</small></span><span>' + E.nHeld(s, h) + '<small>r</small></span></span>' +
         bars(E.progress(s, h)) + (claim ? '<span class="claimtag">claim</span>' : '') + '</button>';
     }).join('');
   }
@@ -483,7 +483,7 @@
         recruit: 'Choose a region with a resident to recruit.', search: 'Choose a region to search.' }[U.mode.kind] || '';
       return '<div class="hint pickhint"><span>' + words + '</span>' + btn('Cancel', function () { U.mode = null; render(); }, { cls: 'small' }) + '</div>';
     }
-    return '<div class="hint mine"><span><b>Your turn.</b> ' + plural(hs.hours, 'hour') + ' left, ' + hs.silver + ' silver. Tap a region for its actions.</span></div>';
+    return '<div class="hint mine"><span><b>Your turn.</b> ' + plural(hs.hours, 'moon') + ' left, ' + hs.silver + ' silver. Tap a region for its actions.</span></div>';
   }
 
   var BAR = [['march', 'March'], ['muster', 'Muster'], ['assault', 'Assault'], ['recruit', 'Recruit'], ['search', 'Search'], ['treat', 'Treat'], ['depart', 'Depart']];
@@ -501,7 +501,7 @@
     if (hs.hours < 1 && kind !== 'march') return 'no hours';
     if (kind === 'march') return hs.hours < 1 ? 'no hours' : 'None of your warbands can march anywhere.';
     if (kind === 'muster') return 'not enough silver';
-    if (kind === 'assault') return hs.hours < 2 ? 'You need 2 hours to assault.' : 'None of your warbands stand next to a region you can assault.';
+    if (kind === 'assault') return hs.hours < 2 ? 'You need 2 moons to assault.' : 'None of your warbands stand next to a region you can assault.';
     if (kind === 'recruit') {
       if (hs.retinue.length >= N.retinueMax) return 'retinue full';
       return 'No resident you can afford stands where your warbands are.';
@@ -549,7 +549,7 @@
       '<header class="topbar"><div class="title"><h1>' + esc(E.ageTitle(s.ageNo)) + '</h1><span class="sub">' +
       (s.phase === 'prophecy' ? 'Choosing prophecies' : 'Round ' + s.round + ' of ' + N.lastRound + (turnH ? ' · ' + (turnH === 'player' ? 'your turn' : who(turnH, s) + "'s turn") : '')) + '</span></div>' +
       btn('☰', function () { U.menuSheet(); }, { cls: 'icon', title: 'Menu' }) + '</header>' +
-      '<section class="strip" style="--n:' + s.order.length + '">' + chips(s) + '<p class="key">s silver · h hours · r regions · bars: <b>S</b>eize <b>F</b>oretell <b>D</b>epart <b>S</b>eat</p></section>' +
+      '<section class="strip" style="--n:' + s.order.length + '">' + chips(s) + '<p class="key">s silver · m moons · r regions · bars: <b>S</b>eize <b>F</b>oretell <b>D</b>epart <b>S</b>eat</p></section>' +
       '<section class="mapbox">' + hint(s, legal) + '<div class="mapframe">' + M.svg(s, view) + '</div>' +
       '<div class="status">' + fortuneRow(s) + endRow(s) + '</div></section>' +
       '<aside class="side">' + dangerPanel(s) + intentPanel(s) + retinuePanel(s) + lawPanel(s) + logPanel() + '</aside>' +

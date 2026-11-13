@@ -68,7 +68,7 @@
         t.push(owned ? 'You hold ' + rn(to) + '.' : (s.regions[to].owner ? 'Held by ' + whoLow(s.regions[to].owner) + '.' : 'No house holds it: you take it when you march in.'));
         if (mode === 'hermit') t.push('The Antlered Hermit lets you pass the free folk.');
         if (mode === 'smuggle') t.push('The Smuggler Queen slips you in past a lone warband.');
-        t.push('Costs 1 hour' + (E.law(s, 'tolls') && !owned ? ' and 1 silver toll' : '') + '.');
+        t.push('Costs 1 moon' + (E.law(s, 'tolls') && !owned ? ' and 1 silver toll' : '') + '.');
         if (from !== 'camp' && n === max && E.holds(s, 'player', from) && s.regions[from].owner === 'player') t.push('Leaving ' + rn(from) + ' empty: you will no longer hold it.');
         return '<p>' + t.join(' ') + '</p>';
       },
@@ -82,7 +82,7 @@
     stepper({
       title: 'Muster in ' + rn(r), min: 1, max: max, start: afford,
       intro: 'Raise new warbands in a region you hold. You have ' + hs.silver + ' silver.',
-      info: function (n) { return '<p>Costs <b>' + E.musterCost(s, 'player', r, n) + ' silver</b> and 1 hour.</p>'; },
+      info: function (n) { return '<p>Costs <b>' + E.musterCost(s, 'player', r, n) + ' silver</b> and 1 moon.</p>'; },
       action: function (n) { return { type: 'muster', region: r, count: n }; },
       label: 'Muster'
     });
@@ -107,7 +107,7 @@
         '<p class="fortune-line"><span class="lbl">Fortune left</span> ' + [0, 1, 2, 3].map(function (v) { return '<span class="fc"><b>' + v + '</b>×' + (left[v] || 0) + '</span>'; }).join('') +
         (s.fortune.length ? '' : ' <span class="muted">(the deck reshuffles first)</span>') + '</p>' +
         '<p class="odds">Chance to win: <b>' + oddsWords(p) + '</b> <span class="muted">(not counting Tide or Witch cards)</span></p>' +
-        '<p>Costs ' + plural(E.assaultHours(s, 'player', to), 'hour') + '.</p>' +
+        '<p>Costs ' + plural(E.assaultHours(s, 'player', to), 'moon') + '.</p>' +
         (broke.length ? '<p class="warn">This breaks your ' + broke.map(function (pc) { return pc.type === 'foe' ? 'common cause' : pc.type; }).join(' and ') + ' with ' + whoLow(pv.defender) + '. They will hold a grudge.</p>' : '') +
         (m ? '<p class="warn">' + esc(plain(m)) + '</p>' : '') +
         '<div class="row">' + btn('Commit to the assault', function () { U.doAction({ type: 'assault', from: from, to: to, count: n }); }, { cls: 'go', off: m }) +
@@ -307,7 +307,7 @@
     }
     // the current mode first
     if (mode) acts.sort(function (x, y) { return (y[0] === mode) - (x[0] === mode); });
-    out.push('<h3>Actions <small>' + plural(hs.hours, 'hour') + ', ' + hs.silver + ' silver</small></h3><div class="actlist">' + acts.map(function (x) { return x[1]; }).join('') + '</div>');
+    out.push('<h3>Actions <small>' + plural(hs.hours, 'moon') + ', ' + hs.silver + ' silver</small></h3><div class="actlist">' + acts.map(function (x) { return x[1]; }).join('') + '</div>');
     return out.join('');
   }
   function campHtml(s, hs, my, legal) {
@@ -338,7 +338,7 @@
       out.push('<header class="rhead"><span class="sitebox">' + stamp(h, 40) + '</span><div><h2>' + esc(hs.name) + '</h2><p class="muted">' +
         (mine ? 'Your house' : esc(cap(hs.temper)) + ' temper') + (s.ruler === h ? ' · ruled at the start of the age' : '') + '</p></div></header>');
       out.push('<p class="facts">' + hs.silver + ' silver · ' + plural(E.nHeld(s, h), 'region') + ' · ' + plural(E.totalBands ? E.totalBands(s, h) : 0, 'warband') + ' · ' +
-        plural(hs.hours && s.order[s.turn] === h ? hs.hours : E.hoursFor(s, h), 'hour') + ' a turn' + (hs.camp ? ' · ' + hs.camp + ' camped' : '') + '</p>');
+        plural(hs.hours && s.order[s.turn] === h ? hs.hours : E.hoursFor(s, h), 'moon') + ' a turn' + (hs.camp ? ' · ' + hs.camp + ' camped' : '') + '</p>');
       out.push('<div class="progress">' + ['seize', 'foretell', 'depart', 'seat'].map(function (k) {
         var words = { seize: 'Seize: hold ' + N.seizeRegions + ' regions', foretell: 'Foretell: fulfil the prophecy', depart: 'Depart by the Far Pass', seat: 'Seat: hold the Crown hold when the age ends' }[k];
         return '<div class="prow"><span>' + words + '</span><span class="pbar b-' + k + '"><i style="width:' + Math.round(Math.min(1, p[k]) * 100) + '%"></i></span></div>';
@@ -369,7 +369,7 @@
     var target = null;
     U.openSheet(function () {
       var s = age(), hs = me(), legal = H.legalNow(s).filter(function (a) { return a.type === 'treat'; });
-      var out = ['<h2>Treat with a rival</h2><p>Offer one pact a turn. It costs 1 hour. The rival answers at once.</p>'];
+      var out = ['<h2>Treat with a rival</h2><p>Offer one pact a turn. It costs 1 moon. The rival answers at once.</p>'];
       out.push('<div class="row wrap">' + s.order.filter(function (h) { return h !== 'player'; }).map(function (h) {
         return btn(stamp(h, 18) + ' ' + who(h), function () { target = h; U.redrawSheet(); }, { cls: target === h ? 'active' : '' });
       }).join('') + '</div>');
@@ -418,7 +418,7 @@
     var hs = me();
     if (hs.hours < 1) { U.doAction({ type: 'end' }); return; }
     U.openSheet(function () {
-      return '<h2>End your turn?</h2><p>You still have ' + plural(hs.hours, 'hour') + '. Unused hours are lost.</p>' +
+      return '<h2>End your turn?</h2><p>You still have ' + plural(hs.hours, 'moon') + '. Unused moons are lost.</p>' +
         '<div class="row">' + btn('End turn', function () { U.doAction({ type: 'end' }); }, { cls: 'go' }) + btn('Keep playing', function () { U.closeSheet(); }) + '</div>';
     });
   };
@@ -440,7 +440,7 @@
         '<li><span><b>Foretell.</b> Fulfil your secret prophecy. It is claimed the same way.</span></li>' +
         '<li><span><b>Depart.</b> From the ' + ordinal(N.departFrom) + ' round, hold the Far Pass with enough warbands since the start of your turn and carry the relics it needs, then depart.</span></li>' +
         '<li><span><b>Seat.</b> If the age ends with no other winner, the house holding the Crown hold wins.</span></li></ul>' +
-        '<h3>Your turn</h3><p>You get hours each turn. March (1 hour), muster (1 hour and silver), assault (2 hours), recruit, search and treat. Tap a region to see what you can do there.</p>' +
+        '<h3>Your turn</h3><p>You get moons each turn to spend on actions. March (1 moon), muster (1 moon and silver), assault (2 moons), recruit, search and treat. Tap a region to see what you can do there.</p>' +
         '<h3>The age ends</h3><p>After round ' + N.lastRound + ' at the latest. After round ' + N.endDraws[0].round + ' there is a 1 in ' + N.endDraws[0].of + ' chance it ends early.</p>';
     });
   };
