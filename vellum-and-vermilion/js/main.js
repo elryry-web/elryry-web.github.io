@@ -134,8 +134,8 @@
     seq = { timers: [] };
     seq.timers.push(setTimeout(function () { writeGrumble(); }, 1100));
     seq.timers.push(setTimeout(function () { droll.wakeT0 = performance.now(); startDroll(); }, 1800));
-    // the last page done: the Colophon is next, so send for its painting now
-    if (ART.want && LEVELS.every(function (L) { return save.solved[L.n]; })) ART.want('colophon');
+    // the last page done: the Colophon is next, so send for its painting (and the sunlit one) now
+    if (ART.want && LEVELS.every(function (L) { return save.solved[L.n]; })) { ART.want('colophon'); ART.want('colophon.sun'); }
     seq.timers.push(setTimeout(function () { if (seq) { seq.lit = true; maybeFinish(); } }, 2550));
   }
   function maybeFinish() { if (seq && seq.lit && seq.written) { endSequence(); showNext(); } }
@@ -435,7 +435,7 @@
     else if (cur && cur.n < LEVELS.length && slot === 'drollery.' + LEVELS[cur.n].drollery) r = D;
     else if (r === D) r = D + 1;
     // a finished book: the Colophon is wanted soon, so it heads the queue held back for later
-    if (slot === 'colophon' && LEVELS.every(function (L) { return save.solved[L.n]; })) r = D;
+    if ((slot === 'colophon' || slot === 'colophon.sun') && LEVELS.every(function (L) { return save.solved[L.n]; })) r = D;
     if (r >= D) return r;
     if (bootMode === 'hidden') {   // straight onto a page: its vellum, board and drollery first
       if (slot === 'page' || (cur && slot === 'drollery.' + cur.drollery)) return 0;
@@ -453,7 +453,7 @@
     art.log.push([slot, ok, Math.round(performance.now())]);
     var cover = slot.indexOf('cover.') === 0;
     var isDroll = slot.indexOf('drollery.') === 0, own = cur && slot === 'drollery.' + cur.drollery;
-    if (!cover && slot !== 'colophon' && slot.indexOf('capital.') !== 0 && (!isDroll || own)) art.page = true;
+    if (!cover && slot.indexOf('colophon') !== 0 && slot.indexOf('capital.') !== 0 && (!isDroll || own)) art.page = true;
     // the closed book shows only the cover pieces; the open book can show almost anything (a drollery held
     // back for later only on the Bestiary)
     var st = Book.state && Book.state(), best = st && st.faces && st.faces.indexOf(6) >= 0;

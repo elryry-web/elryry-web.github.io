@@ -552,11 +552,34 @@
      yellow and the paint sits in the page. A soft edge fade hides the picture's rectangle; then the paint is laid
      again over itself at part strength (`source-over`, masked to the painted pixels) so the multiply does not
      muddy the lapis and the gold (opaque pigment does not take the vellum's tint).
+     The finished page stands in full sunlight. The sunlit painting is baked (slot `colophon.sun`,
+     art/colophon-sun.jpg, tools/make-colophon-sun.py): pigments richer, darks a little deeper, the gold flashing
+     where it faces the light (up and to the left). It is laid with the same two layers, and then the whole leaf,
+     words included, is lifted and warmed with one `color-dodge` gradient (the vellum in the sun, brighter toward
+     the top left; coloDodge, the same numbers the bake divided out), and a few points of light are screened on
+     the gold's sharpest corners (COLO_SPARKS). Without the sunlit art the finished page is the plain painting
+     with the lift and the points.
      The reveal, the first time the finished leaf is shown or on a tap: a faint sepia underdrawing inks in, the
-     colour floods outward from the top of the L, a glint runs across the gold (an additive highlight masked to the
-     warm bright pixels), and it settles. Later visits and reduced motion show the finished page at once. The save
-     keeps s.colo = 1. The layers are composed once per leaf size (coloCache). */
-  var COLO_MS = 4500, COLO_RICH = 0.55, colo = { t0: 0, raf: 0, freeze: null, hidAt: 0 }, coloCache = {}, coloScr = null;
+     colour floods outward from the top of the L, a glint runs right across the gold, and as it passes the
+     sunlight comes up (the plain layers cross to the sunlit ones and the lift rises) while the points of light
+     twinkle in one at a time, nearest the sun first. Later visits and reduced motion show the sunlit page at once.
+     The save keeps s.colo = 1. The layers are composed once per leaf size (coloCache): the finished page is two
+     painting blits, one gradient fill and one blit of the points. */
+  var COLO_MS = 5500, COLO_RICH = 0.55, colo = { t0: 0, raf: 0, freeze: null, hidAt: 0 }, coloCache = {}, coloScr = null;
+  // the glint: from GL_T0 for GL_MS it runs along the diagonal axis from GL_FROM to GL_TO (a little faster in the
+  // middle), half-width GL_BW, fading in and out around GL_PEAK
+  var GL_T0 = 2600, GL_MS = 1300, GL_FROM = -0.15, GL_TO = 1.15, GL_PEAK = 0.85, GL_BW = 0.10;
+  // the sun comes up from SUN_T0 over SUN_MS; the points twinkle in from SP_T0, SP_GAP apart, each over SP_MS
+  var SUN_T0 = 3200, SUN_MS = 1100, SP_T0 = 3600, SP_GAP = 110, SP_MS = 450;
+  // the points of light, from the sunlight still (tools/make-colophon-sun.py): x, y and size as fractions of the
+  // painting, the tilt of the rays in degrees (0: a plain point, no rays)
+  var COLO_SPARKS = [[0.2449, 0.3573, 0.0160, 18], [0.2037, 0.3991, 0.0165, 16], [0.3879, 0.1188, 0.0198, 12],
+    [0.4714, 0.1821, 0.0186, 16], [0.2380, 0.5419, 0.0032, 0], [0.4096, 0.4880, 0.0049, 0], [0.5286, 0.2718, 0.0023, 0],
+    [0.4760, 0.1162, 0.0043, 0], [0.3787, 0.5444, 0.0029, 0], [0.5778, 0.1906, 0.0036, 0], [0.5915, 0.1316, 0.0055, 0],
+    [0.7517, 0.1368, 0.0033, 0], [0.8135, 0.1581, 0.0027, 0]];
+  // the still the light was set on (a leaf at 876 x 1314 device px) and the painting's place in it: the light's
+  // geometry is measured in its coordinates, carried by the painting, so it sits the same at every leaf size
+  var SUN_STILL = { w: 876, h: 1314, x: 1, y: 22, pw: 874, ph: 1170 };
   // the painting's own blank margin (fractions of the picture): the letter sits inside these
   var COLO_IN = { x0: 0.035, x1: 0.965, y0: 0.035, y1: 0.93 };
   function reducedMotion() { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } }
@@ -570,16 +593,84 @@
     return g;
   }
   function canvasOf(w, h) { var cv = document.createElement('canvas'); cv.width = w; cv.height = h; return cv; }
+  // how much a pixel is the gold: warm hue (about 25-55 degrees), well saturated, bright
+  function coloGold(r, gg, b) {
+    var hi = Math.max(r, gg, b), lo = Math.min(r, gg, b), v = hi / 255, s = hi ? (hi - lo) / hi : 0, hue = 0;
+    if (hi > lo && hi === r) hue = 60 * (gg - b) / (hi - lo);
+    else if (hi > lo && hi === gg) hue = 60 * (2 + (b - r) / (hi - lo));
+    return smooth(20, 30, hue) * (1 - smooth(52, 62, hue)) * smooth(0.32, 0.46, s) * smooth(0.5, 0.72, v);
+  }
+  // where the glint is el ms into the reveal: u its progress, mid and bw its place and half-width on the axis
+  // (0..1 from the picture's top left to (0.75 W, H)), a its strength
+  function coloBand(el) {
+    var u = clamp((el - GL_T0) / GL_MS, 0, 1), q = 0.5 * u + 0.5 * smooth(0, 1, u);
+    return { u: u, mid: GL_FROM + (GL_TO - GL_FROM) * q, bw: GL_BW, a: GL_PEAK * smooth(0, 0.12, u) * (1 - smooth(0.75, 1, u)) };
+  }
+  // the band as a mask gradient: a soft bell across the axis
+  function coloBandGrad(sg, W, H, mid, bw) {
+    var lg = sg.createLinearGradient(0, 0, W * 0.75, H);
+    [[-1, 0], [-0.6, 0.3], [-0.25, 0.85], [0, 1], [0.25, 0.85], [0.6, 0.3], [1, 0]].forEach(function (s) {
+      lg.addColorStop(clamp(mid + s[0] * bw, 0, 1), 'rgba(0,0,0,' + s[1] + ')');
+    });
+    return lg;
+  }
+  // the sun on the vellum: the gain the sunlight gives the leaf's own colour (linear light lifted 16-26% and
+  // warmed, under a soft shoulder), as a color-dodge colour (out = in / (1 - s), so s = 1 - 1 / gain).
+  // grad is the broad light, 1 at the top left of the still. The bake (sun_dodge) divides the same out.
+  function coloDodgeColour(grad) {
+    var LEAF = [220, 201, 159], WARM = [1.05, 1, 0.925], s = [];
+    for (var c = 0; c < 3; c++) {
+      var v = LEAF[c] / 255, lin = (v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)) * (1.16 + 0.10 * grad) * WARM[c];
+      if (lin > 0.7) lin = 0.7 + 0.275 * (1 - Math.exp(-(lin - 0.7) / 0.275));
+      var o = lin <= 0.0031308 ? lin * 12.92 : 1.055 * Math.pow(lin, 1 / 2.4) - 0.055;
+      s.push(Math.round(255 * clamp(1 - v / o, 0, 1)));
+    }
+    return 'rgb(' + s.join(',') + ')';
+  }
+  // the lift as a gradient over the leaf (CSS px): the still's diagonal 0.55 u + 0.45 v, carried by the painting
+  function coloDodge(C) {
+    var S = SUN_STILL, im = C.img;
+    var du = S.pw / (S.w * im.w), dv = S.ph / (S.h * im.h), u0 = (S.x - im.x * S.pw / im.w) / S.w, v0 = (S.y - im.y * S.ph / im.h) / S.h;
+    var a = 0.55 * du, b = 0.45 * dv, c = 0.55 * u0 + 0.45 * v0, nn = a * a + b * b;
+    var lg = scratch(1, 1).createLinearGradient(-c * a / nn, -c * b / nn, (1 - c) * a / nn, (1 - c) * b / nn);
+    for (var i = 0; i <= 10; i++) lg.addColorStop(i / 10, coloDodgeColour(1 - smooth(0, 1, i / 10)));
+    return lg;
+  }
+  // a point of light (as the still drew them: a hot core, a faint warm halo and, for the four nearest the sun,
+  // thin four-pointed rays), drawn into a small canvas in device px for `screen`: colour v / max(v), alpha max(v).
+  // f is device px per px of the still
+  function coloSparkSprite(sp, W, Hh, f) {
+    var size = sp[2] * SUN_STILL.pw, cx = sp[0] * W, cy = sp[1] * Hh, R = Math.ceil(Math.max(12, size * 3.2 + 8) * f);
+    var ox = Math.floor(cx) - R, oy = Math.floor(cy) - R, n = 2 * R + 1, cv = canvasOf(n, n), cg = cv.getContext('2d');
+    var id = cg.createImageData(n, n), d = id.data, cs = 0.7 + 0.035 * size, hs = 2.2 + 0.35 * size;
+    var t = sp[3] * Math.PI / 180, co = Math.cos(t), si = Math.sin(t);
+    for (var y = 0; y < n; y++) for (var x = 0; x < n; x++) {
+      var dx = (ox + x + 0.5 - cx) / f, dy = (oy + y + 0.5 - cy) / f, r2 = dx * dx + dy * dy;
+      var core = 1.1 * Math.exp(-r2 / (2 * cs * cs)), halo = 0.2 * Math.exp(-r2 / (2 * hs * hs)), ray = 0;
+      if (sp[3]) {
+        var a1 = dx * co + dy * si, a2 = -dx * si + dy * co;
+        ray = 0.95 * (Math.exp(-a1 * a1 / 0.605) * Math.exp(-Math.abs(a2) / (size * 0.55)) +
+          Math.exp(-a2 * a2 / 0.605) * Math.exp(-Math.abs(a1) / (size * 0.72 * 0.55)));
+      }
+      var r = Math.min(1, core + halo + ray), gg = Math.min(1, core * 0.98 + halo * 0.86 + ray * 0.95),
+        b = Math.min(1, core * 0.92 + halo * 0.55 + ray * 0.84), m = Math.max(r, gg, b), o = (y * n + x) * 4;
+      if (m < 0.004) continue;
+      d[o] = 255 * r / m; d[o + 1] = 255 * gg / m; d[o + 2] = 255 * b / m; d[o + 3] = 255 * m;
+    }
+    cg.putImageData(id, 0, 0);
+    return { cv: cv, x: ox, y: oy, diag: 0.55 * sp[0] + 0.45 * sp[1] };
+  }
   function coloBuild(w, h, mx, top, cw) {
-    var dpr = Math.min(2, window.devicePixelRatio || 1);
-    var key = [w, h, dpr, ART.has('colophon') ? 1 : 0].join('|');
+    var dpr = Math.min(2, window.devicePixelRatio || 1), sun = ART.has('colophon.sun');
+    var key = [w, h, dpr, ART.has('colophon') ? 1 : 0, sun ? 1 : 0].join('|');
     if (coloCache.key === key) return coloCache;
+    ['full', 'rich', 'under', 'glint', 'fullSun', 'richSun', 'sparks'].forEach(function (k) { zap(coloCache[k]); });
     var C = { key: key, dpr: dpr, ms: COLO_MS }, pc = document.createElement('canvas').getContext('2d');
     // the words at the foot, measured first: the painting takes the rest of the leaf
     var ls = clamp(w * 0.06, 12, 30), ns = clamp(w * 0.03, 9.5, 15), foot = h - Math.max(10, h * 0.025);
     font(pc, ns, FELL, 'italic');
     // no-break spaces keep the signature on one line when the note wraps
-    var lines = wrap(pc, 'All thirty pages are finished. Thank you for playing. — the scribe', cw * 0.96);
+    var lines = wrap(pc, 'All thirty pages are finished. Thank you for playing. — the scribe', cw * 0.96);
     var yLast = foot - ns * 1.75, yFirst = yLast - (lines.length - 1) * ns * 1.3, yL = yFirst - ns * 1.5;
     C.text = { ls: ls, ns: ns, lines: lines, yFirst: yFirst, yL: yL };
     // the letter (the picture less its blank margin) as large as fits between the leaf's edges and the words
@@ -589,6 +680,7 @@
     var ix = w / 2 - iw * (COLO_IN.x0 + COLO_IN.x1) / 2, iy = (by0 + by1) / 2 - ih * (COLO_IN.y0 + COLO_IN.y1) / 2;
     C.img = { x: ix, y: iy, w: iw, h: ih };
     C.box = [ix + iw * COLO_IN.x0, iy + ih * COLO_IN.y0, iw * fw, ih * fh];
+    C.dodge = coloDodge(C);
     // the layers, in device pixels
     var W = Math.max(1, Math.round(iw * dpr)), Hh = Math.max(1, Math.round(ih * dpr));
     var src = canvasOf(W, Hh), sg = src.getContext('2d');
@@ -605,27 +697,39 @@
       for (y = 0; y < Hh; y++) ey[y] = smooth(0, ft, y + 0.5) * smooth(0, fb, Hh - y - 0.5);
       for (var i = 0; i < n; i++) {
         var o = i * 4, r = d[o], gg = d[o + 1], b = d[o + 2], E = ex[i % W] * ey[(i / W) | 0];
-        var hi = Math.max(r, gg, b), lo = Math.min(r, gg, b), v = hi / 255, s = hi ? (hi - lo) / hi : 0;
+        var lo = Math.min(r, gg, b);
         F[o] = r; F[o + 1] = gg; F[o + 2] = b; F[o + 3] = 255 * E;
         // the painted pixels (not the lifted ground): laid again at part strength over the multiply
         R[o] = r; R[o + 1] = gg; R[o + 2] = b; R[o + 3] = 255 * E * COLO_RICH * smooth(0.05, 0.3, 1 - lo / 255);
         // the underdrawing: the picture's value only, in a pale sepia, contrast cut to a third
         var l = (r * 0.3 + gg * 0.59 + b * 0.11) / 255, k = (1 - l) * 0.34;
         U[o] = 255 - (255 - 104) * k; U[o + 1] = 255 - (255 - 70) * k; U[o + 2] = 255 - (255 - 40) * k; U[o + 3] = 255 * E;
-        // the gold: warm hue (about 25-55 degrees), well saturated, bright
-        var hue = 0;
-        if (hi > lo && hi === r) hue = 60 * (gg - b) / (hi - lo);
-        else if (hi > lo && hi === gg) hue = 60 * (2 + (b - r) / (hi - lo));
-        var gm = smooth(20, 30, hue) * (1 - smooth(52, 62, hue)) * smooth(0.32, 0.46, s) * smooth(0.5, 0.72, v);
-        Gd[o] = 255; Gd[o + 1] = 238; Gd[o + 2] = 186; Gd[o + 3] = 255 * E * gm;
+        // the gold: the glint's mask, strongest on the gold's own lights so it follows the painted modelling
+        Gd[o] = 255; Gd[o + 1] = 238; Gd[o + 2] = 186; Gd[o + 3] = 255 * E * coloGold(r, gg, b) * (0.3 + 0.7 * smooth(0.5, 0.88, l));
       }
       C.full = canvasOf(W, Hh); C.full.getContext('2d').putImageData(full, 0, 0);
       C.rich = canvasOf(W, Hh); C.rich.getContext('2d').putImageData(rich, 0, 0);
       C.under = canvasOf(W, Hh); C.under.getContext('2d').putImageData(under, 0, 0);
       C.glint = canvasOf(W, Hh); C.glint.getContext('2d').putImageData(glint, 0, 0);
+      // the sunlit painting in the same two layers: its colour, the plain layers' alpha
+      if (sun) ['full', 'rich'].forEach(function (k) {
+        var cv = canvasOf(W, Hh), cg = cv.getContext('2d');
+        cg.imageSmoothingQuality = 'high';
+        ART.draw(cg, 'colophon.sun', 0, 0, W, Hh, 0, {});
+        cg.globalCompositeOperation = 'destination-in'; cg.drawImage(C[k], 0, 0);
+        C[k + 'Sun'] = cv;
+      });
+      // the points of light: one sprite each for the reveal, and all of them in one layer for the finished page
+      C.sp = COLO_SPARKS.map(function (sp) { return coloSparkSprite(sp, W, Hh, W / SUN_STILL.pw); });
+      C.sparks = canvasOf(W, Hh);
+      var spg = C.sparks.getContext('2d');
+      spg.globalCompositeOperation = 'lighter';
+      C.sp.forEach(function (s) { spg.drawImage(s.cv, s.x, s.y); });
+      // they light nearest the sun first
+      C.sp.sort(function (a, b) { return a.diag - b.diag; });
     } catch (e) {
       // a tainted canvas (file://): the plain picture, faded at the edges by alpha alone, and no reveal
-      C.full = src; C.rich = null; C.under = null; C.glint = null; C.ms = 0;
+      C.full = src; C.rich = null; C.under = null; C.glint = null; C.fullSun = null; C.richSun = null; C.sparks = null; C.sp = null; C.ms = 0;
     }
     coloCache = C;
     return C;
@@ -646,9 +750,25 @@
     sg.globalCompositeOperation = 'source-over';
     return sg;
   }
+  // a plain layer part way to its sunlit twin (k 0..1): the two weighted and added, so the alpha stays the same
+  function coloMix(C, a, b, k) {
+    if (!b || k <= 0) return a;
+    if (k >= 1) return b;
+    var sg = scratch(C.W, C.H);
+    sg.globalAlpha = 1 - k; sg.drawImage(a, 0, 0);
+    sg.globalCompositeOperation = 'lighter'; sg.globalAlpha = k; sg.drawImage(b, 0, 0);
+    sg.globalCompositeOperation = 'source-over'; sg.globalAlpha = 1;
+    return coloScr;
+  }
+  // how far the sun is up, el ms into the reveal (1e9: finished)
+  function coloSun(el) { return smooth(SUN_T0, SUN_T0 + SUN_MS, el); }
   // one frame of the painting, el ms into the reveal (1e9: finished)
   function coloFrame(g, C, el) {
-    if (el >= C.ms) { coloBlit(g, C, C.full, 'multiply', 1); coloBlit(g, C, C.rich, 'source-over', 1); return; }
+    var k = coloSun(el);
+    if (el >= C.ms) {
+      coloBlit(g, C, C.fullSun || C.full, 'multiply', 1); coloBlit(g, C, C.richSun || C.rich, 'source-over', 1);
+      return;
+    }
     var W = C.W, H = C.H;
     // the colour's front: a soft ring spreading from the top of the L's stem to the far corner
     var ox = W * 0.17, oy = H * 0.12, rMax = Math.hypot(W - ox, H - oy), soft = rMax * 0.24;
@@ -663,24 +783,46 @@
       if (grad) { coloMasked(C, C.under, grad, true); coloBlit(g, C, coloScr, 'multiply', ua); }
       else coloBlit(g, C, C.under, 'multiply', ua);
     }
-    // 2. the colour floods outward from the L
+    // 2. the colour floods outward from the L, and (once it is all down) crosses to the sunlit painting
     if (grad) {
-      if (p >= 1) { coloBlit(g, C, C.full, 'multiply', 1); coloBlit(g, C, C.rich, 'source-over', 1); }
-      else {
+      if (p >= 1) {
+        coloBlit(g, C, coloMix(C, C.full, C.fullSun, k), 'multiply', 1);
+        coloBlit(g, C, coloMix(C, C.rich, C.richSun, k), 'source-over', 1);
+      } else {
         coloMasked(C, C.full, grad, false); coloBlit(g, C, coloScr, 'multiply', 1);
         coloMasked(C, C.rich, grad, false); coloBlit(g, C, coloScr, 'source-over', 1);
       }
     }
-    // 3. a glint runs down across the gold
-    var gp = clamp((el - 2900) / 1100, 0, 1);
-    if (gp > 0 && gp < 1 && C.glint) {
-      var sl = scratch(W, H), mid = -0.12 + 1.24 * gp, bw = 0.09;
-      var lg = sl.createLinearGradient(0, 0, W * 0.75, H);
-      lg.addColorStop(clamp(mid - bw, 0, 1), 'rgba(0,0,0,0)'); lg.addColorStop(clamp(mid, 0, 1), 'rgba(0,0,0,1)');
-      lg.addColorStop(clamp(mid + bw, 0, 1), 'rgba(0,0,0,0)');
+    // 3. a glint runs down right across the gold, ahead of the sun
+    var bd = coloBand(el);
+    if (bd.a > 0 && C.glint) {
+      var lg = coloBandGrad(scratch(1, 1), W, H, bd.mid, bd.bw);
       coloMasked(C, C.glint, lg, false);
-      coloBlit(g, C, coloScr, 'lighter', 0.75 * Math.sin(Math.PI * gp));
+      coloBlit(g, C, coloScr, 'lighter', bd.a);
     }
+  }
+  // the light over the whole leaf, after the words: the vellum's lift, then the points of light
+  function coloLight(g, C, el, w, h) {
+    var k = el >= C.ms ? 1 : coloSun(el);
+    if (k > 0) {
+      g.globalCompositeOperation = 'color-dodge'; g.globalAlpha = k; g.fillStyle = C.dodge; g.fillRect(0, 0, w, h);
+      g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
+    }
+    if (!C.sp) return;
+    if (el >= C.ms) { coloBlit(g, C, C.sparks, 'screen', 1); return; }
+    var sx = C.img.w / C.W, sy = C.img.h / C.H;
+    g.globalCompositeOperation = 'screen';
+    C.sp.forEach(function (s, j) {
+      var t = (el - SP_T0 - j * SP_GAP) / SP_MS;
+      if (t <= 0) return;
+      // it flares in past full and settles
+      var a = t >= 1 ? 1 : smooth(0, 0.3, t) * (1 + 0.6 * Math.sin(Math.PI * smooth(0, 1, t)));
+      for (; a > 0; a -= 1) {
+        g.globalAlpha = Math.min(1, a);
+        g.drawImage(s.cv, C.img.x + s.x * sx, C.img.y + s.y * sy, s.cv.width * sx, s.cv.height * sy);
+      }
+    });
+    g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
   }
   function coloFace(g, w, h, mx, top, cw, H, t) {
     var C = coloBuild(w, h, mx, top, cw);
@@ -697,6 +839,7 @@
       var a = ln.slice(0, k), b = ln.slice(k), wa = g.measureText(a).width, wb = g.measureText(b).width, x0 = w / 2 - (wa + wb) / 2;
       g.textAlign = 'left'; g.fillText(a, x0, y); g.fillStyle = RED; g.fillText(b, x0 + wa, y); g.textAlign = 'center';
     });
+    coloLight(g, C, ela, w, h);
     H.push({ x: C.box[0], y: C.box[1], w: C.box[2], h: C.box[3], act: { colo: 1 } });
   }
   function coloSide() {
@@ -734,7 +877,7 @@
   // the reveal's layers are big (the picture at device size, four times over): let go of them while the book is shut
   function coloFree() {
     coloStop();
-    ['full', 'rich', 'under', 'glint'].forEach(function (k) { zap(coloCache[k]); });
+    ['full', 'rich', 'under', 'glint', 'fullSun', 'richSun', 'sparks'].forEach(function (k) { zap(coloCache[k]); });
     coloCache = {}; zap(coloScr); coloScr = null;
   }
   function coloLoop() {
@@ -1193,7 +1336,7 @@
   function refresh() {
     if (mode === 'hidden') return;
     thumbs = freeAll(thumbs);
-    ['full', 'rich', 'under', 'glint'].forEach(function (k) { zap(coloCache[k]); }); coloCache = {};
+    ['full', 'rich', 'under', 'glint', 'fullSun', 'richSun', 'sparks'].forEach(function (k) { zap(coloCache[k]); }); coloCache = {};
     computeLayout();
     if (mode === 'open') setStatic();
     else if (mode === 'closed') {   // the endpaper (inside the board) only matters while the cover is lifting

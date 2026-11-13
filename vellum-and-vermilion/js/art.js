@@ -2036,7 +2036,7 @@
     rank: function (slot) {
       if (/^cover\.(leather|spine|title|medallion|corner|clasp|pages)$/.test(slot)) return 0;
       if (slot === 'page' || slot === 'cover.endpaper' || slot === 'cover.flyleaf') return 1;
-      if (/^(capital\.|colophon$)/.test(slot)) return ART.DEMAND;
+      if (/^(capital\.|colophon(\.sun)?$)/.test(slot)) return ART.DEMAND;
       if (slot.indexOf('drollery.') === 0) return ART.DEFER;
       return 2;
     },
