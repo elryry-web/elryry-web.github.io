@@ -1,10 +1,12 @@
 'use strict';
 /* =====================================================================
    QUILL & SIGIL — editor.js (v177)
-   The level editor (editor.html, desktop only). It draws the level with the game's own renderer (world.js: loadWorld,
-   render) and picks tiles with the game's own aim pick (pick), so what is built here is what plays. A level is the
+   The level editor (quill-and-sigil-editor/index.html, desktop only; a site entry of its own, not reached from the
+   game). It runs the game's files from ../quill-and-sigil/ (ink.js, world.js, art) and has no engine of its own.
+   It draws the level with the game's own renderer (world.js: loadWorld, render) and picks tiles with the game's own aim pick (pick), so what is built here is what plays. A level is the
    lesson format of main.js (t / o rows, flows, sigils, ring rules, par, ink); Custom (custom.js) checks it, writes it
-   into a link, and tells the editor when the maker has beaten it in test play (which opens sharing).
+   into a link, and tells the editor when the maker has beaten it in test play (which opens sharing). Test play and shared
+   links open play.html in this folder, which plays the level on the game's own screen.
    The work in progress lives in localStorage (quillsigil.editor); nothing here touches the game's save.
    ===================================================================== */
 // world.js plays sounds only while the world steps, which never happens here; DPR as the game's own
@@ -494,10 +496,12 @@ const Editor = (() => {
     $('bShare').title = w ? 'Make a link that plays this level' : 'Beat the level in test play to share it';
     $('bPlay').disabled = !L;
   }
+  // the play page beside this one (built from the page's own address: the <base> points into the game's folder)
+  const playURL = code => new URL('play.html#level=' + code, location.href).href;
   async function testPlay() {
     let L; try { L = Custom.sanitize(build()); } catch (e) { say(`Not ready to play: ${e.message}.`); return; }
     store();
-    location.href = 'index.html#level=' + await Custom.encode(L) + '&edit=1';
+    location.href = playURL(await Custom.encode(L)) + '&edit=1';
   }
   // back from a winning test play: the maker's count becomes the par, unless they set one themselves
   function takeWin() {
@@ -508,7 +512,7 @@ const Editor = (() => {
   }
   async function share() {
     const L = checked(); if (!beaten(L)) return;
-    const url = new URL('index.html#level=' + await Custom.encode(L), location.href).href;
+    const url = playURL(await Custom.encode(L));
     modal(`<h2>Share this level</h2><p>Anyone with this link plays it, on a phone too. The level is inside the link itself (${url.length} letters).</p>
       <input class="link" id="mLink" readonly value="${url.replace(/"/g, '&quot;')}">
       <div class="row"><span class="err" id="mErr"></span><a class="btn" href="${url.replace(/"/g, '&quot;')}" target="_blank" rel="noopener">Open it</a><button class="btn primary" id="mCopy">Copy link</button><button class="btn" id="mClose">Close</button></div>`);
@@ -533,7 +537,7 @@ const Editor = (() => {
     };
   }
   function importUI() {
-    modal(`<h2>Import</h2><p>Paste a level's JSON or a shared link, or open a saved file.</p><textarea id="mText" spellcheck="false" placeholder='{"name": …}  or  https://…/index.html#level=…'></textarea>
+    modal(`<h2>Import</h2><p>Paste a level's JSON or a shared link, or open a saved file.</p><textarea id="mText" spellcheck="false" placeholder='{"name": …}  or  https://…/play.html#level=…'></textarea>
       <div class="row"><span class="err" id="mErr"></span><label class="btn">Open file<input type="file" id="mFile" accept=".json,application/json,text/plain" hidden></label><button class="btn primary" id="mOpen">Import</button><button class="btn" id="mClose">Close</button></div>`);
     $('mFile').onchange = async e => { const f = e.target.files[0]; if (f) $('mText').value = (await f.text()).slice(0, 200000); };
     $('mOpen').onclick = async () => {

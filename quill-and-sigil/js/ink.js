@@ -1176,7 +1176,7 @@ function folioLeaf(g, x, y, w, h, flip, fill) {
   let [sx, sy, sw, sh] = FOLIO_ART.page.leaf;
   if (!fill) { const k = Math.max(w / sw, h / sh), cw = w / k, ch = h / k; sx += (sw - cw) / 2; sy += (sh - ch) / 2; sw = cw; sh = ch; }
   g.save(); g.translate(x + (flip ? w : 0), y); if (flip) g.scale(-1, 1);
-  g.drawImage(im, sx, sy, sw, sh, 0, 0, w, h); g.restore();
+  drawArt(g, im, sx, sy, sw, sh, 0, 0, w, h); g.restore();
   return true;
 }
 // the picture with its ruled borders painted out: each rule (both its lines) covered by the parchment just inside it,
@@ -1205,18 +1205,18 @@ function folioSlices(g, im, xs, ys, dpr) {
       if (x1 <= x0 || y1 <= y0) continue;
       const fx = i % 2, fy = j % 2;
       g.save(); g.translate(fx ? x1 : x0, fy ? y1 : y0); g.scale(fx ? -1 : 1, fy ? -1 : 1);
-      g.drawImage(im, X.a0, Y.a0, X.a1 - X.a0, Y.a1 - Y.a0, 0, 0, x1 - x0, y1 - y0);
+      drawArt(g, im, X.a0, Y.a0, X.a1 - X.a0, Y.a1 - Y.a0, 0, 0, x1 - x0, y1 - y0);
       g.restore();
     }
   }
 }
 // an image with its corner at (x, y), turned outwards by fx/fy = ±1 (for the four corners of a page)
-function drawFlip(g, im, x, y, w, h, fx, fy) { g.save(); g.translate(x, y); g.scale(fx, fy); g.drawImage(im, 0, 0, w, h); g.restore(); }
+function drawFlip(g, im, x, y, w, h, fx, fy) { g.save(); g.translate(x, y); g.scale(fx, fy); drawSharp(g, im, 0, 0, w, h); g.restore(); }
 // an image cropped to fill a box without stretching
 function drawCover(g, im, x, y, w, h, flip) {
   const iw = im.naturalWidth, ih = im.naturalHeight, k = Math.max(w / iw, h / ih), sw = w / k, sh = h / k;
   g.save(); g.translate(x + (flip ? w : 0), y); if (flip) g.scale(-1, 1);
-  g.drawImage(im, (iw - sw) / 2, (ih - sh) / 2, sw, sh, 0, 0, w, h); g.restore();
+  drawArt(g, im, (iw - sw) / 2, (ih - sh) / 2, sw, sh, 0, 0, w, h); g.restore();
 }
 // a painted frame stretched to a box, its corners kept square (b: the corner's size in the painting, d: on the page)
 function nineSlice(g, im, x, y, w, h, b, d) {
@@ -1224,23 +1224,99 @@ function nineSlice(g, im, x, y, w, h, b, d) {
   const sx = [0, b, iw - b, iw], sy = [0, b, ih - b, ih], dx = [x, x + d, x + w - d, x + w], dy = [y, y + d, y + h - d, y + h];
   for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
     if (i === 1 && j === 1) continue;
-    g.drawImage(im, sx[i], sy[j], sx[i + 1] - sx[i], sy[j + 1] - sy[j], dx[i], dy[j], dx[i + 1] - dx[i], dy[j + 1] - dy[j]);
+    drawArt(g, im, sx[i], sy[j], sx[i + 1] - sx[i], sy[j + 1] - sy[j], dx[i], dy[j], dx[i + 1] - dx[i], dy[j + 1] - dy[j]);
   }
 }
+/* (v180) The painted pieces kept sharp. A canvas shrinks a picture with a cheap filter that turns fine knotwork into
+   speckle once it is drawn at less than half its size (a corner boss: 420 px painted, about 170 screen pixels on a
+   phone). So each piece is shrunk once, with good filtering, to the screen pixels it covers, kept, and laid on whole
+   pixels; pieces cut into slices draw from a copy halved (filtered) until no slice shrinks it more than twice. */
+function smoothCtx(g) { g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; return g; }
+const artW = im => im.naturalWidth || im.width, artH = im => im.naturalHeight || im.height;
+// the picture halved over and over (level n is 1 / 2^n, each step filtered), and the level for drawing it at k screen
+// pixels per picture pixel: { im, fx, fy } (fx, fy: that level's size against the picture's)
+function artMip(im, k) {
+  if (!(k < 0.5)) return { im, fx: 1, fy: 1 };
+  const L = im._mip || (im._mip = [im]); let n = 0;
+  while (k * 2 ** (n + 1) <= 1 && artW(L[n]) > 8 && artH(L[n]) > 8) {
+    n++;
+    if (!L[n]) {
+      const p = L[n - 1], c = document.createElement('canvas'); c.width = Math.ceil(artW(p) / 2); c.height = Math.ceil(artH(p) / 2);
+      smoothCtx(c.getContext('2d')).drawImage(p, 0, 0, c.width, c.height); L[n] = c;
+    }
+  }
+  return { im: L[n], fx: artW(L[n]) / artW(im), fy: artH(L[n]) / artH(im) };
+}
+// how many screen pixels a page pixel covers on g (the book is drawn at the screen's pixel ratio)
+const devScale = g => { const m = g.getTransform(); return Math.hypot(m.a, m.b) || 1; };
+// g.drawImage(im, sx, sy, sw, sh, dx, dy, dw, dh), from the halved copy that suits the size
+function drawArt(g, im, sx, sy, sw, sh, dx, dy, dw, dh) {
+  const k = devScale(g), M = artMip(im, Math.min(Math.abs(dw) * k / sw, Math.abs(dh) * k / sh));
+  g.drawImage(M.im, sx * M.fx, sy * M.fy, sw * M.fx, sh * M.fy, dx, dy, dw, dh);
+}
+// the picture shrunk once to exactly W x H screen pixels (kept, a few sizes per picture)
+let _sharp = new WeakMap();
+function sharpCopy(im, W, H) {
+  let m = _sharp.get(im); if (!m || m.size > 24) _sharp.set(im, m = new Map());
+  const key = W + 'x' + H; let c = m.get(key); if (c) return c;
+  c = document.createElement('canvas'); c.width = W; c.height = H;
+  smoothCtx(c.getContext('2d')).drawImage(artMip(im, Math.min(W / artW(im), H / artH(im))).im, 0, 0, W, H);
+  m.set(key, c); return c;
+}
+// g.drawImage(im, x, y, w, h), sharp: from a copy the size it covers on the screen, laid on whole screen pixels (turned
+// or mirrored by g's transform as before; only a slanted transform falls back to the halved copies)
+function drawSharp(g, im, x, y, w, h) {
+  const M = g.getTransform();
+  if (M.b || M.c) { drawArt(g, im, 0, 0, artW(im), artH(im), x, y, w, h); return; }
+  const X0 = Math.round(M.a * x + M.e), X1 = Math.round(M.a * (x + w) + M.e), Y0 = Math.round(M.d * y + M.f), Y1 = Math.round(M.d * (y + h) + M.f);
+  const W = Math.abs(X1 - X0), H = Math.abs(Y1 - Y0); if (!W || !H) return;
+  g.save(); g.setTransform(Math.sign(X1 - X0), 0, 0, Math.sign(Y1 - Y0), X0, Y0); g.drawImage(sharpCopy(im, W, H), 0, 0); g.restore();
+}
+// (kept copies are let go when the page comes back from the background, in case the browser wiped them)
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) return;
+  _sharp = new WeakMap(); _knotTiles.clear();
+  for (const im of [...Object.values(GART), ...Object.values(FOLIO)]) if (im) delete im._mip;
+});
+// a spark's colour as it looked added onto the parchment: most of the way to a warm white
+const _sparkLit = new Map();
+function sparkLit(hex) {
+  let c = _sparkLit.get(hex); if (c) return c;
+  const n = parseInt(hex.slice(1), 16), mx = (v, w) => Math.round(v + (w - v) * 0.6).toString(16).padStart(2, '0');
+  c = '#' + mx(n >> 16 & 255, 255) + mx(n >> 8 & 255, 250) + mx(n & 255, 225); _sparkLit.set(hex, c); return c;
+}
 // the painted roundel round a circle of radius r (its open middle is 60% of it)
-function roundelAt(g, cx, cy, r) { const R = r / 0.6; g.drawImage(GART.roundel, cx - R, cy - R, R * 2, R * 2); return R; }
+function roundelAt(g, cx, cy, r) { const R = r / 0.6; drawSharp(g, GART.roundel, cx - R, cy - R, R * 2, R * 2); return R; }
+// one repeat of the knot strip, H screen pixels tall and a whole number of pixels long: shrunk from three repeats side
+// by side and cut from the middle, so its ends carry on into the next repeat without a seam
+const _knotTiles = new Map();
+function knotTile(V, H) {
+  let t = _knotTiles.get(H); if (t && t.src === V) return t.c;
+  const w = artW(V), h = artH(V), TW = Math.max(1, Math.round(w * H / h));
+  const three = document.createElement('canvas'); three.width = w * 3; three.height = h;
+  const q3 = three.getContext('2d'); for (let i = 0; i < 3; i++) q3.drawImage(V, i * w, 0);
+  const c = document.createElement('canvas'); c.width = TW; c.height = H;
+  smoothCtx(c.getContext('2d')).drawImage(sharpCopy(three, TW * 3, H), TW, 0, TW, H, 0, 0, TW, H);
+  if (_knotTiles.size > 12) _knotTiles.clear();
+  _knotTiles.set(H, { src: V, c }); return c;
+}
 // the painted knotwork laid along a line from (x0, y0) to (x1, y1), centred on it, fading out briefly at both ends
-function vineRun(g, x0, y0, x1, y1, h, dpr) {
+// (v180: built in screen pixels from one sharp repeat, and laid on whole pixels, so it is never resampled again)
+function vineRun(g, x0, y0, x1, y1, h) {
   const V = GART.knot, len = Math.hypot(x1 - x0, y1 - y0); if (!V || len < h) return;
-  const c = document.createElement('canvas'); c.width = Math.ceil(len * dpr); c.height = Math.ceil(h * dpr);
-  const q = c.getContext('2d'); q.scale(dpr, dpr);
-  const tw = V.naturalWidth * h / V.naturalHeight, n = Math.ceil(len / tw) + 1, sx = (len - n * tw) / 2;
-  for (let i = 0; i < n; i++) q.drawImage(V, sx + i * tw - 0.5 * i, 0, tw, h);
+  const M = g.getTransform(), k = devScale(g), H = Math.max(2, Math.round(h * k)), D = Math.max(1, Math.round(len * k));
+  const T = knotTile(V, H), TW = T.width, n = Math.ceil(D / TW) + 1, ox = Math.round((D - n * TW) / 2);
+  const c = document.createElement('canvas'); c.width = D; c.height = H;
+  const q = c.getContext('2d');
+  for (let i = 0; i < n; i++) q.drawImage(T, ox + i * TW, 0);
   q.globalCompositeOperation = 'destination-in';
-  const f = Math.min(0.12, h * 0.8 / len), gr = q.createLinearGradient(0, 0, len, 0);
+  const f = Math.min(0.12, h * 0.8 / len), gr = q.createLinearGradient(0, 0, D, 0);
   gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(f, '#000'); gr.addColorStop(1 - f, '#000'); gr.addColorStop(1, 'rgba(0,0,0,0)');
-  q.fillStyle = gr; q.fillRect(0, 0, len, h);
-  g.save(); g.translate(x0, y0); g.rotate(Math.atan2(y1 - y0, x1 - x0)); g.drawImage(c, 0, -h / 2, len, h); g.restore();
+  q.fillStyle = gr; q.fillRect(0, 0, D, H);
+  const p = M.transformPoint(new DOMPoint(x0, y0)), p1 = M.transformPoint(new DOMPoint(x1, y1));
+  let a = Math.atan2(p1.y - p.y, p1.x - p.x); const qa = Math.round(a / (Math.PI / 2)) * (Math.PI / 2);
+  if (Math.abs(a - qa) < 1e-3) a = qa; // (a run along the page's edge: square to the pixels)
+  g.save(); g.setTransform(1, 0, 0, 1, Math.round(p.x), Math.round(p.y)); g.rotate(a); g.drawImage(c, 0, -Math.round(H / 2)); g.restore();
 }
 // gilded lettering, painted the way a miniature painter paints gold without metal paint, on letters cut the way a
 // chisel cuts them: every stroke rises from both its edges to a sharp spine down its middle (where strokes meet, the
@@ -1521,7 +1597,11 @@ const Grim = {
 
   init(cv) {
     this.cv = cv; this.g = cv.getContext('2d');
-    this.book = document.createElement('canvas');
+    // (v180) the painted book is a canvas of its own under the page, at the screen's full pixel ratio (up to 3) so its
+    // art is sharp on a phone; it is painted only when the page changes, and the opening slide and fade move it whole
+    // (CSS), so the canvas drawn every frame stays at 2x and no larger
+    this.book = document.createElement('canvas'); this.book.id = 'pageBook';
+    cv.parentNode.insertBefore(this.book, cv);
     this.inkLayer = document.createElement('canvas');
     cv.addEventListener('pointerdown', e => this.down(e));
     cv.addEventListener('pointermove', e => this.move(e));
@@ -1535,9 +1615,10 @@ const Grim = {
     this.resize();
   },
   resize() {
-    const dpr = this.dpr = Math.min(2, window.devicePixelRatio || 1);
+    const dpr = this.dpr = Math.min(2, window.devicePixelRatio || 1), bdpr = this.bdpr = Math.min(3, window.devicePixelRatio || 1);
     const w = innerWidth, h = innerHeight;
-    for (const c of [this.cv, this.book, this.inkLayer]) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
+    for (const c of [this.cv, this.inkLayer]) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
+    this.book.width = Math.round(w * bdpr); this.book.height = Math.round(h * bdpr);
     this.layout(); this.bookDirty = true; this.inkDirty = true;
   },
   layout() {
@@ -1586,12 +1667,13 @@ const Grim = {
       L.area = { x: P.x + (P.w - size) / 2, y: top + Math.max(0, room - size) * 0.5, size };
     } else {
       // upright: the circle takes nearly the page's full width (the width is what limits it) and the book grows
-      // as tall as it needs — header, circle, then the status, the buttons' two rows (as tall as they measured)
-      // and the bottom border: the last row sits between the bottom corner bosses, just above the vine
+      // as tall as it needs — header, circle, then the status, the buttons' row (as tall as it measured) and the
+      // bottom border: the row stands just above the bottom corner bosses (v180: Undo · Blot · Satchel, and Inscribe
+      // under it between the bosses, in room the bosses already take, so only the row is counted)
       const HEAD = 128 + (L.legend ? 14 : 0), pad = 4;
       const bw = Math.min(vw - 4, 640), pw = bw - pad * 2;
       // (the status: the name clear of the ring and two lines of read-back, as statusAt places them — more on wider pages)
-      const FOOT = Math.max(64, 78 * pw / 520 + 15) + (this.btnH || 88) + pw * 0.035 + Math.max(9, pw * 0.03) + 6;
+      const FOOT = Math.max(64, 78 * pw / 520 + 15) + (this.btnH || 42) + pw * 0.035 + pw * 0.14 * 0.9 + 4;
       // the whole drawing circle stays inside the page's border (margin m, plus room for the vine's leaves)
       const m = pw * 0.035;
       const size = Math.max(160, Math.min((pw - 2 * (m + 9)) * 0.99 / L.fr, vh - 4 - pad * 2 - HEAD - FOOT));
@@ -1638,12 +1720,15 @@ const Grim = {
   placeButtons() {
     const pb = document.getElementById('pagebtns'), L = this.L; if (!pb || !L) return;
     this.headUnder();
+    this.placeCorners();
     pb.classList.toggle('single', L.single);
     // (a phone held sideways sets them out as upright, at the foot of its left-hand page, the column's)
     pb.classList.toggle('upright', L.single);
     this.fitButtons();
     pb.style.bottom = 'auto';
+    const ib = document.getElementById('pInscribe');
     if (!L.single) {
+      pb.classList.remove('foot'); for (const k of ['left', 'top', 'width', 'height']) ib.style[k] = ''; // (a phone's place for Inscribe)
       pb.style.left = L.right.x + 'px'; pb.style.width = L.right.w + 'px';
       // room for the name and two lines of the read-back, the big Inscribe kept above the bottom border
       const P = L.right, B = this.borderSize(P), h = pb.style.display === 'flex' ? pb.offsetHeight : 0;
@@ -1654,23 +1739,63 @@ const Grim = {
       pb.style.top = Math.min(Math.max(L.area.y + L.area.size + P.h * 0.1, this.statusAt().end), P.y + P.h - B.m - B.vh - 8 - h) + 'px';
       return;
     }
-    // upright: inside the knotwork border, always two rows (CSS: Notes, Undo, Blot, Recall and a ✕ for Close
-    // across the page; Keep, Satchel and Inscribe between the bottom corner bosses, just above the vine), the
-    // first row clear of the bosses' tops; the labels shrink to fit (large system text) rather than wrap to a third row
+    // upright: inside the knotwork border, Undo · Blot · Satchel in a row standing just clear of the bottom corner
+    // bosses' tops, and Inscribe under it in the strip between the two bottom bosses, down to just inside the bottom
+    // knotwork (v180; it was two rows of eight, the second between the bosses, then one row of four). Only the row
+    // counts towards btnH (Inscribe is out of the flow, CSS #pagebtns.foot), so the circle keeps a row's height.
+    // Where that strip is too short for a plaque (a sideways phone's left page, its bosses smaller), Inscribe takes
+    // the full width of a second row instead. The labels shrink to fit (large system text) rather than wrap.
     // (sideways, on the left page: the column's, the circle having the right one)
     const P = L.side ? L.left : L.right, B = this.borderSize(P), inset = B.m + B.vh + 4;
+    const bossTop = P.y + P.h - B.m - B.bs * 0.9, gap = 4;
+    const ix0 = P.x + B.m + B.bs * 0.9 + gap, ix1 = P.x + P.w - B.m - B.bs * 0.9 - gap;
+    const iy0 = bossTop, iy1 = P.y + P.h - B.m - B.vh - 1.5 - 3, foot = iy1 - iy0 >= 20 && ix1 - ix0 >= 120;
+    pb.classList.toggle('foot', foot);
     pb.style.left = (P.x + inset) + 'px'; pb.style.width = (P.w - inset * 2) + 'px';
-    pb.style.setProperty('--bx', Math.max(0, B.m + B.bs * 0.9 + 4 - inset) + 'px');
-    pb.style.rowGap = Math.max(4, B.bs * 0.9 - B.vh - 42) / 2 + 'px'; // (halved: the row break is an empty line of its own)
+    if (foot) {
+      Object.assign(ib.style, { left: (ix0 - P.x - inset) + 'px', width: (ix1 - ix0) + 'px', height: (iy1 - iy0) + 'px' });
+      pb.style.setProperty('--ib', Math.min(9, Math.round((iy1 - iy0) * 0.22)) + 'px'); // (a slimmer frame on the shorter plaque)
+    } else for (const k of ['left', 'top', 'width', 'height']) ib.style[k] = '';
     this.fitButtons(); // (again, now the row has its width: measured before it, the plaques were still as wide as the last layout left them)
     if (pb.style.display === 'flex') {
       const h = pb.offsetHeight;
-      if (h && Math.abs(h - (this.btnH || 88)) > 2 && (this._relaid = (this._relaid || 0) + 1) < 4) {
+      if (h && Math.abs(h - (this.btnH || 42)) > 2 && (this._relaid = (this._relaid || 0) + 1) < 4) {
         this.btnH = h; this.layout(); this.bookDirty = true; this.inkDirty = true; this._relaid = 0;
         return;
       }
     }
-    pb.style.top = (P.y + P.h - inset - (this.btnH || 88)) + 'px';
+    const top = bossTop - gap - (this.btnH || 42);
+    pb.style.top = top + 'px';
+    if (foot) ib.style.top = (iy0 - top) + 'px';
+  },
+  // (v180) the lesson's name at the head of a phone's page (codexStrip draws it): its size and place, shrunk if need be
+  // so the name and the ❦ (Notes) beside it fit between the top corner bosses; the pair is centred on the page
+  titleBox() {
+    const L = this.L, lv = typeof Game !== 'undefined' && Game.level; if (!L || !L.single || !lv) return null;
+    const P = L.side || L.right, PG = L.side ? L.left : L.right, B = this.borderSize(PG);
+    const s = Math.min(1, P.w / 520), y = L.side ? P.y + 32 : P.y + 54, NW = 36; // (NW: the ❦'s 30px and a gap)
+    const room = PG.w - 2 * (B.m + B.bs * 0.9) - 6 - NW, font = f => `700 ${f}px "Cinzel Decorative", serif`;
+    const g = this.g; let fs = Math.round(20 * s + 4);
+    g.save(); g.font = font(fs); let w = decoWidth(g, lv.name);
+    if (w > room) { fs = Math.max(11, Math.floor(fs * room / w * 10) / 10); g.font = font(fs); w = decoWidth(g, lv.name); }
+    g.restore();
+    const cx = P.x + P.w / 2 - NW / 2;
+    return { font: font(fs), fs, cx, y, x0: cx - w / 2, x1: cx + w / 2 };
+  },
+  // (v180) the corner buttons (HTML, #pagecorner): the round ✕ inside the border just under the top-right boss (on the
+  // drawing page: upright, the sideways phone's left page, the spread's right page); on a phone the ❦ just right of
+  // the lesson's name, which is a tap target for the notes as well (titleRect, in down())
+  placeCorners() {
+    const pc = document.getElementById('pagecorner'), L = this.L; if (!pc || !L) return;
+    pc.classList.toggle('single', !!L.single);
+    const PG = L.side ? L.left : L.right, B = this.borderSize(PG), cw = 34;
+    const x = PG.x + PG.w - (B.m + B.vh) - 6 - cw, y = PG.y + B.m + B.bs * 0.9 + 2;
+    const xb = document.getElementById('pClose'), nb = document.getElementById('pNotes');
+    xb.style.left = x + 'px'; xb.style.top = y + 'px';
+    this.closeRect = { x, y, w: cw, h: cw };
+    const T = this.titleBox();
+    this.titleRect = T && { x: T.x0 - 4, y: T.y - T.fs - 4, w: T.x1 - T.x0 + 8, h: T.fs + 12 };
+    if (T) { nb.style.left = (T.x1 + 6) + 'px'; nb.style.top = (T.y - T.fs * 0.36 - 15) + 'px'; }
   },
   // upright, each page button's label shrinks until it fits its plaque (Firefox for Android scales text up with the
   // system font size, which used to wrap the buttons to a third row and shrink the circle); elsewhere they keep the CSS size
@@ -1683,7 +1808,7 @@ const Grim = {
     if (!pb.classList.contains('upright') || pb.style.display !== 'flex') return;
     const r = document.createRange();
     for (const b of pb.children) {
-      if (!b.offsetParent || b.id === 'pClose') continue;
+      if (!b.offsetParent) continue;
       r.selectNodeContents(b);
       const room = b.clientWidth - 6; // (the field inside the knotwork, less 3px each side)
       if (r.getBoundingClientRect().width > room) b.style.letterSpacing = '0px';
@@ -1692,6 +1817,10 @@ const Grim = {
         const fs = parseFloat(getComputedStyle(b).fontSize); if (fs <= 7.01) break;
         b.style.fontSize = Math.max(7, fs * room / w * 0.98).toFixed(2) + 'px';
       }
+      // (and no taller than the field: Inscribe between the bottom bosses is a shorter plaque, its capitals clipped
+      // by large system text before they ran too wide)
+      const fh = b.clientHeight * 1.1, fs = parseFloat(getComputedStyle(b).fontSize);
+      if (fh && fs > fh) b.style.fontSize = Math.max(7, fh).toFixed(2) + 'px';
     }
   },
   /* screen rects of things on the page, for the tips (js/tips.js): 'guide', 'centre', 'slot:k', 'sign', 'status',
@@ -1743,9 +1872,12 @@ const Grim = {
 
   show() {
     // the window may have been sized after load (embedded views): lay the book out afresh
-    if (this.cv.width !== Math.round(innerWidth * Math.min(2, window.devicePixelRatio || 1)) || !this.L || this.L.bw <= 0) this.resize();
-    this.open = true; this.closing = false; this.cv.style.display = 'block';
+    if (this.cv.width !== Math.round(innerWidth * Math.min(2, window.devicePixelRatio || 1)) || !this.L || this.L.bw <= 0 ||
+      this.book.width !== Math.round(innerWidth * Math.min(3, window.devicePixelRatio || 1))) this.resize();
+    this.open = true; this.closing = false; this.cv.style.display = 'block'; this.book.style.display = 'block';
     document.getElementById('pagebtns').style.display = 'flex';
+    document.getElementById('pagecorner').style.display = 'block';
+    this.placeCorners(); // (the ❦ follows the lesson's name, which may have changed since the last layout)
     this.headUnder();
     // (the page itself is painted again only when its lesson or the screen changes, not at every opening)
     this.inkDirty = true;
@@ -1756,10 +1888,12 @@ const Grim = {
   releaseLayers() {
     if (this.open || this.closing) return;
     for (const c of [this.cv, this.book, this.inkLayer, this.glowLayer]) if (c) { c.width = 1; c.height = 1; }
+    this._bookOp = this._bookTf = null;
   },
   hide() {
     this.closing = true; this.open = false;
     document.getElementById('pagebtns').style.display = 'none';
+    document.getElementById('pagecorner').style.display = 'none';
     this.headUnder();
     document.getElementById('notes').classList.remove('show');
     Sfx.pen(0);
@@ -1774,6 +1908,9 @@ const Grim = {
         this.ghost = this.ghost === r.id ? null : r.id; Sfx.play('tick'); return;
       }
     }
+    // (v180) a phone's lesson name at the head of the page opens the notes, as the ❦ beside it does
+    const T = this.titleRect;
+    if (T && this.L.single && e.clientX >= T.x && e.clientX <= T.x + T.w && e.clientY >= T.y && e.clientY <= T.y + T.h) { Game.openNotes(); return; }
     const B = this.L;
     const inBook = e.clientX >= B.bx && e.clientX <= B.bx + B.bw && e.clientY >= B.by && e.clientY <= B.by + B.bh;
     if (!inBook) { Game.closeGrimoire(); return; }
@@ -1822,15 +1959,42 @@ const Grim = {
     this.inkDirty = true;
     this.updateStatus();
   },
-  undo() { this.draft.undo(); this.inkDirty = true; this.updateStatus(); Sfx.play('smudge'); },
-  blot() { this.draft.clear(); this.inkDirty = true; this.updateStatus(); Sfx.play('page'); },
+  // (v180) Undo takes back the last thing done to the page: a stroke, or a whole page laid at once (Blot, Recall, a
+  // kept spell). Those last are kept in hist, each with the page it replaced and the stroke count it left, so Undo
+  // restores that page once every stroke drawn since has been taken back. Cleared when the page is inscribed or a
+  // lesson starts (resetHist).
+  hist: [],
+  resetHist() { this.hist = []; this.syncButtons(); },
+  replacePage(strokes) {
+    this.hist.push({ was: JSON.parse(JSON.stringify(this.draft.strokes)), n: strokes.length });
+    if (this.hist.length > 30) this.hist.shift();
+    this.draft.clear(); for (const s of strokes) this.draft.add(JSON.parse(JSON.stringify(s)));
+    this.inkDirty = true; this.updateStatus();
+  },
+  undo() {
+    const h = this.hist[this.hist.length - 1];
+    if (h && this.draft.strokes.length <= h.n) {
+      this.hist.pop(); this.draft.clear(); for (const s of h.was) this.draft.add(s);
+    } else if (this.draft.strokes.length) this.draft.undo();
+    else return;
+    this.inkDirty = true; this.updateStatus(); Sfx.play('smudge');
+  },
+  blot() { if (!this.draft.strokes.length) return; this.replacePage([]); Sfx.play('page'); },
   recall() {
     if (!this.lastStrokes) { this.status = 'No spell has yet been cast this lesson.'; return; }
     this.loadStrokes(this.lastStrokes);
   },
-  loadStrokes(strokes) {
-    this.draft.clear(); for (const s of strokes) this.draft.add(JSON.parse(JSON.stringify(s)));
-    this.inkDirty = true; this.updateStatus(); Sfx.play('page');
+  // (v180) Blot and Recall share a button: Blot while the page has ink, Recall on a clean page once a spell was cast
+  blotOrRecall() { if (this.draft.strokes.length) this.blot(); else if (this.lastStrokes) this.recall(); },
+  loadStrokes(strokes) { this.replacePage(strokes); Sfx.play('page'); },
+  // the page buttons follow the page: Blot or Recall, and Undo greyed with nothing to take back
+  syncButtons() {
+    const b = document.getElementById('pBlot'), u = document.getElementById('pUndo'); if (!b) return;
+    const ink = this.draft.strokes.length > 0, rec = !ink && !!this.lastStrokes, label = rec ? 'Recall' : 'Blot';
+    b.disabled = !ink && !rec;
+    b.title = rec ? 'Lay your last spell on the page again' : 'Blot the page clean (Delete)';
+    if (b.textContent !== label) { b.textContent = label; this.fitButtons(); }
+    if (u) u.disabled = !ink && !this.hist.length;
   },
   keep() {
     const sp = buildSpell(this.draft, knownRules()); // (v178: a sigil not yet learned can't be kept, so the satchel never names it)
@@ -1847,6 +2011,7 @@ const Grim = {
     return true;
   },
   updateStatus() {
+    this.syncButtons();
     const A = this.draft.a, allowed = lessonRules();
     this.statusCol = '#4a3220';
     if (!this.draft.strokes.length) { this.status = 'Begin with the seal: draw one closed circle.'; return; }
@@ -1879,17 +2044,18 @@ const Grim = {
       const a = Math.random() * TAU, r = S.r * (0.9 + Math.random() * 0.25);
       this.sparks.push({ x: S.cx + Math.cos(a) * r, y: S.cy + Math.sin(a) * r, vx: Math.cos(a) * 0.4 * Math.random(), vy: Math.sin(a) * 0.4 * Math.random() - 0.1, t: 0, life: 0.7 + Math.random() * 0.5, col: sp.color });
     }
-    setTimeout(() => { this.draft.clear(); this.inkDirty = true; Game.holdSpell(sp); }, 380);
+    setTimeout(() => { this.draft.clear(); this.resetHist(); this.inkDirty = true; Game.holdSpell(sp); }, 380);
   },
 
   /* ---------- rendering ---------- */
   renderBook() {
-    const g = this.book.getContext('2d'), L = this.L, dpr = this.dpr;
+    const g = smoothCtx(this.book.getContext('2d')), L = this.L, dpr = this.bdpr;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, innerWidth, innerHeight);
     const t0 = performance.now();
     this._classic = typeof CLASSIC !== 'undefined' && CLASSIC.on;
     document.getElementById('pagebtns')?.classList.toggle('plaques', !this._classic); // the painted brass plaques (CSS) follow the look
+    document.getElementById('pagecorner')?.classList.toggle('classic', this._classic);
     // the painted book (until its picture has loaded, and in the old look, the drawn one)
     // (two pages — the open spread, or a phone held sideways — the whole book; one, the right-hand page alone)
     const fk = L.left ? 'book' : 'page', fa = folioArt(fk);
@@ -1929,7 +2095,7 @@ const Grim = {
     // its shadow: soft layers spreading out below it (a canvas blur this size is very slow on phones)
     const bx = xs[0].d0, bw = xs[xs.length - 1].d1 - bx, by = ys[0].d0, bh = ys[2].d1 - by;
     for (let k = 8; k >= 1; k--) { g.fillStyle = 'rgba(0,0,0,0.075)'; roundRect(g, bx - k * 3, by + 16 - k * 2.5, bw + k * 6, bh + k * 5, 8 + k * 3); g.fill(); }
-    folioSlices(g, im, xs, ys, this.dpr);
+    folioSlices(g, im, xs, ys, this.bdpr);
     for (const Pg of (L.left ? [L.left, P] : [P])) this.pageBorderArt(g, Pg);
   },
   // the drawn book: a leather cover with gold rules, a few leaves beneath, parchment pages with an inked border and a
@@ -1983,7 +2149,7 @@ const Grim = {
   notesBackdrop(bg, fr) {
     const w = bg.offsetWidth, h = bg.offsetHeight, pim = gart('page'); if (!w || !h || !pim) return 0;
     const dpr = Math.min(window.devicePixelRatio || 1, 3), P = { x: 0, y: 0, w, h };
-    for (const c of [bg, fr]) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); c.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0); }
+    for (const c of [bg, fr]) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); smoothCtx(c.getContext('2d')).setTransform(dpr, 0, 0, dpr, 0, 0); }
     const g = bg.getContext('2d');
     if (!folioLeaf(g, 0, 0, w, h)) drawCover(g, pim, 0, 0, w, h);
     const vg = g.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.3, w / 2, h / 2, Math.max(w, h) * 0.75);
@@ -1992,17 +2158,17 @@ const Grim = {
     const cg = g.createRadialGradient(w * 0.2, h * 0.12, 0, w * 0.2, h * 0.12, Math.max(w, h) * 1.05);
     cg.addColorStop(0, 'rgba(255,214,140,0.16)'); cg.addColorStop(0.55, 'rgba(255,190,110,0.04)'); cg.addColorStop(1, 'rgba(70,35,10,0.14)');
     g.fillStyle = cg; g.fillRect(0, 0, w, h);
-    const keep = this.dpr; this.dpr = dpr; this.pageBorderArt(fr.getContext('2d'), P); this.dpr = keep;
+    this.pageBorderArt(fr.getContext('2d'), P);
     // how far in the corner bosses reach (the writing scrolls clear of them, not in under their open knotwork)
     const { m, vh, bs } = this.borderSize(P); this.notesBoss = GART.boss ? m + bs * 0.9 + 2 : 0; return m + vh;
   },
   pageBorderArt(g, P) {
-    const ink = '#4a2e1a', dpr = this.dpr, { m, vh, bs } = this.borderSize(P);
+    const ink = '#4a2e1a', { m, vh, bs } = this.borderSize(P);
     const x0 = P.x + m, y0 = P.y + m, x1 = P.x + P.w - m, y1 = P.y + P.h - m, c = vh / 2;
     g.save();
     if (GART.knot) {
-      vineRun(g, x0 + bs * 0.7, y0 + c, x1 - bs * 0.7, y0 + c, vh, dpr); vineRun(g, x1 - bs * 0.7, y1 - c, x0 + bs * 0.7, y1 - c, vh, dpr);
-      vineRun(g, x0 + c, y1 - bs * 0.7, x0 + c, y0 + bs * 0.7, vh, dpr); vineRun(g, x1 - c, y0 + bs * 0.7, x1 - c, y1 - bs * 0.7, vh, dpr);
+      vineRun(g, x0 + bs * 0.7, y0 + c, x1 - bs * 0.7, y0 + c, vh); vineRun(g, x1 - bs * 0.7, y1 - c, x0 + bs * 0.7, y1 - c, vh);
+      vineRun(g, x0 + c, y1 - bs * 0.7, x0 + c, y0 + bs * 0.7, vh); vineRun(g, x1 - c, y0 + bs * 0.7, x1 - c, y1 - bs * 0.7, vh);
     }
     g.strokeStyle = hexA(ink, 0.65); g.lineWidth = 1; g.strokeRect(x0 - 1.5, y0 - 1.5, x1 - x0 + 3, y1 - y0 + 3);
     g.strokeStyle = hexA(ink, 0.45); g.strokeRect(x0 + vh + 1.5, y0 + vh + 1.5, x1 - x0 - vh * 2 - 3, y1 - y0 - vh * 2 - 3);
@@ -2046,7 +2212,7 @@ const Grim = {
     if (BAND) {
       // the lesson's name on the cream panel of the title box, ivy and beasts in the knotwork round it (v157; smaller type for a long name)
       const bw = w * 0.84, bh = bw * BAND.naturalHeight / BAND.naturalWidth, by = y + 8 * s;
-      g.drawImage(BAND, P.x + (P.w - bw) / 2, by, bw, bh);
+      drawSharp(g, BAND, P.x + (P.w - bw) / 2, by, bw, bh);
       let fs = Math.min(22 * s, bh * 0.3);
       g.font = `700 ${Math.round(fs)}px "Cinzel Decorative", serif`;
       const tw = decoWidth(g, lv.name); if (tw > bw * 0.5) { fs *= bw * 0.5 / tw; g.font = `700 ${Math.round(fs)}px "Cinzel Decorative", serif`; }
@@ -2069,7 +2235,7 @@ const Grim = {
     if (IN) {
       // the lapis field in its knotwork frame (the blue is the middle 72.5% of the painting), a gilded capital on it
       const D = capS / 0.725;
-      g.drawImage(IN, x0 - D * 0.14, y - D * 0.14, D, D);
+      drawSharp(g, IN, x0 - D * 0.14, y - D * 0.14, D, D);
       goldCap(g, first, x0 - D * 0.14 + D / 2, y - D * 0.14 + D / 2, capS);
     } else {
       g.fillStyle = '#f3dfa8'; g.strokeStyle = gold; g.lineWidth = 1.5;
@@ -2104,7 +2270,7 @@ const Grim = {
     if (gart('knot')) {
       // its heading between two short bands of knotwork
       const hy = y + 8 * s, tw = g.measureText(head).width, kh = 10 * s, gap = 10 * s;
-      vineRun(g, x0, hy, P.x + P.w / 2 - tw / 2 - gap, hy, kh, this.dpr); vineRun(g, x0 + w, hy, P.x + P.w / 2 + tw / 2 + gap, hy, kh, this.dpr);
+      vineRun(g, x0, hy, P.x + P.w / 2 - tw / 2 - gap, hy, kh); vineRun(g, x0 + w, hy, P.x + P.w / 2 + tw / 2 + gap, hy, kh);
       g.textBaseline = 'middle'; g.fillText(head, P.x + P.w / 2, hy + 1); g.textBaseline = 'alphabetic';
       y = hy + 14 * s;
     } else {
@@ -2250,7 +2416,7 @@ const Grim = {
       // a spiral tailpiece in the room left at the foot of the page, if there is room for one
       if (free > 70 * s) {
         const ts = Math.min(free * 0.8, w * 0.36), th = ts * TRI.naturalHeight / TRI.naturalWidth;
-        g.drawImage(TRI, P.x + (P.w - ts) / 2, end + 6 * s + (free - th) / 2, ts, th);
+        drawSharp(g, TRI, P.x + (P.w - ts) / 2, end + 6 * s + (free - th) / 2, ts, th);
       }
     }
   },
@@ -2262,14 +2428,22 @@ const Grim = {
     const MD = gart('roundel');
     // the name in flat rubric ink, as the folio's own headings are set (.bk-head: Cinzel Decorative 700, #7a1c12); v167's
     // chiselled gold here looked chunky and busy on the parchment (gold stays for the drop cap on its lapis ground)
+    // (v180: sized and placed by titleBox, with the ❦ for the notes beside it, which placeCorners sets there)
+    this.placeCorners();
+    const T = this.titleBox();
     g.textAlign = 'center'; g.fillStyle = MD ? '#7a1c12' : ink;
-    g.font = `700 ${Math.round(20 * s + 4)}px "Cinzel Decorative", serif`;
-    decoText(g, lv.name, P.x + P.w / 2, top, (t, x, y) => g.fillText(t, x, y));
+    g.font = T ? T.font : `700 ${Math.round(20 * s + 4)}px "Cinzel Decorative", serif`;
+    decoText(g, lv.name, T ? T.cx : P.x + P.w / 2, top, (t, x, y) => g.fillText(t, x, y));
     this.codexRects = [];
-    // the row keeps inside the knotwork border (its first and last names were clipped by it)
+    // the row keeps inside the knotwork border (its first and last names were clipped by it), and (v180) clear of the
+    // ✕ under the top-right boss: a row that would reach it moves left, then narrows, to end before it
     const B = this.borderSize(P), inner = MD ? P.w - 2 * (B.m + B.vh) - 14 : P.w - 20;
-    const ids = lv.sigils, cw = Math.min(70, inner / ids.length);
-    const x0 = P.x + P.w / 2 - cw * ids.length / 2;
+    const ids = lv.sigils, CR = this.closeRect, iL = P.x + P.w / 2 - inner / 2;
+    let cw = Math.min(70, inner / ids.length), x0 = P.x + P.w / 2 - cw * ids.length / 2;
+    if (CR && x0 + cw * ids.length > CR.x - 4) {
+      x0 = Math.max(iL, CR.x - 4 - cw * ids.length);
+      cw = Math.min(cw, (CR.x - 4 - x0) / ids.length);
+    }
     // (v177) the lesson's ring rules under each name: what that centre takes on its ring, or "ring only"; once a
     // centre is drawn, the sigils its ring will not take are greyed
     const R = ringRules(lv);
@@ -2359,7 +2533,7 @@ const Grim = {
     if (!this.open && !this.closing) return;
     this.anim = clamp(this.anim + (this.open ? dt : -dt) / 0.32, 0, 1);
     if (!this.open && this.anim <= 0) {
-      this.closing = false; this.cv.style.display = 'none';
+      this.closing = false; this.cv.style.display = 'none'; this.book.style.display = 'none';
       return;
     }
     if (typeof CLASSIC !== 'undefined' && CLASSIC.on !== this._classic) this.bookDirty = true; // the look was switched (◐)
@@ -2373,13 +2547,15 @@ const Grim = {
     const g = this.g, dpr = this.dpr, e = ease(this.anim), A = this.L.area;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, innerWidth, innerHeight);
-    g.fillStyle = `rgba(8,5,18,${0.62 * e})`; g.fillRect(0, 0, innerWidth, innerHeight);
     this.shake = Math.max(0, this.shake - dt);
     const sx = Math.sin(t * 70) * this.shake * 14;
+    // (v180) the book and the dimmed world round it (the book canvas's own background) fade and slide as one, by CSS
+    const bs = this.book.style, op = e.toFixed(3), tf = `translate(${sx.toFixed(1)}px, ${((1 - e) * 80).toFixed(1)}px)`;
+    if (this._bookOp !== op) { bs.opacity = this._bookOp = op; }
+    if (this._bookTf !== tf) { bs.transform = this._bookTf = tf; }
     g.save();
     g.globalAlpha = e;
     g.translate(sx, (1 - e) * 80);
-    g.drawImage(this.book, 0, 0, innerWidth, innerHeight);
     if (this.open && this.anim < 1) this.pageTurn(g, e);
     this.drawMiniMap(g, t);
     // sideways, everything of the circle's (a large seal's rune ring and places, the ink) stays inside the right
@@ -2431,14 +2607,15 @@ const Grim = {
       g.save(); g.globalCompositeOperation = 'lighter'; g.globalAlpha = this.flash * 0.8;
       g.drawImage(this.inkLayer, 0, 0, innerWidth, innerHeight); g.restore();
     }
-    // sparks
-    g.save(); g.globalCompositeOperation = 'lighter';
+    // sparks (v180: laid over the page's own canvas now, not added to the parchment, so drawn as the near-white the
+    // adding gave)
+    g.save();
     for (let i = this.sparks.length - 1; i >= 0; i--) {
       const p = this.sparks[i]; p.t += dt;
       if (p.t > p.life) { this.sparks.splice(i, 1); continue; }
       p.x += p.vx * dt; p.y += p.vy * dt;
       const a = 1 - p.t / p.life;
-      g.fillStyle = hexA(p.col || '#ffd27a', a * 0.9);
+      g.fillStyle = hexA(sparkLit(p.col || '#ffd27a'), a * 0.9);
       g.beginPath(); g.arc(A.cx + p.x * A.half, A.cy + p.y * A.half, 1.2 + a * 1.8, 0, TAU); g.fill();
     }
     g.restore();

@@ -95,6 +95,9 @@ const Tips = (() => {
       const score = over(x, y, bw, bh, R) * 3 + over(x, y, bw, bh, avoid) + (Math.abs(x - x0) + Math.abs(y - y0)) * 2 + far * 40;
       if (!best || score < best.score) best = { side, x, y, score };
     }
+    // (v180) the round ✕ sits at the page's top right: a note over it slides left off it when the screen has room
+    const X = page() && Grim.closeRect;
+    if (X && over(best.x, best.y, bw, bh, X) && X.x - 6 - bw >= m) best.x = X.x - 6 - bw;
     box.style.left = best.x + 'px'; box.style.top = best.y + 'px';
     box.dataset.side = best.side;
     const ar = box.querySelector('.tiparrow');

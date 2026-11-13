@@ -1000,7 +1000,7 @@ const Game = {
     // (v175) remembered at once, so the title's Continue and a reload of the page both come back to this lesson
     if (Save.data.at !== Save.idOf(i)) { Save.data.at = Save.idOf(i); Save.save(); }
     this.playing(i);
-    Grim.draft.clear(); Grim.ghost = null; Grim.bookDirty = true; Grim.inkDirty = true;
+    Grim.draft.clear(); Grim.resetHist(); Grim.ghost = null; Grim.bookDirty = true; Grim.inkDirty = true;
     parts.length = 0;
     loadWorld(this.level);
     $('#note').classList.remove('show');
@@ -1097,7 +1097,7 @@ const Game = {
     $('#aimbar').classList.remove('show');
     this.state = 'draw';
     if (Grim.lastStrokes) { Grim.draft.clear(); for (const s of Grim.lastStrokes) Grim.draft.add(JSON.parse(JSON.stringify(s))); }
-    Grim.inkDirty = true; Grim.show();
+    Grim.resetHist(); Grim.inkDirty = true; Grim.show();
   },
   cast() {
     if (this.state !== 'aim' || !this.aim) return;
@@ -1185,6 +1185,7 @@ const Game = {
     list.innerHTML = ''; bar.innerHTML = '';
     $('#satCount').textContent = Satchel.list.length || '';
     Grim.fitButtons(); // (the count can crowd the upright plaque's label)
+    this.keepState();
     if (!Satchel.list.length) list.innerHTML = '<div class="empty">Your satchel is empty. Draft a spell on the page, then keep it here to cast again without redrawing.</div>';
     Satchel.list.forEach((e, i) => {
       const inf = Satchel.info(i), ok = !allowed || !Satchel.spell(i, allowed).err;
@@ -1271,7 +1272,20 @@ const Game = {
   openSatchel() { if (this.state !== 'draw') return; this.renderSatchel(); $('#satchel').classList.add('show'); Sfx.play('page'); },
   closeSatchel() { $('#satchel').classList.remove('show'); },
   satchelOpen() { return $('#satchel').classList.contains('show'); },
-  keep() { if (Grim.keep()) this.renderSatchel(); },
+  // (v180) Keep lives at the top of the satchel: greyed, with the reason under it, when the page holds nothing it can
+  // keep; after a keep (button or K) the line says what was kept and where (the page's own status is behind the sheet)
+  keep() {
+    const ok = Grim.keep();
+    if (ok) this.renderSatchel();
+    if (this.satchelOpen()) { const w = $('#sKeepWhy'); w.textContent = Grim.status; w.classList.toggle('done', ok); }
+  },
+  keepState() {
+    const b = $('#sKeep'), w = $('#sKeepWhy'), D = Grim.draft;
+    const why = !D.strokes.length ? 'The page is empty: draw a spell on it first, then keep it here.'
+      : buildSpell(D, knownRules()).err ? 'The spell on the page is not finished yet.'
+      : Satchel.list.length >= Satchel.max ? 'Your satchel is full. Let a kept spell go first.' : '';
+    b.disabled = !!why; w.textContent = why; w.classList.remove('done');
+  },
   quick(i) {
     if (this.state !== 'play' || !Satchel.list[i] || this.dry()) return;
     const sp = Satchel.spell(i, lessonRules());
@@ -1299,7 +1313,7 @@ const TERMS = [
   { at: 'first-breath', t: 'Seal', d: 'One closed circle with a sigil inside. Inscribe it on the page, then cast it.' },
   { at: 'first-breath', t: 'Sign', d: 'A stroke out from the seal through a small circle. It points the spell.' },
   { at: 'long-meadow', t: 'Barb', d: 'A short stroke across a sign. Each barb makes the spell stronger.', more: ['rift', ' A sign takes two at most.'] },
-  { at: 'long-meadow', t: 'Rewind and Recall', d: 'Rewind takes back your last cast. Recall lays your last spell on the page again.' },
+  { at: 'long-meadow', t: 'Rewind and Recall', d: 'Rewind takes back your last cast. Recall lays your last spell on the page again: on a clean page, the Blot button turns to Recall.' },
   { at: 'from-the-abyss', t: 'Arm', d: 'With stone, ice or water, a sign raises a line running out the way it points; each barb adds a tile. Unadorned, with no sign, one tile.' },
   { at: 'featherfall', t: 'Float', d: 'What Luna gives: the orb hangs in the air, glides over low ground and open air, and settles after ten tiles.' },
   { at: 'featherfall-ii', t: 'Outer circle', d: 'A circle drawn around the whole seal. Around Luna, the float carries twice as far.', more: ['broad-water', ' Around anything else, the spell grows broader, not stronger.'] },
@@ -1392,7 +1406,7 @@ const Reveal = {
   finish() { cancelAnimationFrame(this.raf); this.raf = 0; this.drawn = true; this.draw(99); },
   // t seconds into the drawing: the seal's circle, the sigil's lines (each in turn, by length), then its colour
   draw(t) {
-    const c = $('#rvGlyph'), dpr = Math.min(2, devicePixelRatio || 1), n = Math.round((c.clientWidth || 150) * dpr);
+    const c = $('#rvGlyph'), dpr = Math.min(3, devicePixelRatio || 1), n = Math.round((c.clientWidth || 150) * dpr);
     if (c.width !== n) c.width = c.height = n;
     const g = c.getContext('2d'), S = SIGILS[this.queue[this.k]], R = n / 2 - 4 * dpr, r = R * 0.78, cx = n / 2, cy = n / 2;
     g.clearRect(0, 0, n, n); g.lineCap = 'round'; g.lineJoin = 'round';
@@ -2141,10 +2155,8 @@ bind('#bReplay', () => Game.start(Game.idx));
 bind('#bWinMenu', () => Game.lessons());
 bind('#pInscribe', () => Grim.inscribe());
 bind('#pUndo', () => Grim.undo());
-bind('#pBlot', () => Grim.blot());
-bind('#pRecall', () => Grim.recall());
+bind('#pBlot', () => Grim.blotOrRecall());
 bind('#pClose', () => Game.closeGrimoire());
-bind('#pKeep', () => Game.keep());
 bind('#pSatchel', () => Game.openSatchel());
 bind('#sKeep', () => Game.keep());
 bind('#sClose', () => Game.closeSatchel());

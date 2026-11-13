@@ -1,13 +1,15 @@
 'use strict';
 /* =====================================================================
-   QUILL & SIGIL — custom.js (v177)
-   Custom levels: made in the level editor (editor.html) and shared as a link that holds the whole level
-   (index.html#level=<code>). The code is the level's JSON, deflated and written in base64url ("1…"), or plain ("0…")
-   where the browser has no CompressionStream.
-   In the game a custom level plays outside the folio, as LEVELS[-1] (an array property, so LEVELS.length, the folio and
-   every lesson index are untouched), and it never touches the player's save: Save.save is held off while it is in play,
-   and Save.data is put back exactly as it was when the custom level is left.
-   The editor loads this file too, for the codec only (no Game there).
+   QUILL & SIGIL — custom.js (v177; moved out of the game after v179)
+   Custom levels: made in the level editor (quill-and-sigil-editor/index.html) and shared as a link that holds the whole
+   level (quill-and-sigil-editor/play.html#level=<code>; a test play adds &edit=1). The code is the level's JSON,
+   deflated and written in base64url ("1…"), or plain ("0…") where the browser has no CompressionStream.
+   The game itself (quill-and-sigil/) has no custom-level code and never loads this file. Two pages do:
+   - the editor, for the codec only (no Game there);
+   - play.html, which writes the game's own index.html into itself (its scripts loaded from ../quill-and-sigil/) and adds
+     this file after main.js. There the level plays outside the folio, as LEVELS[-1] (an array property, so
+     LEVELS.length, the folio and every lesson index are untouched), and the player's save is never written. Leaving the
+     level (the title, the folio, To the Lessons) goes to the real game; after a test play, back to the editor.
    ===================================================================== */
 const Custom = (() => {
   const SIG = ['gale', 'stone', 'flame', 'tide', 'frost', 'luna'];
@@ -115,37 +117,29 @@ const Custom = (() => {
   const codeFromHash = h => { const m = /[#&]level=([A-Za-z0-9_-]+)/.exec(h || ''); return m ? m[1] : null; };
   const API = { sanitize, wire, encode, decode, fingerprint, codeFromHash, WON_KEY, SIG };
 
-  /* ---------------- the game's side (index.html only) ---------------- */
+  /* ---------------- the play page's side (play.html, with the game loaded into it) ---------------- */
   if (typeof Game === 'undefined' || typeof LEVELS === 'undefined' || typeof Save === 'undefined') return API;
 
-  const C = { on: false, L: null, edit: false, code: '', keep: null, busy: 0 };
-  const save0 = Save.save, start0 = Game.start, win0 = Game.win, lessons0 = Game.lessons, title0 = Game.title,
-    next0 = Game.next, playing0 = Game.playing, show0 = Game.showScreen;
-  Save.save = function () { if (C.on) return; return save0.apply(this, arguments); };
-  Game.playing = function (i) { if (i === -1 || C.on) return; return playing0.apply(this, arguments); };
+  const C = { on: false, L: null, edit: false, code: '', busy: 0 };
+  const start0 = Game.start, show0 = Game.showScreen;
+  // this page never writes the player's save, nor the game's "lesson in play" for a reload: those belong to the game
+  Save.save = function () { };
+  Game.playing = function () { };
   // a custom level counts as coming after every lesson: the outer circle is taught (ringTaught, ink.js) and a sigil it
   // leaves out reads "unused this lesson", not "not yet learned"
   const indexOf0 = LEVELS.indexOf;
   LEVELS.indexOf = function (x) { return x && x === this[-1] ? this.length : indexOf0.apply(this, arguments); };
 
-  function enter() {
-    if (!C.on) { C.keep = JSON.stringify(Save.data); C.on = true; }
-    LEVELS[-1] = C.L;
-  }
-  function leave() {
-    if (!C.on) return;
-    C.on = false;
-    try { Save.data = JSON.parse(C.keep); } catch (e) { }
-    delete LEVELS[-1];
-    const b = document.getElementById('bCustBack'); if (b) b.remove();
-    const w = document.getElementById('bCustWin'); if (w) w.remove();
-    if (codeFromHash(location.hash)) try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { }
-  }
-  const toEditor = () => { leave(); location.href = 'editor.html'; };
+  // the ways out: to the editor after a test play, to the real game from a shared level (the folio and the title live
+  // there, under the game's own address and save)
+  const go = rel => { C.on = false; location.href = new URL(rel, location.href).href; };
+  const toEditor = () => go('index.html');
+  const toGame = () => go('../quill-and-sigil/');
+  const out = () => (C.edit ? toEditor() : toGame());
 
   Game.start = function (i) {
     if (i === -1 && C.L) {
-      enter();
+      C.on = true; LEVELS[-1] = C.L;
       start0.call(this, -1);
       document.getElementById('lnum').textContent = C.edit ? 'Custom level · test play' : 'Custom level';
       if (C.edit && !document.getElementById('bCustBack')) {
@@ -157,20 +151,15 @@ const Custom = (() => {
       }
       return;
     }
-    leave();
-    return start0.apply(this, arguments);
+    out(); // (a lesson of the game is played in the game)
   };
-  Game.title = function () { leave(); return title0.apply(this, arguments); };
-  Game.lessons = function () {
-    // from a custom level the folio opens on the lesson the player was last on, as it would from the title page
-    if (C.on) { leave(); this.level = null; this.state = 'title'; }
-    return lessons0.apply(this, arguments);
-  };
-  Game.next = function () { if (C.on) { if (C.edit) toEditor(); else this.lessons(); return; } return next0.apply(this, arguments); };
+  Game.title = out;
+  Game.lessons = out;
+  Game.next = out;
+  const win0 = Game.win;
   Game.win = function () {
-    if (!C.on) return win0.apply(this, arguments);
-    const r = win0.apply(this, arguments); // (its Save.won and Save.data.at land in the copy put back on leaving)
-    if (C.edit) try { localStorage.setItem(WON_KEY, JSON.stringify({ fp: fingerprint(C.L), casts: this.casts, at: Date.now() })); } catch (e) { }
+    const r = win0.apply(this, arguments); // (its Save.won and Save.data.at stay in this page: Save.save is held off)
+    if (C.on && C.edit) try { localStorage.setItem(WON_KEY, JSON.stringify({ fp: fingerprint(C.L), casts: this.casts, at: Date.now() })); } catch (e) { }
     return r;
   };
   // the win card of a custom level: its own title, no next lesson, and the way back to the editor after a test play
@@ -181,11 +170,13 @@ const Custom = (() => {
       const tally = `${this.casts} seal${this.casts === 1 ? '' : 's'} cast. The maker's mark is ${C.L.par}.`;
       document.getElementById('winText').textContent = C.edit ? `${tally} Sharing is open in the editor.` : tally;
       const nx = document.getElementById('bNext'); nx.style.display = '';
-      nx.textContent = C.edit ? '✎ Back to the Editor' : 'To the Lessons →';
-    } else if (id === 'win') document.getElementById('bNext').textContent = 'Next Lesson →';
+      nx.textContent = C.edit ? '✎ Back to the Editor' : 'Play Quill & Sigil →';
+      const fm = document.getElementById('bWinMenu'); if (fm) fm.style.display = 'none'; // (the folio is the game's)
+    }
     return r;
   };
 
+  // a link that cannot be played: said at the top, with the way to the game (the title page behind it leads there too)
   function note(msg) {
     let el = document.getElementById('custNote');
     if (!el) {
@@ -193,16 +184,20 @@ const Custom = (() => {
       el.style.cssText = 'position:fixed;left:50%;top:16px;transform:translateX(-50%);z-index:99;max-width:min(92vw,520px);padding:10px 16px;border-radius:10px;background:rgba(20,12,36,.92);color:#f3e7cc;border:1px solid rgba(232,194,122,.5);font:15px "IM Fell English",serif;text-align:center';
       document.body.append(el);
     }
-    el.textContent = msg; el.style.display = '';
-    clearTimeout(note.t); note.t = setTimeout(() => { el.style.display = 'none'; }, 6000);
+    el.textContent = msg + ' ';
+    const a = document.createElement('a'); a.href = new URL('../quill-and-sigil/', location.href).href;
+    a.textContent = 'Play Quill & Sigil'; a.style.color = '#e8c27a';
+    el.append(a); el.style.display = '';
   }
   async function boot() {
-    const code = codeFromHash(location.hash); if (!code) return;
+    const code = codeFromHash(location.hash);
+    if (!code) { note('This page plays a custom level from a shared link, and this link holds no level.'); return; }
     const n = ++C.busy;
     try {
       const L = await decode(code);
       if (n !== C.busy) return;
       C.L = L; C.code = code; C.edit = /[#&]edit=1/.test(location.hash);
+      const el = document.getElementById('custNote'); if (el) el.style.display = 'none';
       Game.start(-1);
     } catch (e) {
       console.warn('custom level', e);

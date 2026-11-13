@@ -2,10 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<!-- The editor has no engine of its own: it runs the game's files beside it in ../quill-and-sigil/. The base makes the
+     game's own relative loads (art/, icons/) find them. Paths here are written from this folder (../…), which reads the
+     same with or without the base. -->
+<base href="../quill-and-sigil/">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Quill &amp; Sigil · Level Editor</title>
 <meta name="theme-color" content="#120d26">
-<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="../quill-and-sigil/icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=Cinzel:wght@400;600;700&family=IM+Fell+English:ital@0;1&family=Pinyon+Script&display=swap" rel="stylesheet">
@@ -117,7 +121,7 @@
   <button class="btn primary" id="bPlay" title="Play the level in the game (P)">▶ Test play</button>
   <button class="btn" id="bShare" title="Beat the level in test play to share it" disabled>✉ Share</button>
   <span class="sep"></span>
-  <a class="btn" href="index.html" title="Back to the game">← Game</a>
+  <a class="btn" href="../quill-and-sigil/" title="Open the game">← Play Quill &amp; Sigil</a>
 </div>
 
 <div id="palette" class="panel">
@@ -170,11 +174,11 @@
 
 <div id="modal"><div class="box panel" id="mbox"></div></div>
 
-<div id="desk"><div><h1>Quill &amp; Sigil</h1>The level editor needs a desktop browser: a wide screen, a mouse and a keyboard.<br><br>Shared levels play on any screen.<br><br><a href="index.html">← Back to the game</a></div></div>
+<div id="desk"><div><h1>Quill &amp; Sigil</h1>The level editor needs a desktop browser: a wide screen, a mouse and a keyboard.<br><br>Shared levels play on any screen.<br><br><a href="../quill-and-sigil/">← Play Quill &amp; Sigil</a></div></div>
 
-<script src="js/ink.js?v=179"></script>
-<script src="js/world.js?v=179"></script>
-<script src="js/custom.js?v=179"></script>
-<script src="js/editor.js?v=179"></script>
+<script src="../quill-and-sigil/js/ink.js?v=180"></script>
+<script src="../quill-and-sigil/js/world.js?v=180"></script>
+<script src="../quill-and-sigil-editor/js/custom.js?v=180"></script>
+<script src="../quill-and-sigil-editor/js/editor.js?v=180"></script>
 </body>
 </html>
