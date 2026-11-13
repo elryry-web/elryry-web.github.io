@@ -211,6 +211,160 @@
       g.fillStyle = goldFill(g, x, cy - s / 2, x + w * 0.3, cy + s / 2); g.fillText(ln, x + w / 2, cy);
     });
   });
+  /* ================= Book II's closed volume on the shelf (drawn here; a painted PNG in any of these slots replaces its piece) =================
+     b2.cover.velvet   the whole board: deep blue velvet, a chemise binding, with its nap
+     b2.cover.corner   one gilt corner boss (opts.angle turns it to its corner, as cover.corner)
+     b2.cover.roundel  the small gilt roundel at the centre, a crane inside
+     b2.cover.tie      one red-thread tie at the fore-edge (two are drawn)
+     b2.cover.title    the title, gold blackletter (opts.text, one line per \n) */
+  var FRAK = '"UnifrakturMaguntia", "Uncial Antiqua", serif';
+  var velvetCache = {};
+  function velvet(w, h) {
+    var key = Math.round(w) + 'x' + Math.round(h);
+    if (velvetCache[key]) return velvetCache[key];
+    var sc = Math.min(2, window.devicePixelRatio || 1), cv = document.createElement('canvas');
+    cv.width = Math.max(1, Math.round(w * sc)); cv.height = Math.max(1, Math.round(h * sc));
+    var g = cv.getContext('2d'); g.scale(sc, sc);
+    var R = ART.rand(41);
+    var gr = g.createRadialGradient(w * 0.42, h * 0.38, Math.max(0, Math.min(w, h) * 0.05), w * 0.5, h * 0.5, Math.max(1, Math.max(w, h) * 0.8));
+    gr.addColorStop(0, '#1f2d68'); gr.addColorStop(0.55, '#16214d'); gr.addColorStop(1, '#0a1029');
+    g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    // the pile catches the light in broad soft bands, the way velvet does when it is stroked one way
+    var sh = g.createLinearGradient(0, 0, w, h);
+    sh.addColorStop(0, 'rgba(120,140,210,0)'); sh.addColorStop(0.28, 'rgba(120,140,210,0.16)'); sh.addColorStop(0.4, 'rgba(120,140,210,0)');
+    sh.addColorStop(0.68, 'rgba(4,6,18,0.3)'); sh.addColorStop(0.9, 'rgba(120,140,210,0.1)'); sh.addColorStop(1, 'rgba(120,140,210,0.02)');
+    g.fillStyle = sh; g.fillRect(0, 0, w, h);
+    for (var i = 0; i < 40; i++) {   // patches where the pile lies a little differently
+      var x = R() * w, y = R() * h, r = 12 + R() * Math.min(w, h) * 0.25, m = g.createRadialGradient(x, y, 0, x, y, r);
+      m.addColorStop(0, R() < 0.5 ? 'rgba(2,4,16,0.22)' : 'rgba(110,130,200,0.09)'); m.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = m; g.fillRect(x - r, y - r, 2 * r, 2 * r);
+    }
+    var n = Math.round(w * h / 9);   // the nap: short fibres, all leaning the same way
+    g.lineWidth = 0.6;
+    for (i = 0; i < n; i++) {
+      x = R() * w; y = R() * h;
+      var l = 0.8 + R() * 1.6;
+      g.strokeStyle = R() < 0.5 ? 'rgba(2,4,16,' + (0.2 + R() * 0.3) + ')' : 'rgba(120,140,210,' + (0.08 + R() * 0.14) + ')';
+      g.beginPath(); g.moveTo(x, y); g.lineTo(x + l * 0.35, y + l); g.stroke();
+    }
+    // the pile is worn flat and paler at the corners and along the edges; the hinge (left) lies in shadow
+    [[0, 0], [w, 0], [0, h], [w, h]].forEach(function (c) {
+      var cg = g.createRadialGradient(c[0], c[1], 0, c[0], c[1], Math.min(w, h) * 0.14);
+      cg.addColorStop(0, 'rgba(120,135,190,0.28)'); cg.addColorStop(1, 'rgba(120,135,190,0)');
+      g.fillStyle = cg; g.fillRect(0, 0, w, h);
+    });
+    var e = Math.min(w, h) * 0.035;
+    g.strokeStyle = 'rgba(110,125,185,0.16)'; g.lineWidth = e; g.strokeRect(e / 2, e / 2, w - e, h - e);
+    var hg = g.createLinearGradient(0, 0, w * 0.09, 0);
+    hg.addColorStop(0, 'rgba(2,3,12,0.6)'); hg.addColorStop(0.6, 'rgba(2,3,12,0.16)'); hg.addColorStop(1, 'rgba(2,3,12,0)');
+    g.fillStyle = hg; g.fillRect(0, 0, w * 0.09, h);
+    velvetCache[key] = cv;
+    return cv;
+  }
+  ART.define('b2.cover.velvet', function (g, x, y, w, h) { g.drawImage(velvet(w, h), x, y, w, h); });
+  ART.define('b2.cover.corner', function (g, x, y, w, h, t, o) {
+    g.translate(x + w / 2, y + h / 2); if (o.angle) g.rotate(o.angle); g.translate(-w / 2, -h / 2);
+    var s = w, gold = goldFill(g, 0, 0, s, s), ln = Math.max(0.8, s * 0.025);
+    g.fillStyle = 'rgba(2,3,12,0.45)';   // the boss's shadow on the pile
+    g.beginPath(); g.moveTo(s * 0.06, s * 0.08); g.lineTo(s * 0.86, s * 0.08); g.lineTo(s * 0.08, s * 0.86); g.closePath(); g.fill();
+    // a gilt corner plate: a right-angled piece with a pointed leaf running in along the diagonal
+    g.fillStyle = gold; g.strokeStyle = 'rgba(30,18,4,0.75)'; g.lineWidth = ln;
+    g.beginPath(); g.moveTo(0, 0); g.lineTo(s * 0.8, 0); g.quadraticCurveTo(s * 0.62, s * 0.2, s * 0.5, s * 0.36);
+    g.quadraticCurveTo(s * 0.62, s * 0.62, s * 0.7, s * 0.7);   // the leaf's tip
+    g.quadraticCurveTo(s * 0.62, s * 0.62, s * 0.36, s * 0.5); g.quadraticCurveTo(s * 0.2, s * 0.62, 0, s * 0.8); g.closePath();
+    g.fill(); g.stroke();
+    g.strokeStyle = 'rgba(60,35,8,0.6)'; g.lineWidth = ln * 0.8;   // the plate's engraved edge
+    g.beginPath(); g.moveTo(s * 0.08, s * 0.66); g.lineTo(s * 0.08, s * 0.08); g.lineTo(s * 0.66, s * 0.08); g.stroke();
+    // the domed boss, lit from the top left
+    var bx = s * 0.3, by = s * 0.3, br = s * 0.17, dg = g.createRadialGradient(bx - br * 0.4, by - br * 0.45, br * 0.05, bx, by, br);
+    dg.addColorStop(0, '#fff3c4'); dg.addColorStop(0.35, '#e2b957'); dg.addColorStop(0.8, '#946a1f'); dg.addColorStop(1, '#5e3f10');
+    g.fillStyle = dg; g.beginPath(); g.arc(bx, by, br, 0, 6.283); g.fill();
+    g.strokeStyle = 'rgba(30,18,4,0.8)'; g.lineWidth = ln; g.stroke();
+    g.fillStyle = 'rgba(255,248,215,0.8)'; g.beginPath(); g.arc(bx - br * 0.38, by - br * 0.4, br * 0.18, 0, 6.283); g.fill();
+  });
+  function crane(g, cx, cy, s, gold) {
+    // a crane standing on one leg, the other drawn up, its neck in an S: gold on the blue, the crown red
+    g.save(); g.translate(cx, cy); g.scale(s, s);
+    g.lineCap = 'round'; g.lineJoin = 'round';
+    g.strokeStyle = gold; g.lineWidth = 0.035;
+    g.beginPath(); g.moveTo(0.02, 0.18); g.lineTo(0.0, 0.62); g.stroke();   // the standing leg
+    g.beginPath(); g.moveTo(0.1, 0.2); g.lineTo(0.2, 0.36); g.lineTo(0.06, 0.42); g.stroke();   // the drawn-up leg
+    g.fillStyle = gold; g.strokeStyle = 'rgba(30,18,4,0.8)'; g.lineWidth = 0.018;
+    g.beginPath();   // body and tail plumes
+    g.moveTo(-0.3, 0.02); g.quadraticCurveTo(-0.1, -0.16, 0.16, -0.08); g.quadraticCurveTo(0.3, 0.02, 0.2, 0.18);
+    g.quadraticCurveTo(0.0, 0.26, -0.22, 0.2); g.quadraticCurveTo(-0.38, 0.22, -0.46, 0.3); g.quadraticCurveTo(-0.4, 0.14, -0.3, 0.02);
+    g.closePath(); g.fill(); g.stroke();
+    g.beginPath();   // the neck rising from the breast in an S
+    g.moveTo(0.1, -0.1); g.bezierCurveTo(0.24, -0.3, 0.04, -0.4, 0.11, -0.56); g.lineTo(0.15, -0.55);
+    g.bezierCurveTo(0.1, -0.4, 0.3, -0.3, 0.18, -0.05); g.closePath(); g.fill(); g.stroke();
+    g.beginPath(); g.ellipse(0.15, -0.58, 0.055, 0.045, -0.2, 0, 6.283); g.fill(); g.stroke();   // head
+    g.beginPath(); g.moveTo(0.19, -0.6); g.lineTo(0.46, -0.53); g.lineTo(0.19, -0.56); g.closePath(); g.fill(); g.stroke();   // bill
+    g.fillStyle = RED; g.beginPath(); g.arc(0.13, -0.62, 0.032, 0, 6.283); g.fill();   // the red crown
+    g.fillStyle = 'rgba(20,12,4,0.9)'; g.beginPath(); g.arc(0.17, -0.585, 0.012, 0, 6.283); g.fill();
+    g.strokeStyle = 'rgba(80,50,10,0.7)'; g.lineWidth = 0.012;   // wing lines
+    g.beginPath(); g.moveTo(-0.16, 0.02); g.quadraticCurveTo(0.02, -0.04, 0.14, 0.04); g.moveTo(-0.24, 0.1); g.quadraticCurveTo(-0.04, 0.06, 0.1, 0.13); g.stroke();
+    g.restore();
+  }
+  ART.define('b2.cover.roundel', function (g, x, y, w, h) {
+    var cx = x + w / 2, cy = y + h / 2, R = Math.min(w, h) / 2, gold = goldFill(g, x, y, x + w, y + h);
+    g.fillStyle = 'rgba(2,3,12,0.4)'; g.beginPath(); g.arc(cx + R * 0.04, cy + R * 0.06, R, 0, 6.283); g.fill();
+    g.fillStyle = gold; g.beginPath(); g.arc(cx, cy, R * 0.98, 0, 6.283); g.fill();
+    g.strokeStyle = 'rgba(30,18,4,0.8)'; g.lineWidth = Math.max(0.8, R * 0.025); g.stroke();
+    for (var i = 0; i < 24; i++) {   // a beaded rim
+      var a = i * Math.PI / 12;
+      g.fillStyle = 'rgba(70,42,8,0.55)'; g.beginPath(); g.arc(cx + Math.cos(a) * R * 0.88, cy + Math.sin(a) * R * 0.88, R * 0.035, 0, 6.283); g.fill();
+    }
+    var bg = g.createRadialGradient(cx - R * 0.2, cy - R * 0.25, 0, cx, cy, R * 0.78);   // the field: deep blue enamel
+    bg.addColorStop(0, '#2c4290'); bg.addColorStop(1, '#121c48');
+    g.fillStyle = bg; g.beginPath(); g.arc(cx, cy, R * 0.78, 0, 6.283); g.fill();
+    g.strokeStyle = 'rgba(30,18,4,0.8)'; g.lineWidth = Math.max(0.8, R * 0.03); g.stroke();
+    crane(g, cx - R * 0.02, cy - R * 0.02, R * 1.15, goldFill(g, cx - R, cy - R, cx + R * 0.4, cy + R));
+  });
+  ART.define('b2.cover.tie', function (g, x, y, w, h) {
+    // a red silk thread coming round the fore-edge (right), wound about a gilt pin, its ends hanging in a little tassel
+    var px = x + w * 0.3, py = y + h * 0.4, pr = Math.min(w, h) * 0.09, lw = Math.max(1.2, h * 0.045);
+    function cord(path, wd) {
+      g.lineCap = 'round'; g.lineJoin = 'round';
+      g.strokeStyle = 'rgba(2,3,12,0.45)'; g.lineWidth = wd * 1.6; g.save(); g.translate(wd * 0.4, wd * 0.6); path(); g.stroke(); g.restore();
+      g.strokeStyle = '#7d1610'; g.lineWidth = wd; path(); g.stroke();
+      g.strokeStyle = '#c63a28'; g.lineWidth = wd * 0.45; g.setLineDash([wd * 0.9, wd * 0.9]); path(); g.stroke(); g.setLineDash([]);   // the twist
+    }
+    cord(function () { g.beginPath(); g.moveTo(x + w + 1, py - lw * 0.6); g.quadraticCurveTo(x + w * 0.65, py - pr * 1.6, px + pr, py - pr * 0.4); }, lw);
+    cord(function () { g.beginPath(); g.moveTo(x + w + 1, py + lw * 0.6); g.quadraticCurveTo(x + w * 0.65, py + pr * 1.3, px + pr, py + pr * 0.4); }, lw);
+    // the hanging ends and the tassels
+    var ends = [[px - w * 0.02, y + h * 0.8], [px + w * 0.1, y + h * 0.84]];
+    cord(function () { g.beginPath(); g.moveTo(px - pr * 0.2, py + pr); g.quadraticCurveTo(px - w * 0.08, py + h * 0.22, ends[0][0], ends[0][1]); }, lw * 0.85);
+    cord(function () { g.beginPath(); g.moveTo(px + pr * 0.3, py + pr); g.quadraticCurveTo(px + w * 0.12, py + h * 0.24, ends[1][0], ends[1][1]); }, lw * 0.85);
+    ends.forEach(function (p) {
+      var th = h * 0.12;
+      g.fillStyle = '#9c2116'; g.beginPath(); g.moveTo(p[0] - lw * 0.7, p[1]); g.lineTo(p[0] + lw * 0.7, p[1]); g.lineTo(p[0] + lw * 1.1, p[1] + th); g.lineTo(p[0] - lw * 1.1, p[1] + th); g.closePath(); g.fill();
+      g.strokeStyle = 'rgba(60,8,4,0.6)'; g.lineWidth = 0.6;
+      for (var k = -2; k <= 2; k++) { g.beginPath(); g.moveTo(p[0] + k * lw * 0.3, p[1] + 1); g.lineTo(p[0] + k * lw * 0.45, p[1] + th); g.stroke(); }
+      g.fillStyle = goldFill(g, p[0] - lw, p[1] - lw, p[0] + lw, p[1] + lw); g.beginPath(); g.arc(p[0], p[1], lw * 0.8, 0, 6.283); g.fill();   // a gilt bead binds it
+    });
+    // the pin's head, over the thread wound round it
+    var dg = g.createRadialGradient(px - pr * 0.4, py - pr * 0.4, pr * 0.05, px, py, pr * 1.2);
+    dg.addColorStop(0, '#fff3c4'); dg.addColorStop(0.4, '#ddb455'); dg.addColorStop(1, '#6e4a12');
+    g.fillStyle = 'rgba(2,3,12,0.45)'; g.beginPath(); g.arc(px + pr * 0.2, py + pr * 0.3, pr * 1.15, 0, 6.283); g.fill();
+    g.strokeStyle = '#8f1d13'; g.lineWidth = lw * 1.2; g.beginPath(); g.arc(px, py, pr * 1.05, 0, 6.283); g.stroke();
+    g.fillStyle = dg; g.beginPath(); g.arc(px, py, pr * 0.8, 0, 6.283); g.fill();
+    g.strokeStyle = 'rgba(30,18,4,0.8)'; g.lineWidth = 0.8; g.stroke();
+  });
+  ART.define('b2.cover.title', function (g, x, y, w, h, t, o) {
+    var lines = String(o.text || 'Vellum\n& Vermilion').split('\n'), sz = [1, 0.74, 0.5], tot = 0;
+    lines.forEach(function (ln, i) { tot += sz[Math.min(i, 2)]; });
+    var unit = h / (tot * 1.08), yy = y;
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    lines.forEach(function (ln, i) {
+      var f = sz[Math.min(i, 2)], lh = unit * f * 1.08, s = Math.floor(unit * f * 0.95);
+      g.font = s + 'px ' + FRAK;
+      while (g.measureText(ln).width > w && s > 8) { s -= 1; g.font = s + 'px ' + FRAK; }
+      var cy = yy + lh / 2;
+      g.fillStyle = 'rgba(2,3,12,0.65)'; g.fillText(ln, x + w / 2 + 1, cy + 1.5);   // the gold sits on the pile, a shadow under it
+      g.fillStyle = goldFill(g, x, cy - s / 2, x + w * 0.3, cy + s / 2); g.fillText(ln, x + w / 2, cy);
+      yy += lh;
+    });
+  });
   ART.define('cover.endpaper', function (g, x, y, w, h) {
     g.drawImage(paperCanvas(w, h, 'L'), x, y, w, h);
     g.fillStyle = 'rgba(255,250,235,0.25)'; g.fillRect(x, y, w, h);
@@ -541,7 +695,7 @@
     g.fillStyle = RED; var ls = fitFont(g, 'LUMEN — light', UNC, clamp(w * 0.085, 14, 40), cw);
     g.fillText('LUMEN — light', w / 2, y); y += ls * 0.9;
     var ns = clamp(w * 0.035, 10, 17); font(g, ns, FELL, 'italic'); g.fillStyle = INKC;
-    var note = 'All thirty pages are finished. Thank you for playing.';
+    var note = 'All thirty pages are finished. Thank you for playing. Another volume waits on the lectern.';
     wrap(g, note, cw * 0.94).forEach(function (ln) { y += ns * 1.35; g.fillText(ln, w / 2, y); });
     y += ns * 1.6; g.textAlign = 'right'; g.fillStyle = RED; font(g, ns, FELL, 'italic');
     g.fillText('— the scribe', mx + cw, y); g.textAlign = 'center';
@@ -670,7 +824,7 @@
     var ls = clamp(w * 0.06, 12, 30), ns = clamp(w * 0.03, 9.5, 15), foot = h - Math.max(10, h * 0.025);
     font(pc, ns, FELL, 'italic');
     // no-break spaces keep the signature on one line when the note wraps
-    var lines = wrap(pc, 'All thirty pages are finished. Thank you for playing. — the scribe', cw * 0.96);
+    var lines = wrap(pc, 'All thirty pages are finished. Thank you for playing. Another volume waits on the lectern. — the scribe', cw * 0.96);
     var yLast = foot - ns * 1.75, yFirst = yLast - (lines.length - 1) * ns * 1.3, yL = yFirst - ns * 1.5;
     C.text = { ls: ls, ns: ns, lines: lines, yFirst: yFirst, yL: yL };
     // the letter (the picture less its blank margin) as large as fits between the leaf's edges and the words
@@ -1186,9 +1340,21 @@
     el.fB.style.display = sp ? '' : 'none';
     document.body.classList.toggle('bkSpread', sp);
     // the closed book: the cover alone, a little smaller, centred above the buttons
-    var room = H - 24 - 120, k = Math.min(1, room / ph, (W - 24) / pw);
+    var room = H - 24 - 120, k = Math.min(1, room / ph, (W - 24) / pw), cxA = W / 2, cxB = W / 2;
+    if (SH.on) {
+      // the shelf: the two volumes side by side where both fit at a fair size, else one at a time with the
+      // arrows and dots under it. Each volume is laid out with a little room right of it (Book I's clasps).
+      var gap = Math.max(36, W * 0.06), k2 = Math.min(1, room / ph, (W - 32 - gap) / (2.32 * pw));
+      SH.two = W >= 600 && pw * k2 >= 150;
+      if (SH.two) {
+        k = k2;
+        var u = pw * k * 1.16;
+        cxA = W / 2 - gap / 2 - u / 2; cxB = W / 2 + gap / 2 + u / 2;
+      } else { room -= 50; k = Math.min(1, room / ph, (W - 24) / pw); }
+    } else SH.two = false;
     var cy = 12 + room / 2 + 6, dy = cy - (L.top + ph / 2);
-    L.closed = { k: k, dx: sp ? -pw / 2 * k : 0, dy: dy };
+    L.closed = { k: k, dx: (sp ? -pw / 2 * k : 0) + (cxA - W / 2), dy: dy };
+    SH.box = { w: pw * k, h: ph * k, cxA: cxA, cxB: cxB, cy: cy };
     // hot corners at the outer foot of the leaves
     var cs = 46;
     el.cornL.style.cssText = 'left:0;top:' + (ph - cs) + 'px;width:' + cs + 'px;height:' + cs + 'px';
@@ -1341,6 +1507,7 @@
     if (mode === 'open') setStatic();
     else if (mode === 'closed') {   // the endpaper (inside the board) only matters while the cover is lifting
       drawFaceTo(el.cF, 'cover');
+      drawShelfCover();
       if (tween) drawFaceTo(el.cK, 'endpaper', 'L');
     }
   }
@@ -1448,6 +1615,7 @@
   function showClosed() {
     mode = 'closed'; show(true);
     CL.s = 1; CL.z = 3; CL.a = 1;
+    SH.on = shelfUnlocked();
     computeLayout();
     document.body.classList.add('bkClosed'); document.body.classList.remove('bkOpen');
     el.fA.style.visibility = 'hidden'; el.fB.style.visibility = 'hidden';
@@ -1462,12 +1630,108 @@
     var cn = (s.current && !s.solved[s.current] && G.unlocked(s.current)) ? s.current : n;
     el.cont.style.display = any && cn ? '' : 'none';
     if (cn) { var l = G.LEVELS[cn - 1]; el.cont.textContent = 'Continue: Quire ' + QN[l.quire - 1] + ' · Folio ' + FN[l.folio - 1]; el.cont.dataset.n = cn; }
+    placeShelf();
     s.screen = 'cover'; G.persist();
+  }
+
+  /* ================= the shelf: Book II's closed volume beside Book I's =================
+     It appears once Book I's Colophon has been seen, or all of Book I is solved, or Book II has any progress.
+     Book II is played at index.html?book=2 (main.js), with its own save (root.b2); opening it from here goes
+     there, and its "Book" button comes back here (index.html?from=2) with Book II in view. root.shelf keeps
+     which volume was last opened (1 or 2), so the shelf starts on that one. */
+  var SH = { on: false, two: false, view: 0, box: null, drag: null, quietTo: 0, fontAsked: false };
+  function b2Save() { var b = G.save().b2; return b && typeof b === 'object' ? b : null; }
+  function b2Any() {
+    var b = b2Save();
+    return !!b && ['solved', 'seen', 'prog'].some(function (k) { return b[k] && typeof b[k] === 'object' && Object.keys(b[k]).length > 0; });
+  }
+  function shelfUnlocked() { var s = G.save(); return !!s.colo || solvedCount() >= G.LEVELS.length || b2Any(); }
+  function shelfQuiet() { return now() < SH.quietTo; }   // just after a swipe, the tap it ended with opens nothing
+  function shelfXf(dx) {
+    var one = SH.on && !SH.two, W = L.W, v = one ? SH.view : 0;
+    el.volA.style.transform = one ? 'translateX(' + (-v * W + (dx || 0)) + 'px)' : '';
+    el.volB.style.transform = one ? 'translateX(' + ((1 - v) * W + (dx || 0)) + 'px)' : '';
+  }
+  function setView(v) {
+    v = v ? 1 : 0;
+    SH.view = v;
+    if (!SH.on || SH.two) return;
+    shelfXf(0);
+    el.shL.disabled = v === 0; el.shR.disabled = v === 1;
+    var dots = el.shelfNav.querySelectorAll('.dots i');
+    for (var i = 0; i < dots.length; i++) dots[i].classList.toggle('on', i === v);
+  }
+  function placeShelf() {
+    var B = document.body, ui = el.coverUI.style;
+    B.classList.toggle('bkShelf', SH.on);
+    B.classList.toggle('bkOne', SH.on && !SH.two);
+    if (!SH.on) { ui.left = ui.right = ui.width = ''; shelfXf(0); return; }
+    var bx = SH.box, uw = Math.min(340, Math.max(240, bx.w + 40));
+    if (SH.two) {
+      ui.left = Math.round(bx.cxA - uw / 2) + 'px'; ui.right = 'auto'; ui.width = uw + 'px';
+      el.coverUI2.style.cssText = 'left:' + Math.round(bx.cxB - uw / 2) + 'px;width:' + uw + 'px';
+    } else {
+      ui.left = ui.right = ui.width = '';
+      el.coverUI2.style.cssText = 'left:0;right:0';
+      el.shelfNav.style.top = Math.round(bx.cy + bx.h / 2 + 14) + 'px';
+    }
+    var cs = el.c2.style;
+    cs.left = Math.round(bx.cxB - bx.w / 2) + 'px'; cs.top = Math.round(bx.cy - bx.h / 2) + 'px';
+    cs.width = Math.round(bx.w) + 'px'; cs.height = Math.round(bx.h) + 'px';
+    drawShelfCover();
+    // Book II's button: Open, or Continue where its own save left off
+    var b = b2Save() || {}, L2 = window.LEVELS2 || [], l2 = L2[(b.current || 1) - 1];
+    if (b2Any() && l2) { el.open2.textContent = 'Continue: ' + l2.rubric; el.open2.className = 'cont'; }
+    else { el.open2.textContent = 'Open the book'; el.open2.className = ''; }
+    // placed without the slide (a layout change or a fresh visit should not animate the volumes across)
+    el.volA.classList.add('drag'); el.volB.classList.add('drag');
+    setView(SH.view);
+    shelfXf(0);
+    void el.volA.offsetWidth;
+    el.volA.classList.remove('drag'); el.volB.classList.remove('drag');
+  }
+  function drawShelfCover() {
+    if (!SH.on || !SH.box) return;
+    var w = Math.round(SH.box.w), h = Math.round(SH.box.h);
+    if (!(w > 0 && h > 0)) return;
+    if (!SH.fontAsked && document.fonts && document.fonts.load) {   // the blackletter title waits for its face
+      SH.fontAsked = true;
+      document.fonts.load('40px "UnifrakturMaguntia"').then(function () { if (mode === 'closed') drawShelfCover(); }, function () {});
+    }
+    var g = prep(el.c2, w, h);
+    ART.draw(g, 'b2.cover.velvet', 0, 0, w, h, 0, {});
+    var m = Math.min(w, h), b = m * 0.045, cs = m * 0.2;
+    [[b, b, 0], [w - b - cs, b, 1], [w - b - cs, h - b - cs, 2], [b, h - b - cs, 3]].forEach(function (c) {
+      ART.draw(g, 'b2.cover.corner', c[0], c[1], cs, cs, 0, { angle: c[2] * Math.PI / 2 });
+    });
+    var R = Math.min(w * 0.25, h * 0.16);
+    ART.draw(g, 'b2.cover.roundel', w / 2 - R, h * 0.62 - R, 2 * R, 2 * R, 0, {});
+    // the painted title fitted between the corners, centred on the upper third; else the drawn one
+    var tm = ART.meta('b2.cover.title');
+    if (tm) {
+      var tw = Math.min(w * 0.72, h * 0.2 * tm.aspect), th = tw / tm.aspect;
+      ART.draw(g, 'b2.cover.title', (w - tw) / 2, h * 0.27 - th / 2, tw, th, 0, {});
+    } else ART.draw(g, 'b2.cover.title', w * 0.17, h * 0.15, w * 0.66, h * 0.3, 0, { text: 'Vellum\n& Vermilion\nBook the Second' });
+    // the two ties: the painted strap's gilt tab on the velvet, its tassel at the fore-edge
+    var im = ART.meta('b2.cover.tie');
+    [im ? 0.42 : 0.32, im ? 0.78 : 0.68].forEach(function (f, i) {   // the painted ties clear of the title
+      if (im) { var lw = w * 0.24, lh = lw / im.aspect; ART.draw(g, 'b2.cover.tie', w * 0.995 - lw, h * f - lh / 2, lw, lh, 0, { i: i }); }
+      else ART.draw(g, 'b2.cover.tie', w * 0.8, h * (f - 0.08), w * 0.2, h * 0.16, 0, { i: i });
+    });
+  }
+  function openB2() {
+    if (mode !== 'closed' || busy() || shelfQuiet()) return;
+    lock(3000);
+    if (window.SFX) window.SFX.unlock();
+    var s = G.save(); s.shelf = 2; s.screen = 'cover'; G.persist();
+    el.scr.classList.add('fade');
+    setTimeout(function () { location.href = 'index.html?book=2'; }, 240);
   }
   function startFace() { var n = nextUnsolved(); return n ? G.LEVELS[n - 1].quire : F_COLO; }
   function openBook(face) {
     if (mode !== 'closed' || busy()) return;
     lock(1500);
+    if (SH.on) G.save().shelf = 1;   // persisted with the open book's first face
     pos = posOfFace(face === undefined ? startFace() : face);
     var fs = facesOf(pos), C = L.closed, fits = openFits();
     tween = {};
@@ -1658,18 +1922,67 @@
     el.prev.onclick = function () { turn(-1); };
     el.next.onclick = function () { turn(1); };
     el.close.onclick = function () { closeBook(); };
-    el.open.onclick = function (e) { e.stopPropagation(); openBook(); };
-    el.cont.onclick = function (e) { e.stopPropagation(); if (mode === 'closed' && !busy()) toPlay(+el.cont.dataset.n); };
+    el.open.onclick = function (e) { e.stopPropagation(); if (!shelfQuiet()) openBook(); };
+    el.cont.onclick = function (e) {
+      e.stopPropagation();
+      if (mode === 'closed' && !busy() && !shelfQuiet()) { if (SH.on) G.save().shelf = 1; toPlay(+el.cont.dataset.n); }
+    };
     el.scr.addEventListener('click', function (e) {
       if (mode !== 'closed' || e.target === el.cont) return;
+      // on the shelf only Book I's own cover opens it (Book II's has its own handler; the bare desk, nothing)
+      if (SH.on && (shelfQuiet() || !el.spread.contains(e.target) || (!SH.two && SH.view !== 0))) return;
       if (window.SFX) window.SFX.unlock();
       openBook();
+    });
+    el.c2.addEventListener('click', function (e) { e.stopPropagation(); if (SH.two || SH.view === 1) openB2(); });
+    el.open2.onclick = function (e) { e.stopPropagation(); openB2(); };
+    el.shL.onclick = function (e) { e.stopPropagation(); setView(0); };
+    el.shR.onclick = function (e) { e.stopPropagation(); setView(1); };
+    // one volume at a time: a sideways swipe moves along the shelf, the volumes following the finger
+    el.scr.addEventListener('pointerdown', function (e) {
+      if (mode !== 'closed' || !SH.on || SH.two || busy() || e.button > 0) return;
+      SH.drag = { id: e.pointerId, x: e.clientX, y: e.clientY, on: false };
+    });
+    el.scr.addEventListener('pointermove', function (e) {
+      var d = SH.drag;
+      if (!d || e.pointerId !== d.id) return;
+      var dx = e.clientX - d.x;
+      if (!d.on) {
+        if (Math.abs(dx) < 10 || Math.abs(dx) < Math.abs(e.clientY - d.y)) return;
+        d.on = true; el.volA.classList.add('drag'); el.volB.classList.add('drag');
+        try { el.scr.setPointerCapture(e.pointerId); } catch (er) {}
+      }
+      if ((SH.view === 0 && dx > 0) || (SH.view === 1 && dx < 0)) dx *= 0.3;   // the shelf's ends give a little
+      shelfXf(dx);
+    });
+    function shelfUp(e, cancel) {
+      var d = SH.drag;
+      if (!d || e.pointerId !== d.id) return;
+      SH.drag = null;
+      if (!d.on) return;
+      el.volA.classList.remove('drag'); el.volB.classList.remove('drag');
+      SH.quietTo = now() + 350;
+      var dx = e.clientX - d.x;
+      setView(!cancel && Math.abs(dx) > 50 ? (dx < 0 ? 1 : 0) : SH.view);
+    }
+    el.scr.addEventListener('pointerup', function (e) { shelfUp(e, false); });
+    el.scr.addEventListener('pointercancel', function (e) { shelfUp(e, true); });
+    // back from Book II through the browser's history: the page may come back as it was left, faded
+    window.addEventListener('pageshow', function (e) {
+      if (!e.persisted || mode !== 'closed') return;
+      el.scr.classList.remove('fade'); busyUntil = 0; showClosed();
     });
     document.addEventListener('keydown', function (e) {
       if (mode === 'open') {
         if (e.key === 'ArrowRight') { turn(1); e.preventDefault(); }
         else if (e.key === 'ArrowLeft') { turn(-1); e.preventDefault(); }
-      } else if (mode === 'closed' && (e.key === 'Enter' || e.key === ' ')) { openBook(); e.preventDefault(); }
+      } else if (mode === 'closed') {
+        if (SH.on && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) { setView(e.key === 'ArrowRight' ? 1 : 0); e.preventDefault(); return; }
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        if (e.target && e.target.tagName === 'BUTTON' && el.scr.contains(e.target)) return;   // a focused button acts for itself
+        if (SH.on && SH.view === 1) openB2(); else openBook();
+        e.preventDefault();
+      }
     });
     // a hidden tab draws nothing: the Bestiary and the Colophon's reveal stop, and pick up again on return
     document.addEventListener('visibilitychange', function () {
@@ -1695,6 +2008,8 @@
       G = game; beastsInit();
       ['scr', 'spread', 'fA', 'fB', 'cA', 'cB', 'shA', 'shB', 'leaf', 'cF', 'cK', 'shF', 'shK', 'mark', 'cornL', 'cornR', 'prev', 'next', 'pos', 'close', 'open', 'cont']
         .forEach(function (k) { el[k] = $('bk_' + k); });
+      ['volA', 'volB', 'c2', 'open2', 'shelfNav', 'shL', 'shR'].forEach(function (k) { el[k] = $('bk_' + k); });
+      el.coverUI = $('coverUI'); el.coverUI2 = $('coverUI2');
       el.spine = $('bk_spine'); el.block = $('bk_block');
       el.clasp = document.createElement('canvas'); el.clasp.className = 'bind'; el.clasp.id = 'bk_clasp';
       el.block.parentNode.insertBefore(el.clasp, el.block.nextSibling);
@@ -1706,13 +2021,23 @@
       var live = false;
       try { live = !!sessionStorage.getItem('vv.live'); sessionStorage.setItem('vv.live', '1'); } catch (e) {}
       var s = G.save();
-      if (live && s.screen === 'play') { mode = 'hidden'; show(false); G.load(s.current || 1); }
+      // back from Book II (its "Book" button): the shelf, Book II in view, whatever Book I was showing
+      var from2 = /[?&]from=2(&|$)/.test(location.search);
+      if (from2) {
+        s.shelf = 2;
+        try { history.replaceState(null, '', location.pathname); } catch (e) {}
+      }
+      SH.view = s.shelf === 2 ? 1 : 0;
+      if (from2) showClosed();
+      else if (live && s.screen === 'play') { mode = 'hidden'; show(false); G.load(s.current || 1); }
       else if (live && s.screen === 'book') showOpenInstant(s.face || 0);
       else showClosed();
     },
     fromPlay: fromPlay,
     refresh: refresh,
     mode: function () { return mode; },
+    shelf: function () { return { on: SH.on, two: SH.two, view: SH.view }; },
+    view: setView,
     // test hooks
     open: function (f) { openBook(f); }, close: closeBook, turn: turn, goto: gotoFace, play: toPlay,
     state: function () { return { mode: mode, pos: pos, faces: facesOf(pos), spread: L.spread, pw: L.pw, ph: L.ph, turning: !!T, busy: busy(), marker: marker }; },

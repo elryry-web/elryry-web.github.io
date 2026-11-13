@@ -115,7 +115,45 @@
   body.bkClosed #bkTop, body.bkClosed #bk_scr .nav, body.bkClosed .corner { display: none; }
   body:not(.bkOpen) #bk_scr .nav, body:not(.bkOpen) #bkTop { visibility: hidden; }
   body.bkClosed #bk_spread { cursor: pointer; }
+  /* the shelf: Book II's closed volume beside Book I's (side by side, or one at a time on a narrow screen) */
+  #bk_volA, #bk_volB { position: absolute; inset: 0; transition: transform .35s ease; }
+  #bk_volB, #bk_shelfNav { display: none; }
+  body.bkShelf.bkOne.bkClosed #bk_scr { touch-action: none; }   /* a sideways swipe moves along the shelf, not the page */
+  body.bkShelf.bkClosed #bk_volB { display: block; }
+  body.bkShelf.bkClosed.bkOne #bk_shelfNav { display: flex; }
+  body:not(.bkClosed) #bk_volA { transform: none !important; transition: none; }
+  #bk_volA.drag, #bk_volB.drag { transition: none; }
+  #bk_volB { pointer-events: none; }
+  #bk_c2 { position: absolute; display: block; cursor: pointer; pointer-events: auto; border-radius: 2px 7px 7px 2px;
+    box-shadow: 2px 2px 0 #efe2c2, 4px 4px 0 #d9c69c, 5px 6px 0 #c3ab7c, 8px 12px 26px rgba(0,0,0,0.65); }
+  #coverUI2 { position: absolute; bottom: max(22px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; align-items: center; gap: 10px; pointer-events: auto; }
+  #coverUI2 button { font-family: "Uncial Antiqua", serif; font-size: 19px; min-width: 220px; color: #f3e6c6; background: #1d2d5a; border-color: #0d1530; }
+  #coverUI2 button.cont { font-size: 16px; }
+  #bk_shelfNav { position: absolute; left: 0; right: 0; justify-content: center; align-items: center; gap: 14px; z-index: 6; }
+  #bk_shelfNav button { width: 44px; height: 40px; padding: 0; font-size: 26px; line-height: 1; background: rgba(243,230,198,0.88); }
+  #bk_shelfNav button:disabled { opacity: .3; cursor: default; }
+  #bk_shelfNav .dots { display: flex; gap: 9px; }
+  #bk_shelfNav .dots i { width: 9px; height: 9px; border-radius: 50%; background: rgba(243,230,198,0.35); border: 1px solid rgba(243,230,198,0.7); }
+  #bk_shelfNav .dots i.on { background: #f3e6c6; }
   #ruleArt { display: block; margin: 6px auto; }
+  /* Book II's Bestiary and Colophon (js/book2.js): two leaves over the page screen, on the same desk */
+  #b2_scr { position: fixed; inset: 0; z-index: 30; display: none; overflow: hidden;
+    background: url(art/desk.jpg?v=1) 70% 0% / cover no-repeat, radial-gradient(ellipse at 50% 50%, #3e2412 0%, #1d1007 100%); background-color: #2a180b; }
+  #b2_scr.show { display: block; }
+  #b2Top { position: absolute; left: 0; right: 0; top: 0; height: 52px; display: flex; align-items: center; gap: 10px; padding: max(6px, env(safe-area-inset-top)) 10px 0; }
+  #b2Top button, #b2_nav button { background: rgba(243,230,198,0.88); }
+  #b2_pos { flex: 1; text-align: right; color: #e9d3a5; font-style: italic; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #b2_scr canvas { position: absolute; display: block; box-shadow: 0 6px 22px rgba(0,0,0,0.45); cursor: pointer; }
+  #b2_cap { position: absolute; left: 12px; right: 12px; text-align: center; color: #f0dcae; font-style: italic; font-size: 16px; opacity: 0; transition: opacity 1.2s; pointer-events: none; }
+  #b2_cap.show { opacity: 1; }
+  #b2_nav { position: absolute; left: 0; right: 0; bottom: max(8px, env(safe-area-inset-bottom)); display: none; justify-content: center; align-items: center; gap: 14px; }
+  #b2_scr.one #b2_nav { display: flex; }
+  #b2_scr.one #b2_cap { display: none; }
+  #b2_nav button { width: 64px; height: 46px; padding: 0; font-size: 30px; line-height: 1; }
+  #b2_nav button:disabled { opacity: .3; cursor: default; }
+  #b2_nav .dots { display: flex; gap: 9px; }
+  #b2_nav .dots i { width: 9px; height: 9px; border-radius: 50%; background: rgba(243,230,198,0.35); border: 1px solid rgba(243,230,198,0.7); }
+  #b2_nav .dots i.on { background: #f3e6c6; }
 </style>
 </head>
 <body>
@@ -153,6 +191,7 @@
 
 <div id="bk_scr">
   <div id="bkTop"><button id="bk_close">Close the book</button><span id="bk_pos"></span></div>
+  <div id="bk_volA">
   <div id="bk_spread">
     <canvas id="bk_spine" class="bind"></canvas><canvas id="bk_block" class="bind"></canvas>
     <div class="face" id="bk_fA"><canvas id="bk_cA"></canvas><div class="shade" id="bk_shA"></div></div>
@@ -166,17 +205,21 @@
   </div>
   <button id="bk_prev" class="nav" title="Previous page (&larr;)">&lsaquo;</button><button id="bk_next" class="nav" title="Next page (&rarr;)">&rsaquo;</button>
   <div id="coverUI"><button id="bk_open">Open the book</button><button id="bk_cont"></button></div>
+  </div>
+  <div id="bk_volB"><canvas id="bk_c2" title="Book II"></canvas><div id="coverUI2"><button id="bk_open2">Open the book</button></div></div>
+  <div id="bk_shelfNav"><button id="bk_shL" title="Book I">&lsaquo;</button><span class="dots"><i></i><i></i></span><button id="bk_shR" title="Book II">&rsaquo;</button></div>
 </div>
 
 <script src="js/levels.js?v=6"></script>
-<script src="js/levels2.js?v=1"></script>
+<script src="js/levels2.js?v=2"></script>
 <script src="js/puzzle.js?v=4"></script>
-<script src="js/art.js?v=29"></script>
+<script src="js/art.js?v=30"></script>
 <script src="js/drolleries.js?v=3"></script>
 <script src="js/audio.js?v=3"></script>
 <script src="js/board.js?v=20"></script>
-<script src="js/book.js?v=21"></script>
-<script src="js/main.js?v=17"></script>
+<script src="js/book.js?v=23"></script>
+<script src="js/book2.js?v=1"></script>
+<script src="js/main.js?v=19"></script>
 <script src="js/music.js?v=3"></script>
 </body>
 </html>

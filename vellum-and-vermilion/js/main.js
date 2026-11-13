@@ -33,6 +33,7 @@
   var save = root;
   if (B2) {
     save = root.b2 = Object.assign({ solved: {}, prog: {}, seen: {}, current: 1, face: 0 }, root.b2 || {});
+    root.shelf = 2;   // the title screen's shelf shows Book II first when the reader comes back
     Object.defineProperty(save, 'sound', { get: function () { return root.sound; }, set: function (v) { root.sound = v; }, enumerable: false });
   }
   function persist() { try { localStorage.setItem(KEY, JSON.stringify(root)); } catch (e) {} }
@@ -158,6 +159,7 @@
     seq.timers.push(setTimeout(function () { droll.wakeT0 = performance.now(); startDroll(); }, 1800));
     // the last page done: the Colophon is next, so send for its painting (and the sunlit one) now
     if (!B2 && ART.want && LEVELS.every(function (L) { return save.solved[L.n]; })) { ART.want('colophon'); ART.want('colophon.sun'); }
+    if (B2 && ART.want && LEVELS.every(function (L) { return save.solved[L.n]; })) { ART.want('b2.colophon'); ART.want('b2.colophon.dawn'); }
     seq.timers.push(setTimeout(function () { if (seq) { seq.lit = true; maybeFinish(); } }, 2550));
   }
   function maybeFinish() { if (seq && seq.lit && seq.written) { endSequence(); showNext(); } }
@@ -389,8 +391,9 @@
   }
 
   /* ---------- HUD ---------- */
-  // Book II has no book of its own yet: its Book button and its last page go back to Book I's index
-  $('bBook').onclick = function () { $('ruleModal').classList.remove('show'); if (B2) location.href = 'index.html'; else Book.fromPlay(); };
+  // Book II has no open book of its own: its Book button opens its Bestiary and Colophon (js/book2.js), whose
+  // Shelf button goes back to the title screen; its last page closes on the Colophon, as Book I's does
+  $('bBook').onclick = function () { $('ruleModal').classList.remove('show'); if (B2) Book2.open(0); else Book.fromPlay(); };
   $('bRule').onclick = openRule;
   $('ruleOk').onclick = function () { $('ruleModal').classList.remove('show'); };
   $('bHint').onclick = function () { board.hint(); };
@@ -424,7 +427,7 @@
   };
   function soundLabel() { $('bSound').innerHTML = save.sound ? '&#9835;' : '<s>&#9835;</s>'; $('bSound').title = save.sound ? 'Sound on' : 'Sound off'; }
   $('bSound').onclick = function () { save.sound = !save.sound; SFX.enabled = save.sound; persist(); soundLabel(); if (save.sound) { SFX.unlock(); SFX.pin(); } };
-  $('next').onclick = function () { if (cur.n < LEVELS.length) load(cur.n + 1); else if (B2) location.href = 'index.html'; else Book.fromPlay(7); };   // the last page closes on the Colophon
+  $('next').onclick = function () { if (cur.n < LEVELS.length) load(cur.n + 1); else if (B2) Book2.open(1); else Book.fromPlay(7); };   // the last page closes on the Colophon
   ['ruleModal', 'resetModal'].forEach(function (id) {
     $(id).addEventListener('click', function (e) { if (e.target === $(id)) $(id).classList.remove('show'); });
   });
@@ -461,7 +464,8 @@
   if (B2) {
     // straight onto the page; book.js is never started, so it leaves Book I's book state alone
     Book = { mode: function () { return 'hidden'; }, refresh: function () {}, fromPlay: function () {} };
-    if (window.VV) window.VV.book = null;
+    if (window.VV) { window.VV.book = null; window.VV.book2 = window.Book2; }
+    Book2.init({ LEVELS: LEVELS, persist: persist, save: function () { return save; } });
     var bs = $('bk_scr'); if (bs) bs.style.display = 'none';
     load(save.current || 1);
   } else {
@@ -480,16 +484,23 @@
      land (at most every 250 ms) rather than once at the very end. The closed cover is held back (the desk
      alone) until its pictures are in, then fades in, so it never shows its procedural stand-in first; after
      6 s it shows with whatever has come. */
-  var bootMode = Book.mode();
+  var DROLLS = {}; LEVELS.forEach(function (L) { DROLLS[L.drollery] = 1; });
+  var bootMode = Book.mode(), shelfOn = !B2 && !!(Book.shelf && Book.shelf().on);
   function artRank(slot) {
     // ART.rank: 0 closed cover, 1 leaves, 2 board, DEFER drolleries, DEMAND (only when asked for) Colophon, capitals
     var r = ART.rank(slot), D = ART.DEFER || 10;
+    // each book has its own creatures: the other book's are fetched only if asked for
+    if (slot.indexOf('drollery.') === 0 && !DROLLS[slot.slice(9)]) return ART.DEMAND;
+    // Book II's Colophon paintings: only once its book is finished (and never for Book I)
+    if (slot.indexOf('b2.colophon') === 0) return B2 && LEVELS.every(function (L) { return save.solved[L.n]; }) ? D : ART.DEMAND;
+    // Book II's closed volume: with the closed cover when it is on the shelf, else after everything
+    if (slot.indexOf('b2.cover.') === 0) return B2 ? ART.DEMAND : (bootMode === 'closed' && shelfOn ? 0 : D + 1);
     // the page's own drollery goes with its board; the next page's drollery leads the ones held back
     if (cur && slot === 'drollery.' + cur.drollery) r = 2;
     else if (cur && cur.n < LEVELS.length && slot === 'drollery.' + LEVELS[cur.n].drollery) r = D;
     else if (r === D) r = D + 1;
     // a finished book: the Colophon is wanted soon, so it heads the queue held back for later
-    if ((slot === 'colophon' || slot === 'colophon.sun') && LEVELS.every(function (L) { return save.solved[L.n]; })) r = D;
+    if (!B2 && (slot === 'colophon' || slot === 'colophon.sun') && LEVELS.every(function (L) { return save.solved[L.n]; })) r = D;
     if (r >= D) return r;
     if (bootMode === 'hidden') {   // straight onto a page: its vellum, board and drollery first
       if (slot === 'page' || (cur && slot === 'drollery.' + cur.drollery)) return 0;
@@ -505,13 +516,15 @@
   window.VV.art = art;   // test hook: the order and time each picture landed
   function artLanded(slot, ok) {
     art.log.push([slot, ok, Math.round(performance.now())]);
-    var cover = slot.indexOf('cover.') === 0;
+    var cover = slot.indexOf('cover.') === 0 || slot.indexOf('b2.cover.') === 0;
     var isDroll = slot.indexOf('drollery.') === 0, own = cur && slot === 'drollery.' + cur.drollery;
-    if (!cover && slot.indexOf('colophon') !== 0 && slot.indexOf('capital.') !== 0 && (!isDroll || own)) art.page = true;
+    if (!cover && slot.indexOf('colophon') !== 0 && slot.indexOf('b2.colophon') !== 0 && slot.indexOf('capital.') !== 0 && (!isDroll || own)) art.page = true;
     // the closed book shows only the cover pieces; the open book can show almost anything (a drollery held
     // back for later only on the Bestiary)
     var st = Book.state && Book.state(), best = st && st.faces && st.faces.indexOf(6) >= 0;
     if (cover || (Book.mode() === 'open' && (!isDroll || own || best))) art.book = true;
+    // Book II's leaves, while open, redraw as their creatures, paintings or vellum come in
+    if (B2 && window.Book2 && Book2.isOpen() && (isDroll || slot === 'page' || slot.indexOf('b2.colophon') === 0)) Book2.refresh();
     gateCheck();
     artSchedule();
   }
@@ -534,17 +547,18 @@
   }
 
   // the cover gate
-  var GATE = ['cover.leather', 'cover.spine', 'cover.title', 'cover.medallion', 'cover.corner', 'cover.clasp', 'cover.pages'];
+  var GATE = ['cover.leather', 'cover.spine', 'cover.title', 'cover.medallion', 'cover.corner', 'cover.clasp', 'cover.pages']
+    .concat(shelfOn ? ['b2.cover.velvet', 'b2.cover.corner', 'b2.cover.roundel', 'b2.cover.tie', 'b2.cover.title'] : []);   // Book II's volume, when it is on the shelf
   var gate = null;
   function gateHold() {
-    var sp = $('bk_spread'), ui = $('coverUI');
-    [sp, ui].forEach(function (e) { e.style.opacity = '0'; e.style.pointerEvents = 'none'; });
+    var els = ['bk_spread', 'coverUI', 'bk_volB', 'bk_shelfNav'].map($).filter(Boolean);
+    els.forEach(function (e) { e.style.opacity = '0'; e.style.pointerEvents = 'none'; });
     // a tap or Enter on the empty desk must not open the book it can't see yet
     function swallow(e) { if (gate && !gate.open && $('bk_scr').contains(e.target)) { e.stopPropagation(); e.preventDefault(); } }
     function swallowKey(e) { if (gate && !gate.open && (e.key === 'Enter' || e.key === ' ')) { e.stopPropagation(); e.preventDefault(); } }
     window.addEventListener('click', swallow, true);
     window.addEventListener('keydown', swallowKey, true);
-    gate = { open: false, els: [sp, ui], off: function () {
+    gate = { open: false, els: els, off: function () {
       window.removeEventListener('click', swallow, true); window.removeEventListener('keydown', swallowKey, true);
     } };
     gate.timer = setTimeout(function () { gate.why = 'timeout'; gateOpen(); }, 6000);

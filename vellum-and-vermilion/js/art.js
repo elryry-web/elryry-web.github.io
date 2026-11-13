@@ -379,11 +379,12 @@
     'beast.headOpen': { a: [422.0, 149.1], phi: -0.0937, band: 130, len: 421, f0: -36, f1: -4, fy: -76, eye: [129.5, 84.5, 15], kind: 'head', mouth: true, mod: [-245, -165], pen: [-235, -150] },
     'beast.tail':     { a: [440.0, 78.0], phi: 0.085, band: 138, len: 438, f0: -44, f1: -6, fy: -999, kind: 'tail', mod: [-330, -230], pen: [-300, -200] }
   };
-  // Book II's crane (b2.beast.*): Book I's measurements as placeholders. Re-measure these for the crane PNGs
-  // when they arrive (the same fields: the cut's centre a, its angle phi, band, len, the fade f0/f1/fy, the eye)
-  BEAST['b2.beast.headShut'] = Object.assign({}, BEAST['beast.headShut']);
-  BEAST['b2.beast.headOpen'] = Object.assign({}, BEAST['beast.headOpen']);
-  BEAST['b2.beast.tail'] = Object.assign({}, BEAST['beast.tail']);
+  // Book II's crane (b2.beast.*), measured by tools/cut-b2.py from the cut PNGs (the beak points up the
+  // image, the cut on the right as in Book I). mouthBox [x0, y0, x1, y1]: where the open beak's cream is kept
+  BEAST['b2.beast.headShut'] = { a: [353.3, 175.5], phi: 0, band: 139, len: 352, kind: 'head', f0: -42, f1: -4, fy: -9999, eye: [41.5, 223.0, 16.8], mod: [-253, -167], pen: [-242, -151] };
+  BEAST['b2.beast.headOpen'] = { a: [379.8, 148.2], phi: 0, band: 140, len: 380, kind: 'head', f0: -42, f1: -4, fy: -9999, eye: [60.0, 208.0, 16.5], mod: [-260, -174], pen: [-249, -158], mouth: true, mouthBox: [-4, 4, 98, 183] };
+  BEAST['b2.beast.tail'] = { a: [274.7, 202.1], phi: 0, band: 150, len: 274, kind: 'tail', f0: -45, f1: -4, fy: -9999, mod: [-123, -54], pen: [-109, -41] };
+  function inMouth(B, x, y) { var m = B.mouthBox; return B.mouth && (m ? x >= m[0] && x <= m[2] && y >= m[1] && y <= m[3] : x < 175 && y > 125); }
   // mod: [x0, x1] along the axis, where the ribbon's modelling (shadow band, tint) eases off over the head or the
   // tail's curl; pen: where the lead-white penwork tapers to a point. Both in source px from the cut (negative)
   var BEAST_BAND = 0.36, BEAST_MARGIN = 0.02;   // the art band's share of a tile: the board's ribbon body, so the gilt meets
@@ -421,7 +422,7 @@
       if (cnt < 600) {
         var mx2 = sx / cnt, my2 = sy / cnt, isle = false;
         if (B.eye && Math.hypot(mx2 - B.eye[0], my2 - B.eye[1]) < B.eye[2] + 8) isle = true;
-        if (B.mouth && cnt > 20 && mx2 < 175 && my2 > 125) isle = true;
+        if (cnt > 20 && inMouth(B, mx2, my2)) isle = true;
         if (isle) for (var j = 0; j < list.length; j++) keep[list[j]] = 1;
       }
     }
@@ -609,7 +610,7 @@
         if (pa > 0) { pc[0] += (PC[0] - pc[0]) * pa; pc[1] += (PC[1] - pc[1]) * pa; pc[2] += (PC[2] - pc[2]) * pa; }
         var kw = L >= 0.62 ? w : w * sstep(0.22, 0.62, L);   // the pixel's share of cream (an outline's soft edge: part)
         if (kw < 1) {
-          var cf = P.D[i] < 12 && L < 0.5 && !(B.mouth && px < 175 && py > 125) ? 0.85 : 0, nk = sstep(-110, -40, xa) * (1 - ob);
+          var cf = P.D[i] < 12 && L < 0.5 && !inMouth(B, px, py) ? 0.85 : 0, nk = sstep(-110, -40, xa) * (1 - ob);
           r += (CT[0] - r) * cf; g += (CT[1] - g) * cf; b += (CT[2] - b) * cf;
           r += (pc[0] - r) * nk; g += (pc[1] - g) * nk; b += (pc[2] - b) * nk;
           kw += (1 - kw) * nk;
@@ -966,14 +967,15 @@
       return kept;
     }
     // the four outermost convex corners (one per diagonal), where the ivy grows
-    function corners(off) {
+    // (facing: prefer a corner whose own outward diagonal is d, so a stepped mask gets one spray per diagonal)
+    function corners(off, facing) {
       return [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(function (d) {
         var best = null, bs = -1e9;
-        V.forEach(function (L) { L.forEach(function (v) { if (!v.convex) return; var s = d[0] * v.x + d[1] * v.y; if (s > bs + 0.5) { bs = s; best = v; } }); });
+        V.forEach(function (L) { L.forEach(function (v) { if (!v.convex) return; var s = d[0] * v.x + d[1] * v.y + (facing && v.nx === d[0] && v.ny === d[1] ? 1e6 : 0); if (s > bs + 0.5) { bs = s; best = v; } }); });
         return best && { x: best.x + best.nx * off, y: best.y + best.ny * off, u1: best.u1, u2: best.u2, nx: best.nx, ny: best.ny };
       }).filter(Boolean);
     }
-    return { loops: V, path: path, dots: dots, corners: corners };
+    return { loops: V, path: path, dots: dots, corners: corners, pts: pts };
   }
 
   // fine burnished-gold spirals and scrolls filling a box (the caller clips to the panel)
@@ -1228,14 +1230,86 @@
   }
   // the thin gilt bar round the board with the vellum showing between it and the ground, sprays at the corners
   function b2Frame(g, G, b, box, room) {
-    var gold = burnish(g, box[0], box[1], box[2], box[3]), bw = b * 0.28, off = b * 0.64, hl = Math.max(0.6, b * 0.045);
+    var bw = b * 0.28, off = b * 0.64, hl = Math.max(0.6, b * 0.045), bar = images['b2.border'];
     g.lineJoin = 'round'; g.lineCap = 'butt';
     g.strokeStyle = INK2; g.lineWidth = Math.max(0.7, b * 0.05); g.stroke(G.path(b * 0.3));
-    g.strokeStyle = INK2; g.lineWidth = bw + 2 * hl; g.stroke(G.path(off));
-    g.strokeStyle = gold; g.lineWidth = bw; g.stroke(G.path(off));
-    g.strokeStyle = 'rgba(255,250,228,0.9)'; g.lineWidth = Math.max(0.5, b * 0.04); g.stroke(G.path(off - bw * 0.22));
-    g.strokeStyle = 'rgba(95,58,12,0.55)'; g.lineWidth = Math.max(0.5, b * 0.03); g.stroke(G.path(off + bw * 0.28));
-    G.corners(off).forEach(function (c, i) { acanthusSpray(g, c, b, room, i); });
+    if (bar) paintedBar(g, G, off, bw + 2 * hl, bar);
+    else {
+      var gold = burnish(g, box[0], box[1], box[2], box[3]);
+      g.strokeStyle = INK2; g.lineWidth = bw + 2 * hl; g.stroke(G.path(off));
+      g.strokeStyle = gold; g.lineWidth = bw; g.stroke(G.path(off));
+      g.strokeStyle = 'rgba(255,250,228,0.9)'; g.lineWidth = Math.max(0.5, b * 0.04); g.stroke(G.path(off - bw * 0.22));
+      g.strokeStyle = 'rgba(95,58,12,0.55)'; g.lineWidth = Math.max(0.5, b * 0.03); g.stroke(G.path(off + bw * 0.28));
+    }
+    G.corners(off, true).forEach(function (c, i) {
+      var im = images['b2.frame.corner.' + (i + 1)];
+      if (!im) { acanthusSpray(g, c, b, room, i); return; }
+      // the painted spray: its knot (at about 12% across, 11% down) on the bar's corner, the leaves out into the margin
+      var sw = Math.max(b * 1.1, room * 1.05), sh = sw * im.naturalHeight / im.naturalWidth;
+      g.save(); g.translate(c.x, c.y); g.scale(c.nx, c.ny);
+      g.drawImage(im, -sw * 0.125, -sh * 0.113, sw, sh);
+      g.restore();
+    });
+  }
+  // the painted gilt bar laid along each edge of the frame's outline at offset off, t thick: each edge
+  // clipped to its mitred quad, the strip tiled along it unstretched, its lit top edge towards the board
+  function paintedBar(g, G, off, t, im) {
+    var iw = im.naturalWidth, ih = im.naturalHeight, k = t / ih;
+    G.loops.forEach(function (L) {
+      var I = G.pts(L, off - t / 2), O = G.pts(L, off + t / 2), C = G.pts(L, off), n = L.length;
+      for (var i = 0; i < n; i++) {
+        var j = (i + 1) % n, ax = C[i][0], ay = C[i][1], dx = C[j][0] - ax, dy = C[j][1] - ay, len = Math.hypot(dx, dy);
+        if (len < 0.5) continue;
+        g.save();
+        g.beginPath(); g.moveTo(I[i][0], I[i][1]); g.lineTo(I[j][0], I[j][1]); g.lineTo(O[j][0], O[j][1]); g.lineTo(O[i][0], O[i][1]); g.closePath(); g.clip();
+        g.translate(ax, ay); g.rotate(Math.atan2(dy, dx)); g.scale(1, -1);
+        var x = -t, end = len + t, sx = (i * 397) % Math.max(1, iw - 200);
+        while (x < end) {
+          var sw = Math.min(iw - sx, (end - x) / k);
+          g.drawImage(im, sx, 0, sw, ih, x, -t / 2, sw * k, t);
+          x += sw * k; sx = 0;
+        }
+        g.restore();
+      }
+    });
+  }
+  // the painted diaper tile (b2-ground.jpg, painted in azure) in a page's ground: its blue turned to the
+  // ground's hue, lightness and saturation scaled by the ground's against azure's; the gold and white kept
+  var b2Tiles = {};
+  function hsl(r, g, b) {
+    var mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, d = mx - mn, h = 0, s = 0;
+    if (d > 0) {
+      s = d / (1 - Math.abs(2 * l - 1));
+      h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      h = (h * 60 + 360) % 360;
+    }
+    return [h, s, l];
+  }
+  function hslRgb(h, s, l) {
+    var c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = l - c / 2, k = (h / 60) | 0;
+    var t = [[c, x, 0], [x, c, 0], [0, c, x], [0, x, c], [x, 0, c], [c, 0, x]][k % 6];
+    return [t[0] + m, t[1] + m, t[2] + m];
+  }
+  function b2GroundTile(name, im) {
+    if (name === 'azure' || !GROUND[name]) return im;
+    var key = name + ':' + im.src;
+    if (b2Tiles[key]) return b2Tiles[key];
+    var cv = document.createElement('canvas'), W = im.naturalWidth, H = im.naturalHeight;
+    cv.width = W; cv.height = H;
+    var g = cv.getContext('2d'); g.drawImage(im, 0, 0);
+    try {
+      var id = g.getImageData(0, 0, W, H), d = id.data, a0 = hexRgb(GROUND.azure.base), t0 = hexRgb(GROUND[name].base);
+      var A = hsl(a0[0] / 255, a0[1] / 255, a0[2] / 255), T = hsl(t0[0] / 255, t0[1] / 255, t0[2] / 255), kl = T[2] / A[2], ks = T[1] / A[1];
+      for (var i = 0; i < d.length; i += 4) {
+        var w = (d[i + 2] - d[i]) / 60;
+        if (w <= 0) continue;
+        if (w > 1) w = 1;
+        var p = hsl(d[i] / 255, d[i + 1] / 255, d[i + 2] / 255), c = hslRgb(T[0], Math.min(1, p[1] * ks), Math.min(1, p[2] * kl));
+        for (var j = 0; j < 3; j++) d[i + j] += (c[j] * 255 - d[i + j]) * w;
+      }
+      g.putImageData(id, 0, 0);
+    } catch (e) { return im; }   // a tainted canvas (file://): the azure tile under the ground's wash
+    return (b2Tiles[key] = cv);
   }
   // Book II's panel: a diaper ground (burnished gold on Compline's pages); on a great initial, a square of
   // burnished gold with the letter (the page's mask) laid on it in rose or azure and filled with acanthus
@@ -1268,7 +1342,7 @@
       } else {
         g.fillStyle = GR.base; g.fill(gp);
         if (pat) {   // a painted diaper tile, repeated about every two cells
-          var pt = g.createPattern(pat, 'repeat'), k = S * 2 / pat.naturalWidth;
+          var tile = b2GroundTile(o.ground, pat), pt = g.createPattern(tile, 'repeat'), k = S * 2 / pat.naturalWidth;
           if (pt.setTransform && window.DOMMatrix) pt.setTransform(new DOMMatrix([k, 0, 0, k, o.pad, o.pad]));
           g.fillStyle = pt; g.fill(gp);
         } else diaper(g, box[0], box[1], box[2], box[3], S, GR, R);
@@ -1277,8 +1351,7 @@
       g.strokeStyle = 'rgba(' + GR.deep + ',0.5)'; g.lineWidth = b * 0.6; g.stroke(G.path(b * 0.1));
       g.restore();
     }
-    if (images['b2.border'] && (o.rect || o.letter)) paintBorder(g, box, b, images['b2.border']);
-    else b2Frame(g, FG, b, box, room);
+    b2Frame(g, FG, b, box, room);
   }
 
   // the whole puzzle panel, drawn once to an offscreen canvas (the board caches it per size and DPR):
@@ -2472,6 +2545,7 @@
   // the slots ART.draw sends to their b2. counterparts in Book II, and Book I's pictures Book II never loads
   var B2ALIAS = { knot: 1, twinFrame: 1, twinEmblem: 1, beastHead: 1, beastTail: 1, border: 1 };
   var B1ONLY = /^(border|knot|twinFrame|twinEmblem|ivy\.|mark\.|beast\.|initial\.)/;
+  var B2PAGE = /^b2\.(beast|ground|frame|border|twinEmblem|mark|margin)/;
   var ART = {
     // the painted ivy on a page's vellum (false when its PNGs are not loaded)
     ivyPage: ivyPage,
@@ -2573,12 +2647,13 @@
       base = base || 'art/'; opts = opts || {};
       var rank = opts.rank || ART.rank, conc = Math.max(1, opts.concurrency || 6);
       if (typeof fetch === 'undefined') return Promise.resolve();
-      return fetch(base + 'manifest.json?v=8', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : {}; }).then(function (m) {
+      return fetch(base + 'manifest.json?v=9', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : {}; }).then(function (m) {
         var keys = Object.keys(m), order = {}, all = [];
         keys.forEach(function (slot, i) {
           var e = typeof m[slot] === 'string' ? { file: m[slot] } : (m[slot] || {});
           if (!e.file) return;
           if (BOOK === 2 && B1ONLY.test(slot)) return;   // Book I's own pictures never appear in Book II
+          if (BOOK !== 2 && B2PAGE.test(slot)) return;   // nor Book II's page pictures in Book I (its shelved cover only)
           order[slot] = i; status[slot] = 0;
           var r = +rank(slot); if (r !== r) r = 0;
           all.push({ slot: slot, e: e, r: r });
