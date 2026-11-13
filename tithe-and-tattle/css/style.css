@@ -264,7 +264,7 @@ li.locked .ptitle { font-style: italic; color: var(--faint); }
 .tmenu .btn { width: 240px; }
 .tmenu .btn.verm { display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .tcont { font-family: var(--serif); font-style: italic; font-size: 15px; opacity: .9; }
-@media (min-width: 700px) { .tline h1 { font-size: 62px; } }
+@media (min-width: 700px) { .titlepage { max-width: 660px; } .tline h1 { font-size: 62px; white-space: nowrap; } }
 @media (max-width: 380px) { .tline h1 { font-size: 38px; } }
 /* index.html's static title (.shell), painted from HTML and CSS alone while the scripts load; pages.js replaces it
    in place (.nofade) with the real one, laid out to match */

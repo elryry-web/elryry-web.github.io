@@ -690,7 +690,7 @@
           });
         }));
       }
-      return fetch(base + 'manifest.json?v=24', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : {}; }).then(function (m) {
+      return fetch(base + 'manifest.json?v=25', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : {}; }).then(function (m) {
         m = m || {};
         var onScreen = [];
         Array.prototype.forEach.call(document.querySelectorAll('canvas.art'), function (c) {
