@@ -71,9 +71,14 @@
     var hs = s.houses[h];
     if (!hs) return false;
     if (hs.retinue.indexOf(id) >= 0) return true;
+    return siteAt(s, h, id, r);
+  }
+  // site-only effects (Wall Warden, Moor Hound): at the site of region r while h holds it; never from a retinue
+  function siteAt(s, h, id, r) {
     var g = s.regions[r];
     return !!g && g.owner === h && g.residents.indexOf(id) >= 0;
   }
+  function siteOnly(id) { return !!(CARDS[id] && CARDS[id].siteOnly); }
   function othersPresent(s, h, r) {
     var b = s.regions[r].bands;
     for (var k in b) if (k !== h && b[k] > 0) return true;
@@ -338,8 +343,8 @@
     v = d ? (g.bands[d] || 0) : g.folk;
     if (siteOn(s, r) && !(attacker && has(s, attacker, 'tunnelRat'))) v += REG[r].siteDef;
     if (d) {
-      if (hasAt(s, d, 'wallWarden', r)) v++;
-      if (hasAt(s, d, 'moorHound', r)) v++;
+      if (siteAt(s, d, 'wallWarden', r)) v++;
+      if (siteAt(s, d, 'moorHound', r)) v++;
       if (s.houses[d].relics.indexOf('ironKey') >= 0 && (g.bands[d] || 0) > 0) v++;
       if (r === 'crown' && has(s, d, 'gatePorter')) v++;
       if ((r === 'saltmarsh' || r === 'oldbarrow') && has(s, d, 'ditchEel')) v++;
@@ -459,7 +464,7 @@
         if (a.card == null) return null;
         if (P.cards.indexOf(a.card) < 0) return err('not drawn');
         if (isRelic(a.card)) return a.to === 'retinue' ? null : err('relics go to the retinue');
-        if (a.to === 'retinue') return hs.retinue.length < N.retinueMax ? null : err('retinue full');
+        if (a.to === 'retinue') return siteOnly(a.card) ? err('stays at its site') : hs.retinue.length < N.retinueMax ? null : err('retinue full');
         if (a.to === 'site') return s.regions[P.region].residents.length < slotsOf(s, P.region) ? null : err('no empty slot');
         return err('keep where?');
       }
@@ -515,6 +520,7 @@
         g = s.regions[a.region];
         if (!g || bandsAt(s, h, a.region) < 1) return err('no warbands there');
         if (g.residents.indexOf(a.card) < 0) return err('not there');
+        if (siteOnly(a.card)) return err('stays at its site');
         if (hs.retinue.length >= N.retinueMax) return err('retinue full');
         if (hours < 1) return err('no hours');
         if (!opts.ignoreHours && hs.silver < recruitCost(s, h, a.card)) return err('not enough silver');
@@ -958,6 +964,7 @@
     var inc = income(s, h);
     hs.silver += inc;
     ev.push({ type: 'income', house: h, silver: inc });
+    payUpkeep(s, h, ev);
     s.pacts.forEach(function (p) { if (p.type === 'tribute' && p.payer === h && p.paid < s.round) payTribute(s, p, ev); });
     if (has(s, h, 'ledgerThief')) {
       var rich = null;
@@ -969,6 +976,36 @@
     if (holds(s, h, 'farpass') && bandsAt(s, h, 'farpass') >= departNeeds(s, h).bands) hs.flags.passHeld = true;
     // landless: the house returns as the free first step of its turn
     if (!nHeld(s, h)) { hs.flags.returnDue = true; ev.push({ type: 'landless', house: h }); }
+  }
+  // upkeep: 1 silver for every full N.upkeepPer warbands on the board, paid after income
+  function boardBands(s, h) {
+    var n = 0;
+    for (var i = 0; i < IDS.length; i++) n += s.regions[IDS[i]].bands[h] || 0;
+    return n;
+  }
+  function upkeep(s, h, bands) { return Math.floor((bands == null ? boardBands(s, h) : bands) / N.upkeepPer); }
+  // short of silver: disband 1 warband per silver short, from the largest stack,
+  // never emptying a region the house holds while another stack can give one
+  function payUpkeep(s, h, ev) {
+    var hs = s.houses[h], bands = boardBands(s, h), due = upkeep(s, h, bands);
+    if (!due) return;
+    var paid = Math.min(hs.silver, due), short = due - paid, lost = [];
+    hs.silver -= paid;
+    for (var k = 0; k < short; k++) {
+      var best = null, bv = -1, safe = false;
+      IDS.forEach(function (r) {
+        var b = bandsAt(s, h, r);
+        if (b <= 0) return;
+        var ok = !(b === 1 && holds(s, h, r));
+        if ((ok && !safe) || (ok === safe && b > bv)) { best = r; bv = b; safe = ok; }
+      });
+      if (!best) break;
+      s.regions[best].bands[h] -= 1;
+      if (!s.regions[best].bands[h]) delete s.regions[best].bands[h];
+      lost.push(best);
+      settle(s, best);
+    }
+    ev.push({ type: 'upkeep', house: h, bands: bands, due: due, silver: paid, short: short, lost: lost });
   }
   function endTurn(s, ev) {
     var h = s.order[s.turn];
@@ -1237,7 +1274,7 @@
     legalActions: legalActions, check: check, applyAction: applyAction, currentHouse: currentHouse,
     // queries for the screen and the AI
     income: income, hoursFor: hoursFor, heldBy: heldBy, nHeld: nHeld, bandsAt: bandsAt, totalBands: totalBands,
-    has: has, hasAt: hasAt, holds: holds, adjacent: adjacent, slotsOf: slotsOf, siteOn: siteOn, law: law, truce: truce,
+    has: has, hasAt: hasAt, siteAt: siteAt, siteOnly: siteOnly, upkeep: upkeep, boardBands: boardBands, holds: holds, adjacent: adjacent, slotsOf: slotsOf, siteOn: siteOn, law: law, truce: truce,
     prophecyProgress: prophecyProgress, progress: progress, threat: threat, checkVictory: checkVictory, claimStanding: claimStanding, departNeeds: departNeeds,
     endChances: endChances, fortuneLeft: fortuneLeft, peekFortune: peekFortune, assaultOdds: assaultOdds,
     battlePreview: battlePreview, attackBonus: attackBonus, defenceOf: defenceOf, lastStand: lastStand, returnSpots: returnSpots,

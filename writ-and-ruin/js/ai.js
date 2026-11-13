@@ -250,6 +250,7 @@
     var bands = E.totalBands(s, h) - (hs.camp || 0);   // the camp breaks up at the end of the turn
     v += bands * t.bands + Math.min(hs.silver, 10) * t.silver + Math.max(0, hs.silver - 10) * 0.05;
     v += E.income(s, h) * 0.35 + held.length * 0.6;
+    v -= E.upkeep(s, h, bands) * t.silver * 2;   // upkeep owed over the next turns or so
     hs.retinue.forEach(function (c) { v += cardValue(t, c); });
     v += hs.relics.length * 0.6;
     // exposure of what we hold
@@ -325,6 +326,9 @@
     }
     c = tryApply(s, a);
     if (c.pending && c.pending.type === 'search') c.pending = null;
+    // never muster into an upkeep next turn's silver cannot pay
+    if (a.type === 'muster' && E.upkeep(c, h) > E.upkeep(s, h) &&
+        c.houses[h].silver + E.income(c, h) < E.upkeep(c, h)) return -1e4;
     return evaluate(c, h);
   }
   function isWeakest(s, d) {

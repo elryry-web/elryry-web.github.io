@@ -78,7 +78,8 @@
     'the age is over': 'The age is over.',
     'no Poisoner': 'You have no Poisoner to use.',
     'no Bell Seer': 'You have no Bell Seer to use.',
-    'bad count': 'You cannot muster that many.'
+    'bad count': 'You cannot muster that many.',
+    'stays at its site': 'This resident works only at its site. It cannot join a retinue.'
   };
   function plain(m) {
     if (!m) return '';
@@ -150,6 +151,13 @@
       case 'roundStart': return '— The ' + (D.ORDINALS[ev.round - 1] || ev.round).toLowerCase() + ' round —';
       case 'turnStart': return h === 'player' ? 'Your turn.' : W + "'s turn.";
       case 'income': return W + ' gained ' + ev.silver + ' silver.';
+      case 'upkeep': {
+        if (!ev.short) return W + ' paid ' + ev.silver + ' silver upkeep for ' + ev.bands + ' warbands.';
+        var by = {}, ord = [];
+        ev.lost.forEach(function (r) { if (!by[r]) { by[r] = 0; ord.push(r); } by[r]++; });
+        var lost = listAnd(ord.map(function (r, i) { return (i ? by[r] : plural(by[r], 'warband')) + ' in ' + rn(r); }));
+        return W + (ev.silver ? ' paid ' + ev.silver + ' of ' + ev.due + ' silver upkeep' : ' could not pay upkeep') + ' and disbanded ' + lost + '.';
+      }
       case 'tribute': return W + ' paid ' + whoLow(ev.to, s) + ' ' + ev.silver + ' silver in tribute.';
       case 'ledgerThief': return W + ' took 1 silver from ' + whoLow(ev.from, s) + ' (Ledger Thief).';
       case 'crownsDue': return W + ' paid 1 silver to ' + whoLow(ev.to, s) + ' (Crowns Due).';

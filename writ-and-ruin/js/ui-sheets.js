@@ -67,7 +67,13 @@
     stepper({
       title: 'Muster in ' + rn(r), min: 1, max: max, start: afford,
       intro: 'Raise new warbands in a region you hold. You have ' + hs.silver + ' silver.',
-      info: function (n) { return '<p>Costs <b>' + E.musterCost(s, 'player', r, n) + ' silver</b> and 1 moon.</p>'; },
+      info: function (n) {
+        var cost = E.musterCost(s, 'player', r, n), tot = E.boardBands(s, 'player') + n, up = E.upkeep(s, 'player', tot);
+        var t = '<p>Costs <b>' + cost + ' silver</b> and 1 moon.</p>' +
+          '<p class="note">Upkeep: 1 silver for every ' + N.upkeepPer + ' warbands, paid each turn after income. You will have ' + tot + ': next turn you pay ' + up + '.</p>';
+        if (up && hs.silver - cost + E.income(s, 'player') < up) t += '<p class="warn">You may be short. Each silver you cannot pay disbands 1 warband.</p>';
+        return t;
+      },
       action: function (n) { return { type: 'muster', region: r, count: n }; },
       label: 'Muster'
     });
@@ -192,10 +198,10 @@
           var relic = D.CARDS[id].relic, ac = [];
           if (relic) ac.push(btn('Take the relic', function () { U.doAction({ type: 'keep', card: id, to: 'retinue' }); }, { cls: 'go', off: E.check(s, { type: 'keep', house: 'player', card: id, to: 'retinue' }) }));
           else {
-            ac.push(btn('To your retinue', function () { U.doAction({ type: 'keep', card: id, to: 'retinue' }); }, { cls: 'go', off: E.check(s, { type: 'keep', house: 'player', card: id, to: 'retinue' }) }));
-            ac.push(btn('Leave at the site', function () { U.doAction({ type: 'keep', card: id, to: 'site' }); }, { off: E.check(s, { type: 'keep', house: 'player', card: id, to: 'site' }) }));
+            if (!D.CARDS[id].siteOnly) ac.push(btn('To your retinue', function () { U.doAction({ type: 'keep', card: id, to: 'retinue' }); }, { cls: 'go', off: E.check(s, { type: 'keep', house: 'player', card: id, to: 'retinue' }) }));
+            ac.push(btn('Leave at the site', function () { U.doAction({ type: 'keep', card: id, to: 'site' }); }, { cls: D.CARDS[id].siteOnly ? 'go' : '', off: E.check(s, { type: 'keep', house: 'player', card: id, to: 'site' }) }));
           }
-          return A.card(id, '<div class="row">' + ac.join('') + '</div>');
+          return A.card(id, (D.CARDS[id].siteOnly ? '<p class="note">Works only at its site. It does nothing in a retinue.</p>' : '') + '<div class="row">' + ac.join('') + '</div>');
         }).join('') + '</div>' +
         '<p class="muted">A resident left at the site can be recruited later by whoever has warbands there.</p>' +
         '<div class="row">' + btn('Keep no more', function () { U.doAction({ type: 'keep', card: null }); }) + '</div>';
@@ -236,6 +242,7 @@
       var a = { type: 'recruit', region: r, card: id }, m = my ? cand(a) : 'not your turn';
       var cost = E.recruitCost(s, 'player', id);
       var show = my && E.bandsAt(s, 'player', r) > 0;
+      if (D.CARDS[id].siteOnly) return A.card(id, '<p class="muted">Works only at its site' + (g.owner === 'player' ? ': it guards your region.' : ', for whoever holds the region.') + ' It cannot be recruited.</p>');
       return A.card(id, show ? '<div class="row">' + btn('Recruit for ' + cost + 's', function () { U.doAction({ type: 'recruit', region: r, card: id }); }, { cls: mode === 'recruit' ? 'go' : '', off: m }) + '</div>' : '');
     }).join('') + '</div>');
     if (!my) {
@@ -328,7 +335,8 @@
       out.push('<header class="rhead"><span class="sitebox">' + stamp(h, 40) + '</span><div><h2>' + esc(hs.name) + '</h2><p class="muted">' +
         (mine ? 'Your house' : esc(cap(hs.temper)) + ' temper') + (s.ruler === h ? ' · ruled at the start of the age' : '') + '</p></div></header>');
       out.push('<p class="facts">' + hs.silver + ' silver · ' + plural(E.nHeld(s, h), 'region') + ' · ' + plural(E.totalBands ? E.totalBands(s, h) : 0, 'warband') + ' · ' +
-        plural(hs.hours && s.order[s.turn] === h ? hs.hours : E.hoursFor(s, h), 'moon') + ' a turn' + (hs.camp ? ' · ' + hs.camp + ' camped' : '') + '</p>');
+        plural(hs.hours && s.order[s.turn] === h ? hs.hours : E.hoursFor(s, h), 'moon') + ' a turn' + (hs.camp ? ' · ' + hs.camp + ' camped' : '') +
+        '<br>Income ' + E.income(s, h) + ' silver a turn · upkeep ' + E.upkeep(s, h) + ' silver a turn</p>');
       out.push('<div class="progress">' + ['seize', 'foretell', 'depart', 'seat'].map(function (k) {
         var words = { seize: 'Seize: hold ' + N.seizeRegions + ' regions', foretell: 'Foretell: fulfil the prophecy', depart: 'Depart by the Far Pass', seat: 'Seat: hold the Crown hold when the age ends' }[k];
         return '<div class="prow"><span>' + words + '</span><span class="pbar b-' + k + '"><i style="width:' + Math.round(Math.min(1, p[k]) * 100) + '%"></i></span></div>';
@@ -432,6 +440,8 @@
         '<li><span><b>Depart.</b> From the ' + ordinal(N.departFrom) + ' round, hold the Far Pass with enough warbands since the start of your turn and carry the relics it needs, then depart.</span></li>' +
         '<li><span><b>Seat.</b> If the age ends with no other winner, the house holding the Crown hold wins.</span></li></ul>' +
         '<h3>Your turn</h3><p>You get moons each turn to spend on actions. March (1 moon), muster (1 moon and silver), assault (2 moons), recruit, search and treat. Tap a region to see what you can do there.</p>' +
+        '<h3>Silver</h3><p>Each turn starts with income from your regions and sites. Then you pay upkeep: 1 silver for every ' + N.upkeepPer + ' warbands on the board. ' +
+        'Each silver you cannot pay disbands 1 warband from your largest stack.</p>' +
         '<h3>The first round</h3><p>No assaults in the first round. You may march only into your own regions, or into a region no one holds or guards.</p>' +
         '<h3>The age ends</h3><p>After round ' + N.lastRound + ' at the latest. After round ' + N.endDraws[0].round + ' there is a 1 in ' + N.endDraws[0].of + ' chance it ends early.</p>';
     });

@@ -36,10 +36,11 @@
   // ---------------------------------------------------------------- residents
   // "Here" means the region where the resident sits, for its holder. In a retinue, "here" means anywhere.
   // Residents without "here" help the region's holder everywhere, as if in the retinue.
+  // siteOnly: works only at its site, for the region's holder. It cannot be recruited or kept in a retinue.
   var SUITS = ['Order', 'Hearth', 'Lore', 'Wild', 'Shade'];
   var RESIDENTS = [
     { id: 'pikeSergeant', name: 'Pike Sergeant', suit: 'Order', cost: 2, text: '+1 attack when assaulting from here.' },
-    { id: 'wallWarden', name: 'Wall Warden', suit: 'Order', cost: 2, text: '+1 defence here.' },
+    { id: 'wallWarden', name: 'Wall Warden', suit: 'Order', cost: 2, siteOnly: true, text: '+1 defence in this region, while at its site.' },
     { id: 'titheReeve', name: 'Tithe Reeve', suit: 'Order', cost: 3, text: '+1 income.' },
     { id: 'drillCaptain', name: 'Drill Captain', suit: 'Order', cost: 3, text: 'Muster places up to 4.' },
     { id: 'bannerClerk', name: 'Banner Clerk', suit: 'Order', cost: 2, text: 'Assault costs 1 moon (once per turn).' },
@@ -56,7 +57,7 @@
     { id: 'blindCartographer', name: 'The Blind Cartographer', suit: 'Lore', cost: 3, text: 'March may move through one region you hold.' },
     { id: 'bellSeer', name: 'Bell Seer', suit: 'Lore', cost: 4, text: "See one rival's prophecy." },
     { id: 'lampMonk', name: 'Lamp Monk', suit: 'Lore', cost: 1, text: 'Counts as 2 Lore for prophecies.' },
-    { id: 'moorHound', name: 'Moor Hound', suit: 'Wild', cost: 1, text: '+1 defence here.' },
+    { id: 'moorHound', name: 'Moor Hound', suit: 'Wild', cost: 1, siteOnly: true, text: '+1 defence in this region, while at its site.' },
     { id: 'antleredHermit', name: 'Antlered Hermit', suit: 'Wild', cost: 2, text: 'Free folk never fight you.' },
     { id: 'heronWitch', name: 'Heron Witch', suit: 'Wild', cost: 3, text: 'Once per age, discard the fortune card you turned and turn another.' },
     { id: 'oldBoar', name: 'The Old Boar', suit: 'Wild', cost: 3, text: '+2 attack when assaulting an unheld region.' },
@@ -182,7 +183,9 @@
     // last stand: defence bonus for a house defending the only region it holds
     lastStand: 2,
     // landless return: warbands a house with no region musters free at the start of its turn
-    returnBands: 3
+    returnBands: 3,
+    // upkeep: after income, a house pays 1 silver for every full upkeepPer warbands it has on the board
+    upkeepPer: 5
   };
 
   var ORDINALS = ['First', 'Second', 'Third', 'Fourth', 'Fifth', 'Sixth', 'Seventh', 'Eighth', 'Ninth', 'Tenth',
