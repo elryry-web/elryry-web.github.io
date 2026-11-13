@@ -176,6 +176,11 @@
     return JEWELS.filter(function (j) { return c.indexOf(j) < 0; }).slice(0, 3);
   }
   var images = {}, metas = {}, crispCache = {}, status = {};
+  // ART.probe records every picture a drawing reaches for that is still on its way (status 0), so a screen
+  // about to be shown can wait for its own pictures (ART.ready) instead of showing their drawn stand-ins
+  var REC = null;
+  if (typeof Proxy === 'function') images = new Proxy(images, { get: function (o, k) {
+    var v = o[k]; if (REC && !v && status[k] === 0) REC[k] = 1; return v; } });
   // slots whose drawing function lays its own PNG (placement, cells or tint), so ART.draw doesn't stretch it
   var SELF = { knot: 1, twinFrame: 1, twinEmblem: 1, 'b2.knot': 1, 'b2.twinFrame': 1, 'b2.twinEmblem': 1 };
   // the painted knot (knot.png, ribbon entering from the top): where it sits in the tile, in tiles from the
@@ -1271,7 +1276,7 @@
   function b2Sprays(M, S, pad, band, initial, x0, y0) {
     var inm = M.kinds.map(function (k) { return k !== ' '; }), rect = inm.every(Boolean);
     if (initial && M.level && M.level.initial) { inm = inm.map(function () { return true; }); rect = true; }
-    var G = frameGeom(M.w, M.h, inm, S, x0 + pad, y0 + pad, rect ? 0 : S * (initial ? 0.3 : 0.18)), bb = b2Bar(band);
+    var G = frameGeom(M.w, M.h, inm, S, x0 + pad, y0 + pad, 0), bb = b2Bar(band);   // square, as the board's ground is
     // cands: for each diagonal, the corners facing it on the shape's outer edge (a stepped or cross-shaped board
     // has several within a cell or so of each other); b2Margin takes the one with the most room
     return { size: Math.max(80, Math.min(240, 0.3 * Math.min(M.w, M.h) * S)), pts: G.corners(bb.off + bb.t / 2, true),
@@ -2672,6 +2677,22 @@
     }
     (avoid || []).forEach(function (r) { var p = r[4] ? r[4] * (narrow ? 0.9 : 1.6) + 2 : 4; mark(r[0] - p, r[1] - p, r[0] + r[2] + p, r[1] + r[3] + p); });
     var unit = Math.min(W, H), d = Math.max(9, unit * 0.032), lr = Math.max(2.4, unit * 0.0075), hair = Math.max(0.6, unit * 0.0014);
+    // a narrow page's button bar (the top row of boxes) and its heading (the rubric and the folio's name above the
+    // board, taken as one block): the frame's top run goes between the two, and no spray, tendril, leaf or flower
+    // enters the block
+    var hudB = 0, hd = null;
+    if (narrow) {
+      var nb = (avoid || []).filter(function (r) { return !r[4]; }), top0 = H, bTop = H;
+      nb.forEach(function (r) { top0 = Math.min(top0, r[1]); });
+      (avoid || []).forEach(function (r) { if (r[4]) bTop = Math.min(bTop, r[1]); });
+      var inBar = function (r) { return Math.abs(r[1] - top0) < 6 && r[3] < 70; };
+      nb.forEach(function (r) {
+        if (inBar(r)) { hudB = Math.max(hudB, r[1] + r[3]); return; }
+        if (r[1] + r[3] * 0.5 >= bTop) return;
+        hd = hd ? [Math.min(hd[0], r[0]), Math.min(hd[1], r[1]), Math.max(hd[2], r[0] + r[2]), Math.max(hd[3], r[1] + r[3])] : [r[0], r[1], r[0] + r[2], r[1] + r[3]];
+      });
+      if (hd) { hd = [hd[0] - 3, hd[1] - 2, hd[2] + 3, hd[3] + 3]; mark(hd[0], hd[1], hd[2], hd[3]); }
+    }
     ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     // the sprays first, so the vine breaks round them. Each grows out of the gilt bar's outer corner: two painted
     // sprays, one hugging the outside of each arm of the bar, their roots in a gilt calyx the bar runs into.
@@ -2714,10 +2735,30 @@
       });
       var si = 0, cnt = -1;
       steps.forEach(function (st, s) { var k = grid.filter(function (L) { return L.some(function (e) { return e.f[s]; }); }).length; if (k > cnt && (s < 6 || cnt < 1)) { cnt = k; si = s; } });
-      grid.forEach(function (L) {
+      var spR = function (f) { return Math.max(f.arms[0].art.st * f.arms[0].k, f.arms[1].art.st * f.arms[1].k) * 0.6 + 2; };
+      var inHd = function (f) {
+        if (!f || !hd) return false;
+        for (var n = 0, rr = spR(f); n < f.P.length; n += 2) if (f.P[n] > hd[0] - rr && f.P[n] < hd[2] + rr && f.P[n + 1] > hd[1] - rr && f.P[n + 1] < hd[3] + rr) return true;
+        return false;
+      };
+      grid.forEach(function (L, ci) {
         var e = L.filter(function (e) { return e.f[si]; })[0];
         if (!e) { bare.push(L[0].c); return; }
-        var f = e.f[si], rr = Math.max(f.arms[0].art.st * f.arms[0].k, f.arms[1].art.st * f.arms[1].k) * 0.6 + 2;
+        var f = e.f[si];
+        // on a phone, a spray that would reach into the heading shrinks (to 0.6 of the page's size at most), then
+        // slides along the board's side away from the heading or out past its corner; one that still can't clear
+        // leaves a bare tendril
+        if (inHd(f)) {
+          var c0 = e.c, sw0 = base * steps[si], g = null;
+          [0.9, 0.8, 0.7, 0.6].some(function (m) { g = fit(c0, ci, sw0 * m); return g && !inHd(g) ? true : (g = null, false); });
+          for (var k = 1; !g && k * 3 <= sw0 * 0.5; k++) {
+            var dy = c0.y < hd[3] + sw0 ? 1 : -1, dx = c0.x < W / 2 ? -1 : 1;
+            [[0, dy], [dx, 0]].some(function (v) { g = fit(Object.assign({}, c0, { x: c0.x + v[0] * k * 3, y: c0.y + v[1] * k * 3 }), ci, sw0 * 0.6); return g && !inHd(g) ? true : (g = null, false); });
+          }
+          if (!g) { bare.push(c0); return; }
+          f = g;
+        }
+        var rr = spR(f);
         for (var n = 0; n < f.P.length; n += 2) { mark(f.P[n] - rr, f.P[n + 1] - rr, f.P[n] + rr, f.P[n + 1] + rr); markIn(occS, f.P[n] - rr, f.P[n + 1] - rr, f.P[n] + rr, f.P[n + 1] + rr); }
         sprays.push(f);
       });
@@ -2728,32 +2769,45 @@
     // comes near, the line eases out towards the page edge; where the board itself is in the way it passes
     // behind it. It never crosses the buttons, the text, the drollery or the next-folio button
     if (narrow) {
-      var fu = Math.max(W, H * 0.6), fd = Math.max(16, fu * 0.032), occH = new Uint8Array(gw * gh), occB = new Uint8Array(gw * gh), hudB = 0;
+      var fu = Math.max(W, H * 0.6), fd = Math.max(16, fu * 0.032), occH = new Uint8Array(gw * gh), occB = new Uint8Array(gw * gh);
       (avoid || []).forEach(function (r) {
         if (r[4]) { markIn(occB, r[0] - 1, r[1] - 1, r[0] + r[2] + 1, r[1] + r[3] + 1); return; }
         markIn(occH, r[0] - 2, r[1] - 2, r[0] + r[2] + 2, r[1] + r[3] + 2);
-        if (r[1] < H * 0.1 && r[3] < 70) hudB = Math.max(hudB, r[1] + r[3]);
       });
-      var yT = Math.max(fd, hudB + fd * 0.75);
-      var hardAt = function (x, y) { return x < 2 || y < 2 || x > W - 2 || y > H - 2 || hit(occH, x, y); };
+      // the top run: just under the bar, or midway between the bar and the heading when they're close, its wave
+      // flattened to fit the gap
+      // flattened to fit the gap. The gap can be a few px, finer than the grid, so there the boxes are tested exactly
+      var yT = Math.max(fd, hudB + fd * 0.75), amp0 = fd * 0.2, hdT = hd ? hd[1] + 2 : 0;
+      if (hd) { markIn(occH, hd[0], hd[1], hd[2], hd[3]); yT = Math.max(hudB + 1.5, Math.min(yT, (hudB + hdT) / 2)); amp0 = Math.min(amp0, Math.max(0, (hdT - hudB) / 2 - 3)); }
+      var hardAt0 = function (x, y) { return x < 2 || y < 2 || x > W - 2 || y > H - 2 || hit(occH, x, y); };
+      var hardEx = function (x, y) {
+        return x < 2 || y < 2 || x > W - 2 || (avoid || []).some(function (r) { return !r[4] && x > r[0] - 1.5 && x < r[0] + r[2] + 1.5 && y > r[1] - 1.5 && y < r[1] + r[3] + 1.5; });
+      };
       [0, 1, 2, 3].forEach(function (side) {
         var horiz = side % 2 === 0, ph = R() * 6.283, lam = Math.max(40, fu * 0.055) * (1 + R() * 0.5), oDes = side === 0 ? yT : fd;
-        var lo = side === 0 ? hudB + 3 : 4.5;
+        var lo = side === 0 ? hudB + (hd ? 1.5 : 3) : 4.5, amp = side === 0 ? amp0 : fd * 0.2, hardAt = side === 0 && hd ? hardEx : hardAt0;
         // each side runs a little past the two it crosses, as on a wide page; the sides start just under the bar
         var s0 = horiz ? fd * 0.55 : yT - Math.min(fd * 0.5, Math.max(0, yT - hudB - 8)), s1 = (horiz ? W : H) - fd * 0.55;
         var pos = function (s, o) { return side === 0 ? [s, o] : side === 1 ? [W - o, s] : side === 2 ? [s, H - o] : [o, s]; };
         var N = Math.max(2, Math.ceil((s1 - s0) / 2.5)), step = (s1 - s0) / N, S = [], Wv = [], raw = [], under = [], i, t, p;
         for (i = 0; i <= N; i++) {
-          var s = s0 + step * i, w = oDes + fd * 0.2 * Math.sin(s / lam * 6.283 + ph), o = null, u = 0;
-          for (t = w; t >= lo - 0.01 && o === null; t -= 1) { p = pos(s, t); if (!hardAt(p[0], p[1]) && !hit(occB, p[0], p[1])) o = t; }
-          for (t = w; t >= lo - 0.01 && o === null; t -= 1) { p = pos(s, t); if (!hardAt(p[0], p[1])) { o = t; u = 1; } }
+          var s = s0 + step * i, w = oDes + amp * Math.sin(s / lam * 6.283 + ph), o = null, u = 0;
+          // the offsets to try: from the wave out towards the edge; the top run under a heading tries the whole gap
+          // between the bar and the heading, nearest the wave first
+          var ts = [], q;
+          if (side === 0 && hd) for (q = 0; q <= hd[1] - lo; q += 1) { if (w - q >= lo) ts.push(w - q); if (q && w + q <= hd[1]) ts.push(w + q); }
+          else for (t = w; t >= lo - 0.01; t -= 1) ts.push(t);
+          for (q = 0; q < ts.length && o === null; q++) { p = pos(s, ts[q]); if (!hardAt(p[0], p[1]) && !hit(occB, p[0], p[1])) o = ts[q]; }
+          for (q = 0; q < ts.length && o === null; q++) { p = pos(s, ts[q]); if (!hardAt(p[0], p[1])) { o = ts[q]; u = 1; } }
+          // no gap at all under the bar: over it, along the page's top edge
+          for (t = lo - 1; side === 0 && t >= 2.5 && o === null; t -= 1) { p = pos(s, t); if (!hardAt(p[0], p[1])) { o = t; u = 1; } }
           if (o === null) { o = w; u = 1; }
           S.push(s); Wv.push(w); raw.push(o); under.push(u);
         }
         // ease into and out of every inset: the widest inset within reach, then averaged, so the line bends
         // away well before a box rather than stepping round it
         var dev = raw.map(function (o, k) { return Wv[k] - o; }), R2 = Math.max(4, Math.round(fd * 2.2 / step)), mx = [], sm = [];
-        for (i = 0; i <= N; i++) { var m = 0; for (t = Math.max(0, i - R2); t <= Math.min(N, i + R2); t++) m = Math.max(m, dev[t]); mx.push(m); }
+        for (i = 0; i <= N; i++) { var m = -1e9; for (t = Math.max(0, i - R2); t <= Math.min(N, i + R2); t++) m = Math.max(m, dev[t]); mx.push(m); }
         for (i = 0; i <= N; i++) { var a = 0, c = 0; for (t = Math.max(0, i - R2); t <= Math.min(N, i + R2); t++) { a += mx[t]; c++; } sm.push(a / c); }
         var pts = [];
         for (i = 0; i <= N; i++) {
@@ -2826,7 +2880,7 @@
             ctx.save(); ctx.translate(ex, ey); ctx.rotate(phi - th0); ctx.scale(k, k); ctx.drawImage(im, -B[0] * iw, -B[1] * ih); ctx.restore();
           } else b2Strewn(ctx, kind, cx, cy, fh * 0.45, phi - Math.PI / 2);
           mark(cx - fh * 0.55, cy - fh * 0.55, cx + fh * 0.55, cy + fh * 0.55); markIn(occF, cx - fh * 0.45, cy - fh * 0.45, cx + fh * 0.45, cy + fh * 0.45);
-          stems.push([bx, by]); ki++;
+          stems.push([bx, by, cx, cy, fh]); ki++;
           return true;
         });
       }
@@ -2870,6 +2924,9 @@
       goldLeaf(ctx, sx, sy, lr, l[2]);
     });
     ctx.restore();
+    // what was laid, for checking the layout from the console
+    ivyPage.last = { narrow: narrow, W: W, H: H, lr: lr, hud: hudB, hd: hd, avoid: avoid, runs: runs, leaves: leaves, curls: curls, flowers: stems, bare: bare,
+      sprays: sprays.map(function (f) { return { x: f.c.x, y: f.c.y, sw: f.sw, r: Math.max(f.arms[0].art.st * f.arms[0].k, f.arms[1].art.st * f.arms[1].k) * 0.6 + 2, P: f.P }; }) };
     return true;
   }
   // lays the painted ivy for one page into ctx (the cached page background): a spray in each corner that has
@@ -3119,6 +3176,10 @@
         }
         if (opts.angle) { ctx.translate(x + w / 2, y + h / 2); ctx.rotate(opts.angle); ctx.drawImage(img, -w / 2, -h / 2, w, h); }
         else ctx.drawImage(img, x, y, w, h);
+      } else if (ART.waiting(slot)) {
+        // sent for ahead of the queue (a screen coming into view waited for it, up to its cap): nothing is drawn
+        // until it lands, rather than a drawn stand-in that the painting replaces a moment later. Once it
+        // has failed (status -1) the stand-in is drawn as before
       } else {
         var parts = slot.split('.'), b2 = parts[0] === 'b2';
         var fn = b2 ? DRAW[slot] || DRAW['b2.' + parts[1]] : DRAW[slot] || (slot.indexOf('drollery') === 0 ? DRAW.drollery : null) || (slot.indexOf('initial') === 0 ? DRAW.initial : null);
@@ -3179,6 +3240,42 @@
     },
     // a manifest slot's load state: 0 waiting, 1 loaded, -1 failed, undefined not in the manifest (or not read yet)
     status: function (slot) { return slot == null ? Object.assign({}, status) : status[slot]; },
+    // whether any picture is still to come (true before the manifest is read): with none, a screen needs no probe
+    pending: function () {
+      var L = loader; if (!L) return typeof fetch !== 'undefined';
+      for (var k in status) if (status[k] === 0) { var q = L.items[k]; if (q && (q.r < ART.DEMAND || q.urgent)) return true; }
+      return false;
+    },
+    // a picture sent for ahead of the queue and still on its way: ART.draw leaves it out rather than draw its stand-in
+    waiting: function (slot) { var q = loader && loader.items[slot]; return status[slot] === 0 && !!q && !!q.urgent; },
+    // run fn (a drawing, usually to a throwaway canvas) and return the slots it reached for that are still on their way
+    probe: function (fn) {
+      var prev = REC, rec = REC = {};
+      try { fn(); } catch (err) { if (window.console) console.error(err); } finally { REC = prev; }
+      if (prev) Object.assign(prev, rec);
+      return Object.keys(rec);
+    },
+    // send for these pictures ahead of the queue and decode them; resolves true once all have landed (or
+    // failed: those keep their drawn stand-in), false if cap ms pass first. A capital is only sent for when
+    // its Colophon painting failed (see want)
+    ready: function (slots, cap) {
+      slots = (slots || []).filter(function (s) {
+        return status[s] === 0 && !(/capital\./.test(s) && status.colophon !== -1 && status['b2.colophon'] !== -1);
+      });
+      if (!slots.length) return Promise.resolve(true);
+      return new Promise(function (res) {
+        var left = slots.length, over = false;
+        function fin(ok) { if (!over) { over = true; res(ok); } }
+        setTimeout(function () { fin(false); }, cap || 300);
+        slots.forEach(function (s) {
+          want(s, true).then(function () {
+            var img = images[s];
+            // (decode() can stay pending forever in some tabs/engines: never waited on for long)
+            return img && img.decode ? new Promise(function (r) { img.decode().then(r, r); setTimeout(r, 250); }) : null;
+          }).then(function () { if (--left === 0) fin(true); });
+        });
+      });
+    },
     slots: function () { return Object.keys(DRAW).filter(function (k) { return k !== 'drollery'; }).concat(['drollery.<id>']); }
   };
   window.ART = ART;

@@ -145,12 +145,57 @@
     droll.wakeT0 = solved ? -1e9 : null;
     $('next').classList.remove('show');
     board.setLevel(cur, saved);
-    layout();
+    // laid out and drawn once now; the pictures that drawing reached for and are still on their way are
+    // returned, so the caller can hold the page back until they are in (holdFor)
+    var sl = ART.probe && ART.pending() ? ART.probe(function () { layout(); board.draw(); drawDroll(performance.now()); }) : (layout(), []);
     if (solved) pageSolved(false);
     else if (!opts.quiet && cur.folio === 1 && !save.seen[cur.quire]) { save.seen[cur.quire] = 1; persist(); openRule(); }
     ART.want && ART.want('drollery.' + cur.drollery);
     setTimeout(startDroll, 0);   // book.js sets its mode to the page screen just after calling this
+    return sl;
   }
+
+  /* ---------- a screen held back until its pictures are in ----------
+     The elements are faded out (opacity 0) while the pictures the screen is drawn with load and decode,
+     at most cap ms, then the screen is drawn again with them and fades in. So a page never shows a drawn
+     stand-in that its painting replaces a moment later. slots null: hidden now, holdWait(h, slots) later. */
+  var held = null, holds = [];
+  function holdFor(ids, slots, cap) {
+    var prev = held; held = null;
+    if (slots && !slots.length) { if (prev) holdShow(prev); return null; }
+    var h = { els: ids.map($).filter(Boolean), t0: performance.now(), cap: cap, ids: ids.join(',') };
+    if (prev) {   // a hold superseded (another page before the last one showed): its elements wait for this one
+      prev.done = true; prev.why = 'superseded'; clearTimeout(prev.timer);
+      prev.els.forEach(function (e) { if (h.els.indexOf(e) < 0) h.els.push(e); });
+    }
+    h.els.forEach(function (e) { e.style.transition = 'none'; e.style.opacity = '0'; e.style.pointerEvents = 'none'; });
+    held = h; holds.push(h);
+    h.timer = setTimeout(function () { h.why = h.why || 'cap'; holdShow(h); }, cap + 100);
+    if (slots) holdWait(h, slots);
+    return h;
+  }
+  function holdWait(h, slots) {
+    if (h.done || h.slots) return;
+    h.slots = slots;
+    ART.ready(slots, Math.max(0, h.cap - (performance.now() - h.t0))).then(function (ok) { h.why = h.why || (ok ? 'ready' : 'cap'); holdShow(h); });
+  }
+  function holdShow(h) {
+    if (h.done) return;
+    h.done = true; clearTimeout(h.timer); h.ms = Math.round(performance.now() - h.t0);
+    if (held === h) held = null;
+    if (Book.mode() === 'hidden') { layout(); board.draw(); drawDroll(performance.now()); }   // painted now, before it shows
+    else Book.refresh();
+    // (timers and a forced style flush rather than animation frames, as the cover gate)
+    h.els.forEach(function (e) { e.style.transition = 'opacity 200ms ease-out'; void e.offsetWidth; e.style.opacity = '1'; });
+    setTimeout(function () {
+      h.els.forEach(function (e) {
+        if (held && held.els.indexOf(e) >= 0) return;   // held again since
+        e.style.transition = 'none'; e.style.opacity = ''; e.style.pointerEvents = ''; void e.offsetWidth; e.style.transition = '';
+      });
+    }, 240);
+  }
+  // the page's own canvases: the vellum, the board and the drollery
+  var PAGE_ELS = ['page', 'boardWrap', 'droll'];
 
   /* ---------- illumination sequence ----------
      0 the board floods and gilds (board.js, ~2.5 s) · 1100 the grumble starts writing · 1800 the drollery wakes ·
@@ -435,7 +480,7 @@
   };
   function soundLabel() { $('bSound').innerHTML = save.sound ? '&#9835;' : '<s>&#9835;</s>'; $('bSound').title = save.sound ? 'Sound on' : 'Sound off'; }
   $('bSound').onclick = function () { save.sound = !save.sound; SFX.enabled = save.sound; persist(); soundLabel(); if (save.sound) { SFX.unlock(); SFX.pin(); } };
-  $('next').onclick = function () { if (cur.n < LEVELS.length) load(cur.n + 1); else if (B2) Book2.open(1); else Book.fromPlay(7); };   // the last page closes on the Colophon
+  $('next').onclick = function () { if (cur.n < LEVELS.length) holdFor(PAGE_ELS, load(cur.n + 1), 300); else if (B2) Book2.open(1); else Book.fromPlay(7); };   // the last page closes on the Colophon
   ['ruleModal', 'resetModal'].forEach(function (id) {
     $(id).addEventListener('click', function (e) { if (e.target === $(id)) $(id).classList.remove('show'); });
   });
@@ -448,7 +493,7 @@
 
   /* ---------- test hooks ---------- */
   window.VV = {
-    load: function (n) { load(n); return cur.n; },
+    load: function (n) { holdFor(PAGE_ELS, load(n), 300); return cur.n; }, holds: holds,
     solve: function () { board.applySolution(); return board.solved; },
     state: function () {
       var M = board.M, tr = board.tr;
@@ -481,11 +526,19 @@
     LEVELS: LEVELS, RULES: RULES, unlocked: unlocked, persist: persist,
     save: function () { return save; },
     current: function () { return cur; },
-    load: function (n, o) { load(n, o); }
+    load: function (n, o) { return load(n, o); },
+    // the page screen drawn again (book.js, after waiting for its pictures, before it shows it)
+    redraw: function () { layout(); board.draw(); drawDroll(performance.now()); }
   });
   load(save.current || 1, { quiet: true });   // the page screen is ready behind the cover
   Book.boot();
   }
+  // a screen the game opens straight onto (Book II's page; Book I reopened on a page or its open book) is held
+  // back like the closed cover until the pictures it is drawn with are in, at most 6 s; which those are is
+  // known once the manifest is read (bootGate). The closed cover has its own gate below
+  var bootHeld = Book.mode();
+  var bootHold = typeof fetch !== 'undefined' && ART.probe && (bootHeld === 'hidden' || bootHeld === 'open') ?
+    holdFor(bootHeld === 'open' ? ['bk_spread'] : ['page', 'app'], null, 6000) : null;
 
   /* ---------- the painted art arrives a picture at a time ----------
      What the first screen shows loads first (ART.load ranks it), and each screen is redrawn as its pictures
@@ -497,6 +550,8 @@
   function artRank(slot) {
     // ART.rank: 0 closed cover, 1 leaves, 2 board, DEFER drolleries, DEMAND (only when asked for) Colophon, capitals
     var r = ART.rank(slot), D = ART.DEFER || 10;
+    // Book I's closed cover, seal, Colophon and capitals never show in Book II
+    if (B2 && /^(cover\.|book\.|colophon|capital\.)/.test(slot)) return ART.DEMAND;
     // each book has its own creatures: the other book's are fetched only if asked for
     if (slot.indexOf('drollery.') === 0 && !DROLLS[slot.slice(9)]) return ART.DEMAND;
     // Book II's Colophon paintings: only once its book is finished (and never for Book I)
@@ -534,7 +589,15 @@
     // Book II's leaves, while open, redraw as their creatures, paintings or vellum come in
     if (B2 && window.Book2 && Book2.isOpen() && (isDroll || slot === 'page' || slot.indexOf('b2.colophon') === 0)) Book2.refresh();
     gateCheck();
+    bootGate();
     artSchedule();
+  }
+  // the manifest is read (a first picture has landed): which of the first screen's pictures are still to come
+  function bootGate() {
+    var h = bootHold;
+    if (!h || h.done || h.slots) return;
+    if (Book.mode() !== bootHeld) { holdShow(h); return; }
+    holdWait(h, ART.probe(bootHeld === 'hidden' ? function () { layout(); board.draw(); drawDroll(performance.now()); } : function () { Book.refresh(); }));
   }
   function artSchedule() {
     if (art.timer) return;
@@ -592,6 +655,7 @@
 
   ART.load('art/', artLanded, { rank: artRank }).then(function () {
     art.done = true; gateOpen();
+    if (bootHold && !bootHold.done) { bootGate(); if (!bootHold.done) holdShow(bootHold); }
     clearTimeout(art.timer); art.timer = 0;
     // once more with everything in: the page screen even if it is behind the book, the book when it is still
     art.page = false; layout();

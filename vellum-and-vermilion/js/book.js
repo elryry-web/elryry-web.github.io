@@ -1658,7 +1658,20 @@
 
   /* ================= state ================= */
   var SLOW = 1, mode = 'hidden', pos = 0, T = null, busyUntil = 0, tween = null, liveRaf = 0, liveTo = 0, liveWas = false;
-  function busy() { return now() < busyUntil || !!T || !!tween; }
+  function busy() { return now() < busyUntil || !!T || !!tween || !!pend; }
+  // before faces come into view (a turn, the way back from a page): the pictures they are drawn with that are
+  // still on their way are sent for and decoded first, waiting at most cap ms (then those not yet in are left
+  // blank, filled in as they land; see ART.waiting). With nothing still to come it goes straight on.
+  var pend = 0, pendN = 0;
+  function prepFaces(fs, cap, then) {
+    if (!ART.probe || !ART.pending()) { then(); return; }
+    var cv = document.createElement('canvas');
+    var sl = ART.probe(function () { fs.forEach(function (f) { drawFaceTo(cv, f, 'R'); }); });
+    zap(cv);
+    if (!sl.some(function (x) { return ART.status(x) === 0; })) { then(); return; }
+    var tok = pend = ++pendN;
+    ART.ready(sl, cap).then(function () { if (pend !== tok) return; pend = 0; then(); });
+  }
   function lock(ms) { busyUntil = Math.max(busyUntil, now() + ms); }
   function setStatic() {
     var fs = facesOf(pos);
@@ -1790,7 +1803,10 @@
       startLive();
     })();
   }
-  function turnTo(to, dur) { if (busy()) return; if (beginTurn(to)) finishTurn(true, dur || 620); }
+  function turnTo(to, dur) {
+    if (busy() || mode !== 'open' || to === pos || to < 0 || to >= posCount()) return;
+    prepFaces(facesOf(to), 300, function () { if (beginTurn(to)) finishTurn(true, dur || 620); });
+  }
   function turn(dir) { turnTo(pos + dir); }
   function gotoFace(f) { turnTo(posOfFace(f), 700); }
 
@@ -2148,8 +2164,17 @@
   function toPlay(n) {
     if (busy() || !G.unlocked(n)) return;
     lock(420);
-    G.load(n);
+    var sl = G.load(n) || [];
     var s = G.save(); s.screen = 'play'; G.persist();
+    // the page is drawn behind the book: the book stays until the page's pictures are in (at most 300 ms)
+    if (ART.ready && sl.some(function (x) { return ART.status(x) === 0; })) {
+      var tok = pend = ++pendN;
+      ART.ready(sl, 300).then(function () { if (pend !== tok) return; pend = 0; lock(420); if (G.redraw) G.redraw(); toPlayGo(); });
+      return;
+    }
+    toPlayGo();
+  }
+  function toPlayGo() {
     el.scr.classList.add('fade');
     var m = mode; mode = 'hidden'; stopLive(); coloStop();
     setTimeout(function () {
@@ -2162,9 +2187,12 @@
   // from the page screen back to the book, open at a face (default: the current page's quire)
   function fromPlay(face) {
     if (busy() || mode !== 'hidden') return;
-    lock(350);
     var cur = G.current();
     if (face === undefined) face = cur ? cur.quire : 1;
+    prepFaces(facesOf(posOfFace(face)), 300, function () { if (mode === 'hidden' && !busy()) fromPlayGo(face); });
+  }
+  function fromPlayGo(face) {
+    lock(350);
     // a rule card or reset prompt left open on the page screen must not sit over the book
     Array.prototype.forEach.call(document.querySelectorAll('.modal.show'), function (m) { m.classList.remove('show'); });
     show(true); el.scr.classList.add('fade');

@@ -118,7 +118,17 @@
   }
 
   /* ---------- open and close ---------- */
+  // the leaves wait (at most 300 ms) for their creatures and paintings still on their way, sent for and
+  // decoded first, so they don't open on drawn stand-ins that the paintings replace a moment later
+  var opening = 0;
   function open(face) {
+    if (st.open || opening) return;
+    var sl = BEASTS.map(function (id) { return 'drollery.' + id; }).concat(allDone() ? ['b2.colophon', 'b2.colophon.dawn'] : [], ['page']);
+    if (!ART.ready || !sl.some(function (x) { return ART.status(x) === 0; })) { openNow(face); return; }
+    var tok = opening = Date.now();
+    ART.ready(sl, 300).then(function () { if (opening !== tok) return; opening = 0; openNow(face); });
+  }
+  function openNow(face) {
     if (!scr) build();
     st.face = face === F_COLO || face === 'colo' ? F_COLO : F_BEST;
     st.open = true; st.sel = null;

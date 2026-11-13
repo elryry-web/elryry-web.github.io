@@ -1001,7 +1001,9 @@
         var inm = M.kinds.map(function (k) { return k !== ' '; }), rect = inm.every(Boolean);
         hit = { key: pk, panel: ART.makePanel({ w: M.w, h: M.h, inm: inm, S: S, pad: pad, band: this.band, ivy: this.ivy,
           cssW: this.cssW, cssH: this.cssH, dpr: this.dpr, rect: rect, seed: (M.level.n || 7) * 31 + 7, ground: this.groundName,
-          round: rect ? 0 : S * (this.isInitial ? 0.3 : 0.18), letter: this.isInitial && ART.book === 2 ? M.level.initial : null }) };
+          // Book II's ground runs square into its mitred gilt bar, as a Book of Hours frame does (the book is fixed
+          // for the page's life, so the panel key needn't carry it)
+          round: rect || ART.book === 2 ? 0 : S * (this.isInitial ? 0.3 : 0.18), letter: this.isInitial && ART.book === 2 ? M.level.initial : null }) };
       }
       this._panels.push(hit);
       while (this._panels.length > 2) {   // let an old panel's memory go now rather than at some later collection
