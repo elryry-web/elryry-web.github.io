@@ -261,9 +261,13 @@
   function assaultHours(s, h, to) {
     var c = 2;
     if (has(s, h, 'bannerClerk') && !s.houses[h].flags.clerk) c = 1;
-    var d = s.regions[to].owner;
-    if (d && d !== h && has(s, d, 'drownedBell')) c++;
+    if (bellHolder(s, h, to)) c++;
     return c;
+  }
+  // the rival holding region `to` whose Drowned Bell makes h's assault there cost a moon more, or null
+  function bellHolder(s, h, to) {
+    var d = s.regions[to] && s.regions[to].owner;
+    return d && d !== h && has(s, d, 'drownedBell') ? d : null;
   }
   function recruitCost(s, h, id) {
     var card = CARDS[id], c = card.cost;
@@ -516,7 +520,15 @@
         if (emptyOfOthers(s, h, a.to)) return err('empty: march instead');
         // no unannounced assaults on you: a rival may assault your region only as the plan it showed when you ended your turn
         if (!warnedFor(s, h, a.to)) return err('not its declared plan');
-        if (hours < assaultHours(s, h, a.to)) return err('no hours');
+        var ah = assaultHours(s, h, a.to);
+        if (hours < 1) return err('no hours');
+        if (hours < ah) {
+          // say what it costs and why, not "no moons": 'assault costs 2 moons; have 1' or
+          // 'assault on riverford costs 3 moons (varrow: Drowned Bell); have 2'
+          var bell = bellHolder(s, h, a.to);
+          return err(bell ? 'assault on ' + a.to + ' costs ' + ah + ' moons (' + bell + ': Drowned Bell); have ' + hours
+            : 'assault costs ' + ah + ' moons; have ' + hours);
+        }
         return null;
       }
       case 'recruit': {
@@ -581,7 +593,8 @@
         if (bandsAt(s, h, 'farpass') < dn.bands) return err('need ' + dn.bands + ' warbands');
         if (hs.relics.length < dn.relics) return err('need ' + dn.relics + ' relics');
         if (!hs.flags.passHeld) return err('hold the Far Pass with ' + dn.bands + ' warbands from the start of your turn');
-        if (hours < 3) return err('no hours');
+        if (hours < 1) return err('no hours');
+        if (hours < 3) return err('depart costs 3 moons; have ' + hours);
         return null;
       }
       case 'poison': {
@@ -1408,7 +1421,7 @@
     endChances: endChances, fortuneLeft: fortuneLeft, peekFortune: peekFortune, assaultOdds: assaultOdds,
     battlePreview: battlePreview, attackBonus: attackBonus, defenceOf: defenceOf, lastStand: lastStand, returnSpots: returnSpots,
     marchDests: marchDests, enterMode: enterMode, emptyOfOthers: emptyOfOthers,
-    musterCost: musterCost, musterMax: musterMax, recruitCost: recruitCost, searchSilver: searchSilver, assaultHours: assaultHours,
+    musterCost: musterCost, musterMax: musterMax, recruitCost: recruitCost, searchSilver: searchSilver, assaultHours: assaultHours, bellHolder: bellHolder,
     pactsBetween: pactsBetween, intentLabel: intentLabel, pactsBrokenBy: pactsBrokenBy, grudge: grudge, loreCount: loreCount,
     // utilities
     clone: clone, rnd: rnd, rint: rint, shuffle: shuffle, DATA: D

@@ -102,7 +102,7 @@
         (s.fortune.length ? '' : ' <span class="muted">(the deck reshuffles first)</span>') + '</p>' +
         '<p class="odds">Chance to win: <b>' + oddsWords(p) + '</b></p>' +
         (extra.length ? '<p class="note">' + esc(extra.join(' ')) + ' That is counted in the chance.</p>' : '') +
-        '<p>Costs ' + plural(E.assaultHours(s, 'player', to), 'moon') + '.</p>' +
+        '<p>Costs ' + plural(E.assaultHours(s, 'player', to), 'moon') + (E.bellHolder(s, 'player', to) ? ' (the Drowned Bell)' : '') + '.</p>' +
         (broke.length ? '<p class="warn">This breaks your ' + broke.map(function (pc) { return pc.type === 'foe' ? 'common cause' : pc.type; }).join(' and ') + ' with ' + whoLow(pv.defender) + '. They will hold a grudge.</p>' : '') +
         (m ? '<p class="warn">' + esc(plain(m)) + '</p>' : '') +
         '<div class="row">' + btn('Commit to the assault', function () { U.doAction({ type: 'assault', from: from, to: to, count: n }); }, { cls: 'go', off: m }) +
@@ -245,6 +245,7 @@
     if (bandList.length) facts.push('Warbands: ' + bandList.map(function (k) { return stamp(k, 16) + ' ' + who(k) + ' ' + g.bands[k]; }).join(', '));
     facts.push('Defence ' + E.defenceOf(s, r, defAgainst) + (owner && E.lastStand(s, r) ? ' (with last stand)' : ''));
     if (owner && s.houses[owner].refuge === r) facts.push('<b>Safe:</b> ' + who(owner) + ' returned here and cannot be assaulted here until its next turn.');
+    if (owner && E.has(s, owner, 'drownedBell')) facts.push('<b>Drowned Bell:</b> ' + (owner === 'player' ? "rivals' assaults on you" : 'assaults on ' + who(owner)) + ' cost 1 more moon.');
     facts.push('Neighbours: ' + R.adj.map(rn).join(', '));
     out.push('<p class="facts">' + facts.join('<br>') + '</p>');
     // residents

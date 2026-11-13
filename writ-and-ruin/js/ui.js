@@ -93,6 +93,11 @@
     if ((x = /^need (\d+) relics$/.exec(m))) return 'You need ' + plural(+x[1], 'relic') + ' to depart.';
     if ((x = /^hold the Far Pass with (\d+) warbands/.exec(m))) return 'You must have held the Far Pass with ' + x[1] + ' warbands since the start of your turn.';
     if (/^the Waystone opens/.test(m)) return cap(m) + '.';
+    // a moon or two left, but the action costs more
+    if ((x = /^assault on (\w+) costs (\d+) moons \((\w+): Drowned Bell\); have (\d+)$/.exec(m)))
+      return 'Assaulting ' + rn(x[1]) + ' costs ' + x[2] + ' moons (' + who(x[3]) + ' holds the Drowned Bell); you have ' + x[4] + '.';
+    if ((x = /^(assault|depart) costs (\d+) moons; have (\d+)$/.exec(m)))
+      return (x[1] === 'assault' ? 'An assault costs ' : 'Departing costs ') + x[2] + ' moons; you have ' + x[3] + '.';
     return /[.!?]$/.test(m) ? cap(m) : cap(m) + '.';
   }
 
@@ -591,7 +596,7 @@
     if (hs.hours < 1 && kind !== 'march') return 'no hours';
     if (kind === 'march') return hs.hours < 1 ? 'no hours' : 'None of your warbands can march anywhere.';
     if (kind === 'muster') return 'not enough silver';
-    if (kind === 'assault') return hs.hours < 2 ? 'You need 2 moons to assault.' : 'None of your warbands stand next to a region you can assault.';
+    if (kind === 'assault') return hs.hours < 2 && !(E.has(s, 'player', 'bannerClerk') && !hs.flags.clerk) ? 'assault costs 2 moons; have ' + hs.hours : 'None of your warbands stand next to a region you can assault.';
     if (kind === 'recruit') {
       if (hs.retinue.length >= N.retinueMax) return 'retinue full';
       return 'No resident you can afford stands where your warbands are.';
