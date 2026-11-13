@@ -131,6 +131,7 @@ svg { display: block; }
 .rows .claim { font-weight: 600; color: var(--rust); }
 .rows .claim.good { color: var(--moss); }
 .rows .urg { color: var(--rust); }
+.rows .newplan { color: var(--rust); }
 .plainlist li { display: block; }
 .prophecy { font-style: italic; }
 .loglist { list-style: none; margin: 4px 0; padding: 0; max-height: 300px; overflow-y: auto; font-size: .88rem; }

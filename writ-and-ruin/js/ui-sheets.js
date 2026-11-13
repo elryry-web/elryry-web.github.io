@@ -308,6 +308,7 @@
     // the current mode first
     if (mode) acts.sort(function (x, y) { return (y[0] === mode) - (x[0] === mode); });
     out.push('<h3>Actions <small>' + plural(hs.hours, 'moon') + ', ' + hs.silver + ' silver</small></h3><div class="actlist">' + acts.map(function (x) { return x[1]; }).join('') + '</div>');
+    if (E.truce(s) && acts.some(function (x) { return x[0] === 'assault'; })) out.push('<p class="muted">' + esc(plain(E.truce(s))) + '</p>');
     return out.join('');
   }
   function campHtml(s, hs, my, legal) {
@@ -356,6 +357,7 @@
         return '<li><span>' + esc(t) + (pc.until < 99 ? ' (to the end of round ' + pc.until + ')' : ' (until the age ends)') + '</span></li>';
       }).join('') + '</ul>' : '<p class="muted">None.</p>'));
       if (!mine && hs.intent) out.push('<h3>Plan</h3><p>' + esc(E.intentLabel(s, h, hs.intent)) + '.</p>');
+      if (!mine && hs.then) out.push('<p>' + esc(E.intentLabel(s, h, hs.then).replace(/^([^:]+): /, '$1, then: ')) + '.</p>');
       if (!mine) {
         var mem = s.memory[h] && s.memory[h].player;
         if (mem && (mem.grudge || mem.debt)) out.push('<p class="muted">' + (mem.grudge ? 'Holds a grudge against you (' + mem.grudge + '). ' : '') + (mem.debt ? 'Owes you a debt (' + mem.debt + ').' : '') + '</p>');
@@ -441,6 +443,7 @@
         '<li><span><b>Depart.</b> From the ' + ordinal(N.departFrom) + ' round, hold the Far Pass with enough warbands since the start of your turn and carry the relics it needs, then depart.</span></li>' +
         '<li><span><b>Seat.</b> If the age ends with no other winner, the house holding the Crown hold wins.</span></li></ul>' +
         '<h3>Your turn</h3><p>You get moons each turn to spend on actions. March (1 moon), muster (1 moon and silver), assault (2 moons), recruit, search and treat. Tap a region to see what you can do there.</p>' +
+        '<h3>The first round</h3><p>No assaults in the first round. You may march only into your own regions, or into a region no one holds or guards.</p>' +
         '<h3>The age ends</h3><p>After round ' + N.lastRound + ' at the latest. After round ' + N.endDraws[0].round + ' there is a 1 in ' + N.endDraws[0].of + ' chance it ends early.</p>';
     });
   };

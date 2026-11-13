@@ -133,7 +133,7 @@
   }
 
   // an arrow cut from one region toward another, in a house colour
-  function arrow(from, to, col, dashed, label, h, wide) {
+  function arrow(from, to, col, dashed, label, h, wide, revised) {
     var p = from === 'camp' ? [CAMP[0], CAMP[1], 10] : POS[from], q = POS[to];
     if (!p || !q) return '';
     var dx = q[0] - p[0], dy = q[1] - p[1], len = Math.sqrt(dx * dx + dy * dy), ux = dx / len, uy = dy / len;
@@ -151,27 +151,39 @@
     var mx = (x1 + 2 * cx + x2) / 4, my = (y1 + 2 * cy + y2) / 4;
     if (h) out += stampAt(h, mx, my, 16);
     if (label != null) out += '<circle cx="' + f1(mx + 11) + '" cy="' + f1(my + 7) + '" r="7.5" fill="' + P.paper + '" stroke="' + P.ink + '" stroke-width="1.6"/><text x="' + f1(mx + 11) + '" y="' + f1(my + 10.6) + '" text-anchor="middle" class="tiny b">' + label + '</text>';
+    if (revised) out += newPlan(mx - 12, my - 12);
     return out + '</g>';
   }
+  // a small '!' tag on an intent its house has just changed
+  function newPlan(x, y) {
+    return '<g class="newplan"><title>New plan</title><circle cx="' + f1(x) + '" cy="' + f1(y) + '" r="7.5" fill="' + P.paper + '" stroke="' + P.ink + '" stroke-width="1.8"/>' +
+      '<text x="' + f1(x) + '" y="' + f1(y + 4) + '" text-anchor="middle" class="tiny b">!</text></g>';
+  }
   // a marker for an intent that stays in one region (muster, search, return, depart)
-  function marker(r, h, glyph, second) {
+  function marker(r, h, glyph, second, revised) {
     var p = r === 'camp' ? [CAMP[0], CAMP[1], 14] : POS[r];
     if (!p) return '';
-    var x = p[0] + p[2] * 0.62, y = p[1] - p[2] * 0.25 + (second ? 20 : 0);
+    var x = p[0] + p[2] * 0.62, y = p[1] - p[2] * 0.25 + (second ? 20 * second : 0);
     return '<g class="mark"><circle cx="' + f1(x + 1.4) + '" cy="' + f1(y + 1.2) + '" r="11" fill="' + A.houseCol(h) + '"/>' +
       '<circle cx="' + f1(x) + '" cy="' + f1(y) + '" r="11" fill="none" stroke="' + P.ink + '" stroke-width="2"' + (second ? ' stroke-dasharray="4 3"' : '') + '/>' +
-      '<text x="' + f1(x) + '" y="' + f1(y + 4.5) + '" text-anchor="middle" class="mk" fill="' + A.textOn(A.houseCol(h)) + '">' + glyph + '</text></g>';
+      '<text x="' + f1(x) + '" y="' + f1(y + 4.5) + '" text-anchor="middle" class="mk" fill="' + A.textOn(A.houseCol(h)) + '">' + glyph + '</text>' +
+      (revised ? newPlan(x + 11, y - 10) : '') + '</g>';
   }
+  // a later move (a second move, or one the Owl shows) is drawn dashed and dimmer
   function intentMark(s, h, it, second) {
+    var m = intentMark1(s, h, it, second);
+    return m && second ? '<g class="later" opacity="0.6"><title>Then</title>' + m + '</g>' : m;
+  }
+  function intentMark1(s, h, it, second) {
     if (!it) return '';
-    var col = A.houseCol(h);
+    var col = A.houseCol(h), rv = !!it.revised;
     switch (it.type) {
-      case 'assault': return arrow(it.from, it.to, col, second, it.count, h);
-      case 'march': return arrow(it.from, it.to, col, true, it.count, h);
-      case 'muster': return marker(it.region, h, '+', second);
-      case 'search': return marker(it.region, h, '?', second);
-      case 'return': return marker(it.region, h, '↵', second);
-      case 'depart': return marker('farpass', h, '↑', second);
+      case 'assault': return arrow(it.from, it.to, col, second, it.count, h, false, rv);
+      case 'march': return arrow(it.from, it.to, col, true, it.count, h, false, rv);
+      case 'muster': return marker(it.region, h, '+', second, rv);
+      case 'search': return marker(it.region, h, '?', second, rv);
+      case 'return': return marker(it.region, h, '↵', second, rv);
+      case 'depart': return marker('farpass', h, '↑', second, rv);
     }
     return '';
   }

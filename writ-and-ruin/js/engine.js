@@ -122,13 +122,14 @@
       case 4: P.need = D.PROPHECIES[3].need; P.have = Math.min(P.need, hs.attackWins); break;
       case 5: P.need = 4; n = D.CROWN_NEIGHBOURS.filter(function (r) { return holds(s, h, r); }).length;
         P.have = holds(s, h, 'crown') ? Math.min(n, 3) : n; break;
-      case 6: P.need = 6; P.have = Math.min(6, income(s, h)); break;
-      case 7: P.need = 4; var suits = {};
+      case 6: P.need = D.PROPHECIES[5].need; P.have = Math.min(P.need, income(s, h)); break;
+      case 7: var suits = {};
         hs.retinue.forEach(function (c) { suits[CARDS[c].suit] = 1; });
-        P.have = Math.min(3, Object.keys(suits).length) + (holds(s, h, 'ashwood') ? 1 : 0); break;
+        P.need = D.PROPHECIES[6].need;
+        P.have = Math.min(3, Object.keys(suits).length) + (holds(s, h, 'ashwood') ? 1 : 0) + (holds(s, h, 'highpasture') ? 1 : 0); break;
       case 8: var fp = holds(s, h, 'farpass'), hp = holds(s, h, 'highpasture');
         P.have = (fp ? 1 : 0) + (hp ? 1 : 0) + (fp && hp && bandsAt(s, h, 'farpass') + bandsAt(s, h, 'highpasture') >= 6 ? 1 : 0); break;
-      case 9: P.need = 4; P.have = hs.broke ? 0 : Math.min(4, nHeld(s, h)); break;
+      case 9: P.need = D.PROPHECIES[8].need; P.have = hs.broke ? 0 : Math.min(P.need, nHeld(s, h)); break;
       case 10: P.need = 2; P.have = (hs.tookCrown ? 1 : 0) + (hs.tookCrown && holds(s, h, 'riverford') ? 1 : 0); break;
     }
     P.met = P.have >= P.need;
@@ -244,10 +245,21 @@
     var g = s.regions[r];
     return !!(g && g.owner && g.owner !== h && s.houses[g.owner].refuge === r);
   }
+  // the truce of the first round: no assaults, and a march goes only into your own region or one no one holds or guards.
+  // A plan is judged by the round its house will make it in (planRound, set by the AI).
+  // Returns the reason, or null once the truce is over.
+  function truce(s) {
+    var r = s.planRound || s.round;
+    if (r <= N.truceRounds) return 'the truce';
+    if (r <= N.truceRounds + 1 && law(s, 'longPeace')) return 'the Long Peace';
+    return null;
+  }
   function enterMode(s, h, r) {
     var g = s.regions[r];
     if (g.owner === h) return 'own';
     if (sheltered(s, h, r)) return null;
+    // during the truce a march goes only into a region no one holds or guards (no Hermit, no smuggling)
+    if (truce(s)) return !g.owner && emptyOfOthers(s, h, r) ? 'empty' : null;
     if (emptyOfOthers(s, h, r)) return 'empty';
     if (!g.owner && g.folk > 0 && !othersPresent(s, h, r) && has(s, h, 'antleredHermit')) return 'hermit';
     if (g.owner && (g.bands[g.owner] || 0) <= 1 && has(s, h, 'smugglerQueen')) return 'smuggle';
@@ -382,6 +394,17 @@
     if (r === 'crown') s.history.crown.push({ house: h, round: s.round, how: how });
   }
 
+  // no unannounced moves on you: a rival may march into or assault your region only as a plan it showed when you ended your turn
+  function warnedFor(s, h, r) {
+    if (h === 'player' || s._planning || !s.regions[r] || s.regions[r].owner !== 'player') return true;
+    return (s.houses[h].warned || []).indexOf(r) >= 0;
+  }
+  function useWarned(s, h, r) {
+    var w = s.houses[h].warned, i = w ? w.indexOf(r) : -1;
+    if (i >= 0) w.splice(i, 1);
+  }
+  function warnedBy(it) { return it && (it.type === 'assault' || it.type === 'march') && it.to ? [it.to] : []; }
+
   // ---------------------------------------------------------------- validation
   function err(m) { return m; }
   function check(s, a, opts) {
@@ -428,7 +451,9 @@
         var have = a.from === 'camp' ? hs.camp || 0 : bandsAt(s, h, a.from);
         if (!(a.count >= 1 && a.count <= have)) return err('not enough warbands');
         var ok = marchDests(s, h, a.from).filter(function (d) { return d.to === a.to; })[0];
+        if (!ok && s.regions[a.to].owner && s.regions[a.to].owner !== h && truce(s)) return err(truce(s) + ': held');
         if (!ok) return err('cannot march there');
+        if (!warnedFor(s, h, a.to)) return err('not its declared plan');
         if (!marchFree(s, h, a.from) && hours < 1) return err('no hours');
         if (law(s, 'tolls') && !holds(s, h, a.to) && hs.silver < 1 && !opts.ignoreHours) return err('no silver for the toll');
         return null;
@@ -443,12 +468,14 @@
       case 'assault': {
         var camp = a.from === 'camp';
         if ((!camp && !s.regions[a.from]) || !s.regions[a.to]) return err('no such region');
-        if (s.round === 1 && law(s, 'longPeace')) return err('the Long Peace');
+        if (truce(s)) return err(truce(s));
         if (!adjacent(a.from, a.to)) return err('not neighbours');
         if (!(a.count >= 1 && a.count <= (camp ? hs.camp || 0 : bandsAt(s, h, a.from)))) return err('not enough warbands');
         if (holds(s, h, a.to)) return err('already yours');
         if (sheltered(s, h, a.to)) return err('newly returned: safe until their turn');
         if (emptyOfOthers(s, h, a.to)) return err('empty: march instead');
+        // no unannounced assaults on you: a rival may assault your region only as the plan it showed when you ended your turn
+        if (!warnedFor(s, h, a.to)) return err('not its declared plan');
         if (hours < assaultHours(s, h, a.to)) return err('no hours');
         return null;
       }
@@ -606,8 +633,15 @@
         }
         break;
       case 'end':
+        hs.then = a.then || null;
         if (a.intent) { hs.intent = a.intent; hs.intent2 = a.intent2 || null; ev.push({ type: 'intent', house: h, intent: a.intent, label: intentLabel(s, h, a.intent) }); }
-        else { hs.intent = null; hs.intent2 = null; }
+        else { hs.intent = null; hs.intent2 = null; hs.then = null; }
+        // the plans the player has seen: the only moves on the player's regions allowed before the player's next turn
+        if (h === 'player') s.order.forEach(function (k) {
+          if (k === h) return;
+          var ks = s.houses[k];
+          ks.warned = warnedBy(ks.intent); ks.warned2 = warnedBy(ks.then);
+        });
         if (s.round >= N.claimFrom && nHeld(s, h) >= N.seizeRegions) { ev.push({ type: 'seize', house: h }); endAge(s, h, 'seize', ev); break; }
         endTurn(s, ev); break;
       case 'march': doMarch(s, a, ev); break;
@@ -699,6 +733,7 @@
     if (a.from === 'camp') hs.camp -= a.count;
     else { var src = s.regions[a.from]; src.bands[h] -= a.count; if (!src.bands[h]) delete src.bands[h]; }
     var prev = dst.owner;
+    if (prev === 'player') useWarned(s, h, a.to);
     dst.bands[h] = (dst.bands[h] || 0) + a.count;
     if (mode === 'empty' || mode === 'hermit') { setOwner(s, a.to, h, 'march'); dst.folk = 0; }
     if (a.from !== 'camp') settle(s, a.from);
@@ -712,6 +747,7 @@
     if (has(s, h, 'bannerClerk') && !hs.flags.clerk) hs.flags.clerk = true;
     hs.hours -= hrs;
     var g = s.regions[to], d = g.owner;
+    if (d === 'player') useWarned(s, h, to);   // the declared move, used once
     breakPacts(s, h, d, from, ev);
     var camp = from === 'camp';
     // warbands leave the source: a region, or the Far Pass camp
@@ -906,6 +942,8 @@
     var h = s.order[s.turn];
     if (s.houses[h].camp) { ev.push({ type: 'campBroken', house: h, count: s.houses[h].camp }); s.houses[h].camp = 0; }   // the camp breaks up
     ev.push({ type: 'turnEnd', house: h });
+    // a plan made after you ended your turn was never shown to you: only a second move shown then carries over
+    if (h !== 'player') { s.houses[h].warned = s.houses[h].warned2 || null; s.houses[h].warned2 = null; }
     noteClaims(s, null);
     s.turn++;
     if (s.turn >= s.order.length) {
@@ -982,7 +1020,7 @@
     inAge.forEach(function (h) {
       s.houses[h] = { id: h, name: c.houses[h].name, short: c.houses[h].short, temper: c.houses[h].temperament, ai: h !== 'player' || !!opts.allAI, silver: N.startSilver, retinue: [], relics: [],
         prophecy: null, prophecyOptions: [], attackWins: 0, broke: false, brokeKnown: false, tookCrown: false,
-        hours: 0, turns: 0, flags: {}, once: {}, known: {}, intent: null, intent2: null, camp: 0 };
+        hours: 0, turns: 0, flags: {}, once: {}, known: {}, intent: null, intent2: null, then: null, warned: null, warned2: null, camp: 0 };
     });
     IDS.forEach(function (r) {
       var ruined = !!c.world.ruined[r];
@@ -1167,7 +1205,7 @@
     legalActions: legalActions, check: check, applyAction: applyAction, currentHouse: currentHouse,
     // queries for the screen and the AI
     income: income, hoursFor: hoursFor, heldBy: heldBy, nHeld: nHeld, bandsAt: bandsAt, totalBands: totalBands,
-    has: has, hasAt: hasAt, holds: holds, adjacent: adjacent, slotsOf: slotsOf, siteOn: siteOn, law: law,
+    has: has, hasAt: hasAt, holds: holds, adjacent: adjacent, slotsOf: slotsOf, siteOn: siteOn, law: law, truce: truce,
     prophecyProgress: prophecyProgress, progress: progress, threat: threat, checkVictory: checkVictory, claimStanding: claimStanding, departNeeds: departNeeds,
     endChances: endChances, fortuneLeft: fortuneLeft, peekFortune: peekFortune,
     battlePreview: battlePreview, attackBonus: attackBonus, defenceOf: defenceOf, lastStand: lastStand, returnSpots: returnSpots,

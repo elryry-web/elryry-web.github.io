@@ -52,7 +52,10 @@
     'once per turn': 'You have already treated this turn.',
     'newly returned: safe until their turn': 'That house has just returned there. It is safe until its next turn.',
     'empty: march instead': 'No one defends it: march in instead.',
-    'the Long Peace': 'The Long Peace: no assaults in the first round.',
+    'the truce': 'No assaults in the first round.',
+    'the truce: held': 'No one may take a held region in the first round.',
+    'the Long Peace': 'The Long Peace: no assaults in the second round either.',
+    'the Long Peace: held': 'The Long Peace: no one may take a held region in the second round either.',
     'already yours': 'You already hold it.',
     'not neighbours': 'Those regions are not neighbours.',
     'cannot march there': 'You cannot march there: it is held or guarded. Assault it instead.',
@@ -168,7 +171,8 @@
       case 'depart': return W + ' departed by the Far Pass.';
       case 'poison': return W + ' poisoned ' + cardName(ev.card) + '.';
       case 'seeProphecy': return h === 'player' ? 'The Bell Seer read ' + whoLow(ev.target, s) + "'s prophecy: “" + D.PROPHECIES[ev.prophecy - 1].text + '”' : W + ' read ' + whoLow(ev.target, s) + "'s prophecy.";
-      case 'intent': return 'Plan: ' + ev.label.replace(/^[^:]+: /, W + ' means to ') + '.';
+      case 'intent': return 'Plan: ' + planWords(ev.label, W) + '.';
+      case 'intentRevised': return (ev.then ? 'New second move: ' : 'New plan: ') + planWords(ev.label, W) + '.';
       case 'intentChanged':
         if (ev.note === 'nearest') return W + ' could not keep to its plan and did the nearest thing.';
         if (ev.note === 'dropped') return W + ' dropped its plan (' + ev.label.replace(/^[^:]+: /, '') + ').';
@@ -180,6 +184,8 @@
     }
     return null;
   }
+  // 'Varrow: assault Saltmarsh with 4' -> 'Varrow means to assault Saltmarsh with 4'
+  function planWords(label, W) { return label.replace(/^[^:]+: /, W + ' means to ').replace(' means to returns at ', ' means to return at '); }
   // events into the log, map flashes and reports
   function take(ev) {
     var s = age();
@@ -282,6 +288,7 @@
   // the player must act: the right prompt for the moment
   function playerUp() {
     var s = age(), hs = me(s), P = s.pending;
+    if (AI.ahead(s)) save();   // rivals show the moves they will make before your next turn
     if (U.reports.length) { U.showReports(function () { playerUp(); }); return; }
     if (s.phase === 'prophecy') { render(); U.prophecyDialog(); return; }
     if (P && P.type === 'offer' && P.to === 'player') { render(); U.offerDialog(); return; }
@@ -300,7 +307,9 @@
     a.house = 'player';
     var m = E.check(s, a);
     if (m) { toast(plain(m)); return false; }
+    var before = AI.snapshot(s);
     var ev = E.applyAction(s, a);
+    ev = ev.concat(AI.replan(s, 'player', before));   // rivals whose plans you just upset declare new ones
     take(ev); save();
     closeSheet();
     U.mode = null; U.selected = null;
@@ -369,7 +378,8 @@
       var hs = s.houses[h];
       if (!hs.ai) return;
       if (hs.intent) out.push({ house: h, intent: hs.intent });
-      if (owl && hs.intent2) out.push({ house: h, intent: hs.intent2, second: true });
+      if (hs.then) out.push({ house: h, intent: hs.then, second: 1 });
+      if (owl && hs.intent2) out.push({ house: h, intent: hs.intent2, second: hs.then ? 2 : 1, owl: true });
     });
     return out;
   }
@@ -417,9 +427,16 @@
       var mine = h === 'player';
       var wait = cs.waiting.map(function (k) { return whoLow(k, s); });
       var how = cs.kind === 'seize' ? 'holds six regions' : 'has fulfilled ' + (mine ? 'your' : 'its') + ' prophecy';
-      rows.push('<li class="claim' + (mine ? ' good' : '') + '">' + stamp(h, 18) + '<span><b>' + who(h, s) + '</b> ' + (mine ? how.replace('holds', 'hold').replace('has', 'have') : how) +
-        (s.round >= N.claimFrom ? '. ' + (wait.length ? 'Wins at the start of ' + (mine ? 'your' : 'its') + ' next turn unless ' + listAnd(wait) + ' break' + (wait.length === 1 && wait[0] !== 'you' ? 's' : '') + ' it.' : 'Wins at the start of ' + (mine ? 'your' : 'its') + ' next turn.') :
-          '. Claims count from the ' + D.ORDINALS[N.claimFrom - 1] + ' round.') + '</span></li>');
+      var text;
+      if (s.round >= N.claimFrom) {
+        text = (mine ? how.replace('holds', 'hold').replace('has', 'have') : how) + '. ' +
+          (wait.length ? 'Wins at the start of ' + (mine ? 'your' : 'its') + ' next turn unless ' + listAnd(wait) + ' break' + (wait.length === 1 && wait[0] !== 'you' ? 's' : '') + ' it.' : 'Wins at the start of ' + (mine ? 'your' : 'its') + ' next turn.');
+      } else {
+        // too early to win: say what stands now and when it starts to count
+        text = (cs.kind === 'seize' ? (mine ? 'hold ' : 'holds ') + D.NUMBER_WORDS[N.seizeRegions] + ' regions now.' : (mine ? 'meet your' : 'meets its') + ' prophecy now.') +
+          ' ' + (mine ? 'You' : 'It') + ' can win from the ' + D.ROUND_WORDS[N.claimFrom - 1] + ' round if ' + (mine ? 'you still do.' : 'it still does.');
+      }
+      rows.push('<li class="claim' + (mine ? ' good' : '') + '">' + stamp(h, 18) + '<span><b>' + who(h, s) + '</b> ' + text + '</span></li>');
     });
     var dz = [];
     try { dz = AI.dangers(s, 'player'); } catch (e) { dz = []; }
@@ -433,11 +450,16 @@
     if (!rows.length) rows.push('<li class="muted">No house is close to winning yet.</li>');
     return '<section class="panel danger"><h3>Who is close to winning</h3><ul class="rows">' + rows.join('') + '</ul></section>';
   }
+  // "Varrow: march 2 to Saltmarsh", or for a later move "Varrow, then: march 2 to Saltmarsh"
+  function planLabel(s, x) {
+    var l = E.intentLabel(s, x.house, x.intent);
+    return x.second ? l.replace(/^([^:]+): /, '$1, then: ') : l;
+  }
   function intentPanel(s) {
     var it = intents(s);
     if (!it.length) return '';
     return '<section class="panel"><h3>Rival plans</h3><ul class="rows">' + it.map(function (x) {
-      return '<li>' + stamp(x.house, 18) + '<span>' + esc(E.intentLabel(s, x.house, x.intent)) + (x.second ? ' <em>(second plan, from the Owl)</em>' : '') + '</span></li>';
+      return '<li>' + stamp(x.house, 18) + '<span>' + (x.intent.revised ? '<b class="newplan">New plan.</b> ' : '') + esc(planLabel(s, x)) + (x.owl ? ' <em>(seen by the Owl)</em>' : '') + '</span></li>';
     }).join('') + '</ul></section>';
   }
   function retinuePanel(s) {
@@ -483,7 +505,8 @@
         recruit: 'Choose a region with a resident to recruit.', search: 'Choose a region to search.' }[U.mode.kind] || '';
       return '<div class="hint pickhint"><span>' + words + '</span>' + btn('Cancel', function () { U.mode = null; render(); }, { cls: 'small' }) + '</div>';
     }
-    return '<div class="hint mine"><span><b>Your turn.</b> ' + plural(hs.hours, 'moon') + ' left, ' + hs.silver + ' silver. Tap a region for its actions.</span></div>';
+    return '<div class="hint mine"><span><b>Your turn.</b> ' + plural(hs.hours, 'moon') + ' left, ' + hs.silver + ' silver. Tap a region for its actions.' +
+      (E.truce(s) ? ' ' + plain(E.truce(s)) : '') + '</span></div>';
   }
 
   var BAR = [['march', 'March'], ['muster', 'Muster'], ['assault', 'Assault'], ['recruit', 'Recruit'], ['search', 'Search'], ['treat', 'Treat'], ['depart', 'Depart']];
@@ -497,7 +520,7 @@
       return 'You already have every pact you could offer.';
     }
     if (kind === 'depart') return E.check(s, { type: 'depart', house: 'player' }) || 'You cannot depart now.';
-    if (kind === 'assault' && s.round === 1 && E.law(s, 'longPeace')) return 'the Long Peace';
+    if (kind === 'assault' && E.truce(s)) return E.truce(s);
     if (hs.hours < 1 && kind !== 'march') return 'no hours';
     if (kind === 'march') return hs.hours < 1 ? 'no hours' : 'None of your warbands can march anywhere.';
     if (kind === 'muster') return 'not enough silver';

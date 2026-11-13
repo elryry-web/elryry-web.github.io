@@ -60,7 +60,7 @@
     { id: 'antleredHermit', name: 'Antlered Hermit', suit: 'Wild', cost: 2, text: 'Free folk never fight you.' },
     { id: 'heronWitch', name: 'Heron Witch', suit: 'Wild', cost: 3, text: 'Once per age, discard the fortune card you turned and turn another.' },
     { id: 'oldBoar', name: 'The Old Boar', suit: 'Wild', cost: 3, text: '+2 attack when assaulting an unheld region.' },
-    { id: 'owl', name: 'Owl of Ashwood', suit: 'Wild', cost: 2, text: 'See the next intent of every rival one turn early.' },
+    { id: 'owl', name: 'Owl of Ashwood', suit: 'Wild', cost: 2, text: 'See one more move ahead for every rival.' },
     { id: 'fenLantern', name: 'Fen Lantern', suit: 'Wild', cost: 2, text: 'Search in Old Barrow or Saltmarsh draws 2 more.' },
     { id: 'cutpurse', name: 'Cutpurse', suit: 'Shade', cost: 1, text: 'When you win a battle, take 1 silver from the loser.' },
     { id: 'whisperer', name: 'Whisperer', suit: 'Shade', cost: 2, text: 'Treat costs 0 moons.' },
@@ -111,10 +111,10 @@
     { id: 3, text: 'Hold 2 relics and Stonefields.', need: 3 },
     { id: 4, text: 'Win 5 battles against houses as attacker this age.', need: 5 },
     { id: 5, text: 'Hold every region that neighbours the Crown hold, but not the Crown hold.', need: 4 },
-    { id: 6, text: 'Have 6 income or more.', need: 6 },
-    { id: 7, text: 'Have residents of 3 different suits in your retinue and hold Ashwood.', need: 4 },
+    { id: 6, text: 'Have 8 income or more.', need: 8 },
+    { id: 7, text: 'Have residents of 3 different suits in your retinue and hold Ashwood and High Pasture.', need: 5 },
     { id: 8, text: 'Hold the Far Pass and High Pasture with 6 warbands between them.', need: 3 },
-    { id: 9, text: 'Have no pact broken this age, and hold 4 regions.', need: 4 },
+    { id: 9, text: 'Have no pact broken this age, and hold 5 regions.', need: 5 },
     { id: 10, text: 'Take the Crown hold from its holder by assault, then hold Riverford too.', need: 2 }
   ];
 
@@ -122,7 +122,7 @@
   // tags: which ways of winning an age draw this law into the Reckoning's offer.
   var LAWS = [
     { id: 'tolls', name: 'Tolls', text: "Marching into a region you don't hold costs 1 silver.", tags: ['seize', 'seat'] },
-    { id: 'longPeace', name: 'The Long Peace', text: 'No assaults in round 1.', tags: ['seat', 'foretell'] },
+    { id: 'longPeace', name: 'The Long Peace', text: 'No assaults in round 2 either.', tags: ['seat', 'foretell'] },
     { id: 'openRoads', name: 'Open Roads', text: 'Depart needs only 3 warbands.', tags: ['depart'] },
     { id: 'levy', name: 'Levy', text: 'Muster places 1 more warband.', tags: ['seize'] },
     { id: 'charter', name: 'Free Folk Charter', text: 'Free folk guard every unheld region with 2.', tags: ['seat', 'depart'] },
@@ -175,6 +175,8 @@
     freeHoldBands: 2,
     folk: 1, folkCrown: 2,
     claimFrom: 6, rotate: 1,
+    // the truce lasts this many rounds: no assaults, and no taking a held region (the Long Peace adds one round)
+    truceRounds: 1,
     // the Waystone opens for departing in this round
     departFrom: 7,
     // last stand: defence bonus for a house defending the only region it holds

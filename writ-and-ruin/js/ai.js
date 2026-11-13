@@ -26,6 +26,11 @@
     wild: { win: { seize: 7, foretell: 7, depart: 4, seat: 4 }, suit: { Wild: 1.4 }, bands: 0.6, silver: 0.2, risk: 0.4, breakCost: 2, fight: 0.4, search: 0.8, truce: -0.5, threatW: 11, folk: 0.8, weakest: 0.5 },
     player: { win: { seize: 7, foretell: 7, depart: 6, seat: 7 }, suit: {}, bands: 0.6, silver: 0.25, risk: 0.5, breakCost: 2, fight: 0.2, search: 1, truce: 0.5, threatW: 12 }
   };
+  // the move a rival shows is the only one that may touch the player's regions, so rivals lean toward the player:
+  // player: a bonus on a shown assault or march into a player region;
+  // threat: how much more a rival fears the player's progress than another rival's.
+  // Tune both with the sim's player-seat win rate (target 25-30%).
+  var AIM = { player: 4, threat: 2 };
   function tem(s, h) { var hs = s.houses[h]; return T[hs.temper || 'player']; }
   function temperOf(c, h) { return c.houses[h].temperament; }
 
@@ -233,6 +238,7 @@
       if (o === h) return;
       var q = E.progress(s, o), m = Math.max(q.seize, q.foretell, q.depart * 0.9, q.seat);
       if (wins(q)) m = 1.25;
+      if (o === 'player') m *= AIM.threat;
       sum += m; if (m > lead) lead = m;
     });
     v -= phase * (t.threatW * lead * lead * lead + 1.5 * sum);
@@ -475,20 +481,34 @@
     return best || { type: 'end', house: h };
   }
 
-  function planIntent(s, h) {
-    var c = E.clone(s), hs = c.houses[h];
+  // a copy of s set up as the start of h's next turn, for planning; assaults on the player are not yet barred here
+  function planState(s, h) {
+    var c = E.clone(s), hs = c.houses[h], base = s.planRound || s.round;
+    // the round h's next turn falls in, so the plan obeys the rules of that round (the first-round truce)
+    c.planRound = s.order.indexOf(h) > s.turn ? base : base + 1;
+    c.turn = c.order.indexOf(h); c.pending = null; c._planning = true;
     hs.flags = {}; hs.hours = 9;
-    if (!E.nHeld(c, h)) {
-      hs.flags.returnDue = true;
+    if (!E.nHeld(c, h)) hs.flags.returnDue = true;
+    return c;
+  }
+  function planIntent(s, h, opts) {
+    var c = planState(s, h), hs = c.houses[h];
+    if (hs.flags.returnDue) {
       var ra = returnChoice(c, h);
       return { intent: ra.type === 'return' ? { type: 'return', region: ra.region } : { type: 'hold' }, intent2: null };
     }
-    var list = E.legalActions(c, h, { few: true }).filter(function (a) { return a.type === 'assault' || a.type === 'march' || a.type === 'muster' || a.type === 'depart'; });
+    // a move on the player's regions must be shown during the player's turn: plan one only if the player moves before h does
+    var warnable = (opts && opts.warnable) || h === 'player' || s.order[s.turn] === 'player' || movesBefore(s, h).indexOf('player') >= 0;
+    var list = E.legalActions(c, h, { few: true }).filter(function (a) {
+      if ((a.type === 'assault' || a.type === 'march') && !warnable && c.regions[a.to].owner === 'player') return false;
+      return a.type === 'assault' || a.type === 'march' || a.type === 'muster' || a.type === 'depart';
+    });
     setGuess(c, h);
     var base = evaluate(c, h), scored = [];
     list.forEach(function (a) {
       var v;
       try { v = actionValue(c, h, a, base); } catch (e) { return; }
+      if (h !== 'player' && (a.type === 'assault' || a.type === 'march') && c.regions[a.to].owner === 'player') v += AIM.player;
       scored.push({ a: a, v: v });
     });
     scored.sort(function (x, y) { return y.v - x.v; });
@@ -514,6 +534,139 @@
       return o;
     }
     return { intent: why(strip(first), first), intent2: why(strip(second), second) };
+  }
+
+  // ---------------------------------------------------------------- re-planning when the player's action changes the board
+  function onPlayer(s, it) { return !!(it && (it.type === 'assault' || it.type === 'march') && s.regions[it.to] && s.regions[it.to].owner === 'player'); }
+  // the player's claim or Departure that stands now ('' if none)
+  function playerThreat(s) {
+    if (!s.houses.player) return '';
+    var cs = E.claimStanding(s, 'player'), dn = E.departNeeds(s, 'player');
+    var dep = E.siteOn(s, 'farpass') && E.holds(s, 'player', 'farpass') && E.bandsAt(s, 'player', 'farpass') >= dn.bands && s.houses.player.relics.length >= dn.relics;
+    return (cs ? cs.kind : '') + (dep ? ' depart' : '');
+  }
+  // the board as it stands, to compare after the player acts
+  function snapshot(s) {
+    var o = {};
+    IDS.forEach(function (r) { var g = s.regions[r]; o[r] = { owner: g.owner, bands: JSON.stringify(g.bands) }; });
+    o._threat = playerThreat(s);
+    return o;
+  }
+  function sameIntent(a, b) {
+    if (!a || !b) return !a === !b;
+    return a.type === b.type && a.from === b.from && a.to === b.to && a.count === b.count && a.region === b.region;
+  }
+  function toAction(it, h) { return { type: it.type, house: h, from: it.from, to: it.to, count: it.count, region: it.region }; }
+  // an intent the player's action made illegal or pointless: a region it names changed hands, or it can no longer be done.
+  // later: a move after the next one, judged only by the regions it names
+  function intentStale(s, h, it, before, later) {
+    if (!it || it.type === 'hold') return false;
+    if (it.type === 'depart') return !later && !E.holds(s, h, 'farpass');
+    var regs = [it.from, it.to, it.region].filter(function (r) { return r && before[r]; });
+    if (regs.some(function (r) { return before[r].owner !== s.regions[r].owner; })) return true;
+    if (later || ['assault', 'march', 'muster', 'return'].indexOf(it.type) < 0) return false;
+    return !!E.check(planState(s, h), toAction(it, h), { ignoreHours: true });
+  }
+  // a declared move that can still be made at the start of h's next turn
+  function stillGood(s, h, it) {
+    if (!it || it.type === 'hold') return !!it;
+    if (it.type === 'depart') return E.holds(s, h, 'farpass');
+    return !E.check(planState(s, h), toAction(it, h), { ignoreHours: true });
+  }
+
+  // ---------------------------------------------------------------- plans further ahead
+  // the board for planning h's following turn once intent it is carried out (a battle goes its likelier way)
+  function afterMove(s, h, it) {
+    var c = planState(s, h);
+    c._sim = true;
+    if (it && it.type !== 'hold') {
+      var a = toAction(it, h);
+      if (!E.check(c, a)) {
+        if (a.type === 'assault') { var o = odds(c, a); a._cards = o.p >= 0.5 ? [o.winDiff - o.base, 0] : [-o.loseDiff - o.base, 0]; }
+        try { E.applyAction(c, a); } catch (e) { /* plan from the board as it was */ }
+      }
+    }
+    c.pending = null;
+    return c;
+  }
+  // how many turns h starts before the player's next turn (asked during the player's turn)
+  function turnsBeforePlayer(s, h) {
+    return movesBefore(s, 'player').filter(function (k) { return k === h; }).length;
+  }
+  // the moves h shows past its next one: a second move if it moves twice before the player's next turn,
+  // and with the Owl one move more
+  function aheadPlans(s, h, first) {
+    var n = turnsBeforePlayer(s, h), shown = Math.max(1, n), owl = E.has(s, 'player', 'owl'), want = shown + (owl ? 1 : 0);
+    var plans = [first], c = s;
+    while (plans.length < want) {
+      var prev = plans[plans.length - 1];
+      if (prev && prev.type === 'depart') break;
+      c = afterMove(c, h, prev);
+      if (c.phase !== 'play') break;
+      plans.push(planIntent(c, h, { warnable: true }).intent);
+    }
+    return { then: n >= 2 ? plans[1] || null : null, intent2: owl ? plans[shown] || null : null };
+  }
+  // at the start of the player's turn: every rival shows the moves it will make before the player's next turn
+  function ahead(s) {
+    if (s.phase !== 'play' || s.order[s.turn] !== 'player') return false;
+    var key = s.round + ':' + s.houses.player.turns;
+    if (s._ahead === key) return false;
+    s._ahead = key;
+    s.order.forEach(function (h) {
+      if (h === 'player') return;
+      var hs = s.houses[h], p = aheadPlans(s, h, hs.intent);
+      hs.then = p.then; hs.intent2 = p.intent2;
+    });
+    return true;
+  }
+  // the intent a rival declares as it ends its turn: a second move it already showed, or the Owl's move, if still good
+  function nextIntent(s, h) {
+    var hs = s.houses[h];
+    if (hs.then) {
+      var th = hs.then;
+      if (stillGood(s, h, th)) { delete th.revised; return { intent: th, intent2: hs.intent2 }; }
+      hs.warned2 = null;   // its first move spoilt the second: the fallback may not touch the player's regions
+      return { intent: planIntent(s, h).intent, intent2: null };
+    }
+    if (hs.intent2 && stillGood(s, h, hs.intent2)) { var i2 = hs.intent2; delete i2.revised; return { intent: i2, intent2: null }; }
+    return { intent: planIntent(s, h).intent, intent2: null };
+  }
+
+  // after an action by the player: each rival that lost a region, or whose plan no longer works, declares again
+  function replan(s, mover, before) {
+    var ev = [];
+    if (mover !== 'player' || s.phase !== 'play' || s.order[s.turn] !== mover) return ev;
+    var moved = IDS.some(function (r) { var g = s.regions[r]; return before[r].owner !== g.owner || before[r].bands !== JSON.stringify(g.bands); });
+    if (!moved) return ev;
+    // a claim or Departure of the player's that now stands: every rival plans again to break it (and shows it)
+    var threat = playerThreat(s), fresh = threat && threat !== before._threat;
+    s.order.forEach(function (h) {
+      if (h === mover) return;
+      var hs = s.houses[h];
+      var lost = IDS.some(function (r) { return before[r].owner === h && s.regions[r].owner !== h; });
+      var stale1 = lost || fresh || intentStale(s, h, hs.intent, before), plan = null;
+      // the player's action opened a better move against the player (a region left weak, a claim to break): show it now
+      if (!stale1) { plan = planIntent(s, h); stale1 = onPlayer(s, plan.intent) && !sameIntent(plan.intent, hs.intent); }
+      if (!stale1 && !intentStale(s, h, hs.then, before, true) && !intentStale(s, h, hs.intent2, before, true)) return;
+      if (stale1) {
+        plan = plan || planIntent(s, h);
+        if (!sameIntent(plan.intent, hs.intent)) {
+          plan.intent.revised = true; hs.intent = plan.intent;
+          ev.push({ type: 'intentRevised', house: h, intent: hs.intent, label: E.intentLabel(s, h, hs.intent) });
+        }
+      }
+      var p = aheadPlans(s, h, hs.intent);
+      if (!sameIntent(p.then, hs.then)) {
+        if (p.then) { p.then.revised = true; ev.push({ type: 'intentRevised', house: h, then: true, intent: p.then, label: E.intentLabel(s, h, p.then) }); }
+        hs.then = p.then;
+      }
+      if (!sameIntent(p.intent2, hs.intent2)) {
+        if (p.intent2) p.intent2.revised = true;
+        hs.intent2 = p.intent2;
+      }
+    });
+    return ev;
   }
 
   // carry out the declared intent, or the nearest legal thing
@@ -564,7 +717,7 @@
     if (best) return best;
     var tr = hs._acts < 25 ? treatChoice(s, h) : null;
     if (tr) return tr;
-    var plan = planIntent(s, h);
+    var plan = nextIntent(s, h);
     return { type: 'end', house: h, intent: plan.intent, intent2: plan.intent2 };
   }
 
@@ -575,7 +728,7 @@
     while (s.phase !== 'over' && guard++ < 5000) {
       var h = whoActs(s);
       if (!h) break;
-      if (!s.houses[h].ai && !opts.allAI) break;
+      if (!s.houses[h].ai && !opts.allAI) { ahead(s); break; }
       ev = ev.concat(act(s, h));
       if (opts.untilTurnEnd && ev.length && ev[ev.length - 1].type === 'turnStart') break;
     }
@@ -583,6 +736,11 @@
   }
   // one AI decision for house h, with the intent carried out first at the start of a turn
   function act(s, h) {
+    if (h === 'player') ahead(s);
+    var before = h === 'player' ? snapshot(s) : null, ev = act1(s, h);
+    return before ? ev.concat(replan(s, h, before)) : ev;
+  }
+  function act1(s, h) {
     var hs = s.houses[h], ev = [];
     if (s.phase === 'play' && !s.pending && s.order[s.turn] === h && hs._turn !== hs.turns) {
       hs._turn = hs.turns; hs._acts = 0;
@@ -674,8 +832,8 @@
 
   return {
     decide: decide, whoActs: whoActs, run: run, act: act, respond: respond, reckoningChoice: reckoningChoice,
-    evaluate: evaluate, odds: odds, planIntent: planIntent, pactScore: pactScore, chooseProphecy: chooseProphecy,
+    evaluate: evaluate, odds: odds, planIntent: planIntent, snapshot: snapshot, replan: replan, ahead: ahead, pactScore: pactScore, chooseProphecy: chooseProphecy,
     dangers: function (s, h) { setGuess(s, h); return dangers(s, h); },
-    TEMPERAMENTS: T
+    TEMPERAMENTS: T, AIM: AIM
   };
 });
