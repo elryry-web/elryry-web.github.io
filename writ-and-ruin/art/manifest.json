@@ -1,5 +1,13 @@
 {
  "board": "art/board.jpg",
+ "site-ashwood": "art/site-ashwood.jpg",
+ "site-crown": "art/site-crown.jpg",
+ "site-farpass": "art/site-farpass.jpg",
+ "site-highpasture": "art/site-highpasture.jpg",
+ "site-oldbarrow": "art/site-oldbarrow.jpg",
+ "site-riverford": "art/site-riverford.jpg",
+ "site-saltmarsh": "art/site-saltmarsh.jpg",
+ "site-stonefields": "art/site-stonefields.jpg",
  "stamp-ashwood": "art/stamp-ashwood.png",
  "stamp-highpasture": "art/stamp-highpasture.png",
  "stamp-oldbarrow": "art/stamp-oldbarrow.png",

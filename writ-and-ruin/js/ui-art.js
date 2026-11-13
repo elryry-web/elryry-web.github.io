@@ -176,6 +176,8 @@
   }
   function art(slot, opts) {
     var url = paintedUrl(slot);
+    // a site painting is a landscape: squeezed into an icon it reads as mud, so small sites keep the glyph
+    if (url && slot.indexOf('site/') === 0 && opts && opts.size && opts.size < 100) url = null;
     if (url) return '<img class="painted" src="' + url + '" alt=""' + (opts && opts.size ? ' style="width:' + opts.size + 'px;height:auto"' : '') + '>';
     var p = slot.split('/'), kind = p[0], id = p[1];
     if (kind === 'house') return stamp(id, opts && opts.size);

@@ -297,3 +297,20 @@ body.sheet-up { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
 .rkart { display: flex; align-items: center; gap: 10px; }
 .rkart svg { flex: none; }
+/* the Reckoning's build line with the painting: framed like the title painting, the caption beside it or, when narrow, under it */
+.rkart.painted { flex-wrap: wrap; margin: 10px 0; }
+.rkart.painted img { display: block; flex: none; width: 200px; max-width: calc(100% - 4px); height: auto; border: 3px solid var(--ink); box-shadow: 3px 3px 0 var(--ink); }
+.rkart.painted figcaption { flex: 1 1 9em; }
+
+/* a site painting across the top of a region sheet: the title painting's ink frame, cropped wide.
+   The picture sits in an absolute clip box so the sheet's floated close button can sit over its corner
+   (a clipping box in the flow would be pushed aside by the float); the clip also trims the painting's own paper margin. */
+/* (width: 100% is needed: with an auto width the max-height would carry over through the ratio and narrow the banner) */
+.sitebanner { position: relative; margin: 0 0 12px; width: 100%; aspect-ratio: 2.2 / 1; max-height: 220px;
+  border: 4px solid var(--ink); box-shadow: 4px 4px 0 var(--ink); background: var(--bone); }
+.sitebanner .sb-clip { position: absolute; inset: 0; overflow: hidden; }
+.sitebanner img { position: absolute; top: 0; left: -4%; width: 108%; height: 100%; max-width: none; object-fit: cover; display: block; }
+/* not built yet: the structure as a faded proof, with a paper tag */
+.sitebanner.unbuilt img { filter: grayscale(.85) sepia(.3) opacity(.5); }
+.sitetag { position: absolute; left: 8px; bottom: 8px; padding: 1px 8px 2px; font: 1rem/1.2 var(--head); color: var(--ink);
+  background: var(--paper); border: 2px solid var(--ink); box-shadow: 2px 2px 0 var(--ink); transform: rotate(-1.5deg); }

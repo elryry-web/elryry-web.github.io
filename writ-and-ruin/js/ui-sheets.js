@@ -221,11 +221,20 @@
     U.render();
   };
   function cand(a) { a.house = 'player'; return E.check(age(), a); }
+  // Ryan's site painting across the top of a sheet, cropped wide; the % is how far down the subject sits
+  var SITE_FOCUS = { crown: 35, saltmarsh: 55, riverford: 60, ashwood: 70, highpasture: 60, stonefields: 60, oldbarrow: 70, farpass: 35 };
+  function siteBanner(r, built) {
+    var url = A.paintedUrl && A.paintedUrl('site-' + r);
+    if (!url) return '';
+    return '<figure class="sitebanner' + (built ? '' : ' unbuilt') + '"><span class="sb-clip"><img src="' + url + '" alt="' + esc(REG[r].site) +
+      (built ? '' : ', not yet built') + '" loading="lazy" style="object-position:50% ' + (SITE_FOCUS[r] || 50) + '%"></span>' +
+      (built ? '' : '<span class="sitetag">Not yet built</span>') + '</figure>';
+  }
   function regionHtml(r) {
     var s = age(), hs = me(), my = H.isMyTurn(s), legal = H.legalNow(s), mode = U.mode && U.mode.kind;
     if (r === 'camp') return campHtml(s, hs, my, legal);
     var g = s.regions[r], R = REG[r], owner = g.owner, built = E.siteOn(s, r);
-    var out = [];
+    var out = [siteBanner(r, built)];
     out.push('<header class="rhead"><span class="sitebox' + (built ? '' : ' unbuilt') + '">' + A.art('site/' + r, { size: 40 }) + '</span><div><h2>' + esc(R.name) + '</h2><p class="muted">' +
       (owner ? 'Held by ' + who(owner) : 'Free folk: ' + plural(g.folk, 'band')) + (R.landmark ? ' · a landmark' : built ? '' : ' · undeveloped') + '</p></div></header>');
     out.push('<p class="sitetext"><b>' + esc(R.site) + '.</b> ' + (built ? esc(R.siteText) + (R.landmark ? ' It is a landmark. It always stands.' : ' It works for whoever holds the region.') :
@@ -317,7 +326,7 @@
     return out.join('');
   }
   function campHtml(s, hs, my, legal) {
-    var out = ['<header class="rhead"><span class="sitebox">' + A.art('site/farpass', { size: 40 }) + '</span><div><h2>The camp beyond the Far Pass</h2></div></header>'];
+    var out = [siteBanner('farpass', true) + '<header class="rhead"><span class="sitebox">' + A.art('site/farpass', { size: 40 }) + '</span><div><h2>The camp beyond the Far Pass</h2></div></header>'];
     var campers = s.order.filter(function (h) { return s.houses[h].camp > 0; });
     out.push('<p>A house with no region and nowhere free to return camps here. The camp is next to the Far Pass only, and it breaks up at the end of that house’s turn.</p>');
     out.push('<p class="facts">' + (campers.length ? campers.map(function (h) { return stamp(h, 16) + ' ' + who(h) + ': ' + s.houses[h].camp; }).join('<br>') : 'No one is camped here.') + '</p>');
@@ -552,7 +561,11 @@
       var ch = U.rkAi && U.rkAi.step === o.step ? U.rkAi.choice : null;
       if (!ch) { ch = AI.reckoningChoice(c); U.rkAi = { step: o.step, choice: ch }; }
       out.push('<section class="panel">' + stamp(w, 36) + '<h2>' + STEP_NAME[o.step] + '</h2><p class="bigtext">' + esc(describeAiChoice(c, o, ch)) + '</p>');
-      if (o.step === 'build' && ch && ch.region) out.push('<p class="rkart">' + A.art('site/' + ch.region, { size: 64 }) + '<b>' + esc(REG[ch.region].site) + '</b> at ' + rn(ch.region) + '</p>');
+      if (o.step === 'build' && ch && ch.region) {
+        var rkUrl = A.paintedUrl && A.paintedUrl('site-' + ch.region), rkCap = '<b>' + esc(REG[ch.region].site) + '</b> at ' + rn(ch.region);
+        out.push(rkUrl ? '<figure class="rkart painted"><img src="' + rkUrl + '" alt="' + esc(REG[ch.region].site) + '" width="480" height="358" loading="lazy"><figcaption>' + rkCap + '</figcaption></figure>' :
+          '<p class="rkart">' + A.art('site/' + ch.region, { size: 64 }) + rkCap + '</p>');
+      }
       if (o.step === 'banish' && ch) {
         if ((ch.banish || []).length) out.push('<h3>Banished</h3><div class="cards">' + ch.banish.map(function (id) { return A.card(id, ''); }).join('') + '</div>');
         if ((ch.admit || []).length) out.push('<h3>Admitted</h3><div class="cards">' + ch.admit.map(function (id) { return A.card(id, ''); }).join('') + '</div>');

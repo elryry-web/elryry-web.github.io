@@ -699,7 +699,8 @@
     U.screen = 'title';
     render();
     // painted art arrives after the first draw; draw again with it
-    if (A.onPainted) A.onPainted(function () { if (!U.busy) render(); });
+    // (an open sheet too, so a region sheet picks up its site painting)
+    if (A.onPainted) A.onPainted(function () { if (!U.busy) { render(); if (sheetIsOpen()) redrawSheet(); } });
   }
 
   // exports for ui-sheets.js and for tests
