@@ -177,7 +177,7 @@
   // The painted flag, lozenge and rounds carry less ink than a shield at the same width (tools/prep-art.py
   // trims each to its edges), so at stamp size they read a size smaller. They are drawn wider, never taller
   // than a shield. Measure again if a banner is repainted.
-  var BANNER_SCALE = { gullwing: 1.15, lantern: 1.2, synod: 1.12, moss: 1.12 };
+  var BANNER_SCALE = { gullwing: 1.12, lantern: 1.2, synod: 1.12, moss: 1.12 };
   function bannerScale(h) { return BANNER_SCALE[h] || 1; }
   function art(slot, opts) {
     var url = paintedUrl(slot);
