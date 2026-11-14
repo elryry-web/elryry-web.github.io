@@ -177,8 +177,8 @@ table.tally tr.conflict td, table.tally tr.conflict th { background: rgba(178,58
 .task .rubric, .rubric { color: var(--verm); font-family: var(--display); }
 
 /* wide: grid on the left, panels on the right */
-#scr-puzzle.wide .pz-body { flex-direction: row; }
-#scr-puzzle.wide .pz-gridwrap { flex: 1; align-items: center; justify-content: flex-start; padding: 8px 8px; overflow: hidden; }
+#scr-puzzle.wide .pz-body { flex-direction: row; justify-content: center; }
+#scr-puzzle.wide .pz-gridwrap { flex: 0 1 auto; min-width: 0; align-items: center; justify-content: flex-start; padding: 8px 8px; overflow: hidden; }
 #scr-puzzle.wide .pz-side { flex: none; width: var(--side, 360px); border-top: 0; border-left: 1px solid var(--rule); }
 #scr-puzzle.tally-under .tally-under { display: block; width: 100%; max-width: 640px; margin-top: 10px; }
 #scr-puzzle.tally-under .tallytab { display: none; }
