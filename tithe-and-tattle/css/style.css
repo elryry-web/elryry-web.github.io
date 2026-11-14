@@ -13,7 +13,6 @@ html, body { margin: 0; height: 100%; }
 body {
   background: var(--parch); color: var(--ink); font-family: var(--serif); font-size: 18px; line-height: 1.4;
   background-image: var(--grain), radial-gradient(ellipse at 50% 30%, #f4e9d0 0%, var(--parch) 55%, var(--parch2) 100%);
-  background-attachment: fixed;
   overflow: hidden; -webkit-tap-highlight-color: transparent; touch-action: manipulation;
   -webkit-text-size-adjust: 100%; text-size-adjust: 100%;
 }
