@@ -807,13 +807,13 @@
     var app = document.getElementById('app');
     if (!app) return;
     cur = 'app'; REGS.app = {};
-    var html;
+    var html, onTitle = false;
     try {
       if (U.screen === 'age' && age()) html = renderAge();
       else if (U.screen === 'end') html = U.renderEnd();
       else if (U.screen === 'reckon') html = U.renderReckoning();
       else if (U.screen === 'annals') html = U.renderAnnals();
-      else html = U.renderTitle();
+      else { html = U.renderTitle(); onTitle = true; }
     } catch (e) {
       if (root.console) console.error(e);
       html = '<div class="screen"><p>Something went wrong drawing the screen: ' + esc(e.message) + '</p></div>';
@@ -821,6 +821,7 @@
     app.innerHTML = html;
     app.className = 'app scr-' + U.screen;
     document.body.classList.toggle('busy', !!U.busy);
+    document.body.classList.toggle('on-title', onTitle);   // the title page alone gets the paper grain and vignette
   }
 
   // ---------------------------------------------------------------- taps

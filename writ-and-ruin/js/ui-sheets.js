@@ -536,17 +536,34 @@
     return '<div class="screen title-screen"><div class="titleblock"><div class="title-art' + (hero ? ' painted' : '') + '">' +
       (hero ? '<img src="' + hero + '" alt="A painted valley: a river winding past a castle to the sea">' : titleArt()) + '</div>' +
       '<h1 class="gametitle">Writ <span>&amp;</span> Ruin</h1><p class="tagline">A valley of eight regions, four houses and one Crown. Win an age, write its law, and carry the grudges into the next.</p></div>' +
+      '<svg class="trule" viewBox="0 0 200 14" aria-hidden="true"><path d="M8 7H84M116 7H192" stroke="currentColor" stroke-width="1.5"/>' +
+      '<circle cx="89" cy="7" r="1.6" fill="currentColor"/><circle cx="111" cy="7" r="1.6" fill="currentColor"/><path d="M100 1.5L106 7L100 12.5L94 7Z" fill="currentColor"/></svg>' +
       '<div class="menu">' +
-      (save ? btn('Continue <small>' + esc(where) + '</small>', function () { U.go(H.screenFor(U.c)); }, { cls: 'go big' }) : '') +
-      btn('New campaign', function () {
+      (save ? btn(TICON.crown + 'Continue <small>' + esc(where) + '</small>', function () { U.go(H.screenFor(U.c)); }, { cls: 'tbtn go big' }) : '') +
+      btn(TICON.quill + 'New campaign', function () {
         if (!save) { U.newCampaign(); return; }
         U.openSheet(function () {
           return '<h2>Start a new campaign?</h2><p>Your current campaign and its Annals will be lost.</p><div class="row">' +
             btn('Start anew', function () { U.closeSheet(); U.newCampaign(); }, { cls: 'red' }) + btn('Keep my campaign', function () { U.closeSheet(); }) + '</div>';
         });
-      }, { cls: save ? '' : 'go big' }) +
-      btn('The Annals', function () { U.annalsFrom = 'title'; U.go('annals'); }, { off: save && c.annals.length ? null : 'No age has been recorded yet.' }) +
-      btn('How to win', function () { U.helpSheet(); }) + '</div></div>';
+      }, { cls: save ? 'tbtn' : 'tbtn go big' }) +
+      btn(TICON.book + 'The Annals', function () { U.annalsFrom = 'title'; U.go('annals'); }, { cls: 'tbtn', off: save && c.annals.length ? null : 'No age has been recorded yet.' }) +
+      btn(TICON.scroll + 'How to win', function () { U.helpSheet(); }, { cls: 'tbtn' }) + '</div></div>';
+  };
+  // small woodcut icons for the title menu: one ink, 2px cuts, drawn on a 24-unit block
+  function ticon(body) {
+    return '<svg class="ticon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">' + body + '</svg>';
+  }
+  var TICON = {
+    crown: ticon('<path d="M4.5 17.5L3 8L8.2 12L12 4.5L15.8 12L21 8L19.5 17.5Z" fill="currentColor" fill-opacity=".18"/>' +
+      '<path d="M4.5 20.5H19.5" stroke-width="2.6"/><path d="M12 11.5L13.6 14L12 16.5L10.4 14Z" fill="currentColor" stroke="none"/>' +
+      '<circle cx="3" cy="8" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="4.5" r="1.4" fill="currentColor" stroke="none"/><circle cx="21" cy="8" r="1.4" fill="currentColor" stroke="none"/>'),
+    quill: ticon('<path d="M20.5 3C13.5 4 8.5 9 6.5 16.5L8 18C15 16 19.8 10.5 20.5 3Z" fill="currentColor" fill-opacity=".18"/>' +
+      '<path d="M3.5 21L16 8"/><path d="M11 13.2L14.6 13.4M13.6 10.6L17.4 10.3M8.6 16L11.6 16.6" stroke-width="1.6"/>'),
+    book: ticon('<path d="M5 3H18.2A1 1 0 0 1 19.2 4V20A1 1 0 0 1 18.2 21H5Z" fill="currentColor" fill-opacity=".18"/>' +
+      '<path d="M5 3H8.5V21H5Z" fill="currentColor" stroke="none"/><path d="M11.5 7H16.2V10.2H11.5Z" stroke-width="1.6"/><path d="M11.5 17.5H16.2" stroke-width="1.6"/>'),
+    scroll: ticon('<path d="M6 6.5V17.5M18 6.5V17.5" /><path d="M6 6.5H18V17.5H6Z" fill="currentColor" fill-opacity=".18" stroke="none"/>' +
+      '<rect x="3.5" y="3" width="17" height="3.6" rx="1.8"/><rect x="3.5" y="17.4" width="17" height="3.6" rx="1.8"/><path d="M9 10.3H15M9 13.6H13.5" stroke-width="1.6"/>')
   };
   function titleArt() {
     var P = A.PAL;

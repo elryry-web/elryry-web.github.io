@@ -300,6 +300,44 @@ body.sheet-up { overflow: hidden; }
 .tagline { font-size: 1.05rem; max-width: 30em; margin: 0 auto 16px; }
 .menu { display: flex; flex-direction: column; align-items: stretch; max-width: 360px; margin: 0 auto; width: 100%; }
 .menu .btn { margin: 5px 0; flex-direction: column; }
+
+/* title page only: paper grain and darker edges, a fixed layer under the page so the map screen stays plain */
+body.on-title::before {
+  content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(ellipse 85% 75% at 50% 45%, transparent 55%, rgba(90, 70, 50, .11) 82%, rgba(60, 44, 28, .27) 100%),
+    radial-gradient(rgba(90, 70, 50, .05) .7px, transparent 1.2px) 0 0 / 7px 9px,
+    radial-gradient(rgba(90, 70, 50, .045) .8px, transparent 1.3px) 3px 4px / 11px 13px,
+    radial-gradient(rgba(90, 70, 50, .04) 1px, transparent 1.6px) 9px 2px / 17px 23px,
+    radial-gradient(rgba(255, 252, 240, .35) .8px, transparent 1.4px) 1px 6px / 13px 19px,
+    repeating-linear-gradient(97deg, rgba(90, 70, 50, .022) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(8deg, rgba(90, 70, 50, .018) 0 1px, transparent 1px 7px);
+}
+/* the ornamental rule between the tagline and the menu */
+.trule { width: 190px; max-width: 60%; height: auto; margin: 0 auto 12px; color: var(--ink); }
+.title-screen .tagline { margin-bottom: 12px; }
+/* title menu buttons: a carved wooden block. Faint grain, lit along the top edge, shadowed along the bottom,
+   standing on the same hard ink shadow as the painting's frame; pressed, it sinks onto that shadow. */
+.btn.tbtn { padding-left: 48px; padding-right: 48px; box-shadow: 3px 3px 0 var(--ink); transition: transform .06s, box-shadow .06s; }
+.btn.tbtn::before {
+  background:
+    repeating-linear-gradient(177deg, rgba(90, 70, 50, .07) 0 1px, transparent 1px 5px),
+    repeating-linear-gradient(183deg, rgba(90, 70, 50, .05) 0 2px, transparent 2px 11px),
+    linear-gradient(90deg, rgba(255, 250, 235, .14), rgba(90, 70, 50, .05) 45%, rgba(255, 250, 235, .10) 70%, rgba(90, 70, 50, .06)),
+    var(--tb-wood, var(--bone));
+  box-shadow: inset 0 2px 0 rgba(255, 250, 235, .7), inset 2px 0 0 rgba(255, 250, 235, .3),
+    inset 0 -4px 0 rgba(23, 20, 15, .2), inset -3px 0 0 rgba(23, 20, 15, .1);
+}
+.btn.tbtn.go { --tb-wood: var(--moss); }
+.btn.tbtn.go::before { box-shadow: inset 0 2px 0 rgba(255, 250, 225, .4), inset 2px 0 0 rgba(255, 250, 225, .18),
+    inset 0 -4px 0 rgba(23, 20, 15, .28), inset -3px 0 0 rgba(23, 20, 15, .14); }
+.btn.tbtn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
+.btn.tbtn:active::before { box-shadow: inset 0 3px 0 rgba(23, 20, 15, .18), inset 0 -1px 0 rgba(255, 250, 235, .3); }
+.btn.tbtn.off { box-shadow: none; }
+.btn.tbtn.off::before { background: transparent; box-shadow: none; }
+.btn.tbtn.off:active { transform: none; }
+.tbtn .ticon { position: absolute; left: 14px; top: 50%; width: 24px; height: 24px; margin-top: -12px; }
+.tbtn.off .ticon { opacity: .5; }
 .banner { display: flex; align-items: center; gap: 12px; border: 4px solid var(--ink); padding: 10px 12px; background: var(--bone); position: relative; z-index: 0; }
 .banner::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 10px; transform: translate(2px, 2px); z-index: -1; }
 .banner.won::before { background: var(--moss); }
