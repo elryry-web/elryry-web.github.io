@@ -86,5 +86,11 @@
  "stamp-riverford": "art/stamp-riverford.png",
  "stamp-saltmarsh": "art/stamp-saltmarsh.png",
  "stamp-stonefields": "art/stamp-stonefields.png",
- "title": "art/title.jpg"
+ "title": "art/title.jpg",
+ "work-granary": "art/work-granary.png",
+ "work-greatHall": "art/work-greatHall.png",
+ "work-marketCross": "art/work-marketCross.png",
+ "work-musterField": "art/work-musterField.png",
+ "work-oldRoad": "art/work-oldRoad.png",
+ "work-watchtower": "art/work-watchtower.png"
 }

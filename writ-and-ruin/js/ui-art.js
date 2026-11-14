@@ -124,7 +124,8 @@
     greatHall: '<path d="M1 21V13L6 5H18L23 13V21ZM10 21V16H14V21Z" fill="#17140f" fill-rule="evenodd"/><path d="M6 5L4 2M18 5L20 2" stroke-width="1.8" stroke-linecap="round"/>',
     musterField: '<path d="M5 22L16.5 7.5M19 22L7.5 7.5" stroke-width="2.4" stroke-linecap="round"/><path d="M20.5 2.5L19.5 9L14.5 5.5Z M3.5 2.5L9.5 5.5L4.5 9Z" fill="#17140f"/><path d="M7 19L9.5 21.5M17 19L14.5 21.5" stroke-width="2" stroke-linecap="round"/>',
     marketCross: '<path d="M10.5 2H13.5V6H17V9H13.5V15H10.5V9H7V6H10.5ZM8 15H16V18H8ZM5 18H19V22H5Z" fill="#17140f"/>',
-    oldRoad: '<path d="M9 16V7C9 3.5 15 3.5 15 7V16Z" fill="#17140f"/><path d="M5 22L8.5 17H15.5L19 22Z" fill="#17140f"/><path d="M12 18V19.5M12 21V22" stroke="#f4ead2" stroke-width="1.2"/><path d="M11 9H13" stroke="#f4ead2" stroke-width="1.4" stroke-linecap="round"/>'
+    // a fingerpost with three pointed arms on a low stone base, at the far side of a paved road with its ruts
+    oldRoad: '<path d="M11 2.5H13V16.5H11ZM13 4H18.5L20.5 5.75L18.5 7.5H13ZM11 8H5.5L3.5 9.75L5.5 11.5H11ZM13 11.5H17L18.8 13L17 14.5H13ZM9 16.5H15V18H9Z" fill="#17140f"/><path d="M1 23L4 18.5H20L23 23Z" fill="#17140f"/><path d="M7.5 21H10M14 21H16.5" stroke="#f4ead2" stroke-width="1.2" stroke-linecap="round"/>'
   };
   function workGlyph(id, size) { return glyph(WORK_GLYPH[id] || WORK_GLYPH.watchtower, size || 22); }
   function glyph(inner, size, cls) {

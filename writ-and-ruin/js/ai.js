@@ -922,7 +922,7 @@
   //   workOwn / workElse: times WORK_LIKE, a great work in a region we start in next age / anywhere nobody starts
   //   crown: extra for a great work at the Crown hold (watchtower: for the Watchtower there), as the ruler starts there
   //   razeWork: razing a great work where the strongest grudge-holder starts next age
-  var RK = { struct: [3, 1.8, 1.6], razeStruct: 2, workOwn: 1.8, workElse: 0.3, crown: 0.15, watchtower: 0.4, razeWork: 2.1 };
+  var RK = { struct: [3, 1.8, 1.6], razeStruct: 2, razeFoeStart: 1.5, workOwn: 1.8, workElse: 0.3, crown: 0.15, home: 0.1, watchtower: 0.4, razeWork: 2.1 };
   var LAW_PREF = {
     warlord: ['levy', 'crownsDue', 'tolls', 'wildYear', 'shortReign', 'charter', 'openRoads', 'titheOfLore', 'oathOfArms', 'longPeace'],
     mystic: ['titheOfLore', 'longPeace', 'oathOfArms', 'charter', 'shortReign', 'wildYear', 'openRoads', 'tolls', 'levy', 'crownsDue'],
@@ -951,27 +951,32 @@
   // score every build-or-raze option (see RK) and take the best; none when nothing scores above 0
   function reckoningSite(c, w, tn, options) {
     var loves = LOVED_SITES[tn] || LOVED_SITES.player, built = c.world.built, like = WORK_LIKE[tn] || WORK_LIKE.player;
-    // the strongest grudge-holder against us
-    var foe = null, fg = -1;
-    Object.keys(c.memory).forEach(function (k) {
-      if (k === w) return;
-      var g = c.memory[k][w].grudge + (c.next && c.next.rivals && c.next.rivals.indexOf(k) >= 0 ? 1 : 0);
+    // the strongest grudge-holder against us among the houses of the next age (a rival scores 1 for being drawn)
+    var mem = (c.age && c.age.memory) || c.memory, foe = null, fg = -1;
+    E.nextHouses(c).forEach(function (k) {
+      if (k === w || !mem[k] || !mem[k][w]) return;
+      var g = mem[k][w].grudge + 1;
       if (g > fg) { fg = g; foe = k; }
     });
     var hated = foe && fg > 0 ? HATED_SITE[temperOf(c, foe)] : null;
-    // where each house starts next age, read before the choice is made
-    var starts = E.nextStarts(c) || {}, mine = starts[w] || [], anyStart = {};
-    Object.keys(starts).forEach(function (h) { starts[h].forEach(function (r) { anyStart[r] = anyStart[r] || h; }); });
-    var foeStarts = foe && fg > 0 ? (starts[foe] || (c.holdfast && c.holdfast[foe] ? [c.holdfast[foe]] : [])) : [];
+    // where every house starts next age, read before the choice is made
+    var starts = E.nextStarts(c) || {}, mine = starts[w] || [], theirs = {};
+    Object.keys(starts).forEach(function (h) { if (h !== w) starts[h].forEach(function (r) { if (mine.indexOf(r) < 0) theirs[r] = h; }); });
+    var foeStarts = foe ? (starts[foe] || []).filter(function (r) { return mine.indexOf(r) < 0; }) : [];
     function score(x) {
-      if (x.kind === 'build') { var i = loves.indexOf(x.region); return i >= 0 ? RK.struct[i] : 0; }
-      if (x.kind === 'raze') return x.region === hated && loves.indexOf(x.region) < 0 ? RK.razeStruct : 0;
+      // a structure helps whoever starts on it, so none goes up where another house starts
+      if (x.kind === 'build') { var i = loves.indexOf(x.region); return i >= 0 && !theirs[x.region] ? RK.struct[i] : 0; }
+      if (x.kind === 'raze') {
+        if (loves.indexOf(x.region) >= 0 || mine.indexOf(x.region) >= 0) return 0;
+        return x.region === hated ? RK.razeStruct : foeStarts.indexOf(x.region) >= 0 ? RK.razeFoeStart : 0;
+      }
       if (x.kind === 'work') {
         var lk = like[x.work] || 1;
-        if (mine.indexOf(x.region) >= 0) return RK.workOwn * lk + (x.region === 'crown' ? (x.work === 'watchtower' ? RK.watchtower : RK.crown) : 0);
-        return anyStart[x.region] ? 0 : RK.workElse * lk;
+        // its main start first: the Crown hold, a free hold's Far Pass, or its one region
+        if (mine.indexOf(x.region) >= 0) return RK.workOwn * lk + (x.region === 'crown' ? (x.work === 'watchtower' ? RK.watchtower : RK.crown) : x.region === mine[0] ? RK.home : 0);
+        return theirs[x.region] ? 0 : RK.workElse * lk;
       }
-      if (x.kind === 'razeWork') return foeStarts.indexOf(x.region) >= 0 && mine.indexOf(x.region) < 0 ? RK.razeWork : 0;
+      if (x.kind === 'razeWork') return foeStarts.indexOf(x.region) >= 0 ? RK.razeWork : 0;
       return 0;
     }
     var best = { kind: 'none' }, bs = 0;

@@ -1419,6 +1419,8 @@
     var R = { winner: s.winner, how: s.winType, round: s.endRound, step: 'build', site: null, banished: [], admitted: [], law: null, lapsed: null,
       vaultOffer: c.world.vault.slice(0, 4), lawOffer: s.winner ? drawLaws(c, s.winType) : [], events: [] };
     c.reckoning = R;
+    // the next age's rivals are drawn now, before step I, so the winner sees where every house starts
+    R.rivals = drawRivals(c, R);
     if (!s.winner) finishReckoning(c);
     return R;
   }
@@ -1485,23 +1487,12 @@
   function finishReckoning(c) {
     var R = c.reckoning, s = c.age, ev = [];
     // 4. the Seat
-    var seat = seatAfter(c), ruler = seat.ruler, kept = seat.kept, fill;
+    var seat = seatAfter(c), ruler = seat.ruler, kept = seat.kept;
     if (R.how === 'depart') c.world.freeHold = R.winner;
     c.holdfast = holdfastsAfter(c);
     var rr = ruler ? rulerSpread(seat.regions) : {};
-    // rivals: the ruler and the winner if they are rivals, then the strongest grudges against the winner, then at random
-    var pool = D.HOUSES.map(function (H) { return H.id; });
-    var rivals = [];
-    [R.winner, ruler].forEach(function (h) { if (h && h !== 'player' && rivals.indexOf(h) < 0) rivals.push(h); });
-    if (c.world.freeHold && c.world.freeHold !== 'player' && rivals.length < 3 && rivals.indexOf(c.world.freeHold) < 0 && R.how === 'depart') rivals.push(c.world.freeHold);
-    if (R.winner) {
-      fill = shuffle(c, pool.filter(function (h) { return rivals.indexOf(h) < 0 && h !== R.winner; }));
-      fill.sort(function (x, y) { return s.memory[y][R.winner].grudge - s.memory[x][R.winner].grudge; });
-      var gr = 0;
-      while (rivals.length < 3 && gr < 2 && fill.length && s.memory[fill[0]][R.winner].grudge > 0) { rivals.push(fill.shift()); gr++; }
-    }
-    fill = shuffle(c, pool.filter(function (h) { return rivals.indexOf(h) < 0; }));
-    while (rivals.length < 3) rivals.push(fill.shift());
+    // the rivals drawn when the Reckoning began
+    var rivals = nextRivals(c, R);
     c.next = { ruler: ruler || null, rivals: rivals, rulerRegions: rr, rulerHeld: kept };
     ev.push({ type: 'reckonSeat', ruler: ruler || null, freeHold: c.world.freeHold, rivals: rivals });
     // 5. memory: carried forward, every grudge and debt fades a step
@@ -1520,6 +1511,32 @@
     return ev;
   }
 
+  // the next age's three rivals: the ruler and the winner if they are rivals, then up to two houses with a grudge
+  // against the winner (strongest first, ties at random), then at random. Drawn once, when the Reckoning begins.
+  function drawRivals(c, R) {
+    var s = c.age, ruler = seatAfter(c).ruler, rivals = [], fill;
+    var pool = D.HOUSES.map(function (H) { return H.id; });
+    [R.winner, ruler].forEach(function (h) { if (h && h !== 'player' && rivals.indexOf(h) < 0) rivals.push(h); });
+    if (R.winner) {
+      fill = shuffle(c, pool.filter(function (h) { return rivals.indexOf(h) < 0 && h !== R.winner; }));
+      fill.sort(function (x, y) { return s.memory[y][R.winner].grudge - s.memory[x][R.winner].grudge; });
+      var gr = 0;
+      while (rivals.length < 3 && gr < 2 && fill.length && s.memory[fill[0]][R.winner].grudge > 0) { rivals.push(fill.shift()); gr++; }
+    }
+    fill = shuffle(c, pool.filter(function (h) { return rivals.indexOf(h) < 0; }));
+    while (rivals.length < 3) rivals.push(fill.shift());
+    return rivals;
+  }
+  // the rivals of the next age, as stored in the Reckoning. A save from before they were stored draws them now, once.
+  function nextRivals(c, R) {
+    R = R || c.reckoning;
+    if (!R || !c.age) return [];
+    if (!R.rivals) R.rivals = drawRivals(c, R);
+    return R.rivals.slice();
+  }
+  // every house of the next age: you, then the rivals
+  function nextHouses(c, R) { return ['player'].concat(nextRivals(c, R)); }
+
   // who holds the Seat next age and its three regions. The winner rules; after a Departure, whoever held the Crown hold.
   // The ruler keeps the Crown hold's neighbours it held, most warbands first; the richest fill the rest.
   function seatAfter(c) {
@@ -1535,75 +1552,74 @@
     Object.keys(s.houses).forEach(function (h) { var r = holdfastOf(s, h); if (r) hf[h] = r; });
     return hf;
   }
-  // where each house of the ending age starts next age, for the Reckoning: {house: [regions]}.
-  // The ruler: the Crown hold and its two neighbours. A Departed house: the Far Pass (its free hold). Every other house:
-  // its holdfast, or [] when it has none (it takes an edge start). A holdfast someone else takes is resolved at setup,
-  // to a free neighbour. The ruler's neighbours may depend on richness, so this reads the world as it stands now:
-  // at step I, before the build choice is made.
-  function nextStarts(c, R) {
-    R = R || c.reckoning;
-    var s = c.age;
-    if (!s || !R) return null;
-    var seat = seatAfter(c), hf = holdfastsAfter(c), fh = R.how === 'depart' ? R.winner : c.world.freeHold, out = {};
-    Object.keys(s.houses).forEach(function (h) {
-      if (h === seat.ruler) out[h] = seat.regions.slice();
-      else if (h === fh) out[h] = ['farpass'];
-      else out[h] = hf[h] ? [hf[h]] : [];
+  // where every house of the next age starts, found by setting the next age up on a copy of the campaign:
+  // {house: {why, region, regions?, also?, holdfast?}} as startAge records it, or null outside a Reckoning.
+  // Nothing between the Reckoning and the next age draws from the campaign's rng, so it is exact for the world as it
+  // stands now. A build or raze at step I can still move the ruler's lands, so it is read again after the choice.
+  var aheadMemo = { key: null, starts: null, owner: null };
+  function startsAhead(c) {
+    var R = c.reckoning;
+    if (!R || !c.age) return null;
+    nextRivals(c, R);   // a save from before the rivals were stored draws them on the campaign itself, not the copy
+    var held = IDS.map(function (r) { var g = c.age.regions[r]; return [g.owner, g.bands, g.built]; });
+    var key = JSON.stringify([c.seed, c.rng, c.ageNo, R.step, R.winner, R.how, R.rivals, c.world, c.holdfast, held]);
+    if (aheadMemo.key !== key) {
+      var k = clone(c);
+      if (k.reckoning.step !== 'done') finishReckoning(k);
+      var s2 = startAge(k, { allAI: true }), owner = {};
+      Object.keys(s2.starts).forEach(function (h) { var x = s2.starts[h]; if (x.holdfast) owner[x.holdfast] = s2.regions[x.holdfast].owner || null; });
+      aheadMemo = { key: key, starts: s2.starts, owner: owner };
+    }
+    return { starts: clone(aheadMemo.starts), owner: clone(aheadMemo.owner) };
+  }
+  // where each house of the next age starts, for the Reckoning and the AI: {house: [regions]}, the ruler's
+  // the Crown hold first, then the neighbours it kept; a free hold's the Far Pass, then its edge start.
+  function nextStarts(c) {
+    var a = startsAhead(c);
+    if (!a) return null;
+    var out = {};
+    nextHouses(c).forEach(function (h) {
+      var x = a.starts[h];
+      out[h] = !x ? [] : x.why === 'ruler' ? x.regions.slice() : x.why === 'freehold' ? (x.also ? ['farpass', x.also] : ['farpass']) : [x.region];
     });
     return out;
   }
 
-  // where each house sure to play starts next age, as the Reckoning shows it: [{house, why, regions, holdfast, by}], the player first.
-  // why: 'ruler' (regions: the Crown hold and its neighbours), 'freehold' (the Far Pass, plus an edge start),
-  // 'holdfast' (on it), 'near' (its holdfast is covered by house `by`: a free neighbour of it), 'edge' (no holdfast)
-  function startPlan(c, R) {
-    var ns = nextStarts(c, R);
-    if (!ns) return [];
-    R = R || c.reckoning;
-    var fh = R.how === 'depart' ? R.winner : c.world.freeHold, taken = {}, out = [], sure = sureHouses(c, R);
-    Object.keys(ns).forEach(function (h) { if (ns[h].length > 1 || h === fh) ns[h].forEach(function (r) { taken[r] = h; }); });
-    Object.keys(ns).filter(function (h) { return sure.indexOf(h) >= 0; }).sort(function (a, b) { return (a === 'player' ? 0 : 1) - (b === 'player' ? 0 : 1); }).forEach(function (h) {
-      var rs = ns[h];
-      if (rs.length > 1) out.push({ house: h, why: 'ruler', regions: rs.slice() });
-      else if (h === fh && rs[0] === 'farpass') out.push({ house: h, why: 'freehold', regions: ['farpass'] });
-      else if (rs[0] && (taken[rs[0]] || rs[0] === 'crown')) out.push({ house: h, why: 'near', regions: [], holdfast: rs[0], by: taken[rs[0]] || null });
-      else if (rs[0]) out.push({ house: h, why: 'holdfast', regions: [rs[0]], holdfast: rs[0] });
-      else out.push({ house: h, why: 'edge', regions: [] });
+  // where each house of the next age starts, as the Reckoning shows it: [{house, why, regions, holdfast, by}],
+  // you first, then the rivals as drawn (the winner and the ruler lead).
+  // why: 'ruler' (the Crown hold and its neighbours), 'freehold' (the Far Pass and an edge start), 'holdfast' (on it),
+  // 'near' (its holdfast is taken, by house `by` when one holds it: a free region next to it), 'edge' (an edge start;
+  // with `holdfast` when the holdfast and every region next to it are taken)
+  function startPlan(c) {
+    var a = startsAhead(c);
+    if (!a) return [];
+    var ns = nextStarts(c);
+    return nextHouses(c).map(function (h) {
+      var x = a.starts[h] || { why: 'edge' }, p = { house: h, why: x.why, regions: ns[h] || [] };
+      if (x.holdfast) p.holdfast = x.holdfast;
+      if (x.why === 'holdfast') p.holdfast = x.region;
+      if (x.why === 'near') p.by = a.owner[x.holdfast] || null;
+      return p;
     });
-    return out;
-  }
-  // the houses sure to play next age: you, the winner and the ruler. The other rivals are drawn when the Reckoning ends.
-  function sureHouses(c, R) {
-    R = R || c.reckoning;
-    var out = ['player'];
-    [R.winner, seatAfter(c).ruler].forEach(function (h) { if (h && out.indexOf(h) < 0) out.push(h); });
-    return out;
   }
   function houseWord(c, h, low) { var n = h === 'player' ? 'you' : c.houses[h].short; return low ? n : cap(n); }
   // one plain line per house: 'You start in the Crown hold, Riverford and Ashwood.'
-  function startLines(c, R) {
-    var edge = listOr(D.EDGE_STARTS.map(regionName));
-    var lines = startPlan(c, R).map(function (p) {
-      var W = houseWord(c, p.house), you = p.house === 'player', st = you ? ' start' : ' starts', it = you ? 'You' : 'It';
-      if (p.why === 'ruler' || p.why === 'holdfast') return W + st + ' in ' + listAnd(p.regions.map(regionName)) + '.';
-      if (p.why === 'freehold') return W + st + ' in the Far Pass. ' + it + (you ? ' take' : ' takes') + ' an edge start as well.';
+  function startLines(c) {
+    return startPlan(c).map(function (p) {
+      var W = houseWord(c, p.house), you = p.house === 'player', st = you ? ' start' : ' starts', its = you ? 'your' : 'its', r0 = p.regions[0];
+      if (p.why === 'ruler') return W + st + ' in ' + listAnd(p.regions.map(regionName)) + '.';
+      if (p.why === 'freehold') return W + st + ' at ' + its + ' free hold in the Far Pass.' + (p.regions[1] ? ' ' + (you ? 'You also take ' : cap(its === 'its' ? 'it' : 'you') + ' also takes ') + regionName(p.regions[1]) + '.' : '');
+      if (p.why === 'holdfast') return W + st + ' in ' + regionName(r0) + ', ' + its + ' holdfast.';
       if (p.why === 'near') return (you ? 'Your' : W + "'s") + ' holdfast is ' + regionName(p.holdfast) + (p.by ? ', which ' + houseWord(c, p.by, true) + ' will hold' : '') + '. ' +
-        W + st + ' in a free region next to it.';
-      return W + (you ? ' have' : ' has') + ' no holdfast. ' + it + (you ? ' take' : ' takes') + ' an edge start: ' + edge + '.';
+        W + st + ' next to it, in ' + regionName(r0) + '.';
+      var where = r0 ? (D.EDGE_STARTS.indexOf(r0) >= 0 ? (you ? ' take' : ' takes') + ' an edge start in ' + regionName(r0) + '.' : st + ' in ' + regionName(r0) + '. The edge starts are taken.') : (you ? ' take' : ' takes') + ' an edge start.';
+      if (p.holdfast) return (you ? 'Your' : W + "'s") + ' holdfast of ' + regionName(p.holdfast) + ' is taken, with every region next to it. ' + W + where;
+      return W + (you ? ' have' : ' has') + ' no holdfast. ' + W + where;
     });
-    R = R || c.reckoning;
-    var left = 4 - sureHouses(c, R).length;
-    if (left > 0) {
-      var who = R.winner === 'player' ? 'you' : houseWord(c, R.winner, true);
-      lines.push((left === 1 ? 'The third rival is chosen' : (left === 3 ? 'Your three rivals are' : 'The other two rivals are') + ' chosen') +
-        ' when the Reckoning ends. Houses with a grudge against ' + who + ' come first, two at most. ' +
-        (left === 1 ? 'It starts' : 'Each starts') + ' on or next to its holdfast. One with no holdfast takes an edge start.');
-    }
-    return lines;
   }
-  // who is sure to start in region r next age: 'you start here', 'Varrow starts here', or ''
-  function startTag(c, r, R) {
-    var hs = startPlan(c, R).filter(function (p) { return p.regions.indexOf(r) >= 0; }).map(function (p) { return p.house; });
+  // who starts in region r next age: 'you start here', 'Varrow starts here', or ''
+  function startTag(c, r) {
+    var hs = startPlan(c).filter(function (p) { return p.regions.indexOf(r) >= 0; }).map(function (p) { return p.house; });
     if (!hs.length) return '';
     var lone = hs.length === 1 && hs[0] !== 'player';
     return listAnd(hs.map(function (h) { return houseWord(c, h, true); })) + (lone ? ' starts here' : ' start here');
@@ -1706,7 +1722,7 @@
     // queries for the screen and the AI
     income: income, leanBonus: leanBonus, hoursFor: hoursFor, heldBy: heldBy, nHeld: nHeld, bandsAt: bandsAt, totalBands: totalBands,
     buildCost: buildCost, SAVE_VERSION: SAVE_VERSION, holdfastOf: holdfastOf, nextStarts: nextStarts, seatAfter: seatAfter, holdfastsAfter: holdfastsAfter,
-    workAt: workAt, workHere: workHere, workFor: workFor, regionName: regionName, siteSentence: siteSentence, startPlan: startPlan, sureHouses: sureHouses, startLines: startLines, startTag: startTag, reckoningGroups: reckoningGroups, marchFree: marchFree, rulerKept: rulerKept, richestNeighbours: richestNeighbours,
+    workAt: workAt, workHere: workHere, workFor: workFor, regionName: regionName, siteSentence: siteSentence, startPlan: startPlan, nextRivals: nextRivals, nextHouses: nextHouses, startLines: startLines, startTag: startTag, reckoningGroups: reckoningGroups, marchFree: marchFree, rulerKept: rulerKept, richestNeighbours: richestNeighbours,
     has: has, hasAt: hasAt, siteAt: siteAt, siteOnly: siteOnly, upkeep: upkeep, boardBands: boardBands, holds: holds, adjacent: adjacent, slotsOf: slotsOf, siteOn: siteOn, law: law, truce: truce,
     prophecyProgress: prophecyProgress, progress: progress, threat: threat, checkVictory: checkVictory, claimStanding: claimStanding, departNeeds: departNeeds,
     endChances: endChances, fortuneLeft: fortuneLeft, peekFortune: peekFortune, assaultOdds: assaultOdds, lossRange: lossRange, battleLosses: battleLosses,
