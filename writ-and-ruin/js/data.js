@@ -190,7 +190,9 @@
     // landless return: warbands a house with no region musters free at the start of its turn
     returnBands: 3,
     // upkeep: after income, a house pays 1 silver for every full upkeepPer warbands it has on the board
-    upkeepPer: 5
+    upkeepPer: 5,
+    // lean holdings: a house holding 1 or 2 regions still collects this much silver from its regions (0 regions: nothing)
+    incomeFloor: 3
   };
 
   var ORDINALS = ['First', 'Second', 'Third', 'Fourth', 'Fifth', 'Sixth', 'Seventh', 'Eighth', 'Ninth', 'Tenth',

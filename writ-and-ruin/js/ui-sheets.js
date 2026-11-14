@@ -377,7 +377,7 @@
         (mine ? 'Your house' : esc(cap(hs.temper)) + ' temper') + (s.ruler === h ? ' · ruled at the start of the age' : '') + '</p></div></header>');
       out.push('<p class="facts">' + hs.silver + ' silver · ' + plural(E.nHeld(s, h), 'region') + ' · ' + plural(E.totalBands ? E.totalBands(s, h) : 0, 'warband') + ' · ' +
         plural(hs.hours && s.order[s.turn] === h ? hs.hours : E.hoursFor(s, h), 'moon') + ' a turn' + (hs.camp ? ' · ' + hs.camp + ' camped' : '') +
-        '<br>Income ' + E.income(s, h) + ' silver a turn · upkeep ' + E.upkeep(s, h) + ' silver a turn' +
+        '<br>Income ' + E.income(s, h) + ' silver a turn' + (E.leanBonus(s, h) ? ' (lean holdings +' + E.leanBonus(s, h) + ')' : '') + ' · upkeep ' + E.upkeep(s, h) + ' silver a turn' +
         (function () {
           var st = D.REGION_IDS.filter(function (r) { return E.holds(s, h, r) && E.siteOn(s, r); }).map(function (r) { return REG[r].site; });
           return '<br>Structures: ' + (st.length ? esc(listAnd(st)) : 'none');
@@ -498,7 +498,9 @@
         '<h3>Holdfasts</h3><p>When an age ends, each house records its holdfast: the region where it had the most warbands. ' +
           'Next age it starts there. If the ruler or another house has it, the house starts beside it instead. ' +
           'The ruler starts in the Crown hold, with the neighbours of the Crown hold it held at the end of the last age.</p>' +
-        '<h3>Silver</h3><p>Each turn starts with income from your regions and sites. Then you pay upkeep: 1 silver for every ' + N.upkeepPer + ' warbands on the board. ' +
+        '<h3>Silver</h3><p>Each turn starts with income: 1 silver for each region you hold, plus your sites and residents. ' +
+        '<b>Lean holdings:</b> while you hold ' + (N.incomeFloor === 3 ? '1 or 2' : '1 to ' + (N.incomeFloor - 1)) + ' regions, they still give you ' + N.incomeFloor + ' silver. ' +
+        'Then you pay upkeep: 1 silver for every ' + N.upkeepPer + ' warbands on the board. ' +
         'Each silver you cannot pay disbands 1 warband from your largest stack.</p>' +
         '<h3>The first round</h3><p>No assaults in the first round. You may march only into your own regions, or into a region no one holds or guards.</p>' +
         '<h3>The age ends</h3><p>After round ' + N.lastRound + ' at the latest. After round ' + N.endDraws[0].round + ' there is a 1 in ' + N.endDraws[0].of + ' chance it ends early.</p>';

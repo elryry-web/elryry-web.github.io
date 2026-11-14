@@ -95,8 +95,13 @@
   }
   function currentHouse(s) { return s.phase === 'play' ? s.order[s.turn] : null; }
 
+  // lean holdings: a house on 1 or 2 regions still collects N.incomeFloor silver from them (a landless house gets nothing)
+  function leanBonus(s, h) {
+    var n = nHeld(s, h);
+    return n > 0 && n < N.incomeFloor ? N.incomeFloor - n : 0;
+  }
   function income(s, h) {
-    var held = heldBy(s, h), n = held.length, inc = n;
+    var held = heldBy(s, h), n = held.length, inc = n + leanBonus(s, h);
     for (var i = 0; i < held.length; i++) if (siteOn(s, held[i])) inc += REG[held[i]].siteIncome;
     if (has(s, h, 'titheReeve')) inc++;
     if (has(s, h, 'saltWidow')) inc++;
@@ -1429,7 +1434,7 @@
     // the age
     legalActions: legalActions, check: check, applyAction: applyAction, currentHouse: currentHouse,
     // queries for the screen and the AI
-    income: income, hoursFor: hoursFor, heldBy: heldBy, nHeld: nHeld, bandsAt: bandsAt, totalBands: totalBands,
+    income: income, leanBonus: leanBonus, hoursFor: hoursFor, heldBy: heldBy, nHeld: nHeld, bandsAt: bandsAt, totalBands: totalBands,
     buildCost: buildCost, SAVE_VERSION: SAVE_VERSION, holdfastOf: holdfastOf, rulerKept: rulerKept, richestNeighbours: richestNeighbours,
     has: has, hasAt: hasAt, siteAt: siteAt, siteOnly: siteOnly, upkeep: upkeep, boardBands: boardBands, holds: holds, adjacent: adjacent, slotsOf: slotsOf, siteOn: siteOn, law: law, truce: truce,
     prophecyProgress: prophecyProgress, progress: progress, threat: threat, checkVictory: checkVictory, claimStanding: claimStanding, departNeeds: departNeeds,
