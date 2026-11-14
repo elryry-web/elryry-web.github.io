@@ -545,40 +545,29 @@
       var sc = H.screenFor(c);
       where = c.age ? E.ageTitle(c.age.ageNo) + (sc === 'age' ? (c.age.phase === 'prophecy' ? ', choosing prophecies' : ', round ' + c.age.round) : sc === 'end' ? ', ended' : sc === 'reckon' ? ', the Reckoning' : ', in the Annals') : '';
     }
-    // Ryan's painted valley when it has loaded, else the drawn woodcut; the name sits below it on the paper
+    // Ryan's painted valley when it has loaded, else the drawn woodcut; the name sits below it on the paper.
+    // The heraldry stands in the margins beside the tagline; the cut pieces are CSS images (art/ui-*.png).
     var hero = A.paintedUrl && A.paintedUrl('title');
     return '<div class="screen title-screen"><div class="titleblock"><div class="title-art' + (hero ? ' painted' : '') + '">' +
       (hero ? '<img src="' + hero + '" alt="A painted valley: a river winding past a castle to the sea">' : titleArt()) + '</div>' +
-      '<h1 class="gametitle">Writ <span>&amp;</span> Ruin</h1><p class="tagline">A valley of eight regions, fought over by four houses. Whoever wins an age writes its law, which carries into the next age along with any grudges.</p></div>' +
-      '<svg class="trule" viewBox="0 0 200 14" aria-hidden="true"><path d="M8 7H84M116 7H192" stroke="currentColor" stroke-width="1.5"/>' +
-      '<circle cx="89" cy="7" r="1.6" fill="currentColor"/><circle cx="111" cy="7" r="1.6" fill="currentColor"/><path d="M100 1.5L106 7L100 12.5L94 7Z" fill="currentColor"/></svg>' +
+      '<h1 class="gametitle">Writ <span>&amp;</span> Ruin</h1>' +
+      '<div class="herald"><i class="hd shield-lion"></i>' +
+      '<p class="tagline">A valley of eight regions, fought over by four houses. Whoever wins an age writes its law, which carries into the next age along with any grudges.</p>' +
+      '<i class="hd shield-eagle"></i><i class="hd lion"></i><i class="tdivider"></i><i class="hd stag"></i></div></div>' +
       '<div class="menu">' +
-      (save ? btn(TICON.crown + 'Continue <small>' + esc(where) + '</small>', function () { U.go(H.screenFor(U.c)); }, { cls: 'tbtn go big' }) : '') +
-      btn(TICON.quill + 'New campaign', function () {
+      (save ? btn(ticon('crown') + 'Continue <small>' + esc(where) + '</small>', function () { U.go(H.screenFor(U.c)); }, { cls: 'plank green big' }) : '') +
+      btn(ticon('quill') + 'New campaign', function () {
         if (!save) { U.newCampaign(); return; }
         U.openSheet(function () {
           return '<h2>Start a new campaign?</h2><p>Your current campaign and its Annals will be lost.</p><div class="row">' +
             btn('Start anew', function () { U.closeSheet(); U.newCampaign(); }, { cls: 'red' }) + btn('Keep my campaign', function () { U.closeSheet(); }) + '</div>';
         });
-      }, { cls: save ? 'tbtn' : 'tbtn go big' }) +
-      btn(TICON.book + 'The Annals', function () { U.annalsFrom = 'title'; U.go('annals'); }, { cls: 'tbtn', off: save && c.annals.length ? null : 'No age has been recorded yet.' }) +
-      btn(TICON.scroll + 'How to win', function () { U.helpSheet(); }, { cls: 'tbtn' }) + '</div></div>';
+      }, { cls: save ? 'plank' : 'plank green big' }) +
+      btn(ticon('book') + 'The Annals', function () { U.annalsFrom = 'title'; U.go('annals'); }, { cls: 'plank', off: save && c.annals.length ? null : 'No age has been recorded yet.' }) +
+      btn(ticon('scroll') + 'How to win', function () { U.helpSheet(); }, { cls: 'plank' }) + '</div></div>';
   };
-  // small woodcut icons for the title menu: one ink, 2px cuts, drawn on a 24-unit block
-  function ticon(body) {
-    return '<svg class="ticon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">' + body + '</svg>';
-  }
-  var TICON = {
-    crown: ticon('<path d="M4.5 17.5L3 8L8.2 12L12 4.5L15.8 12L21 8L19.5 17.5Z" fill="currentColor" fill-opacity=".18"/>' +
-      '<path d="M4.5 20.5H19.5" stroke-width="2.6"/><path d="M12 11.5L13.6 14L12 16.5L10.4 14Z" fill="currentColor" stroke="none"/>' +
-      '<circle cx="3" cy="8" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="4.5" r="1.4" fill="currentColor" stroke="none"/><circle cx="21" cy="8" r="1.4" fill="currentColor" stroke="none"/>'),
-    quill: ticon('<path d="M20.5 3C13.5 4 8.5 9 6.5 16.5L8 18C15 16 19.8 10.5 20.5 3Z" fill="currentColor" fill-opacity=".18"/>' +
-      '<path d="M3.5 21L16 8"/><path d="M11 13.2L14.6 13.4M13.6 10.6L17.4 10.3M8.6 16L11.6 16.6" stroke-width="1.6"/>'),
-    book: ticon('<path d="M5 3H18.2A1 1 0 0 1 19.2 4V20A1 1 0 0 1 18.2 21H5Z" fill="currentColor" fill-opacity=".18"/>' +
-      '<path d="M5 3H8.5V21H5Z" fill="currentColor" stroke="none"/><path d="M11.5 7H16.2V10.2H11.5Z" stroke-width="1.6"/><path d="M11.5 17.5H16.2" stroke-width="1.6"/>'),
-    scroll: ticon('<path d="M6 6.5V17.5M18 6.5V17.5" /><path d="M6 6.5H18V17.5H6Z" fill="currentColor" fill-opacity=".18" stroke="none"/>' +
-      '<rect x="3.5" y="3" width="17" height="3.6" rx="1.8"/><rect x="3.5" y="17.4" width="17" height="3.6" rx="1.8"/><path d="M9 10.3H15M9 13.6H13.5" stroke-width="1.6"/>')
-  };
+  // a cut woodcut icon at the left end of a plank button (style.css .plank-icon)
+  function ticon(name) { return '<i class="plank-icon pi-' + name + '" aria-hidden="true"></i>'; }
   function titleArt() {
     var P = A.PAL;
     return '<svg viewBox="0 0 300 120" class="woodcut" aria-hidden="true">' +

@@ -826,7 +826,7 @@
     app.innerHTML = html;
     app.className = 'app scr-' + U.screen;
     document.body.classList.toggle('busy', !!U.busy);
-    document.body.classList.toggle('on-title', onTitle);   // the title page alone gets the paper grain and vignette
+    document.body.classList.toggle('on-title', onTitle);   // the title page alone gets the darker edges
   }
 
   // ---------------------------------------------------------------- taps
