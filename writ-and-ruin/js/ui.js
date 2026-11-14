@@ -739,10 +739,14 @@
       var k = b[0], on = !!have[k];
       return btn(b[1], function () { pickKind(k); }, { off: on ? null : whyNot(s, k), cls: U.mode && U.mode.kind === k ? 'active' : '' });
     });
-    out.push(btn('End turn', function () { U.endTurnConfirm(); }, { cls: 'end' }));
-    // three rows of three; the Poisoner and the Bell Seer start a fourth row
-    if (have.poison) out.push(btn('Poison', function () { U.poisonSheet(); }));
-    if (have.seeProphecy) out.push(btn('Bell Seer', function () { U.seerSheet(); }));
+    // phones: two rows of five, End turn filling the last two cells; one Poisoner or Bell Seer takes the
+    // last cell instead, and holding both puts the pair on a third row
+    var extra = [];
+    if (have.poison) extra.push(btn('Poison', function () { U.poisonSheet(); }));
+    if (have.seeProphecy) extra.push(btn('Bell Seer', function () { U.seerSheet(); }));
+    out.push(btn('End turn', function () { U.endTurnConfirm(); }, { cls: 'end' + (extra.length === 1 ? '' : ' span2') }));
+    if (extra.length === 1) out.push(extra[0]);
+    else if (extra.length) out.push('<div class="pair">' + extra.join('') + '</div>');
     return '<div class="abar grid">' + out.join('') + '</div>';
   }
   // station a retinue card: one eligible region goes straight there, more are picked on the map

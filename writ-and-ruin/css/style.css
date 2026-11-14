@@ -7,7 +7,7 @@
   --line: 2.5px;
   --off: 1px;        /* misregistration of the colour block: it covers 1px of the 2.5px right and bottom line */
   --gap: 10px;
-  --bar-h: 88px;     /* phones: the action bar is three rows of three */
+  --bar-h: 94px;     /* phones: the action bar is two rows of five */
 }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
@@ -164,9 +164,14 @@ svg { display: block; }
 .abar { display: flex; flex-wrap: wrap; gap: 0; padding: 4px 6px max(4px, env(safe-area-inset-bottom)); max-width: 1400px; margin: 0 auto; justify-content: center; }
 .abar .btn { flex: 1 0 auto; margin: 3px; padding: 6px 10px; }
 .abar.one .btn { flex: 1; }
-/* your turn: three rows of three, each label on one line; a Poisoner or Bell Seer starts a fourth row */
-.abar.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 3px 4px max(3px, env(safe-area-inset-bottom)); }
-.abar.grid .btn { min-height: 38px; margin: 2px; padding: 3px 6px; white-space: nowrap; }
+/* your turn: two rows of five, each label on one line; End turn fills the last two cells unless a Poisoner
+   or Bell Seer takes one; holding both puts the pair on a third row.
+   Cells are about 78px wide at 412px and 68px at 360px; the side padding is trimmed so "End turn" fits one cell. */
+.abar.grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); padding: 3px 2px max(3px, env(safe-area-inset-bottom)); }
+.abar.grid .btn { min-height: 38px; margin: 2px; padding: 3px 1px; white-space: nowrap; }
+.abar.grid .span2 { grid-column: span 2; }
+.abar.grid .pair { grid-column: 1 / -1; display: flex; }
+.abar.grid .pair .btn { flex: 1; }
 
 body.busy .map [data-region] { cursor: default; }
 
@@ -324,6 +329,8 @@ body.sheet-up { overflow: hidden; }
   /* wide screens: the whole bar on one row */
   .abar.grid { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); padding: 4px 6px max(4px, env(safe-area-inset-bottom)); }
   .abar.grid .btn { min-height: 44px; margin: 3px; padding: 6px 8px; }
+  .abar.grid .span2 { grid-column: auto; }
+  .abar.grid .pair { display: contents; }
   .age {
     --map-h: min(max(300px, calc(100vh - 212px)), calc((100vw - 400px) * 521 / 420));
     display: grid; grid-template-columns: auto minmax(300px, 1fr); grid-template-rows: auto auto auto auto 1fr;
