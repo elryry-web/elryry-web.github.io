@@ -1,8 +1,16 @@
 /* Writ & Ruin: a colour woodcut print. Cream paper, carved black rules, flat colour set a little off the line. */
+/* Writ Woodblock: the headings face, traced from a painted letter sheet by tools/prep-font.py. It has the letters,
+   figures and plain punctuation only; anything else (brackets, symbols) falls back to IM Fell English. */
+@font-face {
+  font-family: 'Writ Woodblock';
+  src: url(../fonts/writ-woodblock.woff2) format('woff2'), url(../fonts/writ-woodblock.woff) format('woff');
+  font-display: swap;
+}
 :root {
   --paper: #f4ead2; --ink: #17140f; --moss: #7f8b4c; --slate: #7c8796; --rust: #a5492f;
   --ochre: #c49a45; --bone: #e6dcc2; --peat: #5a4632;
-  --head: 'IM Fell English', 'Alegreya', Georgia, 'Times New Roman', serif;
+  --head: 'Writ Woodblock', 'IM Fell English', 'Alegreya', Georgia, 'Times New Roman', serif;
+  --fell: 'IM Fell English', 'Alegreya', Georgia, 'Times New Roman', serif;
   --body: 'Alegreya', Georgia, 'Times New Roman', serif;
   --line: 2.5px;
   --gap: 10px;
@@ -235,7 +243,8 @@ body.sheet-up { overflow: hidden; }
 .versus { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 8px 0; padding: 8px; border-top: var(--line) solid var(--ink); border-bottom: var(--line) solid var(--ink); }
 .vs-side { display: flex; flex-direction: column; align-items: center; min-width: 80px; }
 .vs-side small { color: var(--peat); }
-.vs { font-family: var(--head); font-style: italic; color: var(--peat); }
+/* Writ Woodblock has no italic, so the italic "against" keeps IM Fell's real one */
+.vs { font-family: var(--fell); font-style: italic; color: var(--peat); }
 .odds { font-size: 1.05rem; margin-bottom: 2px; }
 .losses { margin-top: 0; font-size: .95rem; }
 .fortune-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
