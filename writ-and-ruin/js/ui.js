@@ -53,6 +53,7 @@
     'retinue full': 'Your retinue is full: three is the most.',
     'return first': 'You hold no region: return first.',
     'once per turn': 'You have already treated this turn.',
+    'already dug in': 'You have already dug in here this turn.',
     'newly returned: safe until their turn': 'That house has just returned there. It is safe until its next turn.',
     'empty: march instead': 'No one defends it: march in instead.',
     'the truce': 'No assaults in the first round.',
@@ -190,6 +191,7 @@
       case 'recruit': return W + ' recruited ' + cardName(ev.card) + ' at ' + rn(ev.region) + '.';
       case 'build': return W + ' built the ' + REG[ev.region].site + ' at ' + rn(ev.region) + ' for ' + ev.silver + ' silver.';
       case 'station': return W + ' stationed ' + cardName(ev.card) + ' at ' + rn(ev.region) + '.';
+      case 'dig': return W + ' dug in at ' + rn(ev.region) + '.';
       case 'search': return W + ' searched ' + rn(ev.region) + ' and drew ' + plural(ev.drew, 'card') + '.' +
         (ev.barrowRelics && ev.barrowRelics.length ? ' The barrow gave up ' + listAnd(ev.barrowRelics.map(cardName)) + '.' : '');
       case 'keep':
@@ -228,7 +230,7 @@
       else if (e.type === 'battle') {
         U.flash = { from: e.from, to: e.to, house: e.house, region: e.to };
         if (e.defender === 'player') U.reports.push(e);
-      } else if (e.type === 'muster' || e.type === 'search' || e.type === 'recruit' || e.type === 'build' || e.type === 'station') U.flash = { region: e.region, house: e.house };
+      } else if (e.type === 'muster' || e.type === 'search' || e.type === 'recruit' || e.type === 'build' || e.type === 'station' || e.type === 'dig') U.flash = { region: e.region, house: e.house };
       else if (e.type === 'return') U.flash = { region: e.camp ? null : e.region, house: e.house };
       else if (e.type === 'turnStart') { U.flash = null; if (e.house === 'player') U.yourTurn = true; }
       if (e.type === 'search' && e.house === 'player') U.lastSearch = e;
@@ -683,7 +685,7 @@
     }
     if (U.mode) {
       var words = { march: 'Choose a region to march from.', muster: 'Choose one of your regions to muster in.', assault: 'Choose a region to assault.',
-        recruit: 'Choose a region with a resident to recruit.', search: 'Choose a region to search.',
+        recruit: 'Choose a region with a resident to recruit.', search: 'Choose a region to search.', dig: 'Choose one of your regions to dig in.',
         station: 'Choose one of your regions with an empty slot to station ' + (U.mode.card ? cardName(U.mode.card) : 'the resident') + ' in.' }[U.mode.kind] || '';
       if (U.mode.kind === 'assault') { var un = unguardedNote(s, legal); if (un) words += ' ' + un; }
       return '<div class="hint pickhint"><span>' + esc(words) + '</span>' + btn('Cancel', function () { U.mode = null; render(); }, { cls: 'small' }) + '</div>';
@@ -692,7 +694,7 @@
       (E.truce(s) ? ' ' + plain(E.truce(s)) : '') + '</span></div>';
   }
 
-  var BAR = [['march', 'March'], ['muster', 'Muster'], ['assault', 'Assault'], ['recruit', 'Recruit'], ['search', 'Search'], ['treat', 'Treat'], ['depart', 'Depart']];
+  var BAR = [['march', 'March'], ['muster', 'Muster'], ['assault', 'Assault'], ['recruit', 'Recruit'], ['search', 'Search'], ['treat', 'Treat'], ['dig', 'Dig in'], ['depart', 'Depart']];
   // why a kind of action is not possible now
   function whyNot(s, kind) {
     var hs = me(s);
@@ -717,6 +719,7 @@
       return 'No resident you can afford stands where your warbands are.';
     }
     if (kind === 'search') return s.deck.length ? 'not enough silver' : 'the world deck is empty';
+    if (kind === 'dig') return 'You have dug in everywhere you hold this turn.';
     return 'You cannot do that now.';
   }
   function actionBar(s, legal) {
@@ -736,10 +739,11 @@
       var k = b[0], on = !!have[k];
       return btn(b[1], function () { pickKind(k); }, { off: on ? null : whyNot(s, k), cls: U.mode && U.mode.kind === k ? 'active' : '' });
     });
+    out.push(btn('End turn', function () { U.endTurnConfirm(); }, { cls: 'end' }));
+    // three rows of three; the Poisoner and the Bell Seer start a fourth row
     if (have.poison) out.push(btn('Poison', function () { U.poisonSheet(); }));
     if (have.seeProphecy) out.push(btn('Bell Seer', function () { U.seerSheet(); }));
-    out.push(btn('End turn', function () { U.endTurnConfirm(); }, { cls: 'end' }));
-    return '<div class="abar">' + out.join('') + '</div>';
+    return '<div class="abar grid">' + out.join('') + '</div>';
   }
   // station a retinue card: one eligible region goes straight there, more are picked on the map
   function stationPick(id, where) {

@@ -100,6 +100,7 @@
         '<p>If you win, your surviving warbands move into ' + rn(to) + (pv.defender ? ' and ' + who(pv.defender) + "'s survivors fall back to a neighbouring region " + who(pv.defender) + ' holds (with none, they scatter).' : ' and the free folk who are left scatter.') +
         ' If you lose, your survivors stay in ' + rn(from) + '.</p>' +
         (pv.lastStand ? '<p class="note"><b>Last stand:</b> this is ' + whoseLow(pv.defender) + " only region, so it defends with +" + pv.lastStand + '. That is counted above.</p>' : '') +
+        (pv.dug ? '<p class="note"><b>Dug in:</b> +1 defence until ' + whoseLow(pv.defender) + ' next turn. That is counted above.</p>' : '') +
         (pv.peek != null ? '<p class="note"><b>Star Reader:</b> the next fortune card is a <b>' + pv.peek + '</b>. You will draw it.</p>' : '') +
         '<p class="fortune-line"><span class="lbl">Fortune left</span> ' + [0, 1, 2, 3].map(function (v) { return '<span class="fc"><b>' + v + '</b>×' + (left[v] || 0) + '</span>'; }).join('') +
         (s.fortune.length ? '' : ' <span class="muted">(the deck reshuffles first)</span>') + '</p>' +
@@ -127,6 +128,7 @@
     var fn = U.fortuneNotes(e, s);
     if (fn) notes.push(fn);
     if (e.lastStand) notes.push('Last stand: +' + N.lastStand + ' to the defence.');
+    if (e.dug) notes.push('Dug in: +1 to the defence.');
     var loss = [];
     if (e.attLoss) loss.push((mine ? 'You' : who(e.house)) + ' lost ' + plural(e.attLoss, 'warband') + '.');
     if (e.defLoss) loss.push((e.defender === 'player' ? 'You' : (e.defender ? who(e.defender) : 'The free folk')) + ' lost ' + plural(e.defLoss, e.defender ? 'warband' : 'band') + '.');
@@ -256,6 +258,7 @@
     var bandList = Object.keys(g.bands).filter(function (k) { return g.bands[k] > 0; });
     if (bandList.length) facts.push('Warbands: ' + bandList.map(function (k) { return stamp(k, 16) + ' ' + who(k) + ' ' + g.bands[k]; }).join(', '));
     facts.push('Defence ' + E.defenceOf(s, r, defAgainst) + (owner && E.lastStand(s, r) ? ' (with last stand)' : ''));
+    if (owner && g.dug === owner) facts.push('<b>Dug in:</b> +1 defence until ' + whoseLow(owner) + ' next turn.');
     if (owner && s.houses[owner].refuge === r) facts.push('<b>Safe:</b> ' + who(owner) + ' returned here and cannot be assaulted here until its next turn.');
     if (owner && !bandList.length && s.houses[owner].refuge !== r) facts.push('<b>Unguarded:</b> ' + (owner === 'player' ? 'You have' : who(owner) + ' has') + ' no warbands here. ' +
       (E.truce(s) ? 'Once ' + esc(E.truce(s)) + ' ends, any neighbour can march in and take it.' : 'Any neighbour can march in and take it.'));
@@ -294,6 +297,8 @@
         if (D.CARDS[id].relic) return;
         acts.push(['station', btn('Station ' + esc(D.CARDS[id].name) + ' here <small>1 moon</small>', function () { U.doAction({ type: 'station', region: r, card: id }); }, { cls: mode === 'station' ? 'go' : '', off: cand({ type: 'station', region: r, card: id }) })]);
       });
+      acts.push(['dig', btn('Dig in', function () { U.doAction({ type: 'dig', region: r }); }, { cls: mode === 'dig' ? 'go' : '', off: cand({ type: 'dig', region: r }) })]);
+      acts.push(['dig', '<p class="muted">+1 defence here until your next turn. 1 moon.</p>']);
     }
     var mine = E.bandsAt(s, 'player', r);
     if (mine > 0) {
@@ -482,7 +487,7 @@
         '<li><span><b>Depart.</b> From the ' + ordinal(N.departFrom) + ' round, hold the Far Pass with enough warbands since the start of your turn and carry the relics it needs, then depart.</span></li>' +
         '<li><span><b>Seat.</b> If the age ends with no other winner, the house holding the Crown hold wins.</span></li></ul>' +
         '<h3>Your turn</h3><p>You get moons each turn to spend on actions. March (1 moon), muster (1 moon and silver), assault (2 moons), recruit, search and treat. ' +
-          'Build a structure in a region you hold (1 moon and silver). Station a resident from your retinue in an empty slot of a region you hold (1 moon). Tap a region to see what you can do there.</p>' +
+          'Build a structure in a region you hold (1 moon and silver). Station a resident from your retinue in an empty slot of a region you hold (1 moon). Dig in (1 moon): +1 defence in a region you hold until your next turn. Tap a region to see what you can do there.</p>' +
         '<h3>Structures</h3><p>The Citadel and the Waystone are landmarks. They stand from the start and can never be razed. ' +
           'The other six regions start undeveloped: no effect, no site income and 1 slot. In the first age the Toll Bridge and the Charcoal Kilns already stand. ' +
           'A built structure gives its effect and a second slot. ' +

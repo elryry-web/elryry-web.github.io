@@ -356,6 +356,7 @@
       if (r === 'crown' && has(s, d, 'gatePorter')) v++;
       if ((r === 'saltmarsh' || r === 'oldbarrow') && has(s, d, 'ditchEel')) v++;
       v += lastStand(s, r);
+      if (g.dug === d) v++;   // dug in until the start of that house's next turn
     }
     return v;
   }
@@ -366,7 +367,7 @@
   }
   function battlePreview(s, a) {
     return { attack: a.count + attackBonus(s, a.house, a.from, a.to), defence: defenceOf(s, a.to, a.house),
-      defender: s.regions[a.to].owner, lastStand: lastStand(s, a.to), peek: peekFortune(s, a.house) };
+      defender: s.regions[a.to].owner, lastStand: lastStand(s, a.to), dug: !!(s.regions[a.to].owner && s.regions[a.to].dug === s.regions[a.to].owner), peek: peekFortune(s, a.house) };
   }
 
   // ---------------------------------------------------------------- pacts
@@ -435,6 +436,7 @@
     var g = s.regions[r];
     if (g.owner === h) return;
     g.owner = h; g.folk = 0;
+    delete g.dug;   // digging in ends when the region changes hands
     if (r === 'crown') s.history.crown.push({ house: h, round: s.round, how: how });
   }
 
@@ -561,6 +563,12 @@
         if (hours < 1) return err('no hours');
         return null;
       }
+      case 'dig': {
+        if (!s.regions[a.region] || !holds(s, h, a.region)) return err('not your region');
+        if (s.regions[a.region].dug === h) return err('already dug in');
+        if (hours < 1) return err('no hours');
+        return null;
+      }
       case 'search': {
         if (!s.regions[a.region] || bandsAt(s, h, a.region) < 1) return err('no warbands there');
         if (!s.deck.length) return err('the world deck is empty');
@@ -672,6 +680,7 @@
         }
         cs.forEach(function (c) { add({ type: 'muster', region: r, count: c }); });
         if (!siteOn(s, r)) add({ type: 'build', region: r });
+        add({ type: 'dig', region: r });
         if (s.regions[r].residents.length < slotsOf(s, r)) hs.retinue.forEach(function (c) { add({ type: 'station', region: r, card: c }); });
       }
     });
@@ -765,6 +774,11 @@
         ev.push({ type: 'station', house: h, region: a.region, card: a.card });
         break;
       }
+      case 'dig':
+        hs.hours -= 1;
+        s.regions[a.region].dug = h;
+        ev.push({ type: 'dig', house: h, region: a.region });
+        break;
       case 'search': doSearch(s, a, ev); break;
       case 'keep': doKeep(s, a, ev); break;
       case 'treat': {
@@ -865,7 +879,7 @@
     var E = { type: 'battle', house: h, defender: d, from: from, to: to, count: n, attack: att, defence: def,
       attCard: ac, defCard: dc, tideCard: extra, witch: witch, attTotal: at, defTotal: dt,
       winner: win ? 'attacker' : 'defender', attLoss: attLoss, defLoss: defLoss, retreat: null, relic: null, silver: 0,
-      lastStand: lastStand(s, to) };
+      lastStand: lastStand(s, to), dug: !!(d && g.dug === d) };
     var src = camp ? null : s.regions[from];
     if (win) {
       lose(n);
@@ -1007,6 +1021,7 @@
     hs.flags = {};
     hs.refuge = null;
     hs.camp = 0;
+    IDS.forEach(function (r) { if (s.regions[r].dug === h) delete s.regions[r].dug; });   // last turn's digging in runs out
     ev.push({ type: 'turnStart', house: h, round: s.round });
     noteClaims(s, null);
     var cs = s.round >= N.claimFrom ? claimStanding(s, h) : null;   // a claim must stand a full round

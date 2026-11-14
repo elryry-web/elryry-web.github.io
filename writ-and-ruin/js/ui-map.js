@@ -198,6 +198,7 @@
     }
     // holder stamp, shelter mark
     if (owner) out += stampAt(owner, cx - 22, cy + 16, 22);
+    if (owner && g.dug === owner) out += dugMark(owner, cx - 38, cy + 15);
     if (owner && s.houses[owner] && s.houses[owner].refuge === r) {
       out += '<g class="safe"><rect x="' + (cx - 38) + '" y="' + (cy + 28) + '" width="34" height="13" fill="' + P.paper + '" stroke="' + P.ink + '" stroke-width="1.4"/>' +
         '<text x="' + (cx - 21) + '" y="' + (cy + 37.6) + '" text-anchor="middle" class="tiny">safe</text></g>';
@@ -296,6 +297,18 @@
     if (label != null) out += '<circle cx="' + f1(mx + 11) + '" cy="' + f1(my + 7) + '" r="7.5" fill="' + P.paper + '" stroke="' + P.ink + '" stroke-width="1.6"/><text x="' + f1(mx + 11) + '" y="' + f1(my + 10.6) + '" text-anchor="middle" class="tiny b">' + label + '</text>';
     if (revised) out += newPlan(mx - 12, my - 12);
     return out + '</g>';
+  }
+  // dug in: a small shield in the holder's colour with '+1', on the corner of the holder stamp
+  function dugMark(h, x, y) {
+    var col = A.houseCol(h);
+    function shield(dx, dy) {
+      var l = x - 8 + dx, rt = x + 8 + dx, top = y - 9 + dy, mid = y - 1 + dy, bot = y + 9 + dy, c = x + dx;
+      return 'M' + f1(l) + ' ' + f1(top) + 'H' + f1(rt) + 'V' + f1(mid) + 'Q' + f1(rt) + ' ' + f1(y + 6 + dy) + ' ' + f1(c) + ' ' + f1(bot) +
+        'Q' + f1(l) + ' ' + f1(y + 6 + dy) + ' ' + f1(l) + ' ' + f1(mid) + 'Z';
+    }
+    return '<g class="dug"><title>Dug in: +1 defence</title><path d="' + shield(1.4, 1.2) + '" fill="' + col + '"/>' +
+      '<path d="' + shield(0, 0) + '" fill="none" stroke="' + P.ink + '" stroke-width="1.8" stroke-linejoin="round"/>' +
+      '<text x="' + f1(x + 0.7) + '" y="' + f1(y + 3) + '" text-anchor="middle" class="dk" fill="' + A.textOn(col) + '">+1</text></g>';
   }
   // a small '!' tag on an intent its house has just changed
   function newPlan(x, y) {

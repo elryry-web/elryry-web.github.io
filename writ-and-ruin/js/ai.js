@@ -392,8 +392,29 @@
 
   function candidates(s, h) {
     return E.legalActions(s, h, { few: true }).filter(function (a) {
-      return a.type !== 'treat' && a.type !== 'poison' && a.type !== 'seeProphecy' && a.type !== 'end';
+      return a.type !== 'treat' && a.type !== 'poison' && a.type !== 'seeProphecy' && a.type !== 'dig' && a.type !== 'end';
     });
+  }
+  // spare moons, once nothing better is left: dig in where a rival is likeliest to take a region worth keeping.
+  // An unguarded region is not worth it (it is marched into, not fought for).
+  var DIG = { min: 0.12, odds: 1.5, crown: 1.5, claim: 3 };
+  function digChoice(s, h, base) {
+    if (s.houses[h].hours < 1) return null;
+    var crit = null, best = null, bv = DIG.min;
+    E.heldBy(s, h).forEach(function (r) {
+      var a = { type: 'dig', house: h, region: r };
+      if (!E.bandsAt(s, h, r) || E.check(s, a)) return;
+      var pr = pressure(s, h, r);
+      if (!pr) return;
+      var d = E.defenceOf(s, r, null), stake = regionWorth(s, r);
+      if (r === 'crown') stake += DIG.crown;
+      if (crit === null) crit = criticalRegions(s, h, h);   // a standing claim or Departure that needs this region
+      if (crit.indexOf(r) >= 0) stake += DIG.claim;
+      var v = (pWin(pr + 1 - d) - pWin(pr - d)) * stake * DIG.odds;
+      try { v += evaluate(tryApply(s, a), h) - base; } catch (e) { return; }
+      if (v > bv) { bv = v; best = a; }
+    });
+    return best;
   }
 
   // ---------------------------------------------------------------- deciding
@@ -529,6 +550,9 @@
     c.planRound = s.order.indexOf(h) > s.turn ? base : base + 1;
     c.turn = c.order.indexOf(h); c.pending = null; c._planning = true;
     hs.flags = {}; hs.hours = 9;
+    // digging in runs out as each house starts its turn: h's own, and any that move before h's next turn
+    var spent = movesBefore(s, h).concat(h);
+    IDS.forEach(function (r) { if (spent.indexOf(c.regions[r].dug) >= 0) delete c.regions[r].dug; });
     if (!E.nHeld(c, h)) hs.flags.returnDue = true;
     return c;
   }
@@ -589,7 +613,7 @@
   // the board as it stands, to compare after the player acts
   function snapshot(s) {
     var o = {};
-    IDS.forEach(function (r) { var g = s.regions[r]; o[r] = { owner: g.owner, bands: JSON.stringify(g.bands) }; });
+    IDS.forEach(function (r) { var g = s.regions[r]; o[r] = { owner: g.owner, bands: JSON.stringify(g.bands), dug: g.dug || null }; });
     o._threat = playerThreat(s);
     return o;
   }
@@ -605,6 +629,7 @@
     if (it.type === 'depart') return !later && !E.holds(s, h, 'farpass');
     var regs = [it.from, it.to, it.region].filter(function (r) { return r && before[r]; });
     if (regs.some(function (r) { return before[r].owner !== s.regions[r].owner; })) return true;
+    if (it.type === 'assault' && before[it.to] && before[it.to].dug !== (s.regions[it.to].dug || null)) return true;   // dug in: weigh the assault again
     if (later || ['assault', 'march', 'muster', 'return'].indexOf(it.type) < 0) return false;
     return !!E.check(planState(s, h), toAction(it, h), { ignoreHours: true });
   }
@@ -682,7 +707,10 @@
   function replan(s, mover, before) {
     var ev = [];
     if (mover !== 'player' || s.phase !== 'play' || s.order[s.turn] !== mover) return ev;
-    var moved = IDS.some(function (r) { var g = s.regions[r]; return before[r].owner !== g.owner || before[r].bands !== JSON.stringify(g.bands); });
+    var moved = IDS.some(function (r) {
+      var g = s.regions[r];
+      return before[r].owner !== g.owner || before[r].bands !== JSON.stringify(g.bands) || (before[r].dug !== undefined && before[r].dug !== (g.dug || null));
+    });
     if (!moved) return ev;
     // a claim or Departure of the player's that now stands: every rival plans again to break it (and shows it)
     var threat = playerThreat(s), fresh = threat && threat !== before._threat;
@@ -762,6 +790,8 @@
     if (best) return best;
     var tr = hs._acts < 25 ? treatChoice(s, h) : null;
     if (tr) return tr;
+    var dg = hs._acts < 25 ? digChoice(s, h, base) : null;
+    if (dg) return dg;
     var plan = nextIntent(s, h);
     return { type: 'end', house: h, intent: plan.intent, intent2: plan.intent2 };
   }
@@ -880,6 +910,7 @@
     decide: decide, whoActs: whoActs, run: run, act: act, respond: respond, reckoningChoice: reckoningChoice,
     evaluate: evaluate, odds: odds, planIntent: planIntent, snapshot: snapshot, replan: replan, ahead: ahead, pactScore: pactScore, chooseProphecy: chooseProphecy,
     dangers: function (s, h) { setGuess(s, h); return dangers(s, h); },
+    digChoice: function (s, h) { setGuess(s, h); return digChoice(s, h, evaluate(s, h)); },
     TEMPERAMENTS: T, AIM: AIM, BUILD: BUILD
   };
 });
