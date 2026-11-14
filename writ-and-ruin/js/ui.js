@@ -70,7 +70,7 @@
     'a region is free: return there': 'A region is free: return there rather than to the camp.',
     'the world deck is empty': 'The world deck is empty: there is nothing left to find.',
     'no warbands there': 'You need warbands there.',
-    'no warbands there or next to it': 'You need warbands there or in a region next to it.',
+    "you don't hold it and have no warbands there or next to it": 'You do not hold it. You need warbands there or in a region next to it.',
     'not its declared plan': 'It did not show that plan.',
     'not your region': 'You do not hold that region.',
     'not your turn': 'It is not your turn.',
@@ -206,7 +206,7 @@
       case 'oath': return 'The Broken Word cost ' + whoLow(h, s) + ' ' + ev.lost.length + ' warbands.';
       case 'recruit':
         if (ev.from) return W + ' poached the ' + cardName(ev.card) + ' from ' + (ev.from === 'player' ? 'your' : whoLow(ev.from, s) + "'s") + ' ' + REG[ev.region].name + ' (' + ev.silver + ' silver).';
-        return W + ' recruited ' + cardName(ev.card) + ' at ' + rn(ev.region) + (ev.reach ? ', with ' + (ev.house === 'player' ? 'your' : 'its') + ' warbands next door in ' + rn(ev.reach) : '') + '.';
+        return W + ' recruited ' + cardName(ev.card) + ' at ' + rn(ev.region) + (ev.reach && ev.reach !== ev.region ? ', with ' + (ev.house === 'player' ? 'your' : 'its') + ' warbands next door in ' + rn(ev.reach) : '') + '.';
       case 'build': return W + ' built the ' + REG[ev.region].site + ' at ' + rn(ev.region) + ' for ' + ev.silver + ' silver.';
       case 'station': return W + ' stationed ' + cardName(ev.card) + ' at ' + rn(ev.region) + '.';
       case 'dig': return W + ' dug in at ' + rn(ev.region) + '.';
@@ -709,7 +709,7 @@
       hs.relics.length ? plural(hs.relics.length, 'relic') : ''].filter(Boolean).join(' · ');
     return fold('house', 'Your house', esc(sum),
       (hs.prophecy ? '<p class="prophecy"><span class="lbl">Prophecy</span> “' + esc(D.PROPHECIES[hs.prophecy - 1].text) + '” <b>' + p.have + '/' + p.need + '</b></p>' : '') +
-      '<p class="lbl">Retinue ' + hs.retinue.length + '/' + N.retinueMax + '</p>' + (cards || '<p class="muted">No one yet. Recruit residents where your warbands stand or next door.</p>') +
+      '<p class="lbl">Retinue ' + hs.retinue.length + '/' + N.retinueMax + '</p>' + (cards || '<p class="muted">No one yet. Recruit residents in regions you hold, or where your warbands stand or next door.</p>') +
       (rel ? '<p class="lbl">Relics</p>' + rel : ''));
   }
   function lawPanel(s) {
@@ -742,7 +742,7 @@
     }
     if (U.mode) {
       var words = { march: 'Choose a region to march from.', muster: 'Choose one of your regions to muster in.', assault: 'Choose a region to assault.',
-        recruit: 'Choose a region with a resident to recruit: where your warbands are, or next door.', search: 'Choose a region to search.', dig: 'Choose one of your regions to dig in.',
+        recruit: 'Choose a region with a resident to recruit: one you hold, where your warbands are, or next door.', search: 'Choose a region to search.', dig: 'Choose one of your regions to dig in.',
         station: 'Choose one of your regions with an empty slot to station ' + (U.mode.card ? cardName(U.mode.card) : 'the resident') + ' in.' }[U.mode.kind] || '';
       if (U.mode.kind === 'assault') { var un = unguardedNote(s, legal); if (un) words += ' ' + un; }
       return '<div class="hint pickhint"><span>' + esc(words) + '</span>' + btn('Cancel', function () { U.mode = null; render(); }, { cls: 'small' }) + '</div>';
@@ -776,7 +776,7 @@
     }
     if (kind === 'recruit') {
       if (hs.retinue.length >= N.retinueMax) return 'retinue full';
-      return 'No resident you can afford stands where your warbands are or next door.';
+      return 'No resident you can afford is in reach. Recruit in a region you hold, where your warbands are, or next door.';
     }
     if (kind === 'search') return s.deck.length ? 'not enough silver' : 'the world deck is empty';
     if (kind === 'dig') return 'You have dug in everywhere you hold this turn.';

@@ -229,7 +229,7 @@
           }
           return A.card(id, (D.CARDS[id].siteOnly ? '<p class="note">Works only at its site. It does nothing in a retinue.</p>' : '') + '<div class="row">' + ac.join('') + '</div>', { pic: 'full' });
         }).join('') + '</div>' +
-        '<p class="muted">A resident left at the site can be recruited later by whoever has warbands there or next door.</p>' +
+        '<p class="muted">A resident left at the site can be recruited later by whoever holds the region, or has warbands there or next door.</p>' +
         '<div class="row">' + btn('Keep no more', function () { U.doAction({ type: 'keep', card: null }); }) + '</div>';
     }, { modal: true, wide: true });
   };
@@ -520,7 +520,7 @@
         '<li><span><b>Seat.</b> If the age ends with no other winner, the house holding the Crown hold wins.</span></li></ul>' +
         '<h3>Your turn</h3><p>You get moons each turn to spend on actions. March (1 moon), muster (1 moon and silver), assault (2 moons), recruit, search and treat. ' +
           'Build a structure in a region you hold (1 moon and silver). Station a resident from your retinue in an empty slot of a region you hold (1 moon). Dig in (1 moon): +1 defence in a region you hold until your next turn. Tap a region to see what you can do there.</p>' +
-        '<p>Recruit a resident where your warbands stand or in a region next to them. Taking one from a region another house holds is poaching: it costs ' + N.poachSilver + ' more silver, and that house takes a grudge against you. You cannot poach from a house you have a pact with. A rival that means to poach from you shows it first, like an assault.</p>' +
+        '<p>Recruit a resident in a region you hold, where your warbands stand, or in a region next to them. Taking one from a region another house holds is poaching: it costs ' + N.poachSilver + ' more silver, and that house takes a grudge against you. You cannot poach from a house you have a pact with. A rival that means to poach from you shows it first, like an assault.</p>' +
         '<h3>Structures</h3><p>The Citadel and the Waystone are landmarks. They stand from the start and can never be razed. ' +
           'The other six regions start undeveloped: no effect, no site income and 1 slot. In the first age the Toll Bridge and the Charcoal Kilns already stand. ' +
           'A built structure gives its effect and a second slot. ' +

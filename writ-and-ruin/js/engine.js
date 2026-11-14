@@ -321,10 +321,11 @@
     }
     return Math.max(0, c) + (r && poachFrom(s, h, r) ? N.poachSilver : 0);
   }
-  // where h recruits in region r from: r itself if h has warbands there, else the neighbour with the most of h's warbands, or null
+  // where h recruits in region r from: r itself if h holds it or has warbands there,
+  // else the neighbour with the most of h's warbands, or null
   function recruitReach(s, h, r) {
     if (!s.regions[r]) return null;
-    if (bandsAt(s, h, r) > 0) return r;
+    if (holds(s, h, r) || bandsAt(s, h, r) > 0) return r;
     var best = null;
     REG[r].adj.forEach(function (n) { if (bandsAt(s, h, n) > 0 && (!best || bandsAt(s, h, n) > bandsAt(s, h, best))) best = n; });
     return best;
@@ -603,7 +604,7 @@
       case 'recruit': {
         g = s.regions[a.region];
         if (!g) return err('no such region');
-        if (!recruitReach(s, h, a.region)) return err('no warbands there or next to it');
+        if (!recruitReach(s, h, a.region)) return err("you don't hold it and have no warbands there or next to it");
         if (g.residents.indexOf(a.card) < 0) return err('not there');
         if (siteOnly(a.card)) return err('stays at its site');
         var victim = poachFrom(s, h, a.region);
@@ -754,7 +755,7 @@
         add({ type: 'dig', region: r });
         if (s.regions[r].residents.length < slotsOf(s, r)) hs.retinue.forEach(function (c) { add({ type: 'station', region: r, card: c }); });
       }
-      // recruit: where h has warbands, or next door to them (from another house's region, a poach)
+      // recruit: where h holds, where h has warbands, or next door to them (from another house's region, a poach)
       if (hs.retinue.length < N.retinueMax && recruitReach(s, h, r)) s.regions[r].residents.forEach(function (c) { add({ type: 'recruit', region: r, card: c }); });
     });
     if (!hs.flags.treated) {
@@ -827,7 +828,9 @@
       }
       case 'recruit': {
         var rc = recruitCost(s, h, a.card, a.region), g = s.regions[a.region], pv = poachFrom(s, h, a.region);
-        var reach = bandsAt(s, h, a.region) > 0 ? null : recruitReach(s, h, a.region);
+        // reach: the neighbour h recruits through, or null when h holds the region or stands in it
+        var reach = recruitReach(s, h, a.region);
+        if (reach === a.region) reach = null;
         hs.silver -= rc; hs.hours -= 1;
         g.residents.splice(g.residents.indexOf(a.card), 1);
         hs.retinue.push(a.card);
