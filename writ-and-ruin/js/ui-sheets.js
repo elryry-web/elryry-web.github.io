@@ -545,15 +545,17 @@
       var sc = H.screenFor(c);
       where = c.age ? E.ageTitle(c.age.ageNo) + (sc === 'age' ? (c.age.phase === 'prophecy' ? ', choosing prophecies' : ', round ' + c.age.round) : sc === 'end' ? ', ended' : sc === 'reckon' ? ', the Reckoning' : ', in the Annals') : '';
     }
-    // Ryan's painted valley when it has loaded, else the drawn woodcut; the name sits below it on the paper.
-    // The heraldry stands in the margins beside the tagline; the cut pieces are CSS images (art/ui-*.png).
+    // Ryan's painted valley when it has loaded, else the drawn woodcut; the name, a letterpress wordmark cut from
+    // the mock-up, sits below it on the paper. The heraldry belongs to the frame: small shields on the border beside
+    // the picture and the tagline, the lion and stag on scroll flourishes growing out of it (art/ui-herald-*.png).
     var hero = A.paintedUrl && A.paintedUrl('title');
     return '<div class="screen title-screen"><div class="titleblock"><div class="title-art' + (hero ? ' painted' : '') + '">' +
-      (hero ? '<img src="' + hero + '" alt="A painted valley: a river winding past a castle to the sea">' : titleArt()) + '</div>' +
-      '<h1 class="gametitle">Writ <span>&amp;</span> Ruin</h1>' +
-      '<div class="herald"><i class="hd shield-lion"></i>' +
+      (hero ? '<img src="' + hero + '" alt="A painted valley: a river winding past a castle to the sea">' : titleArt()) +
+      '<i class="hd pale-l"></i><i class="hd pale-r"></i></div>' +
+      '<h1 class="gametitle"><img src="art/ui-wordmark.png" alt="Writ &amp; Ruin" width="1056" height="160"></h1>' +
+      '<div class="herald"><i class="hd shield-l"></i>' +
       '<p class="tagline">A valley of eight regions, fought over by four houses. Whoever wins an age writes its law, which carries into the next age along with any grudges.</p>' +
-      '<i class="hd shield-eagle"></i><i class="hd lion"></i><i class="tdivider"></i><i class="hd stag"></i></div></div>' +
+      '<i class="hd shield-r"></i><i class="hd lion"></i><i class="tdivider"></i><i class="hd stag"></i></div></div>' +
       '<div class="menu">' +
       (save ? btn(ticon('crown') + 'Continue <small>' + esc(where) + '</small>', function () { U.go(H.screenFor(U.c)); }, { cls: 'plank green big' }) : '') +
       btn(ticon('quill') + 'New campaign', function () {
@@ -562,7 +564,7 @@
           return '<h2>Start a new campaign?</h2><p>Your current campaign and its Annals will be lost.</p><div class="row">' +
             btn('Start anew', function () { U.closeSheet(); U.newCampaign(); }, { cls: 'red' }) + btn('Keep my campaign', function () { U.closeSheet(); }) + '</div>';
         });
-      }, { cls: save ? 'plank' : 'plank green big' }) +
+      }, { cls: save ? 'plank tan' : 'plank green big' }) +
       btn(ticon('book') + 'The Annals', function () { U.annalsFrom = 'title'; U.go('annals'); }, { cls: 'plank', off: save && c.annals.length ? null : 'No age has been recorded yet.' }) +
       btn(ticon('scroll') + 'How to win', function () { U.helpSheet(); }, { cls: 'plank' }) + '</div></div>';
   };
