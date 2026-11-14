@@ -231,7 +231,7 @@ body.sheet-up { overflow: hidden; }
 /* an undeveloped region: its structure shown faded and dashed until someone builds it */
 .sitebox.unbuilt { border-style: dashed; box-shadow: none; }
 .sitebox.unbuilt svg { opacity: 0.4; filter: grayscale(1); }
-.map .cost { font: 11.5px var(--head); fill: var(--ink); }   /* the build cost on an unbuilt site's coin */
+.map .cost { font: 700 12px var(--head); fill: #000; stroke: #000; stroke-width: .15px; letter-spacing: .3px; }   /* the build cost on an unbuilt site's coin: black and thickened so it holds on the silver */
 .sitetext { border-left: 4px solid var(--moss); padding-left: 8px; }
 .facts { font-size: .92rem; line-height: 1.55; }
 .facts svg { display: inline-block; vertical-align: -3px; }
