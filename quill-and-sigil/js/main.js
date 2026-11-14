@@ -1841,7 +1841,7 @@ const numHTML = r => [...r].map(c => `<img src="art/num-${c}.png?v=1" width="${N
 // a finished lesson's wax seal, pressed by hand: one of six painted seals (all one crimson wax and one gold), a tilt and a
 // size, all from a hash of the lesson's name (not its place in the list), so a lesson always gets the same seal. A lesson whose pick
 // matches the lesson before it in the same folio steps on to the next seal, so neighbours differ.
-const SEAL_N = 6, sealLooks = [];
+const SEAL_N = 6, sealLooks = [], SEAL_FIT = [1, 0.997, 1.007, 0.977, 0.987, 0.984];
 function sealLook(i) {
   if (sealLooks[i]) return sealLooks[i];
   let h = 0x811c9dc5;
@@ -1850,7 +1850,9 @@ function sealLook(i) {
   let n = Math.floor(next() * SEAL_N);
   if (i > 0 && !LEVELS[i].opens && sealLook(i - 1).n === n) n = (n + 1) % SEAL_N;
   const lerp = (a, b) => a + (b - a) * next();
-  return (sealLooks[i] = { n, tilt: lerp(-8, 8).toFixed(1), size: lerp(0.95, 1.03).toFixed(3) });
+  // (v182) each seal picture's phoenix stamp measures 149.5-154px of 256, so SEAL_FIT brings every stamp to seal-1's
+  // size and the random part stays within ±1%: the wax may differ, the phoenixes differ by about 2% at most
+  return (sealLooks[i] = { n, tilt: lerp(-8, 8).toFixed(1), size: (SEAL_FIT[n] * lerp(0.99, 1.01)).toFixed(3) });
 }
 const sealHTML = i => {
   const k = sealLook(i);
