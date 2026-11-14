@@ -635,14 +635,27 @@
     return '';
   }
   var STEP_NAME = { build: 'I. The valley', banish: 'II. The world deck', law: 'III. The law' };
+  var STEP_ORDER = ['build', 'banish', 'law'];
+  // the step's heading: its numeral in an ink badge, then its name
+  function stepHead(k) {
+    var m = STEP_NAME[k].match(/^(\w+)\. (.*)$/);
+    return '<h2 class="rk-h"><span class="rk-num">' + m[1] + '</span> ' + m[2] + '</h2>';
+  }
+  // the running count of a step as a chip, ochre once it is complete
+  function chip(label, have, need) {
+    return '<span class="rk-chip' + (have >= need ? ' full' : '') + '">' + label + ' <b>' + have + '/' + need + '</b></span>';
+  }
   U.renderReckoning = function () {
     var c = U.c, R = c.reckoning, o = E.reckoningOptions(c), w = R.winner, mine = w === 'player';
     var out = ['<div class="screen reckon-screen"><h1>The Reckoning</h1><p class="muted">' + esc(howWords(c, w, R.how, R.round, c.age)) + '</p>',
-      '<ol class="steps">' + ['build', 'banish', 'law'].map(function (k) { return '<li class="' + (k === o.step ? 'now' : (['build', 'banish', 'law'].indexOf(k) < ['build', 'banish', 'law'].indexOf(o.step) ? 'done' : '')) + '">' + STEP_NAME[k] + '</li>'; }).join('') + '</ol>'];
+      '<ol class="steps">' + STEP_ORDER.map(function (k) {
+        var now = k === o.step, done = STEP_ORDER.indexOf(k) < STEP_ORDER.indexOf(o.step);
+        return '<li class="' + (now ? 'now' : done ? 'done' : '') + '"' + (now ? ' aria-current="step"' : '') + '>' + STEP_NAME[k] + '</li>';
+      }).join('') + '</ol>'];
     if (!mine) {
       var ch = U.rkAi && U.rkAi.step === o.step ? U.rkAi.choice : null;
       if (!ch) { ch = AI.reckoningChoice(c); U.rkAi = { step: o.step, choice: ch }; }
-      out.push('<section class="panel">' + stamp(w, 36) + '<h2>' + STEP_NAME[o.step] + '</h2><p class="bigtext">' + esc(describeAiChoice(c, o, ch)) + '</p>');
+      out.push('<section class="panel">' + stamp(w, 36) + stepHead(o.step) + '<p class="bigtext">' + esc(describeAiChoice(c, o, ch)) + '</p>');
       if (o.step === 'build' && ch && ch.region && (ch.kind === 'work' || ch.kind === 'razeWork')) {
         var rw = D.WORK[ch.work || (c.world.works || {})[ch.region]];
         out.push('<p class="rkart">' + A.art('work/' + rw.id, { size: 64 }) + '<span><b>' + esc(rw.name) + '</b> at ' + rn(ch.region) + '. ' + esc(rw.text) + '</span></p>');
@@ -656,7 +669,7 @@
         if ((ch.admit || []).length) out.push('<h3>Admitted</h3><div class="cards">' + ch.admit.map(function (id) { return A.card(id, ''); }).join('') + '</div>');
       }
       if (o.step === 'build') out.push(startsHtml(c));
-      if (o.step === 'law' && c.world.laws.length >= o.max) out.push('<p class="muted">Only ' + o.max + ' laws stand at once: the oldest, ' + D.LAW[c.world.laws[0]].name + ', lapses.</p>');
+      if (o.step === 'law' && c.world.laws.length >= o.max) out.push('<p class="rk-hint">Only ' + o.max + ' laws stand at once: the oldest, ' + D.LAW[c.world.laws[0]].name + ', lapses.</p>');
       out.push(btn('Go on', function () { applyRk(ch); }, { cls: 'go big' }) + '</section>');
     } else out.push(playerRk(c, o));
     out.push('</div>');
@@ -675,7 +688,7 @@
   }
   function playerRk(c, o) {
     U.rk = U.rk && U.rk.step === o.step ? U.rk : { step: o.step, pick: null, banish: [], admit: [] };
-    var rk = U.rk, out = ['<section class="panel"><h2>' + STEP_NAME[o.step] + '</h2>'];
+    var rk = U.rk, out = ['<section class="panel">' + stepHead(o.step)];
     if (o.step === 'build') {
       var g = E.reckoningGroups(o), pick = rk.pick && g.raise.filter(function (x) { return x.work === rk.pick; })[0];
       var where = function (r) { var tg = E.startTag(c, r); return ' <small>' + esc(cap(rn(r))) + (tg ? ' · ' + esc(tg) : '') + '</small>'; };
@@ -683,14 +696,14 @@
         // step two of raising a work: where it goes
         var wk = D.WORK[pick.work];
         out.push('<p class="rkart">' + A.art('work/' + wk.id, { size: 48 }) + '<span><b>Raise the ' + esc(wk.name) + '.</b> ' + esc(wk.text) + '</span></p>' +
-          '<h3>Choose a region</h3><p class="muted">Regions with a great work already are left out.</p><div class="actlist">');
+          '<h3>Choose a region</h3><p class="rk-hint">Regions with a great work already are left out.</p><div class="actlist">');
         pick.regions.forEach(function (r) {
           var tg = E.startTag(c, r);
           out.push(btn(A.art('site/' + r, { size: 20 }) + ' ' + esc(cap(rn(r))) + (tg ? ' <small>' + esc(tg) + '</small>' : ''), function () { applyRk({ kind: 'work', region: r, work: wk.id }); }));
         });
         out.push('</div><div class="row">' + btn('Back', function () { rk.pick = null; U.render(); }) + '</div>');
       } else {
-        out.push('<p>Make one change to the valley. It lasts into the ages to come. ' + (g.raise.length ? 'You may raise a great work in any region. ' +
+        out.push('<p class="rk-lead">Make one change to the valley. It lasts into the ages to come.</p><p class="rk-hint">' + (g.raise.length ? 'You may raise a great work in any region. ' +
           'It helps whoever holds that region. A region holds one work at most. ' : 'All six great works stand. None is left to raise. ') +
           'You may also build or raze a structure, or raze a great work. The Citadel and the Waystone always stand. ' +
           'Or leave the valley as it is.</p>');
@@ -722,7 +735,8 @@
       }
     } else if (o.step === 'banish') {
       var needB = Math.min(o.banish, o.deck.length), needA = o.admit;
-      out.push('<p>Banish ' + needB + ' cards from the world deck for good, and admit ' + needA + ' from the Vault. Chosen: ' + rk.banish.length + ' of ' + needB + ' banished, ' + rk.admit.length + ' of ' + needA + ' admitted.</p>');
+      var tally = '<p class="rk-tally"><span class="lbl">Chosen</span>' + chip('Banished', rk.banish.length, needB) + chip('Admitted', rk.admit.length, needA) + '</p>';
+      out.push('<p class="rk-lead">Banish ' + needB + ' cards from the world deck for good, and admit ' + needA + ' from the Vault.</p>' + tally);
       out.push('<h3>Admit from the Vault</h3><div class="cards">' + o.offer.map(function (id) {
         var on = rk.admit.indexOf(id) >= 0;
         return A.card(id, '<div class="row">' + btn(on ? 'Admitted ✓' : 'Admit', function () { toggle(rk.admit, id, needA); }, { cls: on ? 'active' : '' }) + '</div>', { pic: 'full' });
@@ -732,10 +746,12 @@
         return A.card(id, '<div class="row">' + btn(on ? 'Banished ✗' : 'Banish', function () { toggle(rk.banish, id, needB); }, { cls: on ? 'red active' : '' }) + '</div>');
       }).join('') + '</div>');
       var ready = rk.banish.length === needB && rk.admit.length === needA;
-      out.push('<div class="row sticky">' + btn('Confirm', function () { applyRk({ banish: rk.banish, admit: rk.admit }); }, { cls: 'go big', off: ready ? null : 'Choose ' + needB + ' to banish and ' + needA + ' to admit.' }) + '</div>');
+      // the count again beside Confirm, at the foot of the lists; the row is not sticky, so it never covers a card
+      out.push('<div class="rk-foot">' + tally + '<div class="row">' + btn('Confirm', function () { applyRk({ banish: rk.banish, admit: rk.admit }); }, { cls: 'go big', off: ready ? null : 'Choose ' + needB + ' to banish and ' + needA + ' to admit.' }) + '</div></div>');
     } else if (o.step === 'law') {
-      out.push('<p>Write one law. It holds in every age to come until it lapses. Up to ' + o.max + ' laws stand at once.</p>');
-      if (o.standing.length) out.push('<p class="muted">Standing: ' + o.standing.map(function (id) { return D.LAW[id].name; }).join(', ') + '.' + (o.standing.length >= o.max ? ' The oldest, ' + D.LAW[o.standing[0]].name + ', will lapse.' : '') + '</p>');
+      out.push('<p class="rk-lead">Write one law. It holds in every age to come until it lapses.</p><p class="rk-hint">Up to ' + o.max + ' laws stand at once.</p>');
+      if (o.standing.length) out.push('<p class="rk-tally"><span class="lbl">Standing</span>' + o.standing.map(function (id) { return '<span class="rk-chip">' + esc(D.LAW[id].name) + '</span>'; }).join('') + '</p>' +
+        (o.standing.length >= o.max ? '<p class="rk-hint">The oldest, ' + esc(D.LAW[o.standing[0]].name) + ', will lapse.</p>' : ''));
       out.push('<div class="actlist">' + o.options.map(function (id) {
         return '<div class="choice"><b>' + esc(D.LAW[id].name) + '</b><p>' + esc(D.LAW[id].text) + '</p>' + btn('Write this law', function () { applyRk({ law: id }); }, { cls: 'go' }) + '</div>';
       }).join('') + '</div>');

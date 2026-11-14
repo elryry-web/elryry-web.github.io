@@ -69,7 +69,6 @@ svg { display: block; }
 .btn.step { font-size: 1.5rem; width: 56px; }
 .row { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; margin: 8px -3px 0; }
 .row.wrap { gap: 2px; }
-.row.sticky { position: sticky; bottom: 0; background: var(--paper); padding: 6px 0; border-top: var(--line) solid var(--ink); }
 
 /* ---------------------------------------------------------------- the age screen (phone first) */
 .app { max-width: 1400px; margin: 0 auto; }
@@ -405,10 +404,43 @@ body.on-title::before {
 .banner.lost::before { background: var(--rust); }
 .banner h2 { margin: 0 0 4px; }
 .banner svg { flex: none; }
-.steps { display: flex; gap: 4px; list-style: none; padding: 0; margin: 8px 0; font-size: .85rem; }
-.steps li { flex: 1; text-align: center; padding: 6px 2px; border: 2px solid var(--ink); color: var(--peat); }
-.steps li.now { background: var(--ochre); color: var(--ink); font-weight: 700; }
-.steps li.done { background: var(--bone); text-decoration: line-through; }
+/* ---------------------------------------------------------------- the Reckoning
+   The three steps are plank tiles in the woodblock face: the current one ochre on a hard ink shadow, the ones to
+   come cream on a lighter shadow, the finished ones pressed in (sunk 2px like a held button) with a moss tick.
+   Each step's panel leads with its rule; counts are chips (ochre when complete) and asides sit behind an ochre rule. */
+.reckon-screen .steps { display: flex; gap: 8px; list-style: none; padding: 0; margin: 10px 0 16px; }
+.reckon-screen .steps li {
+  flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: center; min-height: 48px; padding: 6px 6px 7px;
+  font: 1rem/1.1 var(--head); text-align: center; color: var(--ink);
+  border: var(--line) solid transparent; border-image: url(../art/ui-plank-cream.png) 40 fill / 8px stretch;
+  box-shadow: 2px 2px 0 rgba(23, 20, 15, .38);
+}
+.reckon-screen .steps li.now { border-image-source: url(../art/ui-plank-ochre.png); box-shadow: 3px 3px 0 var(--ink); }
+.reckon-screen .steps li.done {
+  border: var(--line) solid rgba(23, 20, 15, .55); border-image: none; background: var(--bone); color: var(--peat);
+  box-shadow: inset 2px 2px 0 rgba(23, 20, 15, .16); transform: translate(2px, 2px); position: relative;
+}
+.reckon-screen .steps li.done::before {
+  content: ''; position: absolute; left: 8px; top: 5px; width: 5px; height: 10px; transform: rotate(45deg);
+  border: solid var(--moss); border-width: 0 3px 3px 0;
+}
+.reckon-screen .rk-h { display: flex; align-items: center; gap: 10px; }
+.reckon-screen .rk-num {
+  flex: none; display: inline-grid; place-items: center; min-width: 1.75em; height: 1.75em; padding: 1px .3em 0;
+  font: .78em/1 var(--head); color: var(--paper); background: var(--ink); box-shadow: 2px 2px 0 var(--ochre);
+}
+.reckon-screen .rk-lead { font-size: 1.06rem; margin: .35em 0 .5em; }
+.reckon-screen .rk-hint { margin: 6px 0; padding: 1px 0 1px 9px; border-left: 4px solid var(--ochre); color: var(--peat); font-size: .94rem; }
+.reckon-screen .rk-tally { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 8px 0 6px; }
+.reckon-screen .rk-tally .lbl { margin-right: 2px; }
+.reckon-screen .rk-chip {
+  display: inline-flex; align-items: baseline; gap: .35em; padding: 3px 9px 2px; white-space: nowrap;
+  font: .98rem/1.15 var(--head); background: var(--paper); border: 2px solid var(--ink); box-shadow: 2px 2px 0 var(--ink);
+}
+.reckon-screen .rk-chip b { font-weight: 400; }
+.reckon-screen .rk-chip.full { background: var(--ochre); }
+.reckon-screen .panel h3 { font-size: 1.18rem; margin-top: 1.35em; padding-bottom: 3px; border-bottom: 6px double var(--ink); }
+.reckon-screen .rk-foot { margin-top: 14px; padding-top: 8px; border-top: 6px double var(--ink); }
 .bigtext { font-size: 1.15rem; }
 .reckon-screen .panel > svg { float: right; }
 .annals { list-style: none; padding: 0; }
