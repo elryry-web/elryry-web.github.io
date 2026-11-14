@@ -95,7 +95,10 @@
         btn('+', function () { if (n < max) { n++; U.redrawSheet(); } }, { cls: 'step', off: n >= max ? 'That is all you have there.' : null, title: 'More' }) + '</div>' +
         '<div class="versus"><div class="vs-side"><span class="lbl">Your attack</span><b class="big">' + pv.attack + '</b></div><span class="vs">against</span>' +
         '<div class="vs-side"><span class="lbl">Their defence</span><b class="big">' + pv.defence + '</b></div></div>' +
-        '<p>Each side then draws a fortune card (0 to 3) and adds it. You draw first. A tie goes to the defender.</p>' +
+        '<p>Each side then draws a fortune card (0 to 3) and adds it. You draw first. The higher total wins, and a tie goes to the defender.</p>' +
+        '<p>The loser loses as many warbands as it lost by, at least 1. If the margin is exactly 1, the winner loses 1 too.</p>' +
+        '<p>If you win, your surviving warbands move into ' + rn(to) + (pv.defender ? ' and ' + who(pv.defender) + "'s survivors fall back to a neighbouring region " + who(pv.defender) + ' holds (with none, they scatter).' : ' and the free folk who are left scatter.') +
+        ' If you lose, your survivors stay in ' + rn(from) + '.</p>' +
         (pv.lastStand ? '<p class="note"><b>Last stand:</b> this is ' + whoseLow(pv.defender) + " only region, so it defends with +" + pv.lastStand + '. That is counted above.</p>' : '') +
         (pv.peek != null ? '<p class="note"><b>Star Reader:</b> the next fortune card is a <b>' + pv.peek + '</b>. You will draw it.</p>' : '') +
         '<p class="fortune-line"><span class="lbl">Fortune left</span> ' + [0, 1, 2, 3].map(function (v) { return '<span class="fc"><b>' + v + '</b>×' + (left[v] || 0) + '</span>'; }).join('') +
