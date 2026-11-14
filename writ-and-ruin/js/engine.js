@@ -55,7 +55,7 @@
   }
   // regions a landless house may return to: no warbands of any house in them (unheld, or held but left unguarded)
   function returnSpots(s, h) {
-    return IDS.filter(function (r) { var g = s.regions[r]; return !(g.owner && g.bands[g.owner] > 0) && !othersPresent(s, h, r); });
+    return IDS.filter(function (r) { var g = s.regions[r]; return !(g.owner && g.bands[g.owner] > 0) && !othersPresent(s, h, r) && !watched(s, r); });
   }
   function slotsOf(s, r) { return siteOn(s, r) ? N.slots : N.slotsUndeveloped; }
   // a house's effects: its retinue and relics, plus residents at sites of regions it holds
@@ -91,7 +91,19 @@
     var g = s.regions[r];
     if (othersPresent(s, h, r)) return false;
     if (!g.owner && g.folk > 0) return false;
+    if (g.owner && g.owner !== h && watched(s, r)) return false;
     return true;
+  }
+  // the Town Watch keeps region r: its holder has no warbands there but has the Town Watch here (in its retinue,
+  // or at r's own site). Such a region is not marched into: it is assaulted, and defends at N.townWatch.
+  function watched(s, r) {
+    var g = s.regions[r], d = g && g.owner;
+    return !!d && !((g.bands[d] || 0) > 0) && hasAt(s, d, 'townWatch', r);
+  }
+  // dug in counts only while the holder has warbands there to dig
+  function dugIn(s, r) {
+    var g = s.regions[r], d = g && g.owner;
+    return !!d && g.dug === d && (g.bands[d] || 0) > 0;
   }
   function currentHouse(s) { return s.phase === 'play' ? s.order[s.turn] : null; }
 
@@ -349,6 +361,8 @@
     // during the truce a march goes only into a region no one holds or guards (no Hermit, no smuggling)
     if (truce(s)) return !g.owner && emptyOfOthers(s, h, r) ? 'empty' : null;
     if (emptyOfOthers(s, h, r)) return 'empty';
+    // the Smuggler Queen walks past a Town Watch and takes the region, as if no one kept it
+    if (watched(s, r) && !othersPresent(s, h, r) && has(s, h, 'smugglerQueen')) return 'empty';
     if (!g.owner && g.folk > 0 && !othersPresent(s, h, r) && has(s, h, 'antleredHermit')) return 'hermit';
     if (g.owner && (g.bands[g.owner] || 0) <= 1 && has(s, h, 'smugglerQueen')) return 'smuggle';
     return null;
@@ -392,6 +406,7 @@
   function defenceOf(s, r, attacker) {
     var g = s.regions[r], d = g.owner, v;
     v = d ? (g.bands[d] || 0) : g.folk;
+    if (d && !v && watched(s, r)) v = N.townWatch;
     if (siteOn(s, r) && !(attacker && has(s, attacker, 'tunnelRat'))) v += REG[r].siteDef;
     if (d) {
       if (siteAt(s, d, 'wallWarden', r)) v++;
@@ -400,7 +415,7 @@
       if (r === 'crown' && has(s, d, 'gatePorter')) v++;
       if ((r === 'saltmarsh' || r === 'oldbarrow') && has(s, d, 'ditchEel')) v++;
       v += lastStand(s, r);
-      if (g.dug === d) v++;   // dug in until the start of that house's next turn
+      if (dugIn(s, r)) v++;   // dug in until the start of that house's next turn
     }
     return v;
   }
@@ -411,7 +426,7 @@
   }
   function battlePreview(s, a) {
     return { attack: a.count + attackBonus(s, a.house, a.from, a.to), defence: defenceOf(s, a.to, a.house),
-      defender: s.regions[a.to].owner, lastStand: lastStand(s, a.to), dug: !!(s.regions[a.to].owner && s.regions[a.to].dug === s.regions[a.to].owner), peek: peekFortune(s, a.house) };
+      defender: s.regions[a.to].owner, lastStand: lastStand(s, a.to), dug: dugIn(s, a.to), watch: watched(s, a.to), peek: peekFortune(s, a.house) };
   }
 
   // ---------------------------------------------------------------- pacts
@@ -920,7 +935,7 @@
     function lose(k) { if (camp) hs.camp -= k; else { src.bands[h] -= k; if (!src.bands[h]) delete src.bands[h]; } }
     var n = Math.min(a.count, camp ? hs.camp || 0 : bandsAt(s, h, from));
     if (n < 1) { ev.push({ type: 'assaultCollapsed', house: h, from: from, to: to }); return; }
-    var att = n + attackBonus(s, h, from, to), def = defenceOf(s, to, h);
+    var att = n + attackBonus(s, h, from, to), def = defenceOf(s, to, h), watch = watched(s, to), dug = dugIn(s, to);
     var defBands = d ? (g.bands[d] || 0) : g.folk;
     var ac, dc, extra = null, witch = null;
     if (a._cards && s._sim) { ac = a._cards[0]; dc = a._cards[1]; }   // AI lookahead only
@@ -939,7 +954,7 @@
     var E = { type: 'battle', house: h, defender: d, from: from, to: to, count: n, attack: att, defence: def,
       attCard: ac, defCard: dc, tideCard: extra, witch: witch, attTotal: at, defTotal: dt,
       winner: win ? 'attacker' : 'defender', attLoss: attLoss, defLoss: defLoss, retreat: null, relic: null, silver: 0,
-      lastStand: lastStand(s, to), dug: !!(d && g.dug === d) };
+      lastStand: lastStand(s, to), dug: dug, watch: watch };
     var src = camp ? null : s.regions[from];
     if (win) {
       lose(n);
@@ -1496,7 +1511,7 @@
     prophecyProgress: prophecyProgress, progress: progress, threat: threat, checkVictory: checkVictory, claimStanding: claimStanding, departNeeds: departNeeds,
     endChances: endChances, fortuneLeft: fortuneLeft, peekFortune: peekFortune, assaultOdds: assaultOdds, lossRange: lossRange, battleLosses: battleLosses,
     battlePreview: battlePreview, attackBonus: attackBonus, defenceOf: defenceOf, lastStand: lastStand, returnSpots: returnSpots,
-    marchDests: marchDests, enterMode: enterMode, emptyOfOthers: emptyOfOthers,
+    marchDests: marchDests, enterMode: enterMode, emptyOfOthers: emptyOfOthers, watched: watched, dugIn: dugIn,
     musterCost: musterCost, musterMax: musterMax, recruitCost: recruitCost, recruitReach: recruitReach, poachFrom: poachFrom, searchSilver: searchSilver, assaultHours: assaultHours, bellHolder: bellHolder,
     pactsBetween: pactsBetween, intentLabel: intentLabel, pactsBrokenBy: pactsBrokenBy, grudge: grudge, loreCount: loreCount,
     // utilities

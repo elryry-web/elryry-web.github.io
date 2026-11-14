@@ -447,7 +447,7 @@
   // a region a rival holds with no warbands in it: it cannot be assaulted, but a march in takes it
   function unguarded(s, r) {
     var g = s.regions[r];
-    if (!g || !g.owner || g.owner === 'player') return false;
+    if (!g || !g.owner || g.owner === 'player' || E.watched(s, r)) return false;   // a Town Watch region is assaulted, not marched into
     for (var k in g.bands) if (g.bands[k] > 0) return false;
     return true;
   }

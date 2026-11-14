@@ -58,8 +58,11 @@
         t.push(owned ? 'You hold ' + rn(to) + '.' : (s.regions[to].owner ? 'Held by ' + whoLow(s.regions[to].owner) + (H.unguarded(s, to) ? ', with no warbands there. You take it when you march in.' : '.') : 'No house holds it: you take it when you march in.'));
         if (mode === 'hermit') t.push('The Antlered Hermit lets you pass the free folk.');
         if (mode === 'smuggle') t.push('The Smuggler Queen slips you in past a lone warband.');
+        if (E.watched(s, to) && !owned) t.push('The Smuggler Queen walks you past ' + whoseLow(s.regions[to].owner) + ' Town Watch. You take it when you march in.');
         t.push('Costs 1 moon' + (E.law(s, 'tolls') && !owned ? ' and 1 silver toll' : '') + '.');
-        if (from !== 'camp' && n === max && E.holds(s, 'player', from) && s.regions[from].owner === 'player') t.push('This leaves ' + rn(from) + ' unguarded. You still hold it, but any neighbour can march in and take it.');
+        if (from !== 'camp' && n === max && E.holds(s, 'player', from) && s.regions[from].owner === 'player') t.push(E.hasAt(s, 'player', 'townWatch', from) ?
+          'This leaves no warbands in ' + rn(from) + '. You still hold it, and your Town Watch keeps it: a neighbour must assault it, and it defends at ' + N.townWatch + '.' :
+          'This leaves ' + rn(from) + ' unguarded. You still hold it, but any neighbour can march in and take it.');
         return '<p>' + t.join(' ') + '</p>';
       },
       action: function (n) { return { type: 'march', from: from, to: to, count: n }; },
@@ -102,9 +105,10 @@
         '<div class="vs-side"><span class="lbl">Their defence</span><b class="big">' + pv.defence + '</b></div></div>' +
         '<p>Each side then draws a fortune card (0 to 3) and adds it. You draw first. The higher total wins, and a tie goes to the defender.</p>' +
         '<p>The loser loses as many warbands as it lost by, at least 1. If the margin is exactly 1, the winner loses 1 too.</p>' +
-        '<p>If you win, your surviving warbands move into ' + rn(to) + (pv.defender ? ' and ' + who(pv.defender) + "'s survivors fall back to a neighbouring region " + who(pv.defender) + ' holds (with none, they scatter).' : ' and the free folk who are left scatter.') +
+        '<p>If you win, your surviving warbands move into ' + rn(to) + (pv.watch ? ' and take it from ' + who(pv.defender) + '.' : pv.defender ? ' and ' + who(pv.defender) + "'s survivors fall back to a neighbouring region " + who(pv.defender) + ' holds (with none, they scatter).' : ' and the free folk who are left scatter.') +
         ' If you lose, your survivors stay in ' + rn(from) + '.</p>' +
         (pv.lastStand ? '<p class="note"><b>Last stand:</b> this is ' + whoseLow(pv.defender) + " only region, so it defends with +" + pv.lastStand + '. That is counted above.</p>' : '') +
+        (pv.watch ? '<p class="note"><b>Town Watch:</b> ' + who(pv.defender) + "'s Town Watch keeps it, so it defends at " + N.townWatch + ' (counted above).</p>' : '') +
         (pv.dug ? '<p class="note"><b>Dug in:</b> +1 defence until ' + whoseLow(pv.defender) + ' next turn. That is counted above.</p>' : '') +
         (pv.peek != null ? '<p class="note"><b>Star Reader:</b> the next fortune card is a <b>' + pv.peek + '</b>. You will draw it.</p>' : '') +
         '<p class="fortune-line"><span class="lbl">Fortune left</span> ' + [0, 1, 2, 3].map(function (v) { return '<span class="fc"><b>' + v + '</b>×' + (left[v] || 0) + '</span>'; }).join('') +
@@ -135,6 +139,7 @@
     if (fn) notes.push(fn);
     if (e.lastStand) notes.push('Last stand: +' + N.lastStand + ' to the defence.');
     if (e.dug) notes.push('Dug in: +1 to the defence.');
+    if (e.watch) notes.push('Town Watch: no warbands, so it defended at ' + N.townWatch + '.');
     var loss = [];
     if (e.attLoss) loss.push((mine ? 'You' : who(e.house)) + ' lost ' + plural(e.attLoss, 'warband') + '.');
     if (e.defLoss) loss.push((e.defender === 'player' ? 'You' : (e.defender ? who(e.defender) : 'The free folk')) + ' lost ' + plural(e.defLoss, e.defender ? 'warband' : 'band') + '.');
@@ -277,9 +282,11 @@
     var bandList = Object.keys(g.bands).filter(function (k) { return g.bands[k] > 0; });
     if (bandList.length) facts.push('Warbands: ' + bandList.map(function (k) { return stamp(k, 16) + ' ' + who(k) + ' ' + g.bands[k]; }).join(', '));
     facts.push('Defence ' + E.defenceOf(s, r, defAgainst) + (owner && E.lastStand(s, r) ? ' (with last stand)' : ''));
-    if (owner && g.dug === owner) facts.push('<b>Dug in:</b> +1 defence until ' + whoseLow(owner) + ' next turn.');
+    if (E.dugIn(s, r)) facts.push('<b>Dug in:</b> +1 defence until ' + whoseLow(owner) + ' next turn.');
     if (owner && s.houses[owner].refuge === r) facts.push('<b>Safe:</b> ' + who(owner) + ' returned here and cannot be assaulted here until its next turn.');
-    if (owner && !bandList.length && s.houses[owner].refuge !== r) facts.push('<b>Unguarded:</b> ' + (owner === 'player' ? 'You have' : who(owner) + ' has') + ' no warbands here. ' +
+    if (E.watched(s, r) && s.houses[owner].refuge !== r) facts.push('<b>Town Watch:</b> ' + (owner === 'player' ? 'You have' : who(owner) + ' has') + ' no warbands here, but the Town Watch keeps it. ' +
+      'No one can march in: it must be assaulted, and it defends at ' + N.townWatch + '. Only the Smuggler Queen walks past.');
+    else if (owner && !bandList.length && s.houses[owner].refuge !== r) facts.push('<b>Unguarded:</b> ' + (owner === 'player' ? 'You have' : who(owner) + ' has') + ' no warbands here. ' +
       (E.truce(s) ? 'Once ' + esc(E.truce(s)) + ' ends, any neighbour can march in and take it.' : 'Any neighbour can march in and take it.'));
     if (owner && E.has(s, owner, 'drownedBell')) facts.push('<b>Drowned Bell:</b> ' + (owner === 'player' ? "rivals' assaults on you" : 'assaults on ' + who(owner)) + ' cost 1 more moon.');
     H.intents(s).forEach(function (x) {

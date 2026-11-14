@@ -287,9 +287,11 @@
     held.forEach(function (r) {
       var pr = pressure(s, h, r);
       if (!pr) return;
-      if (!E.bandsAt(s, h, r)) { v -= (0.6 + t.risk) * regionWorth(s, r) * 1.2; return; }
+      // an empty region is marched into for free; a Town Watch makes it a fight at 1, never worse than empty
+      var open = (0.6 + t.risk) * regionWorth(s, r) * 1.2;
+      if (!E.bandsAt(s, h, r) && !E.watched(s, r)) { v -= open; return; }
       var gap = pr + 1 - E.defenceOf(s, r, null);
-      if (gap > 0) v -= t.risk * Math.min(gap, 4) * regionWorth(s, r) * 0.6;
+      if (gap > 0) v -= Math.min(t.risk * Math.min(gap, 4) * regionWorth(s, r) * 0.6, E.bandsAt(s, h, r) ? 1e9 : open);
     });
     return v;
   }
@@ -407,7 +409,7 @@
     });
   }
   // spare moons, once nothing better is left: dig in where a rival is likeliest to take a region worth keeping.
-  // An unguarded region is not worth it (it is marched into, not fought for).
+  // A region with no warbands is not worth it: dig in needs warbands (a Town Watch keeps such a region without it).
   var DIG = { min: 0.12, odds: 1.5, crown: 1.5, claim: 3 };
   function digChoice(s, h, base) {
     if (s.houses[h].hours < 1) return null;
@@ -781,6 +783,16 @@
         if (!near || Math.abs(b.count - it.count) < Math.abs(near.count - it.count) || (b.from === it.from && near.from !== it.from && b.count === near.count)) near = b;
       });
       if (near) return { action: near, note: 'nearest' };
+      // a march spoilt by a Town Watch becomes an assault on the same region, if the odds are fair
+      if (it.type === 'march') {
+        var as = null, ap = 0.5;
+        E.legalActions(s, h).forEach(function (b) {
+          if (b.type !== 'assault' || b.to !== it.to) return;
+          var p = E.assaultOdds(s, b).p;
+          if (p > ap || (as && p === ap && b.count < as.count)) { as = b; ap = p; }
+        });
+        if (as) return { action: as, note: 'nearest' };
+      }
     }
     if (it.type === 'muster') {
       var m = E.legalActions(s, h, { few: true }).filter(function (b) { return b.type === 'muster' && b.region === it.region; })[0];
@@ -933,7 +945,7 @@
 
   return {
     decide: decide, whoActs: whoActs, run: run, act: act, respond: respond, reckoningChoice: reckoningChoice,
-    evaluate: evaluate, odds: odds, planIntent: planIntent, snapshot: snapshot, replan: replan, ahead: ahead, pactScore: pactScore, chooseProphecy: chooseProphecy,
+    evaluate: evaluate, odds: odds, planIntent: planIntent, snapshot: snapshot, replan: replan, intentAction: intentAction, ahead: ahead, pactScore: pactScore, chooseProphecy: chooseProphecy,
     dangers: function (s, h) { setGuess(s, h); return dangers(s, h); },
     digChoice: function (s, h) { setGuess(s, h); return digChoice(s, h, evaluate(s, h)); },
     TEMPERAMENTS: T, AIM: AIM, BUILD: BUILD
