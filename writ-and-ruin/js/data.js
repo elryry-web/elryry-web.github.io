@@ -37,8 +37,9 @@
   // Raised only at the Reckoning, by the age's winner, in any region (landmarks included), on top of its structure.
   // At most one per region; each stands at most once in the valley, into later ages, until razed.
   // Like a structure it works for whoever holds its region: "here" means that region.
+  // barred: regions it can't be raised in (one already standing there from an older save stays)
   var WORKS = [
-    { id: 'watchtower', name: 'Watchtower', text: '+2 defence here.', def: 2 },
+    { id: 'watchtower', name: 'Watchtower', text: "+2 defence here. Can't be raised in the Crown hold.", def: 2, barred: ['crown'] },
     { id: 'granary', name: 'Granary', text: '+1 moon each turn.', hours: 1 },
     { id: 'greatHall', name: 'Great Hall', text: 'A third resident slot here. Recruit here costs 1 silver less.', slots: 1, recruitLess: 1 },
     { id: 'musterField', name: 'Muster Field', text: 'Muster here places 1 more warband.', muster: 1 },
@@ -148,7 +149,7 @@
     { id: 'charter', name: 'Free Folk Charter', text: 'Free folk guard every unheld region with 2.', tags: ['seat', 'depart'] },
     { id: 'shortReign', name: 'Short Reign', text: 'The age may end after round 5 (one in four).', tags: ['seat'] },
     { id: 'titheOfLore', name: 'Tithe of Lore', text: 'Search costs 2 silver; Lore residents cost 1 less.', tags: ['foretell'] },
-    { id: 'crownsDue', name: "Crown's Due", text: 'The ruler takes 1 silver from each house at the start of each round.', tags: ['seat', 'seize'] },
+    { id: 'crownsDue', name: "Crown's Due", text: 'The ruler takes 1 silver from each house richer than it at the start of each round.', tags: ['seat', 'seize'] },
     { id: 'oathOfArms', name: 'The Broken Word', text: 'Breaking a pact costs 3 warbands as well.', tags: ['foretell', 'depart'] },
     { id: 'wildYear', name: 'Wild Year', text: 'Wild residents cost nothing to recruit.', tags: ['depart', 'foretell'] }
   ];

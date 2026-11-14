@@ -696,7 +696,8 @@
         // step two of raising a work: where it goes
         var wk = D.WORK[pick.work];
         out.push('<p class="rkart">' + A.art('work/' + wk.id, { size: 48 }) + '<span><b>Raise the ' + esc(wk.name) + '.</b> ' + esc(wk.text) + '</span></p>' +
-          '<h3>Choose a region</h3><p class="rk-hint">Regions with a great work already are left out.</p><div class="actlist">');
+          '<h3>Choose a region</h3><p class="rk-hint">Regions with a great work already are left out.' +
+          ((wk.barred || []).indexOf('crown') >= 0 ? ' The ' + esc(wk.name) + " can't stand in the Crown hold: its castle has walls enough." : '') + '</p><div class="actlist">');
         pick.regions.forEach(function (r) {
           var tg = E.startTag(c, r);
           out.push(btn(A.art('site/' + r, { size: 20 }) + ' ' + esc(cap(rn(r))) + (tg ? ' <small>' + esc(tg) + '</small>' : ''), function () { applyRk({ kind: 'work', region: r, work: wk.id }); }));

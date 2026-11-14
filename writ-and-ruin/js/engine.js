@@ -1161,8 +1161,9 @@
     s.pacts = keep;
     var ruler = s.regions.crown.owner;
     if (ruler && law(s, 'crownsDue')) {
+      // a catch-up tax: only a house richer than the ruler pays, checked as each payment is made
       s.order.forEach(function (k) {
-        if (k === ruler || s.houses[k].silver < 1) return;
+        if (k === ruler || s.houses[k].silver <= s.houses[ruler].silver) return;
         s.houses[k].silver--; s.houses[ruler].silver++;
         ev.push({ type: 'crownsDue', house: k, to: ruler, silver: 1 });
       });
@@ -1424,6 +1425,8 @@
     if (!s.winner) finishReckoning(c);
     return R;
   }
+  // a great work that can't be raised in this region (the Watchtower in the Crown hold)
+  function workBarred(w, r) { return (WORK[w].barred || []).indexOf(r) >= 0; }
   function reckoningOptions(c) {
     var R = c.reckoning;
     if (!R) return null;
@@ -1433,7 +1436,7 @@
       // great works: any that does not stand, in any region without one (landmarks too); then razing any that stands
       IDS.forEach(function (r) { if (works[r]) standing[works[r]] = r; });
       D.WORK_IDS.forEach(function (w) {
-        if (!standing[w]) IDS.forEach(function (r) { if (!works[r]) o.push({ kind: 'work', region: r, work: w }); });
+        if (!standing[w]) IDS.forEach(function (r) { if (!works[r] && !workBarred(w, r)) o.push({ kind: 'work', region: r, work: w }); });
       });
       IDS.forEach(function (r) { if (works[r]) o.push({ kind: 'razeWork', region: r, work: works[r] }); });
       return { step: 'build', options: o };
@@ -1452,6 +1455,7 @@
       if (cr && choice.kind === 'work') {
         if (!WORK[choice.work]) throw new Error('no such great work');
         if (works[choice.region]) throw new Error('a great work already stands there');
+        if (workBarred(choice.work, choice.region)) throw new Error("the " + WORK[choice.work].name + " can't be raised in " + regionName(choice.region));
         if (IDS.some(function (r) { return works[r] === choice.work; })) throw new Error('the ' + WORK[choice.work].name + ' already stands');
         works[choice.region] = choice.work; R.site = { kind: 'work', region: choice.region, work: choice.work };
       } else if (cr && choice.kind === 'razeWork') {

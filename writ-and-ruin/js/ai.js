@@ -920,9 +920,9 @@
   //   struct: building the temperament's first, second and third loved structure
   //   razeStruct: razing the structure the strongest grudge-holder would use most
   //   workOwn / workElse: times WORK_LIKE, a great work in a region we start in next age / anywhere nobody starts
-  //   crown: extra for a great work at the Crown hold (watchtower: for the Watchtower there), as the ruler starts there
+  //   crown: extra for a great work at the Crown hold, as the ruler starts there (the Watchtower is never offered there)
   //   razeWork: razing a great work where the strongest grudge-holder starts next age
-  var RK = { struct: [3, 1.8, 1.6], razeStruct: 2, razeFoeStart: 1.5, workOwn: 1.8, workElse: 0.3, crown: 0.15, home: 0.1, watchtower: 0.4, razeWork: 2.1 };
+  var RK = { struct: [3, 1.8, 1.6], razeStruct: 2, razeFoeStart: 1.5, workOwn: 1.8, workElse: 0.3, crown: 0.15, home: 0.1, razeWork: 2.1 };
   var LAW_PREF = {
     warlord: ['levy', 'crownsDue', 'tolls', 'wildYear', 'shortReign', 'charter', 'openRoads', 'titheOfLore', 'oathOfArms', 'longPeace'],
     mystic: ['titheOfLore', 'longPeace', 'oathOfArms', 'charter', 'shortReign', 'wildYear', 'openRoads', 'tolls', 'levy', 'crownsDue'],
@@ -973,7 +973,7 @@
       if (x.kind === 'work') {
         var lk = like[x.work] || 1;
         // its main start first: the Crown hold, a free hold's Far Pass, or its one region
-        if (mine.indexOf(x.region) >= 0) return RK.workOwn * lk + (x.region === 'crown' ? (x.work === 'watchtower' ? RK.watchtower : RK.crown) : x.region === mine[0] ? RK.home : 0);
+        if (mine.indexOf(x.region) >= 0) return RK.workOwn * lk + (x.region === 'crown' ? RK.crown : x.region === mine[0] ? RK.home : 0);
         return theirs[x.region] ? 0 : RK.workElse * lk;
       }
       if (x.kind === 'razeWork') return foeStarts.indexOf(x.region) >= 0 ? RK.razeWork : 0;
