@@ -6,12 +6,12 @@
   'use strict';
   var D = root.WR_DATA, E = root.WR_ENGINE, AI = root.WR_AI, A = root.WR_ART, M = root.WR_MAP;
   var N = D.NUM, REG = D.REGION, IDS = D.REGION_IDS;
-  var KEY = 'writ-and-ruin-save', LOGKEY = 'writ-and-ruin-log';
+  var KEY = 'writ-and-ruin-save', LOGKEY = 'writ-and-ruin-log', UNDOKEY = 'writ-and-ruin-undo';
 
   var U = root.WR_UI = {
     c: null, screen: 'title', log: [], mode: null, selected: null, flash: null,
     busy: false, skip: false, reports: [], yourTurn: false, lastSearch: null,
-    undo: []   // this turn's moves that can be taken back, newest last: { age, log, flash, label }; memory only
+    undo: []   // this turn's moves that can be taken back, newest last: { age, log, flash, label }; kept beside the save (UNDOKEY)
   };
 
   // ---------------------------------------------------------------- small helpers
@@ -121,17 +121,29 @@
 
   // ---------------------------------------------------------------- saving
   function save() {
+    var str;
     try {
-      localStorage.setItem(KEY, E.save(U.c));
+      str = E.save(U.c);
+      localStorage.setItem(KEY, str);
       localStorage.setItem(LOGKEY, JSON.stringify(U.log.slice(0, 80)));
-    } catch (e) { /* storage full or blocked: play on */ }
+    } catch (e) { forgetUndo(); return; /* storage full or blocked: play on */ }
+    // the undo stack goes beside the save, marked with it, so a reload keeps the turn's moves
+    var u = U.undo.length ? E.packUndo(U.undo, str, U.c) : null;
+    if (!u) { forgetUndo(); return; }
+    try { localStorage.setItem(UNDOKEY, u); } catch (e) { forgetUndo(); /* too big for storage: undo for this visit only */ }
   }
+  function forgetUndo() { try { localStorage.removeItem(UNDOKEY); } catch (e) { /* storage blocked */ } }
   function loadSave() {
     try {
       var t = localStorage.getItem(KEY);
       if (!t) return null;
       var c = E.load(t);
       try { U.log = JSON.parse(localStorage.getItem(LOGKEY) || '[]') || []; } catch (e) { U.log = []; }
+      // a stored undo stack counts only if it was written with this very save on the player's turn
+      var u = null;
+      try { u = E.unpackUndo(localStorage.getItem(UNDOKEY), t, c); } catch (e) { u = null; }
+      U.undo = u || [];
+      if (!u) forgetUndo();
       return c;
     } catch (e) { return null; }
   }
@@ -194,7 +206,7 @@
       case 'oath': return 'The Broken Word cost ' + whoLow(h, s) + ' ' + ev.lost.length + ' warbands.';
       case 'recruit':
         if (ev.from) return W + ' poached the ' + cardName(ev.card) + ' from ' + (ev.from === 'player' ? 'your' : whoLow(ev.from, s) + "'s") + ' ' + REG[ev.region].name + ' (' + ev.silver + ' silver).';
-        return W + ' recruited ' + cardName(ev.card) + ' at ' + rn(ev.region) + (ev.reach ? ' from ' + rn(ev.reach) : '') + '.';
+        return W + ' recruited ' + cardName(ev.card) + ' at ' + rn(ev.region) + (ev.reach ? ', with ' + (ev.house === 'player' ? 'your' : 'its') + ' warbands next door in ' + rn(ev.reach) : '') + '.';
       case 'build': return W + ' built the ' + REG[ev.region].site + ' at ' + rn(ev.region) + ' for ' + ev.silver + ' silver.';
       case 'station': return W + ' stationed ' + cardName(ev.card) + ' at ' + rn(ev.region) + '.';
       case 'dig': return W + ' dug in at ' + rn(ev.region) + '.';
@@ -296,7 +308,7 @@
   function newCampaign(name) {
     var seed = ((Date.now() % 4294967296) ^ Math.floor(Math.random() * 4294967296)) >>> 0;
     U.c = E.newCampaign(seed, name || 'Your house');
-    U.log = []; U.reports = []; U.undo = [];
+    U.log = []; U.reports = []; U.undo = []; forgetUndo();
     E.startAge(U.c);
     logStart();
     save();
@@ -304,7 +316,7 @@
   }
   function nextAge() {
     E.startAge(U.c);
-    U.log = []; U.reports = []; U.undo = [];
+    U.log = []; U.reports = []; U.undo = []; forgetUndo();
     logStart();
     save();
     go('age');
@@ -387,7 +399,7 @@
     var ev = E.applyAction(s, a);
     ev = ev.concat(AI.replan(s, 'player', before));   // rivals whose plans you just upset declare new ones
     // anything that drew on fortune, showed something hidden or moved the turn on locks in the turn so far
-    if (mark && E.undoFair(mark.age, s)) U.undo.push(mark); else U.undo = [];
+    if (mark && E.undoFair(mark.age, s)) U.undo = E.capUndo(U.undo.concat([mark])); else U.undo = [];
     take(ev); save();
     closeSheet();
     U.mode = null; U.selected = null; U.peek = null;
@@ -418,7 +430,7 @@
     var m = U.undo[U.undo.length - 1];
     if (!m) return null;
     if (!isMyTurn(s) || m.age.ageNo !== s.ageNo || m.age.round !== s.round || m.age.turn !== s.turn ||
-      m.age.houses.player.turns !== s.houses.player.turns) { U.undo = []; return null; }
+      m.age.houses.player.turns !== s.houses.player.turns) { U.undo = []; forgetUndo(); return null; }
     return m;
   }
   function undo() {
@@ -697,7 +709,7 @@
       hs.relics.length ? plural(hs.relics.length, 'relic') : ''].filter(Boolean).join(' · ');
     return fold('house', 'Your house', esc(sum),
       (hs.prophecy ? '<p class="prophecy"><span class="lbl">Prophecy</span> “' + esc(D.PROPHECIES[hs.prophecy - 1].text) + '” <b>' + p.have + '/' + p.need + '</b></p>' : '') +
-      '<p class="lbl">Retinue ' + hs.retinue.length + '/' + N.retinueMax + '</p>' + (cards || '<p class="muted">No one yet. Recruit residents where your warbands stand.</p>') +
+      '<p class="lbl">Retinue ' + hs.retinue.length + '/' + N.retinueMax + '</p>' + (cards || '<p class="muted">No one yet. Recruit residents where your warbands stand or next door.</p>') +
       (rel ? '<p class="lbl">Relics</p>' + rel : ''));
   }
   function lawPanel(s) {

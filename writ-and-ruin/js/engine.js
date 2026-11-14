@@ -922,6 +922,40 @@
     return true;
   }
 
+  // The undo stack is kept beside the save (under its own key) so a reloaded page keeps it. It is trusted only
+  // against the very save it was written with: a fingerprint of that save string, the same campaign seed, age,
+  // round and turn, and the player to move. Entries are { age, log, flash, label }, oldest first.
+  var UNDO_CAP = 20;
+  // length and an FNV-1a hash of a string: cheap, and any change to a save changes it
+  function fingerprint(str) {
+    str = String(str || '');
+    var h = 0x811c9dc5;
+    for (var i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+    return str.length + ':' + h.toString(16);
+  }
+  function capUndo(stack) { return stack.length > UNDO_CAP ? stack.slice(stack.length - UNDO_CAP) : stack; }
+  // the text to store for the stack, taken against saveStr (the save of campaign c as just written), or null
+  function packUndo(stack, saveStr, c) {
+    var s = c && c.age;
+    if (!stack || !stack.length || !s) return null;
+    return JSON.stringify({ v: 1, fp: fingerprint(saveStr), seed: c.seed, ageNo: s.ageNo, round: s.round, turn: s.turn, stack: capUndo(stack) });
+  }
+  // the stack stored as text, if it belongs to saveStr and campaign c (loaded from it) on the player's turn; else null
+  function unpackUndo(text, saveStr, c) {
+    var o, s = c && c.age;
+    if (!text || !s) return null;
+    try { o = JSON.parse(text); } catch (e) { return null; }
+    if (!o || o.v !== 1 || o.fp !== fingerprint(saveStr) || o.seed !== c.seed) return null;
+    if (o.ageNo !== s.ageNo || o.round !== s.round || o.turn !== s.turn) return null;
+    if (s.phase !== 'play' || s.pending || s.order[s.turn] !== 'player') return null;
+    if (!Array.isArray(o.stack) || !o.stack.length) return null;
+    for (var i = 0; i < o.stack.length; i++) {
+      var a = o.stack[i] && o.stack[i].age;
+      if (!a || !a.houses || a.ageNo !== s.ageNo || a.round !== s.round || a.turn !== s.turn) return null;
+    }
+    return capUndo(o.stack);
+  }
+
   function doMarch(s, a, ev) {
     var h = a.house, hs = s.houses[h];
     var dest = marchDests(s, h, a.from).filter(function (d) { return d.to === a.to; })[0];
@@ -1523,6 +1557,7 @@
     save: save, load: load, ageTitle: ageTitle,
     // the age
     legalActions: legalActions, check: check, applyAction: applyAction, currentHouse: currentHouse, undoable: undoable, undoFair: undoFair,
+    UNDO_CAP: UNDO_CAP, fingerprint: fingerprint, capUndo: capUndo, packUndo: packUndo, unpackUndo: unpackUndo,
     // queries for the screen and the AI
     income: income, leanBonus: leanBonus, hoursFor: hoursFor, heldBy: heldBy, nHeld: nHeld, bandsAt: bandsAt, totalBands: totalBands,
     buildCost: buildCost, SAVE_VERSION: SAVE_VERSION, holdfastOf: holdfastOf, rulerKept: rulerKept, richestNeighbours: richestNeighbours,

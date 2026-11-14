@@ -303,7 +303,7 @@
       var cost = E.recruitCost(s, 'player', id, r), from = E.poachFrom(s, 'player', r), reach = E.recruitReach(s, 'player', r);
       var show = my && !!reach;
       var note = !show ? '' : from ? '<p class="note">Poaching: +' + N.poachSilver + ' silver, and ' + who(from) + ' takes a grudge.</p>' :
-        reach !== r ? '<p class="muted">Your warbands in ' + esc(rn(reach)) + ' can reach it.</p>' : '';
+        reach !== r ? '<p class="muted">You have no warbands here. Your warbands next door in ' + esc(rn(reach)) + ' let you recruit.</p>' : '';
       if (D.CARDS[id].siteOnly) return A.card(id, '<p class="muted">Works only at its site' + (g.owner === 'player' ? ': it guards your region.' : ', for whoever holds the region.') + ' It cannot be recruited.</p>', { pic: 'full' });
       return A.card(id, show ? note + '<div class="row">' + btn((from ? 'Poach for ' : 'Recruit for ') + cost + 's', function () { U.doAction({ type: 'recruit', region: r, card: id }); }, { cls: mode === 'recruit' ? 'go' : '', off: m }) + '</div>' : '', { pic: 'full' });
     }).join('') + '</div>');
