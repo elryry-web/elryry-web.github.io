@@ -549,7 +549,7 @@
     var hero = A.paintedUrl && A.paintedUrl('title');
     return '<div class="screen title-screen"><div class="titleblock"><div class="title-art' + (hero ? ' painted' : '') + '">' +
       (hero ? '<img src="' + hero + '" alt="A painted valley: a river winding past a castle to the sea">' : titleArt()) + '</div>' +
-      '<h1 class="gametitle">Writ <span>&amp;</span> Ruin</h1><p class="tagline">A valley of eight regions, fought over by four houses. Whoever wins an age writes its law, which carries into the next age along with the grudges.</p></div>' +
+      '<h1 class="gametitle">Writ <span>&amp;</span> Ruin</h1><p class="tagline">A valley of eight regions, fought over by four houses. Whoever wins an age writes its law, which carries into the next age along with any grudges.</p></div>' +
       '<svg class="trule" viewBox="0 0 200 14" aria-hidden="true"><path d="M8 7H84M116 7H192" stroke="currentColor" stroke-width="1.5"/>' +
       '<circle cx="89" cy="7" r="1.6" fill="currentColor"/><circle cx="111" cy="7" r="1.6" fill="currentColor"/><path d="M100 1.5L106 7L100 12.5L94 7Z" fill="currentColor"/></svg>' +
       '<div class="menu">' +
