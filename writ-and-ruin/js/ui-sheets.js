@@ -374,8 +374,12 @@
           var st = D.REGION_IDS.filter(function (r) { return E.holds(s, h, r) && E.siteOn(s, r); }).map(function (r) { return REG[r].site; });
           return '<br>Structures: ' + (st.length ? esc(listAnd(st)) : 'none');
         })() + '</p>');
+      var dn = E.departNeeds(s, h), seenP = hs.prophecy && (mine || meH.known[h]) ? E.prophecyProgress(s, h, hs.prophecy) : null;
       out.push('<div class="progress">' + ['seize', 'foretell', 'depart', 'seat'].map(function (k) {
-        var words = { seize: 'Seize: hold ' + N.seizeRegions + ' regions', foretell: 'Foretell: fulfil the prophecy', depart: 'Depart by the Far Pass', seat: 'Seat: hold the Crown hold when the age ends' }[k];
+        var words = { seize: 'Seize: hold ' + N.seizeRegions + ' regions',
+          foretell: 'Foretell: fulfil the prophecy' + (seenP ? ' (' + seenP.have + ' of ' + seenP.need + ')' : ''),
+          depart: 'Depart: from the ' + ordinal(N.departFrom) + ' round, hold the Far Pass with ' + plural(dn.bands, 'warband') + ' and carry ' + plural(dn.relics, 'relic'),
+          seat: 'Seat: hold the Crown hold when the age ends' }[k];
         return '<div class="prow"><span>' + words + '</span><span class="pbar b-' + k + '"><i style="width:' + Math.round(Math.min(1, p[k]) * 100) + '%"></i></span></div>';
       }).join('') + '</div>');
       if (claim) out.push('<p class="warn">' + (mine ? 'You have' : who(h) + ' has') + ' a claim to ' + (claim.kind === 'seize' ? 'seize the valley' : 'the age by prophecy') +
