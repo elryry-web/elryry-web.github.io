@@ -903,6 +903,25 @@
     return ev;
   }
 
+  // ---------------------------------------------------------------- undo
+  // The player may take back a move made this turn when it neither drew on fortune nor showed anything hidden.
+  // Undoable: muster, march, build, station, dig, recruit, return, poison (all certain, all on open cards).
+  // Never: assault (fortune), search and keep (draw unseen cards), treat (the rival's answer shows its mind),
+  // Bell Seer (shows a prophecy), depart and end (the turn or the age moves on), the prophecy choice.
+  var UNDOABLE = { muster: 1, march: 1, build: 1, station: 1, dig: 1, recruit: 1, 'return': 1, poison: 1 };
+  function undoable(a) { return !!(a && UNDOABLE[a.type]); }
+  // after an undoable action: before is a copy of the age taken just before it, s the age now. True when nothing
+  // random or hidden came out (the generator, fortune deck and world deck untouched but for a card laid under the
+  // world deck) and it is still the same house's turn with nothing pending, so going back gives nothing away.
+  function undoFair(before, s) {
+    if (!before || s.rng !== before.rng || s.phase !== 'play' || s.pending) return false;
+    if (s.round !== before.round || s.turn !== before.turn || s.ageNo !== before.ageNo) return false;
+    if (s.fortune.join(',') !== before.fortune.join(',')) return false;
+    if (s.deck.length < before.deck.length) return false;
+    for (var i = 0; i < before.deck.length; i++) if (s.deck[i] !== before.deck[i]) return false;
+    return true;
+  }
+
   function doMarch(s, a, ev) {
     var h = a.house, hs = s.houses[h];
     var dest = marchDests(s, h, a.from).filter(function (d) { return d.to === a.to; })[0];
@@ -1503,7 +1522,7 @@
     beginReckoning: beginReckoning, reckoningOptions: reckoningOptions, reckoningChoose: reckoningChoose,
     save: save, load: load, ageTitle: ageTitle,
     // the age
-    legalActions: legalActions, check: check, applyAction: applyAction, currentHouse: currentHouse,
+    legalActions: legalActions, check: check, applyAction: applyAction, currentHouse: currentHouse, undoable: undoable, undoFair: undoFair,
     // queries for the screen and the AI
     income: income, leanBonus: leanBonus, hoursFor: hoursFor, heldBy: heldBy, nHeld: nHeld, bandsAt: bandsAt, totalBands: totalBands,
     buildCost: buildCost, SAVE_VERSION: SAVE_VERSION, holdfastOf: holdfastOf, rulerKept: rulerKept, richestNeighbours: richestNeighbours,

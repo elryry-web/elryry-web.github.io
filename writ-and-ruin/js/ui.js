@@ -10,7 +10,8 @@
 
   var U = root.WR_UI = {
     c: null, screen: 'title', log: [], mode: null, selected: null, flash: null,
-    busy: false, skip: false, reports: [], yourTurn: false, lastSearch: null
+    busy: false, skip: false, reports: [], yourTurn: false, lastSearch: null,
+    undo: []   // this turn's moves that can be taken back, newest last: { age, log, flash, label }; memory only
   };
 
   // ---------------------------------------------------------------- small helpers
@@ -295,7 +296,7 @@
   function newCampaign(name) {
     var seed = ((Date.now() % 4294967296) ^ Math.floor(Math.random() * 4294967296)) >>> 0;
     U.c = E.newCampaign(seed, name || 'Your house');
-    U.log = []; U.reports = [];
+    U.log = []; U.reports = []; U.undo = [];
     E.startAge(U.c);
     logStart();
     save();
@@ -303,7 +304,7 @@
   }
   function nextAge() {
     E.startAge(U.c);
-    U.log = []; U.reports = [];
+    U.log = []; U.reports = []; U.undo = [];
     logStart();
     save();
     go('age');
@@ -380,9 +381,13 @@
     a.house = 'player';
     var m = E.check(s, a);
     if (m) { toast(plain(m)); return false; }
+    // a move that can be taken back keeps a whole copy of the age from just before it (rival plans and the generator too)
+    var mark = E.undoable(a) && isMyTurn(s) ? { age: E.clone(s), log: U.log.slice(), flash: U.flash, label: undoLabel(s, a) } : null;
     var before = AI.snapshot(s);
     var ev = E.applyAction(s, a);
     ev = ev.concat(AI.replan(s, 'player', before));   // rivals whose plans you just upset declare new ones
+    // anything that drew on fortune, showed something hidden or moved the turn on locks in the turn so far
+    if (mark && E.undoFair(mark.age, s)) U.undo.push(mark); else U.undo = [];
     take(ev); save();
     closeSheet();
     U.mode = null; U.selected = null; U.peek = null;
@@ -392,6 +397,41 @@
     else if (after) after(ev);
     else pump();
     return true;
+  }
+  // ---------------------------------------------------------------- undo
+  // 'muster at Riverford', 'march to the Crown hold': what the Undo button takes back
+  function undoLabel(s, a) {
+    switch (a.type) {
+      case 'muster': return 'muster at ' + rn(a.region);
+      case 'march': return 'march to ' + rn(a.to);
+      case 'build': return 'build at ' + rn(a.region);
+      case 'station': return 'station at ' + rn(a.region);
+      case 'dig': return 'dig in at ' + rn(a.region);
+      case 'recruit': return (E.poachFrom(s, 'player', a.region) ? 'poach of ' : 'recruit of ') + cardName(a.card);
+      case 'return': return 'return to ' + rn(a.region);
+      case 'poison': return 'poison';
+    }
+    return a.type;
+  }
+  // the newest move that can still be taken back, or null (a copy from another turn is dropped)
+  function undoTop(s) {
+    var m = U.undo[U.undo.length - 1];
+    if (!m) return null;
+    if (!isMyTurn(s) || m.age.ageNo !== s.ageNo || m.age.round !== s.round || m.age.turn !== s.turn ||
+      m.age.houses.player.turns !== s.houses.player.turns) { U.undo = []; return null; }
+    return m;
+  }
+  function undo() {
+    var s = age(), m = undoTop(s);
+    if (!m) { render(); return; }
+    U.undo.pop();
+    U.c.age = m.age; U.log = m.log; U.flash = m.flash;
+    closeSheet();
+    U.mode = m.age.houses.player.flags.returnDue ? { kind: 'return' } : null;
+    U.selected = null; U.peek = null;
+    save();
+    render();
+    toast('Undone: ' + m.label + '.', 1600);
   }
   function isMyTurn(s) {
     s = s || age();
@@ -695,8 +735,11 @@
       if (U.mode.kind === 'assault') { var un = unguardedNote(s, legal); if (un) words += ' ' + un; }
       return '<div class="hint pickhint"><span>' + esc(words) + '</span>' + btn('Cancel', function () { U.mode = null; render(); }, { cls: 'small' }) + '</div>';
     }
-    return '<div class="hint mine"><span><b>Your turn.</b> ' + plural(hs.hours, 'moon') + ' left, ' + hs.silver + ' silver. Tap a region for its actions.' +
-      (E.truce(s) ? ' ' + plain(E.truce(s)) : '') + '</span></div>';
+    var u = undoTop(s);
+    // once you have moved, the tap-a-region reminder gives way to the Undo plank
+    return '<div class="hint mine' + (u ? ' can-undo' : '') + '"><span><b>Your turn.</b> ' + plural(hs.hours, 'moon') + ' left, ' + hs.silver + ' silver.' +
+      (u ? '' : ' Tap a region for its actions.') + (E.truce(s) ? ' ' + plain(E.truce(s)) : '') + '</span>' +
+      (u ? btn('Undo ' + esc(u.label), undo, { cls: 'small undo' }) : '') + '</div>';
   }
 
   var BAR = [['march', 'March'], ['muster', 'Muster'], ['assault', 'Assault'], ['recruit', 'Recruit'], ['search', 'Search'], ['treat', 'Treat'], ['dig', 'Dig in'], ['depart', 'Depart']];
@@ -863,7 +906,7 @@
   U.h = { esc: esc, cap: cap, age: age, me: me, who: who, whoLow: whoLow, whose: whose, whoseLow: whoseLow, rn: rn, cardName: cardName, planWhen: planWhen, dangerRows: dangerRows, dangerSummary: dangerSummary, intents: intents, planLabel: planLabel, listAnd: listAnd, plural: plural,
     stamp: stamp, btn: btn, K: K, peekBtn: peekBtn, plain: plain, toast: toast, save: save, hasSave: hasSave, logLine: logLine, describe: describe,
     pactWords: pactWords, screenFor: screenFor, isMyTurn: isMyTurn, legalNow: legalNow, bars: bars, unguarded: unguarded };
-  U.go = go; U.render = render; U.pump = pump; U.skipAhead = skip; U.doAction = doAction; U.newCampaign = newCampaign; U.nextAge = nextAge;
+  U.go = go; U.render = render; U.pump = pump; U.skipAhead = skip; U.doAction = doAction; U.undoMove = undo; U.newCampaign = newCampaign; U.nextAge = nextAge;
   U.openSheet = openSheet; U.redrawSheet = redrawSheet; U.closeSheet = closeSheet; U.sheetIsOpen = sheetIsOpen; U.take = take;
   U.loadSave = loadSave; U.KEY = KEY;
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else setTimeout(boot, 0);
