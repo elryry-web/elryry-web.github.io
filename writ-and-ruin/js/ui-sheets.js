@@ -59,7 +59,9 @@
         if (mode === 'hermit') t.push('The Antlered Hermit lets you pass the free folk.');
         if (mode === 'smuggle') t.push('The Smuggler Queen slips you in past a lone warband.');
         if (E.watched(s, to) && !owned) t.push('The Smuggler Queen walks you past ' + whoseLow(s.regions[to].owner) + ' Town Watch. You take it when you march in.');
-        t.push('Costs 1 moon' + (E.law(s, 'tolls') && !owned ? ' and 1 silver toll' : '') + '.');
+        var free = E.marchFree(s, 'player', from, to);
+        t.push((free ? 'Costs no moons' : 'Costs 1 moon') + (E.law(s, 'tolls') && !owned ? ' and 1 silver toll' : '') + '.');
+        if (free) t.push((free === 'toll' ? 'The ' + REG.riverford.site : free === 'oldRoad' ? 'The ' + D.WORK.oldRoad.name : cap(cardName('drover'))) + ' makes one march a turn free.');
         if (from !== 'camp' && n === max && E.holds(s, 'player', from) && s.regions[from].owner === 'player') t.push(E.hasAt(s, 'player', 'townWatch', from) ?
           'This leaves no warbands in ' + rn(from) + '. You still hold it, and your Town Watch keeps it: a neighbour must assault it, and it defends at ' + N.townWatch + '.' :
           'This leaves ' + rn(from) + ' unguarded. You still hold it, but any neighbour can march in and take it.');
@@ -70,7 +72,7 @@
     });
   }
   function musterSheet(r) {
-    var s = age(), hs = me(), max = E.musterMax(s, 'player');
+    var s = age(), hs = me(), max = E.musterMax(s, 'player', r);
     var afford = max; while (afford > 1 && E.musterCost(s, 'player', r, afford) > hs.silver) afford--;
     stepper({
       title: 'Muster in ' + rn(r), min: 1, max: max, start: afford,
@@ -277,11 +279,15 @@
       (owner ? 'Held by ' + who(owner) : 'Free folk: ' + plural(g.folk, 'band')) + (R.landmark ? ' · a landmark' : built ? '' : ' · undeveloped') + '</p></div></header>');
     out.push('<p class="sitetext"><b>' + esc(R.site) + '.</b> ' + (built ? esc(R.siteText) + (R.landmark ? ' It is a landmark. It always stands.' : ' It works for whoever holds the region.') :
       'Not built yet. The region has no effect, no site income and 1 slot. Whoever holds it may build the ' + esc(R.site) + ' for ' + E.buildCost(r) + ' silver and 1 moon. Built, it gives: ' + esc(R.siteText)) + '</p>');
+    var wk = E.workAt(s, r) && D.WORK[E.workAt(s, r)];
+    if (wk) out.push('<p class="worktext">' + A.art('work/' + wk.id, { size: 32 }) + '<span><b>' + esc(wk.name) + '.</b> A great work. ' + esc(wk.text) +
+      ' It works for whoever holds the region. Only the Reckoning can raze it.</span></p>');
     var defAgainst = owner === 'player' ? s.order.filter(function (k) { return k !== 'player'; })[0] : 'player';
     var facts = [];
     var bandList = Object.keys(g.bands).filter(function (k) { return g.bands[k] > 0; });
     if (bandList.length) facts.push('Warbands: ' + bandList.map(function (k) { return stamp(k, 16) + ' ' + who(k) + ' ' + g.bands[k]; }).join(', '));
-    facts.push('Defence ' + E.defenceOf(s, r, defAgainst) + (owner && E.lastStand(s, r) ? ' (with last stand)' : ''));
+    var tower = wk && wk.id === 'watchtower' && !E.has(s, defAgainst, 'tunnelRat');
+    facts.push('Defence ' + E.defenceOf(s, r, defAgainst) + (tower || (owner && E.lastStand(s, r)) ? ' (with ' + [tower ? 'the Watchtower' : '', owner && E.lastStand(s, r) ? 'last stand' : ''].filter(Boolean).join(' and ') + ')' : ''));
     if (E.dugIn(s, r)) facts.push('<b>Dug in:</b> +1 defence until ' + whoseLow(owner) + ' next turn.');
     if (owner && s.houses[owner].refuge === r) facts.push('<b>Safe:</b> ' + who(owner) + ' returned here and cannot be assaulted here until its next turn.');
     if (E.watched(s, r) && s.houses[owner].refuge !== r) facts.push('<b>Town Watch:</b> ' + (owner === 'player' ? 'You have' : who(owner) + ' has') + ' no warbands here, but the Town Watch keeps it. ' +
@@ -525,6 +531,11 @@
           'The other six regions start undeveloped: no effect, no site income and 1 slot. In the first age the Toll Bridge and the Charcoal Kilns already stand. ' +
           'A built structure gives its effect and a second slot. ' +
           'It works for whoever holds the region, and it stands into the ages that follow.</p>' +
+        '<h3>Great works</h3><p>A great work is raised at the Reckoning, in any region. A region holds one at most. Each of the six stands in one place at a time. ' +
+          'It works for whoever holds its region. It stands into the ages that follow until a Reckoning razes it.</p><ul class="rows">' +
+          D.WORKS.map(function (wk) { return '<li>' + A.art('work/' + wk.id, { size: 22 }) + '<span><b>' + esc(wk.name) + '.</b> ' + esc(wk.text) + '</span></li>'; }).join('') + '</ul>' +
+        '<h3>The Reckoning</h3><p>When a house wins an age, it makes one change to the valley. It may build or raze a structure, or raise or raze a great work. ' +
+          'Then it changes the world deck and writes a law for the ages to come.</p>' +
         '<h3>Holdfasts</h3><p>When an age ends, each house records its holdfast: the region where it had the most warbands. ' +
           'Next age it starts there. If the ruler or another house has it, the house starts beside it instead. ' +
           'The ruler starts in the Crown hold, with the neighbours of the Crown hold it held at the end of the last age.</p>' +
@@ -602,8 +613,8 @@
     return '<div class="screen end-screen"><h1>' + esc(E.ageTitle(s.ageNo)) + ' is over</h1>' +
       '<div class="banner ' + (w === 'player' ? 'won' : 'lost') + '">' + (w ? stamp(w, 48) : '') + '<div><h2>' + esc(head) + '</h2><p>' + esc(howWords(c, w, s.winType, s.endRound || s.round, s)) + '</p></div></div>' +
       '<div class="mapframe small">' + M.svg(s, {}) + '</div>' +
-      '<p>' + (w === 'player' ? 'Now the Reckoning. You may build or raze a structure. Then you change the world deck and write a law for the ages to come.' :
-        w ? 'Now the Reckoning. ' + esc(c.houses[w].name) + ' may build or raze a structure. Then it changes the world deck and writes a law for the ages to come.' : 'With no winner there is no Reckoning to make. The age goes into the Annals as it stands.') + '</p>' +
+      '<p>' + (w === 'player' ? 'Now the Reckoning. You may build or raze a structure, or raise or raze a great work. Then you change the world deck and write a law for the ages to come.' :
+        w ? 'Now the Reckoning. ' + esc(c.houses[w].name) + ' may build or raze a structure, or raise or raze a great work. Then it changes the world deck and writes a law for the ages to come.' : 'With no winner there is no Reckoning to make. The age goes into the Annals as it stands.') + '</p>' +
       '<div class="row">' + btn(w ? 'Begin the Reckoning' : 'Write it in the Annals', function () {
         E.beginReckoning(c); U.rk = null; H.save(); U.go(H.screenFor(c));
       }, { cls: 'go big' }) + '</div></div>';
@@ -614,13 +625,16 @@
     var W = cap(c.houses[c.reckoning.winner].short);
     if (o.step === 'build') {
       if (!ch || ch.kind === 'none') return W + ' leaves the valley as it stands.';
+      var wk = D.WORK[ch.work || (c.world.works || {})[ch.region]];
+      if (ch.kind === 'work') return W + ' raises the ' + wk.name + ' at ' + rn(ch.region) + '.';
+      if (ch.kind === 'razeWork') return W + ' razes the ' + wk.name + ' at ' + rn(ch.region) + '.';
       return W + (ch.kind === 'raze' ? ' razes the ' : ' builds the ') + REG[ch.region].site + ' at ' + rn(ch.region) + '.';
     }
     if (o.step === 'banish') return W + ' banishes ' + listAnd((ch.banish || []).map(cardName)) + ' from the world, and admits ' + listAnd((ch.admit || []).map(cardName)) + '.';
     if (o.step === 'law') return W + ' writes the law of ' + D.LAW[ch.law].name + ': ' + D.LAW[ch.law].text;
     return '';
   }
-  var STEP_NAME = { build: 'I. Build or raze', banish: 'II. The world deck', law: 'III. The law' };
+  var STEP_NAME = { build: 'I. The valley', banish: 'II. The world deck', law: 'III. The law' };
   U.renderReckoning = function () {
     var c = U.c, R = c.reckoning, o = E.reckoningOptions(c), w = R.winner, mine = w === 'player';
     var out = ['<div class="screen reckon-screen"><h1>The Reckoning</h1><p class="muted">' + esc(howWords(c, w, R.how, R.round, c.age)) + '</p>',
@@ -629,7 +643,10 @@
       var ch = U.rkAi && U.rkAi.step === o.step ? U.rkAi.choice : null;
       if (!ch) { ch = AI.reckoningChoice(c); U.rkAi = { step: o.step, choice: ch }; }
       out.push('<section class="panel">' + stamp(w, 36) + '<h2>' + STEP_NAME[o.step] + '</h2><p class="bigtext">' + esc(describeAiChoice(c, o, ch)) + '</p>');
-      if (o.step === 'build' && ch && ch.region) {
+      if (o.step === 'build' && ch && ch.region && (ch.kind === 'work' || ch.kind === 'razeWork')) {
+        var rw = D.WORK[ch.work || (c.world.works || {})[ch.region]];
+        out.push('<p class="rkart">' + A.art('work/' + rw.id, { size: 64 }) + '<span><b>' + esc(rw.name) + '</b> at ' + rn(ch.region) + '. ' + esc(rw.text) + '</span></p>');
+      } else if (o.step === 'build' && ch && ch.region) {
         var rkUrl = A.paintedUrl && A.paintedUrl('site-' + ch.region), rkCap = '<b>' + esc(REG[ch.region].site) + '</b> at ' + rn(ch.region);
         out.push(rkUrl ? '<figure class="rkart painted"><img src="' + rkUrl + '" alt="' + esc(REG[ch.region].site) + '" width="480" height="358" loading="lazy"><figcaption>' + rkCap + '</figcaption></figure>' :
           '<p class="rkart">' + A.art('site/' + ch.region, { size: 64 }) + rkCap + '</p>');
@@ -638,6 +655,7 @@
         if ((ch.banish || []).length) out.push('<h3>Banished</h3><div class="cards">' + ch.banish.map(function (id) { return A.card(id, ''); }).join('') + '</div>');
         if ((ch.admit || []).length) out.push('<h3>Admitted</h3><div class="cards">' + ch.admit.map(function (id) { return A.card(id, ''); }).join('') + '</div>');
       }
+      if (o.step === 'build') out.push(startsHtml(c));
       if (o.step === 'law' && c.world.laws.length >= o.max) out.push('<p class="muted">Only ' + o.max + ' laws stand at once: the oldest, ' + D.LAW[c.world.laws[0]].name + ', lapses.</p>');
       out.push(btn('Go on', function () { applyRk(ch); }, { cls: 'go big' }) + '</section>');
     } else out.push(playerRk(c, o));
@@ -650,16 +668,58 @@
     U.rk = null; U.rkAi = null; H.save();
     if (c.reckoning.step === 'done') U.go('annals'); else { U.render(); window.scrollTo(0, 0); }
   }
+  // where each house starts next age, one line a house
+  function startsHtml(c) {
+    var lines = E.startLines(c);
+    return lines.length ? '<h3>Next age</h3><ul class="starts">' + lines.map(function (l) { return '<li>' + esc(l) + '</li>'; }).join('') + '</ul>' : '';
+  }
   function playerRk(c, o) {
     U.rk = U.rk && U.rk.step === o.step ? U.rk : { step: o.step, pick: null, banish: [], admit: [] };
     var rk = U.rk, out = ['<section class="panel"><h2>' + STEP_NAME[o.step] + '</h2>'];
     if (o.step === 'build') {
-      out.push('<p>You may build one structure for free, or raze one that stands. It stays that way in the ages to come. The Citadel and the Waystone are landmarks: they always stand. Or leave the valley as it is.</p><div class="actlist">');
-      o.options.forEach(function (op) {
-        var lbl = op.kind === 'none' ? 'Leave the valley as it is' : (op.kind === 'raze' ? 'Raze the ' : 'Build the ') + REG[op.region].site + ' <small>' + rn(op.region) + '</small>';
-        out.push(btn((op.region ? A.art('site/' + op.region, { size: 20 }) + ' ' : '') + lbl, function () { applyRk(op); }, { cls: op.kind === 'raze' ? 'red' : (op.kind === 'none' ? 'go' : '') }));
-      });
-      out.push('</div>');
+      var g = E.reckoningGroups(o), pick = rk.pick && g.raise.filter(function (x) { return x.work === rk.pick; })[0];
+      var where = function (r) { var tg = E.startTag(c, r); return ' <small>' + esc(cap(rn(r))) + (tg ? ' · ' + esc(tg) : '') + '</small>'; };
+      if (pick) {
+        // step two of raising a work: where it goes
+        var wk = D.WORK[pick.work];
+        out.push('<p class="rkart">' + A.art('work/' + wk.id, { size: 48 }) + '<span><b>Raise the ' + esc(wk.name) + '.</b> ' + esc(wk.text) + '</span></p>' +
+          '<h3>Choose a region</h3><p class="muted">Regions with a great work already are left out.</p><div class="actlist">');
+        pick.regions.forEach(function (r) {
+          var tg = E.startTag(c, r);
+          out.push(btn(A.art('site/' + r, { size: 20 }) + ' ' + esc(cap(rn(r))) + (tg ? ' <small>' + esc(tg) + '</small>' : ''), function () { applyRk({ kind: 'work', region: r, work: wk.id }); }));
+        });
+        out.push('</div><div class="row">' + btn('Back', function () { rk.pick = null; U.render(); }) + '</div>');
+      } else {
+        out.push('<p>Make one change to the valley. It lasts into the ages to come. ' + (g.raise.length ? 'You may raise a great work in any region. ' +
+          'It helps whoever holds that region. A region holds one work at most. ' : 'All six great works stand. None is left to raise. ') +
+          'You may also build or raze a structure, or raze a great work. The Citadel and the Waystone always stand. ' +
+          'Or leave the valley as it is.</p>');
+        out.push(startsHtml(c));
+        if (g.raise.length) {
+          out.push('<h3>Raise a great work</h3><div class="actlist">');
+          g.raise.forEach(function (x) {
+            var w = D.WORK[x.work];
+            out.push(btn(A.art('work/' + w.id, { size: 28 }) + ' <span><b>' + esc(w.name) + '</b> <small>' + esc(w.text) + '</small></span>', function () { rk.pick = w.id; U.render(); window.scrollTo(0, 0); }, { cls: 'work' }));
+          });
+          out.push('</div>');
+        }
+        if (g.build.length) {
+          out.push('<h3>Build a structure</h3><div class="actlist">');
+          g.build.forEach(function (op) { out.push(btn(A.art('site/' + op.region, { size: 20 }) + ' Build the ' + esc(REG[op.region].site) + where(op.region), function () { applyRk(op); })); });
+          out.push('</div>');
+        }
+        if (g.raze.length) {
+          out.push('<h3>Raze a structure</h3><div class="actlist">');
+          g.raze.forEach(function (op) { out.push(btn(A.art('site/' + op.region, { size: 20 }) + ' Raze the ' + esc(REG[op.region].site) + where(op.region), function () { applyRk(op); }, { cls: 'red' })); });
+          out.push('</div>');
+        }
+        if (g.razeWork.length) {
+          out.push('<h3>Raze a great work</h3><div class="actlist">');
+          g.razeWork.forEach(function (op) { out.push(btn(A.art('work/' + op.work, { size: 20 }) + ' Raze the ' + esc(D.WORK[op.work].name) + where(op.region), function () { applyRk(op); }, { cls: 'red' })); });
+          out.push('</div>');
+        }
+        out.push('<div class="actlist">' + btn('Leave the valley as it is', function () { applyRk({ kind: 'none' }); }, { cls: 'go' }) + '</div>');
+      }
     } else if (o.step === 'banish') {
       var needB = Math.min(o.banish, o.deck.length), needA = o.admit;
       out.push('<p>Banish ' + needB + ' cards from the world deck for good, and admit ' + needA + ' from the Vault. Chosen: ' + rk.banish.length + ' of ' + needB + ' banished, ' + rk.admit.length + ' of ' + needA + ' admitted.</p>');

@@ -33,6 +33,21 @@
   var REGION_IDS = REGIONS.map(function (r) { return r.id; });
   var REGION = {};
   REGIONS.forEach(function (r) { REGION[r.id] = r; });
+  // ---------------------------------------------------------------- great works
+  // Raised only at the Reckoning, by the age's winner, in any region (landmarks included), on top of its structure.
+  // At most one per region; each stands at most once in the valley, into later ages, until razed.
+  // Like a structure it works for whoever holds its region: "here" means that region.
+  var WORKS = [
+    { id: 'watchtower', name: 'Watchtower', text: '+2 defence here.', def: 2 },
+    { id: 'granary', name: 'Granary', text: '+1 moon each turn.', hours: 1 },
+    { id: 'greatHall', name: 'Great Hall', text: 'A third resident slot here. Recruit here costs 1 silver less.', slots: 1, recruitLess: 1 },
+    { id: 'musterField', name: 'Muster Field', text: 'Muster here places 1 more warband.', muster: 1 },
+    { id: 'marketCross', name: 'Market Cross', text: '+2 income.', income: 2 },
+    { id: 'oldRoad', name: 'Old Road', text: 'March into here costs 0 moons once per turn.' }
+  ];
+  var WORK_IDS = WORKS.map(function (w) { return w.id; });
+  var WORK = {};
+  WORKS.forEach(function (w) { WORK[w.id] = w; });
   var EDGE_STARTS = ['saltmarsh', 'highpasture', 'oldbarrow'];
   var CROWN_NEIGHBOURS = REGION.crown.adj.slice();
 
@@ -205,6 +220,7 @@
 
   return {
     REGIONS: REGIONS, REGION_IDS: REGION_IDS, REGION: REGION, EDGE_STARTS: EDGE_STARTS, CROWN_NEIGHBOURS: CROWN_NEIGHBOURS,
+    WORKS: WORKS, WORK_IDS: WORK_IDS, WORK: WORK,
     SUITS: SUITS, RESIDENTS: RESIDENTS, VAULT: VAULT, RELICS: RELICS, CARDS: CARDS,
     PROPHECIES: PROPHECIES, LAWS: LAWS, LAW: LAW, MAX_LAWS: MAX_LAWS,
     TEMPERAMENTS: TEMPERAMENTS, HOUSES: HOUSES, FIRST_AGE: FIRST_AGE,

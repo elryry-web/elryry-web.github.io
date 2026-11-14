@@ -44,7 +44,7 @@
     return 0.6 + c.cost * 0.15 + (t.suit[c.suit] || 0);
   }
   function regionWorth(s, r) {
-    return 1 + (E.siteOn(s, r) ? REG[r].siteIncome * 0.4 + (REG[r].landmark ? 0 : 0.3) : 0) + (r === 'crown' ? 1 : 0);
+    return 1 + (E.siteOn(s, r) ? REG[r].siteIncome * 0.4 + (REG[r].landmark ? 0 : 0.3) : 0) + (r === 'crown' ? 1 : 0) + (E.workAt(s, r) ? WORK_HELD.region : 0);
   }
   // ---------------------------------------------------------------- structures
   // what a built structure is worth each turn to whoever holds it (in evaluate's units), before temperament
@@ -72,6 +72,10 @@
   }
   // tuning: held scales a standing structure in a position; payback scales its worth per round left when building
   var BUILD = { held: 0.8, payback: 1.6 };
+  // ---------------------------------------------------------------- great works
+  // what a held great work is worth in a position, on top of what it already adds (income, defence, moons);
+  // region: extra stake in any region with a great work, for whoever fights over it
+  var WORK_HELD = { watchtower: 0.3, granary: 0.6, greatHall: 0.3, musterField: 0.35, marketCross: 0.2, oldRoad: 0.25, region: 0.4 };
   // biggest force another house could bring against region r next turn
   function pressure(s, h, r) {
     var best = 0, by = {};
@@ -279,7 +283,11 @@
     var bands = E.totalBands(s, h) - (hs.camp || 0);   // the camp breaks up at the end of the turn
     v += bands * t.bands + Math.min(hs.silver, 10) * t.silver + Math.max(0, hs.silver - 10) * 0.05;
     v += E.income(s, h) * 0.35 + held.length * 0.6;
-    held.forEach(function (r) { if (!REG[r].landmark && E.siteOn(s, r)) v += structWorth(s, h, t, r); });
+    held.forEach(function (r) {
+      if (!REG[r].landmark && E.siteOn(s, r)) v += structWorth(s, h, t, r);
+      var w = E.workAt(s, r);
+      if (w) v += WORK_HELD[w] * ((WORK_LIKE[hs.temper] || {})[w] || 1);
+    });
     v -= E.upkeep(s, h, bands) * t.silver * 2;   // upkeep owed over the next turns or so
     hs.retinue.forEach(function (c) { v += cardValue(t, c); });
     v += hs.relics.length * 0.6;
@@ -898,6 +906,23 @@
     wanderer: ['highpasture', 'oldbarrow', 'stonefields'], steward: ['saltmarsh', 'riverford', 'ashwood'],
     schemer: ['saltmarsh', 'riverford', 'stonefields'], wild: ['oldbarrow', 'highpasture', 'saltmarsh'], player: ['saltmarsh', 'riverford', 'ashwood']
   };
+  // how much each temperament likes each great work (1 when not listed)
+  var WORK_LIKE = {
+    warlord: { musterField: 1.5, watchtower: 1.4, oldRoad: 1.1 },
+    mystic: { greatHall: 1.4, granary: 1.3, watchtower: 1.1 },
+    wanderer: { oldRoad: 1.5, granary: 1.3 },
+    steward: { watchtower: 1.4, marketCross: 1.4, granary: 1.3 },
+    schemer: { marketCross: 1.5, granary: 1.4, greatHall: 1.1 },
+    wild: { musterField: 1.3, oldRoad: 1.3 },
+    player: { marketCross: 1.2, granary: 1.2 }
+  };
+  // the Reckoning's build-or-raze choice, scored; the best wins and nothing scores 0.
+  //   struct: building the temperament's first, second and third loved structure
+  //   razeStruct: razing the structure the strongest grudge-holder would use most
+  //   workOwn / workElse: times WORK_LIKE, a great work in a region we start in next age / anywhere nobody starts
+  //   crown: extra for a great work at the Crown hold (watchtower: for the Watchtower there), as the ruler starts there
+  //   razeWork: razing a great work where the strongest grudge-holder starts next age
+  var RK = { struct: [3, 1.8, 1.6], razeStruct: 2, workOwn: 1.8, workElse: 0.3, crown: 0.15, watchtower: 0.4, razeWork: 2.1 };
   var LAW_PREF = {
     warlord: ['levy', 'crownsDue', 'tolls', 'wildYear', 'shortReign', 'charter', 'openRoads', 'titheOfLore', 'oathOfArms', 'longPeace'],
     mystic: ['titheOfLore', 'longPeace', 'oathOfArms', 'charter', 'shortReign', 'wildYear', 'openRoads', 'tolls', 'levy', 'crownsDue'],
@@ -910,21 +935,7 @@
   function reckoningChoice(c) {
     var R = c.reckoning, w = R.winner, t = T[temperOf(c, w)] || T.player, tn = temperOf(c, w);
     var o = E.reckoningOptions(c);
-    if (o.step === 'build') {
-      var loves = LOVED_SITES[tn] || LOVED_SITES.player, built = c.world.built;
-      if (!built[loves[0]]) return { kind: 'build', region: loves[0] };
-      // raze what the strongest grudge-holder against us would use most
-      var foe = null, fg = -1;
-      Object.keys(c.memory).forEach(function (k) {
-        if (k === w) return;
-        var g = c.memory[k][w].grudge + (c.next && c.next.rivals && c.next.rivals.indexOf(k) >= 0 ? 1 : 0);
-        if (g > fg) { fg = g; foe = k; }
-      });
-      var site = foe ? HATED_SITE[temperOf(c, foe)] : null;
-      if (site && built[site] && loves.indexOf(site) < 0 && fg > 0) return { kind: 'raze', region: site };
-      var next = loves.filter(function (r) { return !built[r]; })[0];
-      return next ? { kind: 'build', region: next } : { kind: 'none' };
-    }
+    if (o.step === 'build') return reckoningSite(c, w, tn, o.options);
     if (o.step === 'banish') {
       var deck = o.deck.slice().sort(function (x, y) { return selfValue(t, tn, x) - selfValue(t, tn, y); });
       var offer = o.offer.slice().sort(function (x, y) { return selfValue(t, tn, y) - selfValue(t, tn, x); });
@@ -937,6 +948,38 @@
     }
     return null;
   }
+  // score every build-or-raze option (see RK) and take the best; none when nothing scores above 0
+  function reckoningSite(c, w, tn, options) {
+    var loves = LOVED_SITES[tn] || LOVED_SITES.player, built = c.world.built, like = WORK_LIKE[tn] || WORK_LIKE.player;
+    // the strongest grudge-holder against us
+    var foe = null, fg = -1;
+    Object.keys(c.memory).forEach(function (k) {
+      if (k === w) return;
+      var g = c.memory[k][w].grudge + (c.next && c.next.rivals && c.next.rivals.indexOf(k) >= 0 ? 1 : 0);
+      if (g > fg) { fg = g; foe = k; }
+    });
+    var hated = foe && fg > 0 ? HATED_SITE[temperOf(c, foe)] : null;
+    // where each house starts next age, read before the choice is made
+    var starts = E.nextStarts(c) || {}, mine = starts[w] || [], anyStart = {};
+    Object.keys(starts).forEach(function (h) { starts[h].forEach(function (r) { anyStart[r] = anyStart[r] || h; }); });
+    var foeStarts = foe && fg > 0 ? (starts[foe] || (c.holdfast && c.holdfast[foe] ? [c.holdfast[foe]] : [])) : [];
+    function score(x) {
+      if (x.kind === 'build') { var i = loves.indexOf(x.region); return i >= 0 ? RK.struct[i] : 0; }
+      if (x.kind === 'raze') return x.region === hated && loves.indexOf(x.region) < 0 ? RK.razeStruct : 0;
+      if (x.kind === 'work') {
+        var lk = like[x.work] || 1;
+        if (mine.indexOf(x.region) >= 0) return RK.workOwn * lk + (x.region === 'crown' ? (x.work === 'watchtower' ? RK.watchtower : RK.crown) : 0);
+        return anyStart[x.region] ? 0 : RK.workElse * lk;
+      }
+      if (x.kind === 'razeWork') return foeStarts.indexOf(x.region) >= 0 && mine.indexOf(x.region) < 0 ? RK.razeWork : 0;
+      return 0;
+    }
+    var best = { kind: 'none' }, bs = 0;
+    options.forEach(function (x) { var v = score(x); if (v > bs) { bs = v; best = x; } });
+    if (best.kind === 'work') return { kind: 'work', region: best.region, work: best.work };
+    if (best.kind === 'none') return best;
+    return { kind: best.kind, region: best.region };
+  }
   function selfValue(t, tn, id) {
     var c = CARDS[id];
     if (c.relic) return tn === 'wanderer' ? 10 : (id === 'waystoneShard' ? -1 : 1.2);
@@ -948,6 +991,6 @@
     evaluate: evaluate, odds: odds, planIntent: planIntent, snapshot: snapshot, replan: replan, intentAction: intentAction, ahead: ahead, pactScore: pactScore, chooseProphecy: chooseProphecy,
     dangers: function (s, h) { setGuess(s, h); return dangers(s, h); },
     digChoice: function (s, h) { setGuess(s, h); return digChoice(s, h, evaluate(s, h)); },
-    TEMPERAMENTS: T, AIM: AIM, BUILD: BUILD
+    TEMPERAMENTS: T, AIM: AIM, BUILD: BUILD, RK: RK, WORK_LIKE: WORK_LIKE, WORK_HELD: WORK_HELD
   };
 });

@@ -164,6 +164,7 @@
       A.stamp(h, 40).replace(/<svg[^>]*>|<\/svg>/g, '') + '</g>';
   }
 
+  var WORK_DX = -2, WORK_DY = 0, WORK_R = 9.5;   // a great work's badge, from the region's centre
   function region(s, r, view, painted, avoid) {
     var g = s.regions[r], p = POS[r], cx = p[0], cy = p[1], rad = p[2], b = base(), shape = b.shapes[r];
     var owner = g.owner, fill = owner ? A.houseCol(owner) : P.bone, out = '<g class="region" data-region="' + r + '">';
@@ -218,6 +219,15 @@
       var id = g.residents[i], x = cx + 1.5 + i * 13, y = sy - 10;
       out += '<image href="' + MARK.card + '" x="' + x + '" y="' + y + '" width="11" height="16" preserveAspectRatio="none"' +
         (id ? ' filter="' + tint(A.suitCol(A.cardSuit(id))) + '"' : ' opacity="0.35"') + '/>';
+    }
+    // a great work: a small ochre badge on the lower right of the site marker
+    var wk = E.workAt(s, r);
+    if (wk) {
+      var wx = cx + WORK_DX, wy = cy + WORK_DY, wUrl = A.paintedUrl && A.paintedUrl('work-' + wk);
+      out += '<g class="work"><circle cx="' + wx + '" cy="' + wy + '" r="' + WORK_R + '" fill="' + P.ochre + '" stroke="' + P.ink + '" stroke-width="1.8"/>' +
+        (wUrl ? '<image href="' + wUrl + '" x="' + (wx - 8) + '" y="' + (wy - 8) + '" width="16" height="16" preserveAspectRatio="xMidYMid meet"/>' :
+          '<g transform="translate(' + (wx - 7) + ' ' + (wy - 7) + ')">' + A.workGlyph(wk, 14).replace(/<svg[^>]*>/, '<svg x="0" y="0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="' + P.ink + '">') + '</g>') +
+        '</g>';
     }
     // holder stamp, shelter mark
     if (owner) out += stampAt(owner, cx - 22, cy + 16, 22);
@@ -335,6 +345,7 @@
     if (E.siteOn(s, r) && painted && A.paintedUrl && A.paintedUrl('stamp-' + r)) own.push([cx - 43, cy - 24, cx - 1, cy + 4]);
     else own.push([sx - 14, sy - 14, sx + 14, sy + 14]);
     if (slots) own.push([cx - 1, sy - 12, cx + 3 + slots * 13, sy + 10, 0.25]);   // (a squad may cover a resident slot sooner than a stamp)
+    if (E.workAt(s, r)) own.push([cx + WORK_DX - WORK_R, cy + WORK_DY - WORK_R, cx + WORK_DX + WORK_R, cy + WORK_DY + WORK_R]);
     if (owner) {
       var bw = 22 * (A.paintedUrl && A.paintedUrl('house-' + owner) ? A.bannerScale(owner) : 1);
       own.push([cx - 22 - bw / 2, cy + 1, cx - 22 + bw / 2, cy + 28]);

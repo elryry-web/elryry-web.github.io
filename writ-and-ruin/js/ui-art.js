@@ -2,6 +2,7 @@
  * colour nudged off the line). Every picture goes through art(slot): painted art listed in
  * art/manifest.json (made by tools/prep-art.py) replaces these slot by slot, and these stay as the fallback.
  *   art('house/varrow')  heraldic stamp      art('site/crown')  site glyph
+ *   art('work/granary')  great work glyph (painted work-granary when it exists)
  *   art('suit/Lore')     suit glyph          art('card/drover') card glyph (suit, or relic)
  *   art('annals/3', entry)  Annals vignette: the painting for how the age ended (annals-seize, ...), else carved
  * window.WR_ART. Needs WR_DATA.
@@ -116,6 +117,16 @@
     oldbarrow: '<path d="M1 21C3 12 8 8 12 8C16 8 21 12 23 21ZM10 21V16C10 14 14 14 14 16V21Z" fill="#17140f" fill-rule="evenodd"/>',
     farpass: '<path d="M7 22L8 5L12 2L16 5L17 22ZM12 9A2.6 2.6 0 1 0 12.01 9Z" fill="#17140f" fill-rule="evenodd"/>'
   };
+  // great works: carved silhouettes on the same 24-unit grid
+  var WORK_GLYPH = {
+    watchtower: '<path d="M8 22L9.5 9H8V5L9.5 6V4H11V6H13V4H14.5V6L16 5V9H14.5L16 22ZM11 22V18C11 16.6 13 16.6 13 18V22Z" fill="#17140f" fill-rule="evenodd"/>',
+    granary: '<path d="M4 13C4 6.5 7.5 3 12 3C16.5 3 20 6.5 20 13Z M5.5 13H18.5V17H5.5Z" fill="#17140f"/><path d="M7 17V22M12 17V22M17 17V22M4 22H20" stroke-width="2" stroke-linecap="round"/>',
+    greatHall: '<path d="M1 21V13L6 5H18L23 13V21ZM10 21V16H14V21Z" fill="#17140f" fill-rule="evenodd"/><path d="M6 5L4 2M18 5L20 2" stroke-width="1.8" stroke-linecap="round"/>',
+    musterField: '<path d="M5 22L16.5 7.5M19 22L7.5 7.5" stroke-width="2.4" stroke-linecap="round"/><path d="M20.5 2.5L19.5 9L14.5 5.5Z M3.5 2.5L9.5 5.5L4.5 9Z" fill="#17140f"/><path d="M7 19L9.5 21.5M17 19L14.5 21.5" stroke-width="2" stroke-linecap="round"/>',
+    marketCross: '<path d="M10.5 2H13.5V6H17V9H13.5V15H10.5V9H7V6H10.5ZM8 15H16V18H8ZM5 18H19V22H5Z" fill="#17140f"/>',
+    oldRoad: '<path d="M9 16V7C9 3.5 15 3.5 15 7V16Z" fill="#17140f"/><path d="M5 22L8.5 17H15.5L19 22Z" fill="#17140f"/><path d="M12 18V19.5M12 21V22" stroke="#f4ead2" stroke-width="1.2"/><path d="M11 9H13" stroke="#f4ead2" stroke-width="1.4" stroke-linecap="round"/>'
+  };
+  function workGlyph(id, size) { return glyph(WORK_GLYPH[id] || WORK_GLYPH.watchtower, size || 22); }
   function glyph(inner, size, cls) {
     return '<svg class="' + (cls || 'glyph') + '" viewBox="0 0 24 24" width="' + size + '" height="' + size + '" fill="none" stroke="' + PAL.ink + '" aria-hidden="true">' + inner + '</svg>';
   }
@@ -223,6 +234,7 @@
     var p = slot.split('/'), kind = p[0], id = p[1];
     if (kind === 'house') return stamp(id, opts && opts.size);
     if (kind === 'site') return siteGlyph(id, opts && opts.size);
+    if (kind === 'work') return workGlyph(id, opts && opts.size);
     if (kind === 'suit') return suitGlyph(id, opts && opts.size);
     if (kind === 'card') return suitGlyph(cardSuit(id), opts && opts.size || 26);
     if (kind === 'annals') return vignette(opts);
@@ -232,6 +244,6 @@
 
   root.WR_ART = { PAL: PAL, HOUSE: HOUSE, houseCol: houseCol, textOn: textOn, SUIT_COL: SUIT_COL, suitCol: suitCol, cardSuit: cardSuit,
     hash: hash, rng: rng, blob: blob, blobPoints: blobPoints, smooth: smooth, gouges: gouges, f1: f1,
-    stamp: stamp, suitGlyph: suitGlyph, siteGlyph: siteGlyph, SITE_GLYPH: SITE_GLYPH, card: card, vignette: vignette, annalsSlot: annalsSlot,
+    stamp: stamp, suitGlyph: suitGlyph, siteGlyph: siteGlyph, SITE_GLYPH: SITE_GLYPH, workGlyph: workGlyph, WORK_GLYPH: WORK_GLYPH, card: card, vignette: vignette, annalsSlot: annalsSlot,
     art: art, painted: painted, paintedUrl: paintedUrl, bannerScale: bannerScale, onPainted: onPainted, noPortrait: noPortrait };
 })(typeof self !== 'undefined' ? self : this);

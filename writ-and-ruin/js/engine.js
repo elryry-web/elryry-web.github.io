@@ -12,7 +12,7 @@
 })(typeof self !== 'undefined' ? self : this, function (D) {
   'use strict';
 
-  var N = D.NUM, IDS = D.REGION_IDS, REG = D.REGION, CARDS = D.CARDS;
+  var N = D.NUM, IDS = D.REGION_IDS, REG = D.REGION, CARDS = D.CARDS, WORK = D.WORK;
   var SAVE_VERSION = 2;
 
   // ---------------------------------------------------------------- rng (mulberry32, state in obj.rng)
@@ -57,7 +57,17 @@
   function returnSpots(s, h) {
     return IDS.filter(function (r) { var g = s.regions[r]; return !(g.owner && g.bands[g.owner] > 0) && !othersPresent(s, h, r) && !watched(s, r); });
   }
-  function slotsOf(s, r) { return siteOn(s, r) ? N.slots : N.slotsUndeveloped; }
+  function slotsOf(s, r) { return (siteOn(s, r) ? N.slots : N.slotsUndeveloped) + (workAt(s, r) === 'greatHall' ? WORK.greatHall.slots : 0); }
+  // great works: the campaign keeps world.works {region: workId}; each age copies it onto its regions as g.work
+  // (an age from before great works has no g.work: no work stands). A work works for whoever holds its region.
+  function workAt(s, r) { var g = s.regions[r]; return (g && g.work) || null; }
+  // great work id stands in region r and h holds r
+  function workHere(s, h, id, r) { return workAt(s, r) === id && holds(s, h, r); }
+  // the region where great work id stands, if h holds it, else null
+  function workFor(s, h, id) {
+    for (var i = 0; i < IDS.length; i++) if (s.regions[IDS[i]].work === id) return s.regions[IDS[i]].owner === h ? IDS[i] : null;
+    return null;
+  }
   // a house's effects: its retinue and relics, plus residents at sites of regions it holds
   function has(s, h, id) {
     var hs = s.houses[h];
@@ -121,6 +131,7 @@
     if (has(s, h, 'peatCutter') && n > 0 && n <= 2) inc++;
     if (has(s, h, 'woolFactor')) inc += (holds(s, h, 'highpasture') ? 1 : 0) + (holds(s, h, 'farpass') ? 1 : 0);
     if (has(s, h, 'ferryWife') && (holds(s, h, 'riverford') || holds(s, h, 'saltmarsh'))) inc++;
+    if (workFor(s, h, 'marketCross')) inc += WORK.marketCross.income;
     return inc;
   }
   function hoursFor(s, h) {
@@ -128,6 +139,8 @@
     if (has(s, h, 'granaryKeeper')) hr++;
     if (has(s, h, 'antlerCrown')) hr++;
     if (has(s, h, 'hollowAbbess') && n >= 3) hr++;
+    // the Granary, like the Granary Keeper, adds on top of the minimum
+    if (workFor(s, h, 'granary')) hr += WORK.granary.hours;
     return hr;
   }
   function loreCount(s, h) {
@@ -290,12 +303,17 @@
   }
 
   // ---------------------------------------------------------------- costs
-  function marchFree(s, h, from) {
+  // the free march h may use from `from` into `to` (the flag it spends), or null
+  function marchFree(s, h, from, to) {
     if (from === 'riverford' && holds(s, h, 'riverford') && siteOn(s, 'riverford') && !s.houses[h].flags.toll) return 'toll';
+    if (to && s.regions[to] && workHere(s, h, 'oldRoad', to) && !s.houses[h].flags.oldRoad) return 'oldRoad';
     if (has(s, h, 'drover') && !s.houses[h].flags.drover) return 'drover';
     return null;
   }
-  function musterMax(s, h) { return N.musterMax + (has(s, h, 'drillCaptain') ? 1 : 0) + (law(s, 'levy') ? 1 : 0); }
+  // the most warbands one Muster places; with region r, counting a Muster Field there
+  function musterMax(s, h, r) {
+    return N.musterMax + (has(s, h, 'drillCaptain') ? 1 : 0) + (law(s, 'levy') ? 1 : 0) + (r && s.regions[r] && workHere(s, h, 'musterField', r) ? WORK.musterField.muster : 0);
+  }
   function musterCost(s, h, r, count) {
     var c = count - (has(s, h, 'brewer') ? 1 : 0) - (r === 'ashwood' && siteOn(s, 'ashwood') ? 1 : 0);
     return Math.max(0, c);
@@ -317,6 +335,7 @@
     if (law(s, 'wildYear') && card.suit === 'Wild') c = 0;
     else {
       if (has(s, h, 'fairMother')) c--;
+      if (r && s.regions[r] && workHere(s, h, 'greatHall', r)) c -= WORK.greatHall.recruitLess;
       if (law(s, 'titheOfLore') && card.suit === 'Lore') c--;
     }
     return Math.max(0, c) + (r && poachFrom(s, h, r) ? N.poachSilver : 0);
@@ -408,7 +427,9 @@
     var g = s.regions[r], d = g.owner, v;
     v = d ? (g.bands[d] || 0) : g.folk;
     if (d && !v && watched(s, r)) v = N.townWatch;
-    if (siteOn(s, r) && !(attacker && has(s, attacker, 'tunnelRat'))) v += REG[r].siteDef;
+    var walls = !(attacker && has(s, attacker, 'tunnelRat'));   // the Tunnel Rat goes under the Watchtower too
+    if (siteOn(s, r) && walls) v += REG[r].siteDef;
+    if (workAt(s, r) === 'watchtower' && walls) v += WORK.watchtower.def;
     if (d) {
       if (siteAt(s, d, 'wallWarden', r)) v++;
       if (siteAt(s, d, 'moorHound', r)) v++;
@@ -568,13 +589,13 @@
         if (!ok && s.regions[a.to].owner && s.regions[a.to].owner !== h && truce(s)) return err(truce(s) + ': held');
         if (!ok) return err('cannot march there');
         if (!warnedFor(s, h, a.to)) return err('not its declared plan');
-        if (!marchFree(s, h, a.from) && hours < 1) return err('no hours');
+        if (!marchFree(s, h, a.from, a.to) && hours < 1) return err('no hours');
         if (law(s, 'tolls') && !holds(s, h, a.to) && hs.silver < 1 && !opts.ignoreHours) return err('no silver for the toll');
         return null;
       }
       case 'muster': {
         if (!s.regions[a.region] || !holds(s, h, a.region)) return err('not your region');
-        if (!(a.count >= 1 && a.count <= musterMax(s, h))) return err('bad count');
+        if (!(a.count >= 1 && a.count <= musterMax(s, h, a.region))) return err('bad count');
         if (hours < 1) return err('no hours');
         if (!opts.ignoreHours && hs.silver < musterCost(s, h, a.region, a.count)) return err('not enough silver');
         return null;
@@ -744,7 +765,7 @@
         add({ type: 'search', region: r });
       }
       if (holds(s, h, r)) {
-        var mx = musterMax(s, h), cs = opts.few ? [mx, 1] : counts(mx);
+        var mx = musterMax(s, h, r), cs = opts.few ? [mx, 1] : counts(mx);
         if (opts.few && !opts.ignoreHours) {
           // the most this house can pay for
           var afford = mx; while (afford > 1 && musterCost(s, h, r, afford) > hs.silver) afford--;
@@ -963,7 +984,7 @@
     var h = a.house, hs = s.houses[h];
     var dest = marchDests(s, h, a.from).filter(function (d) { return d.to === a.to; })[0];
     var mode = enterMode(s, h, a.to);
-    var free = marchFree(s, h, a.from), silver = 0;
+    var free = marchFree(s, h, a.from, a.to), silver = 0;
     if (free) hs.flags[free] = true; else hs.hours -= 1;
     if (law(s, 'tolls') && mode !== 'own') { silver = Math.min(1, hs.silver); hs.silver -= silver; }
     var dst = s.regions[a.to];
@@ -1254,7 +1275,7 @@
   function newCampaign(seed, playerHouseName) {
     seed = (seed >>> 0) || 1;
     var c = { version: SAVE_VERSION, seed: seed, rng: seed, ageNo: 0, player: 'player', houses: {}, memory: {},
-      world: { built: {}, deck: [], vault: [], lost: [], laws: [], freeHold: null },
+      world: { built: {}, works: {}, deck: [], vault: [], lost: [], laws: [], freeHold: null },
       next: { ruler: D.FIRST_AGE.ruler, rivals: D.FIRST_AGE.rivals.slice(), rulerRegions: rulerSpread(D.FIRST_AGE.rulerRegions), rulerHeld: [] },
       holdfast: {}, annals: [], age: null, reckoning: null };
     (D.FIRST_AGE.built || []).forEach(function (r) { if (!REG[r].landmark) c.world.built[r] = true; });
@@ -1324,9 +1345,10 @@
         prophecy: null, prophecyOptions: [], attackWins: 0, broke: false, brokeKnown: false, tookCrown: false,
         hours: 0, turns: 0, flags: {}, once: {}, known: {}, intent: null, intent2: null, then: null, warned: null, warned2: null, camp: 0 };
     });
+    var works = c.world.works || {};
     IDS.forEach(function (r) {
       var built = !!(REG[r].landmark || c.world.built[r]);
-      s.regions[r] = { owner: null, bands: {}, folk: law(s, 'charter') ? Math.max(2, N.folk) : (r === 'crown' ? N.folkCrown : N.folk), residents: [], built: built };
+      s.regions[r] = { owner: null, bands: {}, folk: law(s, 'charter') ? Math.max(2, N.folk) : (r === 'crown' ? N.folkCrown : N.folk), residents: [], built: built, work: works[r] || null };
     });
     function place(h, r, n) { s.regions[r].owner = h; s.regions[r].folk = 0; s.regions[r].bands[h] = n; }
     var ruler = s.ruler && s.houses[s.ruler] ? s.ruler : null;
@@ -1404,21 +1426,38 @@
     var R = c.reckoning;
     if (!R) return null;
     if (R.step === 'build') {
-      var o = [{ kind: 'none' }];
+      var o = [{ kind: 'none' }], works = c.world.works || {}, standing = {};
       IDS.forEach(function (r) { if (!REG[r].landmark) o.push({ kind: c.world.built[r] ? 'raze' : 'build', region: r }); });
+      // great works: any that does not stand, in any region without one (landmarks too); then razing any that stands
+      IDS.forEach(function (r) { if (works[r]) standing[works[r]] = r; });
+      D.WORK_IDS.forEach(function (w) {
+        if (!standing[w]) IDS.forEach(function (r) { if (!works[r]) o.push({ kind: 'work', region: r, work: w }); });
+      });
+      IDS.forEach(function (r) { if (works[r]) o.push({ kind: 'razeWork', region: r, work: works[r] }); });
       return { step: 'build', options: o };
     }
     if (R.step === 'banish') return { step: 'banish', deck: c.world.deck.slice(), banish: 2, offer: R.vaultOffer.slice(), admit: Math.min(2, R.vaultOffer.length) };
     if (R.step === 'law') return { step: 'law', options: R.lawOffer.slice(), standing: c.world.laws.slice(), max: D.MAX_LAWS };
     return { step: R.step };
   }
-  // choice: build {kind: 'build'|'raze'|'none', region}; banish {banish:[id,id], admit:[id,id]}; law {law:id}
+  // choice: build {kind: 'build'|'raze'|'none', region} or a great work {kind: 'work', region, work} / {kind: 'razeWork', region};
+  // banish {banish:[id,id], admit:[id,id]}; law {law:id}
+  // R.site records it: {kind: 'build'|'raze', region} or {kind: 'work'|'razeWork', region, work}, or null for none
   function reckoningChoose(c, choice) {
     var R = c.reckoning, ev = [];
     if (R.step === 'build') {
-      var cr = choice && choice.region && REG[choice.region];
-      if (cr && cr.landmark) throw new Error('a landmark cannot be razed');
-      if (cr && choice.kind === 'build' && !c.world.built[choice.region]) { c.world.built[choice.region] = true; R.site = { kind: 'build', region: choice.region }; }
+      var cr = choice && choice.region && REG[choice.region], works = c.world.works = c.world.works || {};
+      if (cr && choice.kind === 'work') {
+        if (!WORK[choice.work]) throw new Error('no such great work');
+        if (works[choice.region]) throw new Error('a great work already stands there');
+        if (IDS.some(function (r) { return works[r] === choice.work; })) throw new Error('the ' + WORK[choice.work].name + ' already stands');
+        works[choice.region] = choice.work; R.site = { kind: 'work', region: choice.region, work: choice.work };
+      } else if (cr && choice.kind === 'razeWork') {
+        if (!works[choice.region]) throw new Error('no great work stands there');
+        R.site = { kind: 'razeWork', region: choice.region, work: works[choice.region] };
+        delete works[choice.region];
+      } else if (cr && cr.landmark && (choice.kind === 'build' || choice.kind === 'raze')) throw new Error('a landmark cannot be razed');
+      else if (cr && choice.kind === 'build' && !c.world.built[choice.region]) { c.world.built[choice.region] = true; R.site = { kind: 'build', region: choice.region }; }
       else if (cr && choice.kind === 'raze' && c.world.built[choice.region]) { delete c.world.built[choice.region]; R.site = { kind: 'raze', region: choice.region }; }
       ev.push({ type: 'reckonSite', choice: R.site });
       R.step = 'banish';
@@ -1446,19 +1485,10 @@
   function finishReckoning(c) {
     var R = c.reckoning, s = c.age, ev = [];
     // 4. the Seat
-    var ruler;
-    if (R.how === 'depart') { c.world.freeHold = R.winner; ruler = s.regions.crown.owner; }
-    else ruler = R.winner || s.regions.crown.owner;
-    // holdfasts: where each house of this age had the most warbands; a house with none keeps its old one
-    c.holdfast = c.holdfast || {};
-    Object.keys(s.houses).forEach(function (h) { var r = holdfastOf(s, h); if (r) c.holdfast[h] = r; });
-    var rr = {}, fill, kept = [];
-    if (ruler) {
-      // the ruler keeps the Crown hold's neighbours it held, most warbands first; the richest fill the rest
-      kept = rulerKept(s, ruler);
-      var nb = kept.concat(richestNeighbours(c.world.built, kept));
-      rr = rulerSpread(['crown', nb[0], nb[1]]);
-    }
+    var seat = seatAfter(c), ruler = seat.ruler, kept = seat.kept, fill;
+    if (R.how === 'depart') c.world.freeHold = R.winner;
+    c.holdfast = holdfastsAfter(c);
+    var rr = ruler ? rulerSpread(seat.regions) : {};
     // rivals: the ruler and the winner if they are rivals, then the strongest grudges against the winner, then at random
     var pool = D.HOUSES.map(function (H) { return H.id; });
     var rivals = [];
@@ -1490,10 +1520,123 @@
     return ev;
   }
 
+  // who holds the Seat next age and its three regions. The winner rules; after a Departure, whoever held the Crown hold.
+  // The ruler keeps the Crown hold's neighbours it held, most warbands first; the richest fill the rest.
+  function seatAfter(c) {
+    var R = c.reckoning, s = c.age;
+    var ruler = (R.how === 'depart' ? s.regions.crown.owner : (R.winner || s.regions.crown.owner)) || null;
+    if (!ruler) return { ruler: null, kept: [], regions: [] };
+    var kept = rulerKept(s, ruler), nb = kept.concat(richestNeighbours(c.world.built, kept));
+    return { ruler: ruler, kept: kept, regions: ['crown', nb[0], nb[1]] };
+  }
+  // the holdfasts after this age: where each house of the age had the most warbands; a house with none keeps its old one
+  function holdfastsAfter(c) {
+    var s = c.age, hf = clone(c.holdfast || {});
+    Object.keys(s.houses).forEach(function (h) { var r = holdfastOf(s, h); if (r) hf[h] = r; });
+    return hf;
+  }
+  // where each house of the ending age starts next age, for the Reckoning: {house: [regions]}.
+  // The ruler: the Crown hold and its two neighbours. A Departed house: the Far Pass (its free hold). Every other house:
+  // its holdfast, or [] when it has none (it takes an edge start). A holdfast someone else takes is resolved at setup,
+  // to a free neighbour. The ruler's neighbours may depend on richness, so this reads the world as it stands now:
+  // at step I, before the build choice is made.
+  function nextStarts(c, R) {
+    R = R || c.reckoning;
+    var s = c.age;
+    if (!s || !R) return null;
+    var seat = seatAfter(c), hf = holdfastsAfter(c), fh = R.how === 'depart' ? R.winner : c.world.freeHold, out = {};
+    Object.keys(s.houses).forEach(function (h) {
+      if (h === seat.ruler) out[h] = seat.regions.slice();
+      else if (h === fh) out[h] = ['farpass'];
+      else out[h] = hf[h] ? [hf[h]] : [];
+    });
+    return out;
+  }
+
+  // where each house sure to play starts next age, as the Reckoning shows it: [{house, why, regions, holdfast, by}], the player first.
+  // why: 'ruler' (regions: the Crown hold and its neighbours), 'freehold' (the Far Pass, plus an edge start),
+  // 'holdfast' (on it), 'near' (its holdfast is covered by house `by`: a free neighbour of it), 'edge' (no holdfast)
+  function startPlan(c, R) {
+    var ns = nextStarts(c, R);
+    if (!ns) return [];
+    R = R || c.reckoning;
+    var fh = R.how === 'depart' ? R.winner : c.world.freeHold, taken = {}, out = [], sure = sureHouses(c, R);
+    Object.keys(ns).forEach(function (h) { if (ns[h].length > 1 || h === fh) ns[h].forEach(function (r) { taken[r] = h; }); });
+    Object.keys(ns).filter(function (h) { return sure.indexOf(h) >= 0; }).sort(function (a, b) { return (a === 'player' ? 0 : 1) - (b === 'player' ? 0 : 1); }).forEach(function (h) {
+      var rs = ns[h];
+      if (rs.length > 1) out.push({ house: h, why: 'ruler', regions: rs.slice() });
+      else if (h === fh && rs[0] === 'farpass') out.push({ house: h, why: 'freehold', regions: ['farpass'] });
+      else if (rs[0] && (taken[rs[0]] || rs[0] === 'crown')) out.push({ house: h, why: 'near', regions: [], holdfast: rs[0], by: taken[rs[0]] || null });
+      else if (rs[0]) out.push({ house: h, why: 'holdfast', regions: [rs[0]], holdfast: rs[0] });
+      else out.push({ house: h, why: 'edge', regions: [] });
+    });
+    return out;
+  }
+  // the houses sure to play next age: you, the winner and the ruler. The other rivals are drawn when the Reckoning ends.
+  function sureHouses(c, R) {
+    R = R || c.reckoning;
+    var out = ['player'];
+    [R.winner, seatAfter(c).ruler].forEach(function (h) { if (h && out.indexOf(h) < 0) out.push(h); });
+    return out;
+  }
+  function houseWord(c, h, low) { var n = h === 'player' ? 'you' : c.houses[h].short; return low ? n : cap(n); }
+  // one plain line per house: 'You start in the Crown hold, Riverford and Ashwood.'
+  function startLines(c, R) {
+    var edge = listOr(D.EDGE_STARTS.map(regionName));
+    var lines = startPlan(c, R).map(function (p) {
+      var W = houseWord(c, p.house), you = p.house === 'player', st = you ? ' start' : ' starts', it = you ? 'You' : 'It';
+      if (p.why === 'ruler' || p.why === 'holdfast') return W + st + ' in ' + listAnd(p.regions.map(regionName)) + '.';
+      if (p.why === 'freehold') return W + st + ' in the Far Pass. ' + it + (you ? ' take' : ' takes') + ' an edge start as well.';
+      if (p.why === 'near') return (you ? 'Your' : W + "'s") + ' holdfast is ' + regionName(p.holdfast) + (p.by ? ', which ' + houseWord(c, p.by, true) + ' will hold' : '') + '. ' +
+        W + st + ' in a free region next to it.';
+      return W + (you ? ' have' : ' has') + ' no holdfast. ' + it + (you ? ' take' : ' takes') + ' an edge start: ' + edge + '.';
+    });
+    R = R || c.reckoning;
+    var left = 4 - sureHouses(c, R).length;
+    if (left > 0) {
+      var who = R.winner === 'player' ? 'you' : houseWord(c, R.winner, true);
+      lines.push((left === 1 ? 'The third rival is chosen' : (left === 3 ? 'Your three rivals are' : 'The other two rivals are') + ' chosen') +
+        ' when the Reckoning ends. Houses with a grudge against ' + who + ' come first, two at most. ' +
+        (left === 1 ? 'It starts' : 'Each starts') + ' on or next to its holdfast. One with no holdfast takes an edge start.');
+    }
+    return lines;
+  }
+  // who is sure to start in region r next age: 'you start here', 'Varrow starts here', or ''
+  function startTag(c, r, R) {
+    var hs = startPlan(c, R).filter(function (p) { return p.regions.indexOf(r) >= 0; }).map(function (p) { return p.house; });
+    if (!hs.length) return '';
+    var lone = hs.length === 1 && hs[0] !== 'player';
+    return listAnd(hs.map(function (h) { return houseWord(c, h, true); })) + (lone ? ' starts here' : ' start here');
+  }
+  // the Reckoning's build-step options sorted for the screen: works to raise (each with the regions it can go to),
+  // structures to build, structures to raze, works to raze
+  function reckoningGroups(o) {
+    var g = { raise: [], build: [], raze: [], razeWork: [] }, at = {};
+    ((o && o.options) || []).forEach(function (op) {
+      if (op.kind === 'work') {
+        if (!at[op.work]) { at[op.work] = { work: op.work, regions: [] }; g.raise.push(at[op.work]); }
+        at[op.work].regions.push(op.region);
+      } else if (g[op.kind]) g[op.kind].push(op);
+    });
+    return g;
+  }
+
+  // a region's name in a sentence: 'the Crown hold', 'the Far Pass', 'Saltmarsh'
+  function regionName(r) { return (r === 'crown' || r === 'farpass' ? 'the ' : '') + REG[r].name; }
+  // the sentence for the Reckoning's build-or-raze choice (R.site), or '' for none
+  function siteSentence(site) {
+    if (!site || !REG[site.region]) return '';
+    if (site.kind === 'work') return 'The ' + WORK[site.work].name + ' was raised at ' + regionName(site.region) + '.';
+    if (site.kind === 'razeWork') return 'The ' + WORK[site.work].name + ' at ' + regionName(site.region) + ' was razed.';
+    var name = REG[site.region].site, were = /(ns|es)$/.test(name) ? ' were' : ' was';
+    return 'The ' + name + were + (site.kind === 'raze' ? ' razed.' : ' built.');
+  }
+
   function ageTitle(n) { return 'The ' + (D.ORDINALS[n - 1] || ('Age ' + n)) + (D.ORDINALS[n - 1] ? ' Age' : ''); }
   function cap(t) { return t.charAt(0).toUpperCase() + t.slice(1); }
   function the(name) { return /^The /.test(name) ? 'the' + name.slice(3) : 'the ' + name; }
   function listAnd(a) { return a.length <= 1 ? (a[0] || '') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1]; }
+  function listOr(a) { return a.length <= 1 ? (a[0] || '') : a.slice(0, -1).join(', ') + ' or ' + a[a.length - 1]; }
   function annalsText(c) {
     var R = c.reckoning, s = c.age, H = c.houses, out = [];
     var w = R.winner ? H[R.winner] : null, rw = D.ROUND_WORDS[(R.round || 1) - 1] || ('round ' + R.round);
@@ -1510,10 +1653,7 @@
     }
     var back = w && (s.history.returns || []).filter(function (x) { return x.house === R.winner; })[0];
     if (back) out.push(cap(w.short) + ' lost every region and came back in the ' + (D.ROUND_WORDS[back.round - 1] || 'early') + ' round.');
-    if (R.site) {
-      var site = REG[R.site.region].site, were = /(ns|es)$/.test(site) ? ' were' : ' was';
-      out.push('The ' + site + were + (R.site.kind === 'raze' ? ' razed.' : ' built.'));
-    }
+    if (R.site) out.push(siteSentence(R.site));
     if (R.banished.length) out.push(cap(listAnd(R.banished.map(function (id) { return the(CARDS[id].name); }))) + (R.banished.length > 1 ? ' were lost.' : ' was lost.'));
     if (R.admitted.length) out.push(cap(listAnd(R.admitted.map(function (id) { return the(CARDS[id].name); }))) + ' came into the world.');
     if (R.law) out.push(cap(w.short) + ' wrote the law of ' + D.LAW[R.law].name.replace(/^The /, 'the ') + '.' + (R.lapsed ? ' ' + cap(the(D.LAW[R.lapsed].name)).replace(/^The the /, 'The ') + ' lapsed.' : ''));
@@ -1529,6 +1669,8 @@
     if (c.version === 1) migrate1(c);
     // saves from before holdfasts: no house has one yet
     if (!c.holdfast) c.holdfast = {};
+    // saves from before great works: none stands
+    if (!c.world.works) c.world.works = {};
     return c;
   }
   // ruined -> undeveloped, standing -> built; landmarks always stand
@@ -1563,7 +1705,8 @@
     UNDO_CAP: UNDO_CAP, fingerprint: fingerprint, capUndo: capUndo, packUndo: packUndo, unpackUndo: unpackUndo,
     // queries for the screen and the AI
     income: income, leanBonus: leanBonus, hoursFor: hoursFor, heldBy: heldBy, nHeld: nHeld, bandsAt: bandsAt, totalBands: totalBands,
-    buildCost: buildCost, SAVE_VERSION: SAVE_VERSION, holdfastOf: holdfastOf, rulerKept: rulerKept, richestNeighbours: richestNeighbours,
+    buildCost: buildCost, SAVE_VERSION: SAVE_VERSION, holdfastOf: holdfastOf, nextStarts: nextStarts, seatAfter: seatAfter, holdfastsAfter: holdfastsAfter,
+    workAt: workAt, workHere: workHere, workFor: workFor, regionName: regionName, siteSentence: siteSentence, startPlan: startPlan, sureHouses: sureHouses, startLines: startLines, startTag: startTag, reckoningGroups: reckoningGroups, marchFree: marchFree, rulerKept: rulerKept, richestNeighbours: richestNeighbours,
     has: has, hasAt: hasAt, siteAt: siteAt, siteOnly: siteOnly, upkeep: upkeep, boardBands: boardBands, holds: holds, adjacent: adjacent, slotsOf: slotsOf, siteOn: siteOn, law: law, truce: truce,
     prophecyProgress: prophecyProgress, progress: progress, threat: threat, checkVictory: checkVictory, claimStanding: claimStanding, departNeeds: departNeeds,
     endChances: endChances, fortuneLeft: fortuneLeft, peekFortune: peekFortune, assaultOdds: assaultOdds, lossRange: lossRange, battleLosses: battleLosses,
