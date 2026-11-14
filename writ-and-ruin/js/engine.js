@@ -222,34 +222,59 @@
   // The exact chance that assault a wins, drawing as doAssault does: the attacker's card (two with an unused
   // Tide Reader, keeping the higher), the defender's card, then one Heron Witch redraw (attacker's if losing,
   // else defender's if losing). Cards come from what is left in the deck; an empty deck reshuffles all ten.
-  // Returns { p, tide, attWitch, defWitch } (defWitch is the defending house, or null).
+  // The same walk also gives the chance of each number of warbands lost on either side (battleLosses, as doAssault
+  // counts them), so the win chance and the losses always agree.
+  // Returns { p, tide, attWitch, defWitch, attLoss, defLoss } (defWitch is the defending house, or null;
+  // attLoss[k] / defLoss[k] are the chances that side loses exactly k).
+  function battleLosses(at, dt, n, defBands) {
+    var win = at > dt, diff = Math.abs(at - dt), al, dl;
+    if (win) { dl = Math.min(defBands, Math.max(1, diff)); al = diff === 1 ? 1 : 0; }
+    else { al = Math.min(n, Math.max(1, diff)); dl = diff === 1 ? Math.min(defBands, 1) : 0; }
+    return { win: win, att: Math.min(al, n), def: dl };
+  }
   function assaultOdds(s, a) {
     var h = a.house, hs = s.houses[h], pv = battlePreview(s, a), d = pv.defender, att = pv.attack, def = pv.defence;
+    var g = s.regions[a.to], n = a.count, defBands = d ? (g.bands[d] || 0) : g.folk;
     var tide = has(s, h, 'tideReader') && !hs.flags.tide;
     var attW = has(s, h, 'heronWitch') && !hs.once.witch;
     var defW = d && has(s, d, 'heronWitch') && !s.houses[d].once.witch ? d : null;
     var full = [0, 0, 0, 0]; N.fortune.forEach(function (v) { full[v]++; });
     var deck = [0, 0, 0, 0]; s.fortune.forEach(function (v) { deck[v]++; });
-    // draw one card from counts c, then carry on with k(card, counts after); returns the chance of a win
-    function draw(c, k) {
+    var p = 0, attLoss = [], defLoss = [], i;
+    for (i = 0; i <= n; i++) attLoss.push(0);
+    for (i = 0; i <= defBands; i++) defLoss.push(0);
+    function end(ac, dc, w) {
+      var L = battleLosses(att + ac, def + dc, n, defBands);
+      if (L.win) p += w;
+      attLoss[L.att] += w; defLoss[L.def] += w;
+    }
+    // draw one card from counts c with weight w, then carry on with k(card, counts after, weight)
+    function draw(c, w, k) {
       var tot = c[0] + c[1] + c[2] + c[3];
       if (!tot) { c = full; tot = N.fortune.length; }
-      var p = 0;
-      for (var v = 0; v < 4; v++) if (c[v]) { var c2 = c.slice(); c2[v]--; p += c[v] / tot * k(v, c2); }
-      return p;
+      for (var v = 0; v < 4; v++) if (c[v]) { var c2 = c.slice(); c2[v]--; k(v, c2, w * c[v] / tot); }
     }
-    function afterDefence(ac, dc, c) {
+    function afterDefence(ac, dc, c, w) {
       var win = att + ac > def + dc;
-      if (!win && attW) return draw(c, function (ac2) { return att + ac2 > def + dc ? 1 : 0; });
-      if (win && defW) return draw(c, function (dc2) { return att + ac > def + dc2 ? 1 : 0; });
-      return win ? 1 : 0;
+      if (!win && attW) return draw(c, w, function (ac2, c2, w2) { end(ac2, dc, w2); });
+      if (win && defW) return draw(c, w, function (dc2, c2, w2) { end(ac, dc2, w2); });
+      end(ac, dc, w);
     }
-    function afterAttack(ac, c) { return draw(c, function (dc, c2) { return afterDefence(ac, dc, c2); }); }
-    function first(ac, c) { return tide ? draw(c, function (x, c2) { return afterAttack(Math.max(ac, x), c2); }) : afterAttack(ac, c); }
-    var p;
-    if (pv.peek != null) { var c0 = deck.slice(); c0[pv.peek]--; p = first(pv.peek, c0); }
-    else p = draw(deck, first);
-    return { p: p, tide: tide, attWitch: attW, defWitch: defW };
+    function afterAttack(ac, c, w) { draw(c, w, function (dc, c2, w2) { afterDefence(ac, dc, c2, w2); }); }
+    function first(ac, c, w) {
+      if (tide) draw(c, w, function (x, c2, w2) { afterAttack(Math.max(ac, x), c2, w2); });
+      else afterAttack(ac, c, w);
+    }
+    if (pv.peek != null) { var c0 = deck.slice(); c0[pv.peek]--; first(pv.peek, c0, 1); }
+    else draw(deck, 1, first);
+    return { p: p, tide: tide, attWitch: attW, defWitch: defW, attLoss: attLoss, defLoss: defLoss };
+  }
+  // every number of warbands a side could lose with the cards still left, fewest to most, e.g. [0, 2]
+  function lossRange(dist) {
+    var lo = -1, hi = -1;
+    for (var k = 0; k < dist.length; k++) if (dist[k] > 1e-12) { if (lo < 0) lo = k; hi = k; }
+    if (lo < 0) lo = hi = 0;
+    return [lo, hi];
   }
 
   // ---------------------------------------------------------------- costs
@@ -876,11 +901,8 @@
         s.houses[d].once.witch = true; var old2 = dc; dc = drawFortune(s); witch = { house: d, discarded: old2, card: dc };
       }
     }
-    var at = att + ac, dt = def + dc, win = at > dt, diff = Math.abs(at - dt);
-    var attLoss, defLoss;
-    if (win) { defLoss = Math.min(defBands, Math.max(1, diff)); attLoss = diff === 1 ? 1 : 0; }
-    else { attLoss = Math.min(n, Math.max(1, diff)); defLoss = diff === 1 ? Math.min(defBands, 1) : 0; }
-    attLoss = Math.min(attLoss, n);
+    var at = att + ac, dt = def + dc, L = battleLosses(at, dt, n, defBands), win = L.win;
+    var attLoss = L.att, defLoss = L.def;
     var E = { type: 'battle', house: h, defender: d, from: from, to: to, count: n, attack: att, defence: def,
       attCard: ac, defCard: dc, tideCard: extra, witch: witch, attTotal: at, defTotal: dt,
       winner: win ? 'attacker' : 'defender', attLoss: attLoss, defLoss: defLoss, retreat: null, relic: null, silver: 0,
@@ -1438,7 +1460,7 @@
     buildCost: buildCost, SAVE_VERSION: SAVE_VERSION, holdfastOf: holdfastOf, rulerKept: rulerKept, richestNeighbours: richestNeighbours,
     has: has, hasAt: hasAt, siteAt: siteAt, siteOnly: siteOnly, upkeep: upkeep, boardBands: boardBands, holds: holds, adjacent: adjacent, slotsOf: slotsOf, siteOn: siteOn, law: law, truce: truce,
     prophecyProgress: prophecyProgress, progress: progress, threat: threat, checkVictory: checkVictory, claimStanding: claimStanding, departNeeds: departNeeds,
-    endChances: endChances, fortuneLeft: fortuneLeft, peekFortune: peekFortune, assaultOdds: assaultOdds,
+    endChances: endChances, fortuneLeft: fortuneLeft, peekFortune: peekFortune, assaultOdds: assaultOdds, lossRange: lossRange, battleLosses: battleLosses,
     battlePreview: battlePreview, attackBonus: attackBonus, defenceOf: defenceOf, lastStand: lastStand, returnSpots: returnSpots,
     marchDests: marchDests, enterMode: enterMode, emptyOfOthers: emptyOfOthers,
     musterCost: musterCost, musterMax: musterMax, recruitCost: recruitCost, searchSilver: searchSilver, assaultHours: assaultHours, bellHolder: bellHolder,

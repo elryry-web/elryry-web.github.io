@@ -203,8 +203,10 @@ body.busy .map [data-region] { cursor: default; }
   background: var(--paper); border-top: 5px solid var(--ink); padding: 10px 14px 24px; box-shadow: 0 -4px 0 var(--ochre);
 }
 .sheet-card > h2:first-child, .sheet-card > .sheet-x + h2, .sheet-card > .sheet-x + header { margin-top: 0; padding-right: 48px; }
+/* the close button floats at the top right and scrolls away with the sheet, so the text below wraps around it
+   and never runs under it (a sticky button sat over the text as the sheet scrolled) */
 .sheet-x {
-  position: sticky; float: right; top: 0; z-index: 2; width: 44px; height: 44px; margin: -4px -6px 0 0;
+  position: relative; float: right; z-index: 2; width: 44px; height: 44px; margin: -4px -6px 4px 8px;
   font: 1.8rem/1 var(--head); background: var(--paper); border: var(--line) solid var(--ink); border-radius: 50%; cursor: pointer; color: var(--ink);
 }
 body.sheet-up { overflow: hidden; }
@@ -234,7 +236,8 @@ body.sheet-up { overflow: hidden; }
 .vs-side { display: flex; flex-direction: column; align-items: center; min-width: 80px; }
 .vs-side small { color: var(--peat); }
 .vs { font-family: var(--head); font-style: italic; color: var(--peat); }
-.odds { font-size: 1.05rem; }
+.odds { font-size: 1.05rem; margin-bottom: 2px; }
+.losses { margin-top: 0; font-size: .95rem; }
 .fortune-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 .faces { display: flex; align-items: flex-end; justify-content: center; gap: 16px; margin: 6px 0; }
 .fface { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; max-width: 120px; }

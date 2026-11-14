@@ -20,6 +20,11 @@
     if (p <= 0.005) return 'no chance';
     return Math.round(p * 100) + ' in 100';
   }
+  // the middle half of the outcomes, e.g. "1–2", or "2" when that is all of it
+  function lossWords(dist) {
+    var r = E.lossRange(dist);
+    return r[0] === r[1] ? String(r[0]) : r[0] + '–' + r[1];
+  }
   U.winOdds = winOdds;
 
   // ---------------------------------------------------------------- a stepper sheet for counts
@@ -105,6 +110,7 @@
         '<p class="fortune-line"><span class="lbl">Fortune left</span> ' + [0, 1, 2, 3].map(function (v) { return '<span class="fc"><b>' + v + '</b>×' + (left[v] || 0) + '</span>'; }).join('') +
         (s.fortune.length ? '' : ' <span class="muted">(the deck reshuffles first)</span>') + '</p>' +
         '<p class="odds">Chance to win: <b>' + oddsWords(p) + '</b></p>' +
+        '<p class="losses">Warbands lost: you <b>' + lossWords(o.attLoss) + '</b>, ' + (pv.defender ? esc(whoLow(pv.defender)) : 'the folk') + ' <b>' + lossWords(o.defLoss) + '</b></p>' +
         (extra.length ? '<p class="note">' + esc(extra.join(' ')) + ' That is counted in the chance.</p>' : '') +
         '<p>Costs ' + plural(E.assaultHours(s, 'player', to), 'moon') + (E.bellHolder(s, 'player', to) ? ' (the Drowned Bell)' : '') + '.</p>' +
         (broke.length ? '<p class="warn">This breaks your ' + broke.map(function (pc) { return pc.type === 'foe' ? 'common cause' : pc.type; }).join(' and ') + ' with ' + whoLow(pv.defender) + '. They will hold a grudge.</p>' : '') +
