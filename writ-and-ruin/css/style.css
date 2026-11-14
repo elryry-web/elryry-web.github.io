@@ -366,6 +366,8 @@ body.on-title { padding: 6px; background-image: url(../art/paper-title.jpg); }  
   .hd.shield-l, .hd.shield-r { width: 40px; height: 52px; }
   .herald { grid-template-columns: 44px minmax(0, 1fr) 44px; }
   .hd.lion, .hd.stag { width: 70px; height: 85px; }
+  .tdivider { max-width: 320px; margin-bottom: 6px; }   /* phones keep the small one; here it spans the tagline */
+  .herald { padding-bottom: 2px; }
 }
 /* title page only: darker edges, a fixed layer over the parchment and under the page */
 body.on-title::before {
