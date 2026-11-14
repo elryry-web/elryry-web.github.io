@@ -115,7 +115,7 @@ svg { display: block; }
 .map [data-region] { cursor: pointer; }
 .map text { font-family: var(--head); }
 .map .rname { font-size: 12.5px; fill: var(--ink); paint-order: stroke; stroke: var(--paper); stroke-width: 3px; }
-.map .cnt { font: 700 12px var(--body); }
+.map .cnt { font: 14px var(--head); }   /* the count carved on a warband block */
 .map .tiny { font: 600 9px var(--body); fill: var(--ink); }
 .map .tiny.b { font-weight: 700; }
 .map .mk { font: 700 11px var(--body); }
@@ -227,7 +227,7 @@ body.sheet-up { overflow: hidden; }
 /* an undeveloped region: its structure shown faded and dashed until someone builds it */
 .sitebox.unbuilt { border-style: dashed; box-shadow: none; }
 .sitebox.unbuilt svg { opacity: 0.4; filter: grayscale(1); }
-.map .unbuilt .tiny { opacity: 0.8; }
+.map .cost { font: 11.5px var(--head); fill: var(--ink); }   /* the build cost on an unbuilt site's coin */
 .sitetext { border-left: 4px solid var(--moss); padding-left: 8px; }
 .facts { font-size: .92rem; line-height: 1.55; }
 .facts svg { display: inline-block; vertical-align: -3px; }

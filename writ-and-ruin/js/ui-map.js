@@ -125,12 +125,30 @@
 
   function esc(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
 
-  // a warband counter: a house-colour block nudged off its ink square
+  // the painted markers (art/ui-marker-*.png, cut by tools/prep-markers.py): a wooden block for a warband, a silver
+  // coin for an unbuilt site, a card back for a resident slot. The block and the card are tinted in the SVG, so the
+  // house colours can change: one shared filter per colour turns the art to its brightness and multiplies that by
+  // the colour, so the grain and bevels still show.
+  var MARK = { block: 'art/ui-marker-block.png', coin: 'art/ui-marker-coin.png', card: 'art/ui-marker-card.png' };
+  var tints = {};   // colour -> filter id, filled while the map is drawn and written into its <defs>
+  function tint(col) {
+    var id = 'wr-tint-' + col.replace('#', '');
+    tints[col] = id;
+    return 'url(#' + id + ')';
+  }
+  function tintDefs() {
+    var out = '';
+    Object.keys(tints).forEach(function (col) {
+      var n = parseInt(col.slice(1), 16), c = [n >> 16, (n >> 8) & 255, n & 255], m = '';
+      c.forEach(function (v) { var k = v / 255; m += f1(k * 0.299 * 1000) / 1000 + ' ' + f1(k * 0.587 * 1000) / 1000 + ' ' + f1(k * 0.114 * 1000) / 1000 + ' 0 0 '; });
+      out += '<filter id="' + tints[col] + '" color-interpolation-filters="sRGB" x="0" y="0" width="1" height="1"><feColorMatrix type="matrix" values="' + m + '0 0 0 1 0"/></filter>';
+    });
+    return out ? '<defs>' + out + '</defs>' : '';
+  }
+  // a warband counter: the wooden block tinted to its house, the count carved on its face
   function counter(x, y, col, n, cls) {
-    return '<g class="' + (cls || 'band') + '"><rect x="' + f1(x - 9) + '" y="' + f1(y - 9) + '" width="20" height="20" fill="' + P.paper + '"/>' +
-      '<rect x="' + f1(x - 7.2) + '" y="' + f1(y - 7.6) + '" width="16" height="16" fill="' + col + '"/>' +
-      '<rect x="' + f1(x - 8) + '" y="' + f1(y - 8) + '" width="16" height="16" fill="none" stroke="' + P.ink + '" stroke-width="2"/>' +
-      '<text x="' + f1(x) + '" y="' + f1(y + 4.6) + '" text-anchor="middle" class="cnt" fill="' + A.textOn(col) + '">' + n + '</text></g>';
+    return '<g class="' + (cls || 'band') + '"><image href="' + MARK.block + '" x="' + f1(x - 10) + '" y="' + f1(y - 10) + '" width="20" height="20" filter="' + tint(col) + '"/>' +
+      '<text x="' + f1(x - 0.4) + '" y="' + f1(y + 4.4) + '" text-anchor="middle" class="cnt" fill="' + A.textOn(col) + '">' + n + '</text></g>';
   }
   function stampAt(h, x, y, size) {
     var url = A.paintedUrl('house-' + h);
@@ -171,7 +189,6 @@
       '<text x="' + cx + '" y="' + f1(ny + 2.2) + '" text-anchor="middle" class="rname">' + esc(nm) + '</text>';
     // site glyph in a paper roundel, residents as little suit cards
     var sx = cx - 15, sy = cy - 14;
-    // an undeveloped site: a dashed, empty roundel with its build cost in silver
     var stampUrl = painted && A.paintedUrl && A.paintedUrl('stamp-' + r);
     if (E.siteOn(s, r) && stampUrl) {
       // the painted structure on a paper oval, so it reads on the busy board: it fills the space left of the
@@ -182,19 +199,18 @@
       out += '<circle cx="' + sx + '" cy="' + sy + '" r="12.5" fill="' + P.paper + '" stroke="' + P.ink + '" stroke-width="2"/>' +
         '<g transform="translate(' + (sx - 9) + ' ' + (sy - 9) + ')">' + A.siteGlyph(r, 18).replace(/<svg[^>]*>/, '<svg x="0" y="0" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="' + P.ink + '">') + '</g>';
     } else {
-      out += '<g class="unbuilt"><circle cx="' + sx + '" cy="' + sy + '" r="12.5" fill="' + P.bone + '" stroke="' + P.ink + '" stroke-width="1.4" stroke-dasharray="3 3"/>' +
-        '<text x="' + sx + '" y="' + f1(sy + 4) + '" text-anchor="middle" class="tiny">' + E.buildCost(r) + 's</text></g>';
+      // an unbuilt site: a silver coin with its build cost
+      out += '<g class="unbuilt"><image href="' + MARK.coin + '" x="' + (sx - 14) + '" y="' + (sy - 14) + '" width="28" height="28"/>' +
+        '<text x="' + sx + '" y="' + f1(sy + 4.2) + '" text-anchor="middle" class="cost">' + E.buildCost(r) + 's</text></g>';
     }
     var slots = E.slotsOf(s, r);
     // on the painting the resident slots sit on a paper chip
-    if (painted && slots) out += '<rect x="' + (cx - 1) + '" y="' + (sy - 12) + '" width="' + (slots * 13 + 5) + '" height="21" fill="' + P.paper + '" stroke="' + P.ink + '" stroke-width="1.2"/>';
+    if (painted && slots) out += '<rect x="' + (cx - 1) + '" y="' + (sy - 12) + '" width="' + (slots * 13 + 4) + '" height="22" fill="' + P.paper + '" stroke="' + P.ink + '" stroke-width="1.2"/>';
+    // each slot a card back: tinted to its resident's suit, or faded when the slot is free
     for (var i = 0; i < slots; i++) {
-      var id = g.residents[i], x = cx + 2 + i * 13, y = sy - 9;
-      if (id) {
-        var su = A.cardSuit(id);
-        out += '<rect x="' + (x + 1.2) + '" y="' + (y + 1) + '" width="10" height="15" fill="' + A.suitCol(su) + '"/>' +
-          '<rect x="' + x + '" y="' + y + '" width="10" height="15" fill="none" stroke="' + P.ink + '" stroke-width="1.6"/>';
-      } else out += '<rect x="' + x + '" y="' + y + '" width="10" height="15" fill="none" stroke="' + P.ink + '" stroke-width="1.2" stroke-dasharray="2 2"/>';
+      var id = g.residents[i], x = cx + 1.5 + i * 13, y = sy - 10;
+      out += '<image href="' + MARK.card + '" x="' + x + '" y="' + y + '" width="11" height="16" preserveAspectRatio="none"' +
+        (id ? ' filter="' + tint(A.suitCol(A.cardSuit(id))) + '"' : ' opacity="0.35"') + '/>';
     }
     // holder stamp, shelter mark
     if (owner) out += stampAt(owner, cx - 22, cy + 16, 22);
@@ -350,6 +366,7 @@
     view = view || {};
     var b = base(), board = boardUrl();
     onBoard = !!board;
+    tints = {};
     var out = '<svg class="map' + (board ? ' painted' : '') + '" viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The valley">';
     if (board) out += '<image href="' + board + '" x="0" y="0" width="' + W + '" height="' + H + '" preserveAspectRatio="xMidYMid slice"/>' + roads(true);
     else out += '<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="' + P.paper + '"/>' + b.sky + roads(false);
@@ -360,7 +377,7 @@
     if (fl && fl.from && fl.to && fl.from !== fl.to) out += arrow(fl.from, fl.to, A.houseCol(fl.house), false, null, null, true);
     // carved frame
     out +='<rect x="3" y="3" width="' + (W - 6) + '" height="' + (H - 6) + '" fill="none" stroke="' + P.ink + '" stroke-width="5" rx="3"/>';
-    return out + '</svg>';
+    return out + tintDefs() + '</svg>';
   }
 
   root.WR_MAP = { svg: svg, POS: POS, CAMP: CAMP };
