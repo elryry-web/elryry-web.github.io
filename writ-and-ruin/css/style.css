@@ -173,6 +173,25 @@ svg { display: block; }
 .abar.grid .pair { grid-column: 1 / -1; display: flex; }
 .abar.grid .pair .btn { flex: 1; }
 
+/* looking at the map before answering: the decision's title and its answers in the bar's place.
+   With answers to give, the title takes its own line on phones and the buttons share the row below. */
+.abar.peekbar { align-items: center; flex-wrap: nowrap; }
+.peekbar .pk-title { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 6px; margin: 0 4px; font: 1.05rem/1.15 var(--head); }
+.peekbar .pk-title svg, .peekbar .pk-title img { flex: none; }
+.peekbar .pk-title b { font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.peekbar .pk-btns { flex: none; display: flex; }
+.peekbar .pk-btns .btn { white-space: nowrap; }
+.abar.peekbar.answers { flex-wrap: wrap; }
+.peekbar.answers .pk-title { flex-basis: 100%; margin-top: 2px; }
+.peekbar.answers .pk-btns { flex: 1 1 100%; }
+.peekbar.answers .pk-btns .btn { flex: 1 1 0; padding: 6px 4px; }
+@media (min-width: 760px) {
+  .abar.peekbar.answers { flex-wrap: nowrap; }
+  .peekbar.answers .pk-title { flex-basis: auto; margin-top: 0; }
+  .peekbar.answers .pk-btns { flex: none; }
+  .peekbar.answers .pk-btns .btn { flex: none; padding: 6px 16px; }
+}
+
 body.busy .map [data-region] { cursor: default; }
 
 /* ---------------------------------------------------------------- sheets */

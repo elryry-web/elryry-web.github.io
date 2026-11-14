@@ -162,8 +162,10 @@
   // ---------------------------------------------------------------- prophecy, offers, searches
   U.prophecyDialog = function () {
     var s = age(), hs = me();
+    U.peek = null;
     U.openSheet(function () {
       return '<h2>Choose your prophecy</h2><p>Fulfil it from the ' + ordinal(N.claimFrom) + ' round on and the age is yours. The rivals choose theirs in secret; yours is secret too.</p>' +
+        '<div class="row">' + H.peekBtn({ title: 'Choose your prophecy', reopen: U.prophecyDialog, answers: null }) + '</div>' +
         hs.prophecyOptions.map(function (id) {
           var p = E.prophecyProgress(s, 'player', id);
           return '<div class="choice"><p class="ptext">“' + esc(prophecyText(id)) + '”</p><p class="muted">Now: ' + p.have + ' of ' + p.need + '</p>' +
@@ -181,16 +183,23 @@
     return from + ' offers a pact.';
   }
   U.offerDialog = function () {
-    var s = age(), P = s.pending;
+    var s = age(), P = s.pending, o = P.offer;
+    // the sheet's buttons and the strip's buttons (while looking at the map) answer the same way
+    function accept() { U.closeSheet(); U.doAction({ type: 'respond', accept: true }); }
+    function refuse() { U.closeSheet(); U.doAction({ type: 'respond', accept: false }); }
+    var demand = o.type === 'tribute' && o.payer === 'player';
+    U.peek = null;
     U.openSheet(function () {
-      return '<h2>' + stamp(P.from, 28) + ' An offer from ' + who(P.from) + '</h2><p>' + esc(offerWords(P.offer)) + '</p>' +
+      return '<h2>' + stamp(P.from, 28) + ' An offer from ' + who(P.from) + '</h2><p>' + esc(offerWords(o)) + '</p>' +
         '<p class="muted">Breaking a pact is allowed, but the wronged house holds a grudge.</p>' +
-        '<div class="row">' + btn('Accept', function () { U.closeSheet(); U.doAction({ type: 'respond', accept: true }); }, { cls: 'go' }) +
-        btn('Refuse', function () { U.closeSheet(); U.doAction({ type: 'respond', accept: false }); }) + '</div>';
+        '<div class="row">' + btn('Accept', accept, { cls: 'go' }) + btn('Refuse', refuse) + '</div>' +
+        '<div class="row">' + H.peekBtn({ title: H.whose(P.from) + (demand ? ' demand' : ' offer'), house: P.from, reopen: U.offerDialog,
+          answers: [['Accept', accept, 'go'], ['Refuse', refuse]] }) + '</div>';
     }, { modal: true });
   };
   U.keepDialog = function () {
     var s = age();
+    U.peek = null;
     U.openSheet(function () {
       var P = s.pending, hs = me();
       if (!P || P.type !== 'search') return '<p>Nothing to keep.</p>';
@@ -198,6 +207,7 @@
       var slotsFree = E.slotsOf(s, P.region) - s.regions[P.region].residents.length;
       return '<h2>You searched ' + rn(P.region) + '</h2><p>Keep ' + plural(P.keep, 'card') + ' of these. The rest go back into the world deck.' +
         ' Your retinue holds ' + hs.retinue.length + ' of ' + N.retinueMax + '; the site has ' + plural(Math.max(0, slotsFree), 'empty slot') + '.</p>' +
+        '<div class="row">' + H.peekBtn({ title: 'Your search of ' + rn(P.region), reopen: U.keepDialog, answers: null }) + '</div>' +
         (barrow.length ? '<p class="note">The barrow gave up ' + listAnd(barrow.map(cardName)) + ' as well. ' + (barrow.length === 1 ? 'It is' : 'They are') + ' already yours.</p>' : '') +
         '<div class="cards">' + P.cards.map(function (id) {
           var relic = D.CARDS[id].relic, ac = [];
@@ -280,7 +290,7 @@
       return A.card(id, show ? '<div class="row">' + btn('Recruit for ' + cost + 's', function () { U.doAction({ type: 'recruit', region: r, card: id }); }, { cls: mode === 'recruit' ? 'go' : '', off: m }) + '</div>' : '', { pic: 'full' });
     }).join('') + '</div>');
     if (!my) {
-      out.push(U.busy ? '<p class="muted">A rival is moving. You can act on your turn.</p>' : '');
+      out.push(U.busy ? '<p class="muted">A rival is moving. You can act on your turn.</p>' : U.peek ? '<p class="muted">Nothing can be done until you answer.</p>' : '');
       return out.join('');
     }
     // actions

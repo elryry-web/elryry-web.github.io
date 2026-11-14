@@ -247,7 +247,7 @@
     return 'annals';
   }
   function go(screen) {
-    U.screen = screen; U.mode = null; U.selected = null;
+    U.screen = screen; U.mode = null; U.selected = null; U.peek = null;
     closeSheet();
     render();
     window.scrollTo(0, 0);
@@ -380,7 +380,7 @@
     ev = ev.concat(AI.replan(s, 'player', before));   // rivals whose plans you just upset declare new ones
     take(ev); save();
     closeSheet();
-    U.mode = null; U.selected = null;
+    U.mode = null; U.selected = null; U.peek = null;
     var battle = ev.filter(function (e) { return e.type === 'battle'; })[0];
     render();
     if (battle) U.battleResult(battle, function () { pump(); });
@@ -723,6 +723,7 @@
     return 'You cannot do that now.';
   }
   function actionBar(s, legal) {
+    if (U.peek) { if (peekLive(s)) return peekBar(); U.peek = null; }
     if (s.phase !== 'play') return '';
     if (U.busy) return '<div class="abar one">' + btn(U.skip ? 'Skipping…' : 'Skip to your turn ▸', skip, { cls: 'wide' }) + '</div>';
     if (s.pending || s.order[s.turn] !== 'player') return '';
@@ -749,6 +750,26 @@
     else if (extra.length) out.push('<div class="pair">' + extra.join('') + '</div>');
     return '<div class="abar grid">' + out.join('') + '</div>';
   }
+  // ---------------------------------------------------------------- looking at the map before answering
+  // A decision sheet's "Look at the map" puts the sheet away. The map stays live, and a slim strip in the
+  // action bar's place holds the answer. U.peek lives only in memory: a reload brings the sheet back.
+  //   U.peek = { title, house, reopen: fn, answers: [[label, fn, cls]] or null }
+  function peekBtn(o) {
+    return btn('Look at the map', function () { U.peek = o; U.selected = null; closeSheet(); render(); }, { cls: 'peek' });
+  }
+  // the decision is still waiting on the player
+  function peekLive(s) {
+    var P = s.pending;
+    if (s.phase === 'prophecy') return !me(s).prophecy;
+    return !!P && (P.type === 'offer' ? P.to === 'player' : P.house === 'player');
+  }
+  function peekBar() {
+    var P = U.peek, ans = P.answers || [];
+    var back = btn(ans.length ? 'Read again' : 'Back to it', function () { U.peek = null; render(); P.reopen(); }, { cls: ans.length ? '' : 'go' });
+    return '<div class="abar peekbar' + (ans.length ? ' answers' : '') + '"><span class="pk-title">' + (P.house ? stamp(P.house, 22) : '') + '<b>' + esc(P.title) + '</b></span>' +
+      '<span class="pk-btns">' + ans.map(function (x) { return btn(x[0], function () { U.peek = null; x[1](); }, { cls: x[2] || '' }); }).join('') + back + '</span></div>';
+  }
+
   // station a retinue card: one eligible region goes straight there, more are picked on the map
   function stationPick(id, where) {
     if (where.length === 1) { doAction({ type: 'station', region: where[0].region, card: id }); return; }
@@ -834,7 +855,7 @@
 
   // exports for ui-sheets.js and for tests
   U.h = { esc: esc, cap: cap, age: age, me: me, who: who, whoLow: whoLow, whose: whose, whoseLow: whoseLow, rn: rn, cardName: cardName, planWhen: planWhen, dangerRows: dangerRows, dangerSummary: dangerSummary, intents: intents, planLabel: planLabel, listAnd: listAnd, plural: plural,
-    stamp: stamp, btn: btn, K: K, plain: plain, toast: toast, save: save, hasSave: hasSave, logLine: logLine, describe: describe,
+    stamp: stamp, btn: btn, K: K, peekBtn: peekBtn, plain: plain, toast: toast, save: save, hasSave: hasSave, logLine: logLine, describe: describe,
     pactWords: pactWords, screenFor: screenFor, isMyTurn: isMyTurn, legalNow: legalNow, bars: bars, unguarded: unguarded };
   U.go = go; U.render = render; U.pump = pump; U.skipAhead = skip; U.doAction = doAction; U.newCampaign = newCampaign; U.nextAge = nextAge;
   U.openSheet = openSheet; U.redrawSheet = redrawSheet; U.closeSheet = closeSheet; U.sheetIsOpen = sheetIsOpen; U.take = take;
