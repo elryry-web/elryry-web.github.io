@@ -275,7 +275,7 @@ body.sheet-up { overflow: hidden; }
 .card[data-card="drover"] .card-pic { --pic-x: 85%; }          /* the drover, beside his cattle */
 .card[data-card="moorHound"] .card-pic { --pic-x: 80%; }       /* the hound's head */
 .card[data-card="oldBoar"] .card-pic { --pic-x: 95%; }         /* the snout and tusks */
-.card[data-card="stagOfThePass"] .card-pic { --pic-x: 40%; }   /* both antlers */
+.card[data-card="stagOfThePass"] .card-pic { --pic-x: 38%; }   /* both antlers */
 .card[data-card="starReader"] .card-pic { --pic-x: 80%; }      /* the star disc she holds up */
 .card[data-card="wallWarden"] .card-pic { --pic-x: 80%; }      /* the lantern */
 .card-pic.full { width: 128px; aspect-ratio: 3 / 4; }
