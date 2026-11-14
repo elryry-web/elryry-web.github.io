@@ -178,6 +178,8 @@
     endDraws: [{ round: 7, of: 2 }],
     shortReign: { round: 5, of: 4 },
     grudgeBreak: 2, grudgeTaken: 1, grudgeMax: 5, debtMax: 3,
+    // poaching: recruiting a resident from a region another house holds costs this much more silver (and the holder takes a grudge)
+    poachSilver: 1, grudgePoach: 1,
     freeHoldBands: 2,
     folk: 1, folkCrown: 2,
     claimFrom: 6, rotate: 1,

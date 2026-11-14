@@ -224,7 +224,7 @@
           }
           return A.card(id, (D.CARDS[id].siteOnly ? '<p class="note">Works only at its site. It does nothing in a retinue.</p>' : '') + '<div class="row">' + ac.join('') + '</div>', { pic: 'full' });
         }).join('') + '</div>' +
-        '<p class="muted">A resident left at the site can be recruited later by whoever has warbands there.</p>' +
+        '<p class="muted">A resident left at the site can be recruited later by whoever has warbands there or next door.</p>' +
         '<div class="row">' + btn('Keep no more', function () { U.doAction({ type: 'keep', card: null }); }) + '</div>';
     }, { modal: true, wide: true });
   };
@@ -282,6 +282,9 @@
     if (owner && !bandList.length && s.houses[owner].refuge !== r) facts.push('<b>Unguarded:</b> ' + (owner === 'player' ? 'You have' : who(owner) + ' has') + ' no warbands here. ' +
       (E.truce(s) ? 'Once ' + esc(E.truce(s)) + ' ends, any neighbour can march in and take it.' : 'Any neighbour can march in and take it.'));
     if (owner && E.has(s, owner, 'drownedBell')) facts.push('<b>Drowned Bell:</b> ' + (owner === 'player' ? "rivals' assaults on you" : 'assaults on ' + who(owner)) + ' cost 1 more moon.');
+    H.intents(s).forEach(function (x) {
+      if (x.intent.type === 'poach' && x.intent.region === r) facts.push('<b>Poach:</b> ' + who(x.house) + ' means to poach the ' + esc(cardName(x.intent.card)) + ' from here.');
+    });
     facts.push('Neighbours: ' + R.adj.map(rn).join(', '));
     out.push('<p class="facts">' + facts.join('<br>') + '</p>');
     // residents
@@ -290,10 +293,12 @@
     if (!g.residents.length) out.push('<p class="muted">No one lives here now. Searching can find someone.</p>');
     else out.push('<div class="cards solo">' + g.residents.map(function (id) {
       var a = { type: 'recruit', region: r, card: id }, m = my ? cand(a) : 'not your turn';
-      var cost = E.recruitCost(s, 'player', id);
-      var show = my && E.bandsAt(s, 'player', r) > 0;
+      var cost = E.recruitCost(s, 'player', id, r), from = E.poachFrom(s, 'player', r), reach = E.recruitReach(s, 'player', r);
+      var show = my && !!reach;
+      var note = !show ? '' : from ? '<p class="note">Poaching: +' + N.poachSilver + ' silver, and ' + who(from) + ' takes a grudge.</p>' :
+        reach !== r ? '<p class="muted">Your warbands in ' + esc(rn(reach)) + ' can reach it.</p>' : '';
       if (D.CARDS[id].siteOnly) return A.card(id, '<p class="muted">Works only at its site' + (g.owner === 'player' ? ': it guards your region.' : ', for whoever holds the region.') + ' It cannot be recruited.</p>', { pic: 'full' });
-      return A.card(id, show ? '<div class="row">' + btn('Recruit for ' + cost + 's', function () { U.doAction({ type: 'recruit', region: r, card: id }); }, { cls: mode === 'recruit' ? 'go' : '', off: m }) + '</div>' : '', { pic: 'full' });
+      return A.card(id, show ? note + '<div class="row">' + btn((from ? 'Poach for ' : 'Recruit for ') + cost + 's', function () { U.doAction({ type: 'recruit', region: r, card: id }); }, { cls: mode === 'recruit' ? 'go' : '', off: m }) + '</div>' : '', { pic: 'full' });
     }).join('') + '</div>');
     if (!my) {
       out.push(U.busy ? '<p class="muted">A rival is moving. You can act on your turn.</p>' : U.peek ? '<p class="muted">Nothing can be done until you answer.</p>' : '');
@@ -355,7 +360,8 @@
       acts.push(['depart', btn('Depart by the Far Pass', function () { U.departConfirm(); }, { cls: 'go', off: md })]);
     }
     if (!acts.length) {
-      out.push('<p class="muted">' + (mine ? 'Nothing more to do here this turn.' : "You have no warbands here or next to it. March in from a neighbour.") + '</p>');
+      out.push('<p class="muted">' + (mine ? 'Nothing more to do here this turn.' : !E.recruitReach(s, 'player', r) ? 'You have no warbands here or next to it. March in from a neighbour.' :
+        E.truce(s) ? esc(plain(E.truce(s))) : 'Your warbands next door cannot march or assault here this turn.') + '</p>');
       return out.join('');
     }
     // the current mode first
@@ -507,6 +513,7 @@
         '<li><span><b>Seat.</b> If the age ends with no other winner, the house holding the Crown hold wins.</span></li></ul>' +
         '<h3>Your turn</h3><p>You get moons each turn to spend on actions. March (1 moon), muster (1 moon and silver), assault (2 moons), recruit, search and treat. ' +
           'Build a structure in a region you hold (1 moon and silver). Station a resident from your retinue in an empty slot of a region you hold (1 moon). Dig in (1 moon): +1 defence in a region you hold until your next turn. Tap a region to see what you can do there.</p>' +
+        '<p>Recruit a resident where your warbands stand or in a region next to them. Taking one from a region another house holds is poaching: it costs ' + N.poachSilver + ' more silver, and that house takes a grudge against you. You cannot poach from a house you have a pact with. A rival that means to poach from you shows it first, like an assault.</p>' +
         '<h3>Structures</h3><p>The Citadel and the Waystone are landmarks. They stand from the start and can never be razed. ' +
           'The other six regions start undeveloped: no effect, no site income and 1 slot. In the first age the Toll Bridge and the Charcoal Kilns already stand. ' +
           'A built structure gives its effect and a second slot. ' +

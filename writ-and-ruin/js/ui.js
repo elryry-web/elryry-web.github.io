@@ -69,6 +69,8 @@
     'a region is free: return there': 'A region is free: return there rather than to the camp.',
     'the world deck is empty': 'The world deck is empty: there is nothing left to find.',
     'no warbands there': 'You need warbands there.',
+    'no warbands there or next to it': 'You need warbands there or in a region next to it.',
+    'not its declared plan': 'It did not show that plan.',
     'not your region': 'You do not hold that region.',
     'not your turn': 'It is not your turn.',
     'not enough warbands': 'You do not have that many warbands there.',
@@ -97,6 +99,7 @@
     if ((x = /^need (\d+) relics$/.exec(m))) return 'You need ' + plural(+x[1], 'relic') + ' to depart.';
     if ((x = /^hold the Far Pass with (\d+) warbands/.exec(m))) return 'You must have held the Far Pass with ' + x[1] + ' warbands since the start of your turn.';
     if (/^the Waystone opens/.test(m)) return cap(m) + '.';
+    if ((x = /^you have a pact with (\w+)$/.exec(m))) return 'You have a pact with ' + who(x[1]) + ': you cannot poach from them.';
     // a moon or two left, but the action costs more
     if ((x = /^assault on (\w+) costs (\d+) moons \((\w+): Drowned Bell\); have (\d+)$/.exec(m)))
       return 'Assaulting ' + rn(x[1]) + ' costs ' + x[2] + ' moons (' + who(x[3]) + ' holds the Drowned Bell); you have ' + x[4] + '.';
@@ -188,7 +191,9 @@
       case 'pactBroken': return W + ' broke ' + (PACT_NAME[ev.pact.type] || 'a pact') + ' with ' + whoLow(ev.wronged, s) + '.';
       case 'judge': return whose(ev.house, s) + ' Hanging Judge cost ' + whoLow(ev.breaker, s) + ' ' + plural(ev.lost.length, 'warband') + '.';
       case 'oath': return 'The Broken Word cost ' + whoLow(h, s) + ' ' + ev.lost.length + ' warbands.';
-      case 'recruit': return W + ' recruited ' + cardName(ev.card) + ' at ' + rn(ev.region) + '.';
+      case 'recruit':
+        if (ev.from) return W + ' poached the ' + cardName(ev.card) + ' from ' + (ev.from === 'player' ? 'your' : whoLow(ev.from, s) + "'s") + ' ' + REG[ev.region].name + ' (' + ev.silver + ' silver).';
+        return W + ' recruited ' + cardName(ev.card) + ' at ' + rn(ev.region) + (ev.reach ? ' from ' + rn(ev.reach) : '') + '.';
       case 'build': return W + ' built the ' + REG[ev.region].site + ' at ' + rn(ev.region) + ' for ' + ev.silver + ' silver.';
       case 'station': return W + ' stationed ' + cardName(ev.card) + ' at ' + rn(ev.region) + '.';
       case 'dig': return W + ' dug in at ' + rn(ev.region) + '.';
@@ -685,7 +690,7 @@
     }
     if (U.mode) {
       var words = { march: 'Choose a region to march from.', muster: 'Choose one of your regions to muster in.', assault: 'Choose a region to assault.',
-        recruit: 'Choose a region with a resident to recruit.', search: 'Choose a region to search.', dig: 'Choose one of your regions to dig in.',
+        recruit: 'Choose a region with a resident to recruit: where your warbands are, or next door.', search: 'Choose a region to search.', dig: 'Choose one of your regions to dig in.',
         station: 'Choose one of your regions with an empty slot to station ' + (U.mode.card ? cardName(U.mode.card) : 'the resident') + ' in.' }[U.mode.kind] || '';
       if (U.mode.kind === 'assault') { var un = unguardedNote(s, legal); if (un) words += ' ' + un; }
       return '<div class="hint pickhint"><span>' + esc(words) + '</span>' + btn('Cancel', function () { U.mode = null; render(); }, { cls: 'small' }) + '</div>';
@@ -716,7 +721,7 @@
     }
     if (kind === 'recruit') {
       if (hs.retinue.length >= N.retinueMax) return 'retinue full';
-      return 'No resident you can afford stands where your warbands are.';
+      return 'No resident you can afford stands where your warbands are or next door.';
     }
     if (kind === 'search') return s.deck.length ? 'not enough silver' : 'the world deck is empty';
     if (kind === 'dig') return 'You have dug in everywhere you hold this turn.';

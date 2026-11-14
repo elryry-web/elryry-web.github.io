@@ -281,8 +281,8 @@
     var w = wide ? 6 : 4.5;
     var out = '<g class="arrow' + (wide ? ' live' : '') + '">' +
       (onBoard ? '<path d="' + d + '" stroke="' + P.paper + '" stroke-opacity="0.7" stroke-width="' + (w + 7) + '" fill="none" stroke-linecap="round"/>' : '') +
-      '<path d="' + d + '" stroke="' + P.ink + '" stroke-width="' + (w + 3.4) + '" fill="none" stroke-linecap="round"' + (dashed ? ' stroke-dasharray="10 7"' : '') + '/>' +
-      '<path d="' + d + '" stroke="' + col + '" stroke-width="' + w + '" fill="none" stroke-linecap="round"' + (dashed ? ' stroke-dasharray="10 7"' : '') + '/>' +
+      '<path d="' + d + '" stroke="' + P.ink + '" stroke-width="' + (w + 3.4) + '" fill="none" stroke-linecap="round"' + (dashed ? ' stroke-dasharray="' + (typeof dashed === 'string' ? dashed : '10 7') + '"' : '') + '/>' +
+      '<path d="' + d + '" stroke="' + col + '" stroke-width="' + w + '" fill="none" stroke-linecap="round"' + (dashed ? ' stroke-dasharray="' + (typeof dashed === 'string' ? dashed : '10 7') + '"' : '') + '/>' +
       '<path d="' + head + '" fill="' + col + '" stroke="' + P.ink + '" stroke-width="2" stroke-linejoin="round"/>';
     // the house stamp sits on the curve with the count bubble below right of it: slide both along the curve
     // to the first spot where neither touches a name chip
@@ -340,6 +340,8 @@
       case 'search': return marker(it.region, h, '?', second, rv);
       case 'return': return marker(it.region, h, '↵', second, rv);
       case 'depart': return marker('farpass', h, '↑', second, rv);
+      // a poach: a dotted line carrying the resident out of the region toward the taker's warbands
+      case 'poach': return it.from && it.from !== it.region ? arrow(it.region, it.from, col, '2 7', null, h, false, rv) : marker(it.region, h, '−', second, rv);
     }
     return '';
   }

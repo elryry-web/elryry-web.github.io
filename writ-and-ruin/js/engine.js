@@ -299,13 +299,27 @@
     var d = s.regions[to] && s.regions[to].owner;
     return d && d !== h && has(s, d, 'drownedBell') ? d : null;
   }
-  function recruitCost(s, h, id) {
+  // the silver to recruit resident id; from region r held by another house (a poach) it costs N.poachSilver more
+  function recruitCost(s, h, id, r) {
     var card = CARDS[id], c = card.cost;
-    if (law(s, 'wildYear') && card.suit === 'Wild') return 0;
-    if (has(s, h, 'fairMother')) c--;
-    if (law(s, 'titheOfLore') && card.suit === 'Lore') c--;
-    return Math.max(0, c);
+    if (law(s, 'wildYear') && card.suit === 'Wild') c = 0;
+    else {
+      if (has(s, h, 'fairMother')) c--;
+      if (law(s, 'titheOfLore') && card.suit === 'Lore') c--;
+    }
+    return Math.max(0, c) + (r && poachFrom(s, h, r) ? N.poachSilver : 0);
   }
+  // where h recruits in region r from: r itself if h has warbands there, else the neighbour with the most of h's warbands, or null
+  function recruitReach(s, h, r) {
+    if (!s.regions[r]) return null;
+    if (bandsAt(s, h, r) > 0) return r;
+    var best = null;
+    REG[r].adj.forEach(function (n) { if (bandsAt(s, h, n) > 0 && (!best || bandsAt(s, h, n) > bandsAt(s, h, best))) best = n; });
+    return best;
+  }
+  // the house h would poach from by recruiting in region r: its holder, if that is another house
+  function poachFrom(s, h, r) { var o = s.regions[r] && s.regions[r].owner; return o && o !== h ? o : null; }
+  function poachKey(r, id) { return 'poach:' + r + ':' + id; }
   function searchSilver(s, h) {
     if (has(s, h, 'archivist')) return 0;
     return law(s, 'titheOfLore') ? 2 : N.searchSilver;
@@ -479,7 +493,15 @@
     var w = s.houses[h].warned, i = w ? w.indexOf(r) : -1;
     if (i >= 0) w.splice(i, 1);
   }
-  function warnedBy(it) { return it && (it.type === 'assault' || it.type === 'march') && it.to ? [it.to] : []; }
+  // a shown poach permits taking that one resident from that region, and nothing else
+  function warnedPoach(s, h, r, id) {
+    if (h === 'player' || s._planning || poachFrom(s, h, r) !== 'player') return true;
+    return (s.houses[h].warned || []).indexOf(poachKey(r, id)) >= 0;
+  }
+  function warnedBy(it) {
+    if (it && it.type === 'poach') return [poachKey(it.region, it.card)];
+    return it && (it.type === 'assault' || it.type === 'march') && it.to ? [it.to] : [];
+  }
 
   // ---------------------------------------------------------------- validation
   function err(m) { return m; }
@@ -565,12 +587,17 @@
       }
       case 'recruit': {
         g = s.regions[a.region];
-        if (!g || bandsAt(s, h, a.region) < 1) return err('no warbands there');
+        if (!g) return err('no such region');
+        if (!recruitReach(s, h, a.region)) return err('no warbands there or next to it');
         if (g.residents.indexOf(a.card) < 0) return err('not there');
         if (siteOnly(a.card)) return err('stays at its site');
+        var victim = poachFrom(s, h, a.region);
+        if (victim && pactsBetween(s, h, victim).length) return err('you have a pact with ' + victim);
+        // no unannounced poaching from you: a rival may take a resident from your region only as the plan it showed
+        if (!warnedPoach(s, h, a.region, a.card)) return err('not its declared plan');
         if (hs.retinue.length >= N.retinueMax) return err('retinue full');
         if (hours < 1) return err('no hours');
-        if (!opts.ignoreHours && hs.silver < recruitCost(s, h, a.card)) return err('not enough silver');
+        if (!opts.ignoreHours && hs.silver < recruitCost(s, h, a.card, a.region)) return err('not enough silver');
         return null;
       }
       case 'build': {
@@ -698,7 +725,6 @@
           if (holds(s, h, to) || emptyOfOthers(s, h, to)) return;
           counts(b).forEach(function (c) { add({ type: 'assault', from: r, to: to, count: c }); });
         });
-        s.regions[r].residents.forEach(function (c) { add({ type: 'recruit', region: r, card: c }); });
         add({ type: 'search', region: r });
       }
       if (holds(s, h, r)) {
@@ -713,6 +739,8 @@
         add({ type: 'dig', region: r });
         if (s.regions[r].residents.length < slotsOf(s, r)) hs.retinue.forEach(function (c) { add({ type: 'station', region: r, card: c }); });
       }
+      // recruit: where h has warbands, or next door to them (from another house's region, a poach)
+      if (hs.retinue.length < N.retinueMax && recruitReach(s, h, r)) s.regions[r].residents.forEach(function (c) { add({ type: 'recruit', region: r, card: c }); });
     });
     if (!hs.flags.treated) {
       s.order.forEach(function (t) {
@@ -783,11 +811,16 @@
         break;
       }
       case 'recruit': {
-        var rc = recruitCost(s, h, a.card), g = s.regions[a.region];
+        var rc = recruitCost(s, h, a.card, a.region), g = s.regions[a.region], pv = poachFrom(s, h, a.region);
+        var reach = bandsAt(s, h, a.region) > 0 ? null : recruitReach(s, h, a.region);
         hs.silver -= rc; hs.hours -= 1;
         g.residents.splice(g.residents.indexOf(a.card), 1);
         hs.retinue.push(a.card);
-        ev.push({ type: 'recruit', house: h, region: a.region, card: a.card, silver: rc });
+        if (pv) {
+          addGrudge(s, pv, h, N.grudgePoach);
+          if (pv === 'player') useWarned(s, h, poachKey(a.region, a.card));   // the declared poach, used once
+        }
+        ev.push({ type: 'recruit', house: h, region: a.region, card: a.card, silver: rc, from: pv || null, reach: reach, grudge: pv ? N.grudgePoach : 0 });
         break;
       }
       case 'build': {
@@ -1014,6 +1047,7 @@
       case 'muster': return who + ': muster in ' + R(it.region);
       case 'search': return who + ': search ' + R(it.region);
       case 'recruit': return who + ': recruit ' + CARDS[it.card].name;
+      case 'poach': return who + ': poach the ' + CARDS[it.card].name + ' from ' + R(it.region);
       case 'depart': return who + ': depart by the Far Pass';
       case 'hold': return who + ': hold fast';
       case 'return': return who + ': returns at ' + (it.region === 'camp' ? 'the Far Pass camp' : R(it.region));
@@ -1463,7 +1497,7 @@
     endChances: endChances, fortuneLeft: fortuneLeft, peekFortune: peekFortune, assaultOdds: assaultOdds, lossRange: lossRange, battleLosses: battleLosses,
     battlePreview: battlePreview, attackBonus: attackBonus, defenceOf: defenceOf, lastStand: lastStand, returnSpots: returnSpots,
     marchDests: marchDests, enterMode: enterMode, emptyOfOthers: emptyOfOthers,
-    musterCost: musterCost, musterMax: musterMax, recruitCost: recruitCost, searchSilver: searchSilver, assaultHours: assaultHours, bellHolder: bellHolder,
+    musterCost: musterCost, musterMax: musterMax, recruitCost: recruitCost, recruitReach: recruitReach, poachFrom: poachFrom, searchSilver: searchSilver, assaultHours: assaultHours, bellHolder: bellHolder,
     pactsBetween: pactsBetween, intentLabel: intentLabel, pactsBrokenBy: pactsBrokenBy, grudge: grudge, loreCount: loreCount,
     // utilities
     clone: clone, rnd: rnd, rint: rint, shuffle: shuffle, DATA: D

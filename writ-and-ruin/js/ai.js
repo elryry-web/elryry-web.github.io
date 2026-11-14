@@ -16,21 +16,24 @@
   var IDS = D.REGION_IDS, REG = D.REGION, CARDS = D.CARDS, N = D.NUM;
 
   // ---------------------------------------------------------------- temperaments
-  // win: weight on each way of winning; suit: liking for each suit; other knobs as named
+  // win: weight on each way of winning; suit: liking for each suit; poach: liking for taking residents from other houses' regions;
+  // other knobs as named
   var T = {
-    warlord: { win: { seize: 10, foretell: 5, depart: 2, seat: 6 }, suit: { Order: 1, Wild: 0.5 }, bands: 0.75, silver: 0.2, risk: 0.35, breakCost: 2.5, fight: 0.6, search: 0.6, truce: -1, threatW: 12 },
-    mystic: { win: { seize: 4, foretell: 10, depart: 4, seat: 4 }, suit: { Lore: 1.4 }, bands: 0.55, silver: 0.25, risk: 0.5, breakCost: 3, fight: 0, search: 1.6, truce: 0.8, threatW: 12 },
-    wanderer: { win: { seize: 3, foretell: 5, depart: 10, seat: 3 }, suit: { Wild: 0.4, Lore: 0.4 }, bands: 0.55, silver: 0.25, risk: 0.6, breakCost: 3, fight: -0.4, search: 1.4, truce: 0.8, threatW: 10 },
-    steward: { win: { seize: 5, foretell: 5, depart: 2, seat: 10 }, suit: { Order: 0.7, Hearth: 0.7 }, bands: 0.7, silver: 0.25, risk: 0.8, breakCost: 4, fight: 0, search: 0.5, truce: 1.2, threatW: 12 },
-    schemer: { win: { seize: 6, foretell: 7, depart: 5, seat: 6 }, suit: { Shade: 1 }, bands: 0.55, silver: 0.35, risk: 0.5, breakCost: 0.6, fight: 0.1, search: 0.9, truce: 1, threatW: 12 },
-    wild: { win: { seize: 7, foretell: 7, depart: 4, seat: 4 }, suit: { Wild: 1.4 }, bands: 0.6, silver: 0.2, risk: 0.4, breakCost: 2, fight: 0.4, search: 0.8, truce: -0.5, threatW: 11, folk: 0.8, weakest: 0.5 },
-    player: { win: { seize: 7, foretell: 7, depart: 6, seat: 7 }, suit: {}, bands: 0.6, silver: 0.25, risk: 0.5, breakCost: 2, fight: 0.2, search: 1, truce: 0.5, threatW: 12 }
+    warlord: { win: { seize: 10, foretell: 5, depart: 2, seat: 6 }, suit: { Order: 1, Wild: 0.5 }, bands: 0.75, silver: 0.2, risk: 0.35, breakCost: 2.5, fight: 0.6, search: 0.6, truce: -1, threatW: 12, poach: 0.2 },
+    mystic: { win: { seize: 4, foretell: 10, depart: 4, seat: 4 }, suit: { Lore: 1.4 }, bands: 0.55, silver: 0.25, risk: 0.5, breakCost: 3, fight: 0, search: 1.6, truce: 0.8, threatW: 12, poach: 0.1 },
+    wanderer: { win: { seize: 3, foretell: 5, depart: 10, seat: 3 }, suit: { Wild: 0.4, Lore: 0.4 }, bands: 0.55, silver: 0.25, risk: 0.6, breakCost: 3, fight: -0.4, search: 1.4, truce: 0.8, threatW: 10, poach: 0 },
+    steward: { win: { seize: 5, foretell: 5, depart: 2, seat: 10 }, suit: { Order: 0.7, Hearth: 0.7 }, bands: 0.7, silver: 0.25, risk: 0.8, breakCost: 4, fight: 0, search: 0.5, truce: 1.2, threatW: 12, poach: -0.6 },
+    schemer: { win: { seize: 6, foretell: 7, depart: 5, seat: 6 }, suit: { Shade: 1 }, bands: 0.55, silver: 0.35, risk: 0.5, breakCost: 0.6, fight: 0.1, search: 0.9, truce: 1, threatW: 12, poach: 0.9 },
+    wild: { win: { seize: 7, foretell: 7, depart: 4, seat: 4 }, suit: { Wild: 1.4 }, bands: 0.6, silver: 0.2, risk: 0.4, breakCost: 2, fight: 0.4, search: 0.8, truce: -0.5, threatW: 11, poach: 0.6, folk: 0.8, weakest: 0.5 },
+    player: { win: { seize: 7, foretell: 7, depart: 6, seat: 7 }, suit: {}, bands: 0.6, silver: 0.25, risk: 0.5, breakCost: 2, fight: 0.2, search: 1, truce: 0.5, threatW: 12, poach: 0.3 }
   };
   // the move a rival shows is the only one that may touch the player's regions, so rivals lean toward the player:
   // player: a bonus on a shown assault or march into a player region;
   // threat: how much more a rival fears the player's progress than another rival's.
   // Tune both with the sim's player-seat win rate (target 25-30%).
   var AIM = { player: 4, threat: 2 };
+  // poaching: grudge, the cost of the grudge the holder takes (more if it already holds one)
+  var POACH = { grudge: 0.4 };
   function tem(s, h) { var hs = s.houses[h]; return T[hs.temper || 'player']; }
   function temperOf(c, h) { return c.houses[h].temperament; }
 
@@ -363,6 +366,14 @@
       var full = s.houses[h].retinue.length >= N.retinueMax, sg = pressure(s, h, a.region) + 1 - E.defenceOf(s, a.region, null);
       return evaluate(c, h) + cardValue(t, a.card) * (sg > 0 ? 0.4 : 0.8) + (full ? 0.3 + 0.4 * t.search : -0.3);
     }
+    // poaching: what the holder loses, weighed by temperament, against the grudge it earns
+    if (a.type === 'recruit') {
+      var pv = E.poachFrom(s, h, a.region);
+      if (pv) {
+        var lossW = pv === 'player' ? AIM.threat * 0.5 : 0.5;
+        return evaluate(c, h) + t.poach * (1 + lossW * cardValue(tem(s, pv), a.card)) + 0.35 * E.grudge(s, h, pv) - POACH.grudge * (1 + E.grudge(s, pv, h) * 0.3);
+      }
+    }
     // never muster into an upkeep next turn's silver cannot pay
     if (a.type === 'muster' && E.upkeep(c, h) > E.upkeep(s, h) &&
         c.houses[h].silver + E.income(c, h) < E.upkeep(c, h)) return -1e4;
@@ -566,6 +577,8 @@
     var warnable = (opts && opts.warnable) || h === 'player' || s.order[s.turn] === 'player' || movesBefore(s, h).indexOf('player') >= 0;
     var list = E.legalActions(c, h, { few: true }).filter(function (a) {
       if ((a.type === 'assault' || a.type === 'march') && !warnable && c.regions[a.to].owner === 'player') return false;
+      // a poach from the player is a move on the player's region: shown first, like an assault
+      if (a.type === 'recruit') return warnable && E.poachFrom(c, h, a.region) === 'player';
       return a.type === 'assault' || a.type === 'march' || a.type === 'muster' || a.type === 'depart';
     });
     setGuess(c, h);
@@ -580,7 +593,9 @@
     function strip(a) {
       if (!a) return { type: 'hold' };
       var o = { type: a.type };
-      ['from', 'to', 'count', 'region'].forEach(function (k) { if (a[k] != null) o[k] = a[k]; });
+      ['from', 'to', 'count', 'region', 'card'].forEach(function (k) { if (a[k] != null) o[k] = a[k]; });
+      // a shown poach names the resident and where its taker reaches from (for the map's arrow)
+      if (a.type === 'recruit') { o.type = 'poach'; o.from = E.recruitReach(c, h, a.region); }
       return o;
     }
     var first = scored[0] && scored[0].v > base + 0.2 ? scored[0].a : null;
@@ -602,7 +617,10 @@
   }
 
   // ---------------------------------------------------------------- re-planning when the player's action changes the board
-  function onPlayer(s, it) { return !!(it && (it.type === 'assault' || it.type === 'march') && s.regions[it.to] && s.regions[it.to].owner === 'player'); }
+  function onPlayer(s, it) {
+    if (it && it.type === 'poach') return !!(s.regions[it.region] && s.regions[it.region].owner === 'player');
+    return !!(it && (it.type === 'assault' || it.type === 'march') && s.regions[it.to] && s.regions[it.to].owner === 'player');
+  }
   // the player's claim or Departure that stands now ('' if none)
   function playerThreat(s) {
     if (!s.houses.player) return '';
@@ -613,15 +631,19 @@
   // the board as it stands, to compare after the player acts
   function snapshot(s) {
     var o = {};
-    IDS.forEach(function (r) { var g = s.regions[r]; o[r] = { owner: g.owner, bands: JSON.stringify(g.bands), dug: g.dug || null }; });
+    IDS.forEach(function (r) { var g = s.regions[r]; o[r] = { owner: g.owner, bands: JSON.stringify(g.bands), dug: g.dug || null, residents: g.residents.join(',') }; });
     o._threat = playerThreat(s);
     return o;
   }
   function sameIntent(a, b) {
     if (!a || !b) return !a === !b;
-    return a.type === b.type && a.from === b.from && a.to === b.to && a.count === b.count && a.region === b.region;
+    return a.type === b.type && a.from === b.from && a.to === b.to && a.count === b.count && a.region === b.region && a.card === b.card;
   }
-  function toAction(it, h) { return { type: it.type, house: h, from: it.from, to: it.to, count: it.count, region: it.region }; }
+  // a shown poach is carried out as a recruit of that one resident
+  function toAction(it, h) {
+    if (it.type === 'poach') return { type: 'recruit', house: h, region: it.region, card: it.card };
+    return { type: it.type, house: h, from: it.from, to: it.to, count: it.count, region: it.region };
+  }
   // an intent the player's action made illegal or pointless: a region it names changed hands, or it can no longer be done.
   // later: a move after the next one, judged only by the regions it names
   function intentStale(s, h, it, before, later) {
@@ -630,7 +652,8 @@
     var regs = [it.from, it.to, it.region].filter(function (r) { return r && before[r]; });
     if (regs.some(function (r) { return before[r].owner !== s.regions[r].owner; })) return true;
     if (it.type === 'assault' && before[it.to] && before[it.to].dug !== (s.regions[it.to].dug || null)) return true;   // dug in: weigh the assault again
-    if (later || ['assault', 'march', 'muster', 'return'].indexOf(it.type) < 0) return false;
+    if (it.type === 'poach' && s.regions[it.region].residents.indexOf(it.card) < 0) return true;   // the resident has gone
+    if (later || ['assault', 'march', 'muster', 'return', 'poach'].indexOf(it.type) < 0) return false;
     return !!E.check(planState(s, h), toAction(it, h), { ignoreHours: true });
   }
   // a declared move that can still be made at the start of h's next turn
@@ -709,7 +732,8 @@
     if (mover !== 'player' || s.phase !== 'play' || s.order[s.turn] !== mover) return ev;
     var moved = IDS.some(function (r) {
       var g = s.regions[r];
-      return before[r].owner !== g.owner || before[r].bands !== JSON.stringify(g.bands) || (before[r].dug !== undefined && before[r].dug !== (g.dug || null));
+      return before[r].owner !== g.owner || before[r].bands !== JSON.stringify(g.bands) || (before[r].dug !== undefined && before[r].dug !== (g.dug || null)) ||
+        (before[r].residents !== undefined && before[r].residents !== g.residents.join(','));
     });
     if (!moved) return ev;
     // a claim or Departure of the player's that now stands: every rival plans again to break it (and shows it)
@@ -746,8 +770,9 @@
   function intentAction(s, h) {
     var it = s.houses[h].intent;
     if (!it || it.type === 'hold') return null;
-    var a = { type: it.type, house: h, from: it.from, to: it.to, count: it.count, region: it.region };
+    var a = toAction(it, h);
     if (!E.check(s, a)) return { action: a, note: 'kept' };
+    // a spoilt poach takes no other resident in its place
     if (it.type === 'assault' || it.type === 'march') {
       // same target with what can be brought
       var near = null;
