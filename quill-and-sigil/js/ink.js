@@ -1668,7 +1668,7 @@ const Grim = {
     } else {
       // upright: the circle takes nearly the page's full width (the width is what limits it) and the book grows
       // as tall as it needs — header, circle, then the status, the buttons' row (as tall as it measured) and the
-      // bottom border: the row stands just above the bottom corner bosses (v180: Undo · Blot · Satchel, and Inscribe
+      // bottom border: the row stands just above the bottom corner bosses (v181: Undo · Keep · Satchel, and Inscribe
       // under it between the bosses, in room the bosses already take, so only the row is counted)
       const HEAD = 128 + (L.legend ? 14 : 0), pad = 4;
       const bw = Math.min(vw - 4, 640), pw = bw - pad * 2;
@@ -1739,7 +1739,7 @@ const Grim = {
       pb.style.top = Math.min(Math.max(L.area.y + L.area.size + P.h * 0.1, this.statusAt().end), P.y + P.h - B.m - B.vh - 8 - h) + 'px';
       return;
     }
-    // upright: inside the knotwork border, Undo · Blot · Satchel in a row standing just clear of the bottom corner
+    // upright: inside the knotwork border, Undo · Keep · Satchel in a row standing just clear of the bottom corner
     // bosses' tops, and Inscribe under it in the strip between the two bottom bosses, down to just inside the bottom
     // knotwork (v180; it was two rows of eight, the second between the bosses, then one row of four). Only the row
     // counts towards btnH (Inscribe is out of the flow, CSS #pagebtns.foot), so the circle keeps a row's height.
@@ -1959,8 +1959,8 @@ const Grim = {
     this.inkDirty = true;
     this.updateStatus();
   },
-  // (v180) Undo takes back the last thing done to the page: a stroke, or a whole page laid at once (Blot, Recall, a
-  // kept spell). Those last are kept in hist, each with the page it replaced and the stroke count it left, so Undo
+  // (v180) Undo takes back the last thing done to the page: a stroke, or a whole page laid at once (Recall, a kept
+  // spell, or Delete's blot). Those last are kept in hist, each with the page it replaced and the stroke count it left, so Undo
   // restores that page once every stroke drawn since has been taken back. Cleared when the page is inscribed or a
   // lesson starts (resetHist).
   hist: [],
@@ -1984,17 +1984,34 @@ const Grim = {
     if (!this.lastStrokes) { this.status = 'No spell has yet been cast this lesson.'; return; }
     this.loadStrokes(this.lastStrokes);
   },
-  // (v180) Blot and Recall share a button: Blot while the page has ink, Recall on a clean page once a spell was cast
-  blotOrRecall() { if (this.draft.strokes.length) this.blot(); else if (this.lastStrokes) this.recall(); },
+  // (v181) Recall rides on the Undo button: on a clean page with nothing to take back, once a spell was cast
+  recallReady() { return !this.draft.strokes.length && !this.hist.length && !!this.lastStrokes; },
+  undoOrRecall() { if (this.recallReady()) this.recall(); else this.undo(); },
   loadStrokes(strokes) { this.replacePage(strokes); Sfx.play('page'); },
-  // the page buttons follow the page: Blot or Recall, and Undo greyed with nothing to take back
+  // (v181) why the page holds nothing to keep ('' when it does): the page's Keep button and the satchel's share it
+  keepWhy() {
+    const D = this.draft;
+    return !D.strokes.length ? 'The page is empty: draw a spell on it first.'
+      : buildSpell(D, knownRules()).err ? 'The spell on the page is not finished yet.'
+      : Satchel.list.length >= Satchel.max ? 'Your satchel is full. Let a kept spell go first.' : '';
+  },
+  // the page buttons follow the page: Undo (Recall on a clean page with a last spell; greyed with nothing to take
+  // back) and Keep (greyed, but still tappable for its reason, when there is nothing to keep)
   syncButtons() {
-    const b = document.getElementById('pBlot'), u = document.getElementById('pUndo'); if (!b) return;
-    const ink = this.draft.strokes.length > 0, rec = !ink && !!this.lastStrokes, label = rec ? 'Recall' : 'Blot';
-    b.disabled = !ink && !rec;
-    b.title = rec ? 'Lay your last spell on the page again' : 'Blot the page clean (Delete)';
-    if (b.textContent !== label) { b.textContent = label; this.fitButtons(); }
-    if (u) u.disabled = !ink && !this.hist.length;
+    const u = document.getElementById('pUndo'), k = document.getElementById('pKeep'); if (!u) return;
+    const ink = this.draft.strokes.length > 0, rec = this.recallReady();
+    u.disabled = !ink && !this.hist.length && !rec;
+    u.title = rec ? 'Lay your last spell on the page again' : 'Undo (Backspace)';
+    if (u.dataset.mode !== (rec ? 'recall' : 'undo')) {
+      u.dataset.mode = rec ? 'recall' : 'undo';
+      u.innerHTML = rec ? 'Recall' : '<span class="glyph">⌫ </span>Undo';
+      this.fitButtons();
+    }
+    if (k) {
+      const why = this.keepWhy();
+      k.classList.toggle('off', !!why); k.setAttribute('aria-disabled', why ? 'true' : 'false');
+      k.title = why || 'Keep the spell on this page in your satchel (K)';
+    }
   },
   keep() {
     const sp = buildSpell(this.draft, knownRules()); // (v178: a sigil not yet learned can't be kept, so the satchel never names it)

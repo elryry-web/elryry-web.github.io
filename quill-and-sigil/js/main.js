@@ -1280,11 +1280,17 @@ const Game = {
     if (this.satchelOpen()) { const w = $('#sKeepWhy'); w.textContent = Grim.status; w.classList.toggle('done', ok); }
   },
   keepState() {
-    const b = $('#sKeep'), w = $('#sKeepWhy'), D = Grim.draft;
-    const why = !D.strokes.length ? 'The page is empty: draw a spell on it first, then keep it here.'
-      : buildSpell(D, knownRules()).err ? 'The spell on the page is not finished yet.'
-      : Satchel.list.length >= Satchel.max ? 'Your satchel is full. Let a kept spell go first.' : '';
-    b.disabled = !!why; w.textContent = why; w.classList.remove('done');
+    const why = Grim.keepWhy(), w = $('#sKeepWhy');
+    $('#sKeep').disabled = !!why; w.textContent = why; w.classList.remove('done');
+    Grim.syncButtons(); // (the page's Keep greys with a full satchel, and wakes when a kept spell is let go)
+  },
+  // (v181) the page's Keep button: keeps as the satchel's does, the kept message on the page's status line; greyed, a
+  // tap shows why on that line for a moment instead
+  pageKeep() {
+    const why = Grim.keepWhy();
+    if (!why) return this.keep();
+    Grim.status = why; Grim.statusCol = '#8a2a1a'; Grim.shake = 0.3; Sfx.play('fizzle');
+    clearTimeout(this._kw); this._kw = setTimeout(() => { if (Grim.status === why) Grim.updateStatus(); }, 2600);
   },
   quick(i) {
     if (this.state !== 'play' || !Satchel.list[i] || this.dry()) return;
@@ -1313,7 +1319,7 @@ const TERMS = [
   { at: 'first-breath', t: 'Seal', d: 'One closed circle with a sigil inside. Inscribe it on the page, then cast it.' },
   { at: 'first-breath', t: 'Sign', d: 'A stroke out from the seal through a small circle. It points the spell.' },
   { at: 'long-meadow', t: 'Barb', d: 'A short stroke across a sign. Each barb makes the spell stronger.', more: ['rift', ' A sign takes two at most.'] },
-  { at: 'long-meadow', t: 'Rewind and Recall', d: 'Rewind takes back your last cast. Recall lays your last spell on the page again: on a clean page, the Blot button turns to Recall.' },
+  { at: 'long-meadow', t: 'Rewind and Recall', d: 'Rewind takes back your last cast. Recall lays your last spell on the page again: on a clean page, the Undo button turns to Recall.' },
   { at: 'from-the-abyss', t: 'Arm', d: 'With stone, ice or water, a sign raises a line running out the way it points; each barb adds a tile. Unadorned, with no sign, one tile.' },
   { at: 'featherfall', t: 'Float', d: 'What Luna gives: the orb hangs in the air, glides over low ground and open air, and settles after ten tiles.' },
   { at: 'featherfall-ii', t: 'Outer circle', d: 'A circle drawn around the whole seal. Around Luna, the float carries twice as far.', more: ['broad-water', ' Around anything else, the spell grows broader, not stronger.'] },
@@ -2154,8 +2160,8 @@ bind('#bNext', () => Game.next());
 bind('#bReplay', () => Game.start(Game.idx));
 bind('#bWinMenu', () => Game.lessons());
 bind('#pInscribe', () => Grim.inscribe());
-bind('#pUndo', () => Grim.undo());
-bind('#pBlot', () => Grim.blotOrRecall());
+bind('#pUndo', () => Grim.undoOrRecall());
+bind('#pKeep', () => Game.pageKeep());
 bind('#pClose', () => Game.closeGrimoire());
 bind('#pSatchel', () => Game.openSatchel());
 bind('#sKeep', () => Game.keep());

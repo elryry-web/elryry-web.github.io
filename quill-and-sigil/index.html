@@ -109,11 +109,12 @@
   #pagebtns.tight { gap: 3px; } #pagebtns.tight .btn { letter-spacing: 0; padding-left: 0; padding-right: 0; font-size: 10px; }
   #pagebtns.tight .btn.primary { font-size: 11px; padding-left: 3px; padding-right: 3px; }
   #pagebtns.plaques .btn:hover { box-shadow: none; filter: drop-shadow(0 0 6px rgba(232,194,122,.8)) drop-shadow(0 2px 3px rgba(0,0,0,.45)); }
-  /* a button with nothing to do (Undo on a clean page; Blot with no ink and no last spell to recall) */
-  #pagebtns .btn:disabled { opacity: .45; cursor: default; transform: none; filter: grayscale(.6); }
-  #pagebtns .btn:disabled:hover { transform: none; box-shadow: inset 0 0 0 2px rgba(255,255,255,.28), 0 3px 10px rgba(0,0,0,.45); }
-  #pagebtns.plaques .btn:disabled:hover { box-shadow: none; filter: grayscale(.6) drop-shadow(0 2px 3px rgba(0,0,0,.45)); }
-  /* phones (upright, and the left page sideways): Undo · Blot/Recall · Satchel in a row just above the bottom corner
+  /* a button with nothing to do (Undo on a clean page with nothing to recall; Keep with nothing to keep, which is .off
+     rather than disabled so a tap can still say why) */
+  #pagebtns .btn:disabled, #pagebtns .btn.off { opacity: .45; cursor: default; transform: none; filter: grayscale(.6); }
+  #pagebtns .btn:disabled:hover, #pagebtns .btn.off:hover { transform: none; box-shadow: inset 0 0 0 2px rgba(255,255,255,.28), 0 3px 10px rgba(0,0,0,.45); }
+  #pagebtns.plaques .btn:disabled:hover, #pagebtns.plaques .btn.off:hover { box-shadow: none; filter: grayscale(.6) drop-shadow(0 2px 3px rgba(0,0,0,.45)); }
+  /* phones (upright, and the left page sideways): Undo/Recall · Keep · Satchel in a row just above the bottom corner
      bosses, and Inscribe under it, between the bosses (v180; it was two rows of eight, then one row of four). The plaques are a fixed thumb-sized 42px tall and the labels shrink
      to fit them (fitButtons) instead of wrapping. */
   #pagebtns.upright { gap: 6px; flex-wrap: wrap; }
@@ -150,7 +151,7 @@
   #pagecorner.classic .pc { color: #3a2414; background: linear-gradient(#f6ead0, #dcc597); border: 1px solid #8a6a3a;
     box-shadow: inset 0 0 0 2px rgba(255,255,255,.28), inset 0 -3px 6px rgba(120,80,30,.25), 0 2px 6px rgba(0,0,0,.35); }
   #pagecorner.classic .pc:hover { color: #8e2f22; box-shadow: inset 0 0 0 2px rgba(255,255,255,.35), 0 0 12px rgba(232,194,122,.6); }
-  /* (v180) Keep now lives at the top of the satchel; its reason line says why it can't be used, or what keeping did */
+  /* (v180) Keep at the top of the satchel (v181: and on the page); its reason line says why it can't be used, or what keeping did */
   #sKeepBox { display: flex; flex-direction: column; align-items: center; gap: 6px; margin: 4px 0 14px; }
   #sKeep:disabled { opacity: .5; cursor: default; filter: grayscale(.5); transform: none; }
   #sKeepWhy { font-style: italic; font-size: 15px; color: #6a4a30; min-height: 1.2em; max-width: 30em; line-height: 1.3; }
@@ -688,7 +689,7 @@
 
 <div id="pagebtns">
   <button class="btn" id="pUndo" title="Undo (Backspace)"><span class="glyph">⌫ </span>Undo</button>
-  <button class="btn" id="pBlot" title="Blot the page clean (Delete)">Blot</button>
+  <button class="btn" id="pKeep" title="Keep the spell on this page in your satchel (K)">Keep</button>
   <button class="btn" id="pSatchel" title="Your kept spells, and keeping this one (K keeps it)">Satchel <b id="satCount"></b></button>
   <button class="btn primary" id="pInscribe" title="Enter">✦ Inscribe</button>
 </div>
@@ -853,9 +854,9 @@
   </div>
 </div>
 
-<script src="js/ink.js?v=180"></script>
-<script src="js/world.js?v=180"></script>
-<script src="js/tips.js?v=180"></script>
-<script src="js/main.js?v=180"></script>
+<script src="js/ink.js?v=181"></script>
+<script src="js/world.js?v=181"></script>
+<script src="js/tips.js?v=181"></script>
+<script src="js/main.js?v=181"></script>
 </body>
 </html>
