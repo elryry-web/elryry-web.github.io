@@ -388,16 +388,106 @@
   // image, the cut on the right as in Book I). mouthBox [x0, y0, x1, y1]: where the open beak's cream is kept
   BEAST['b2.beast.headShut'] = { a: [353.3, 175.5], phi: 0, band: 139, len: 352, kind: 'head', f0: -42, f1: -4, fy: -9999, eye: [41.5, 223.0, 16.8], mod: [-253, -167], pen: [-242, -151] };
   BEAST['b2.beast.headOpen'] = { a: [379.8, 148.2], phi: 0, band: 140, len: 380, kind: 'head', f0: -42, f1: -4, fy: -9999, eye: [60.0, 208.0, 16.5], mod: [-260, -174], pen: [-249, -158], mouth: true, mouthBox: [-4, 4, 98, 183] };
-  BEAST['b2.beast.tail'] = { a: [274.7, 202.1], phi: 0, band: 150, len: 274, kind: 'tail', f0: -45, f1: -4, fy: -9999, mod: [-123, -54], pen: [-109, -41] };
+  BEAST['b2.beast.tail'] = { a: [274.7, 202.1], phi: 0, band: 150, len: 274, kind: 'tail', f0: -45, f1: -4, fy: -9999, mod: [-123, -54], pen: [-109, -41],
+    fit: [157, 80, 60, 25], fitx: [20, 40, 80, 96, 6], fo: [96, 116] };
+  // fit [T, b, k, R]: the crane's tuft fans wider across its axis than its tile (to 0.56 of the side either way of
+  // the band's centre, where the tile ends at 0.5), so it was cut off square by the tile's clip. Its plumes are
+  // drawn in toward the axis (fitBeast) until none reaches past T source px from the band's centre (0.44 of the
+  // side, leaving room for the ink line and shadow round it). The band itself (b px either way) is left as it is
+  // where it meets the ribbon, so only the feathers outside it are drawn in there; out in the tuft (from 45 to 110
+  // px back from the cut) the drawing in spreads over the whole fan. k: the px over which it eases in; R: how
+  // far along the axis each column's squeeze is spread, so the feathers bend smoothly rather than column by column
+  // fo [o0, o1]: the plumes curling up beside the neck reach the cut, where the neck's fade (f0..f1) ran
+  // straight across them and the cut squared them off. The fade and the cut are eased off from o0 to o1 source
+  // px out from the band's centre (past the neck's own ink line and shadow), so those plumes keep their outline
   function inMouth(B, x, y) { var m = B.mouthBox; return B.mouth && (m ? x >= m[0] && x <= m[2] && y >= m[1] && y <= m[3] : x < 175 && y > 125); }
   // mod: [x0, x1] along the axis, where the ribbon's modelling (shadow band, tint) eases off over the head or the
   // tail's curl; pen: where the lead-white penwork tapers to a point. Both in source px from the cut (negative)
   var BEAST_BAND = 0.36, BEAST_MARGIN = 0.02;
+  // Book II's flat crane: how much of the art's own light and shade is laid over the head (none on the neck)
+  var B2_HEAD_LIGHT = 0.2;
   // Book II's crane is drawn a little broader, nearly the width of the cream ribbon body, so only a fine band
   // of the body and the ribbon's ink line ring it
   function beastBand() { return BOOK === 2 ? 0.42 : BEAST_BAND; }   // the art band's share of a tile: the board's ribbon body, so the gilt meets
   var beastPrep = {}, beastCache = {}, beastCacheN = 0, beastBad = {};
   function sstep(a, b, x) { var t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); }
+  // one line of a beast's pixels (n of them, from pixel o, stride st) redrawn so that source position p lands at
+  // fw(p) (rising), into the same line of out. Each output pixel is the source it covers, averaged with its
+  // alpha, so the fine feather lines stay clean
+  function remapLine(d, out, o, st, n, fw) {
+    var C = new Float64Array((n + 1) * 4), m = n * 4 + 1, f = new Float64Array(m), g = new Float64Array(n + 1), i, j, q, pp = 0;
+    for (i = 0; i < n; i++) {
+      var p = (o + i * st) * 4, al = d[p + 3] / 255;
+      for (q = 0; q < 3; q++) C[(i + 1) * 4 + q] = C[i * 4 + q] + d[p + q] * al;
+      C[(i + 1) * 4 + 3] = C[i * 4 + 3] + al;
+    }
+    for (j = 0; j < m; j++) f[j] = fw(j / 4);
+    for (j = 0; j <= n; j++) {   // the source position each output pixel's edge comes from
+      if (j <= f[0]) { g[j] = 0; continue; }
+      if (j >= f[m - 1]) { g[j] = n; continue; }
+      while (pp < m - 2 && f[pp + 1] < j) pp++;
+      g[j] = (pp + (j - f[pp]) / Math.max(1e-9, f[pp + 1] - f[pp])) / 4;
+    }
+    function Cat(v, q) { v = v < 0 ? 0 : v > n ? n : v; var k = Math.min(n - 1, v | 0), fr = v - k; return C[k * 4 + q] + (C[(k + 1) * 4 + q] - C[k * 4 + q]) * fr; }
+    for (i = 0; i < n; i++) {
+      var o4 = (o + i * st) * 4, dd = g[i + 1] - g[i], a = dd < 1e-9 ? 0 : (Cat(g[i + 1], 3) - Cat(g[i], 3)) / dd;
+      if (a <= 1e-4) { out[o4] = out[o4 + 1] = out[o4 + 2] = out[o4 + 3] = 0; continue; }
+      for (q = 0; q < 3; q++) out[o4 + q] = (Cat(g[i + 1], q) - Cat(g[i], q)) / dd / a;
+      out[o4 + 3] = Math.round(a * 255);
+    }
+  }
+  // a beast's art (RGBA pixels d, its axis along the image's rows, phi 0) drawn in so it keeps clear of its tile's
+  // edges. B.fitx: first, row by row, the plumes beside the neck are drawn back toward the tip; then, column by
+  // column (B.fit), what reaches farther across the axis than T is drawn in toward the axis, each side of the
+  // band's centre on its own. Each line is left as it is out to a knee, then eased down to the squeeze s that
+  // brings its farthest feather to the limit; s is spread over neighbouring lines so the feathers bend together
+  function fitBeast(d, W, H, B) {
+    var ax = B.a[0], ay = B.a[1], x, y, c, k2;
+    function G(t) { return t <= 1 ? t * t * t - t * t * t * t / 2 : 0.5 + (t - 1); }   // the eased squeeze, summed out to t
+    function need(e, lim, kn, K) {   // the squeeze that brings a line reaching to e back to lim, easing in from kn
+      if (e <= lim) return 1;
+      var gk = G((e - kn) / K); return gk > 0 ? Math.max(0.3, 1 - (e - lim) / (K * gk)) : 0.3;
+    }
+    function spread(sv, n, R) {   // the least s within R either way, then its mean within R (never above a line's own need)
+      var mn = new Float32Array(n), i;
+      for (i = 0; i < n; i++) { var m = 1; for (k2 = Math.max(0, i - R); k2 <= Math.min(n - 1, i + R); k2++) m = Math.min(m, sv[k2]); mn[i] = m; }
+      for (i = 0; i < n; i++) { var sm = 0, cn = 0; for (k2 = Math.max(0, i - R); k2 <= Math.min(n - 1, i + R); k2++) { sm += mn[k2]; cn++; } sv[i] = sm / cn; }
+    }
+    if (B.fitx) {   // along the axis: [M, K, v0, v1, R], the limit M px short of the cut, rows within v0 of the
+      // band's centre (the neck, which runs on into the ribbon) left as they are, eased in by v1
+      var L = ax - B.fitx[0], K1 = B.fitx[1], xk = L - K1, sx = new Float32Array(H), wv = new Float32Array(H);
+      for (y = 0; y < H; y++) {
+        var xr = 0; for (x = W - 1; x >= 0; x--) if (d[(y * W + x) * 4 + 3] > 10) { xr = x + 1; break; }
+        wv[y] = sstep(B.fitx[2], B.fitx[3], Math.abs(y + 0.5 - ay));
+        sx[y] = wv[y] > 0 ? need(xr, L, xk, K1) : 1;
+      }
+      spread(sx, H, B.fitx[4]);
+      var dx = new Uint8ClampedArray(d);
+      for (y = 0; y < H; y++) {
+        var s1 = 1 - (1 - sx[y]) * wv[y];
+        if (s1 < 0.9999) remapLine(d, dx, y * W, 1, W, function (p) { return p - (1 - s1) * K1 * G(Math.max(0, p - xk) / K1); });
+      }
+      d = dx;
+    }
+    // across the axis: [T, b, K, R], b the band's half width kept near the cut, K the px the squeeze eases in over
+    var T = B.fit[0], K = B.fit[2], bk = new Float32Array(W), S2 = [new Float32Array(W), new Float32Array(W)];
+    for (x = 0; x < W; x++) {
+      bk[x] = B.fit[1] * (1 - sstep(-45, -110, x + 0.5 - ax));
+      var y0 = -1, y1 = -1;
+      for (y = 0; y < H; y++) if (d[(y * W + x) * 4 + 3] > 10) { if (y0 < 0) y0 = y; y1 = y; }
+      for (c = 0; c < 2; c++) S2[c][x] = y0 < 0 ? 1 : need(c ? y1 + 1 - ay : ay - y0, T, bk[x], K);
+    }
+    spread(S2[0], W, B.fit[3]); spread(S2[1], W, B.fit[3]);
+    var out = new Uint8ClampedArray(W * H * 4);
+    for (x = 0; x < W; x++) {
+      var sa = S2[0][x], sb = S2[1][x], kx = bk[x];
+      remapLine(d, out, x, W, H, function (p) {
+        var u = p - ay, au = u < 0 ? -u : u;
+        return ay + (u < 0 ? -1 : 1) * (au - (1 - (u < 0 ? sa : sb)) * K * G(Math.max(0, au - kx) / K));
+      });
+    }
+    return out;
+  }
   // once per PNG: what each pixel is (cream body to retint, or ink, tongue, teeth and eye to keep),
   // its place on the ramp, and the fade into the ribbon
   function prepBeast(slot) {
@@ -409,6 +499,7 @@
       var cv = document.createElement('canvas'); cv.width = W; cv.height = H;
       var g = cv.getContext('2d'); g.drawImage(img, 0, 0); d = g.getImageData(0, 0, W, H).data;
     } catch (e) { beastBad[slot] = 1; return null; }   // a tainted canvas (file://): the drawn beast instead
+    if (B.fit) d = fitBeast(d, W, H, B);
     var N = W * H, Lm = new Float32Array(N), cream = new Uint8Array(N), i;
     for (i = 0; i < N; i++) {
       var r = d[i * 4], gg = d[i * 4 + 1], b = d[i * 4 + 2], mx = Math.max(r, gg, b), mn = Math.min(r, gg, b);
@@ -540,10 +631,35 @@
   }
   // how much of the art shows at (xa, ya), measured from the cut along and across the neck: none past the cut,
   // rising over the last stretch of the neck so the ribbon shows through there (the ears are never faded)
-  function beastFade(B, xa, ya) { return xa >= 0 ? 0 : ya < B.fy ? 1 : 1 - sstep(B.f0, B.f1, xa); }
+  function beastFade(B, xa, ya) {
+    var f = xa >= 0 ? 0 : ya < B.fy ? 1 : 1 - sstep(B.f0, B.f1, xa);
+    return B.fo ? f + (1 - f) * sstep(B.fo[0], B.fo[1], Math.abs(ya)) : f;
+  }
+  // one band px toward the page's light (top left) in a beast's source px, for its tile's quarter turn q (as in
+  // beastModel); Book II's flat crane moves its lit tone this way, as b2Shift moves the ribbon's
+  function beastLight(B, r, q) {
+    var an = q * Math.PI / 2, tx = -0.7071 * Math.cos(an) - 0.7071 * Math.sin(an), ty = 0.7071 * Math.sin(an) - 0.7071 * Math.cos(an);
+    var ix = -ty, iy = tx;
+    if (q === 0 || q === 3) iy = -iy;
+    var ax = ix / r, cp = Math.cos(B.phi), sp = Math.sin(B.phi);
+    return [cp * ax + sp * iy, -sp * ax + cp * iy];
+  }
   // the ramp a beast is retinted to: a painted strand's own, the bare vellum's, or one made from a flat colour
   function beastRamp(o) {
     var r = o.fill;
+    if (BOOK === 2 && r && (r.nmm || r.leaf != null || r.sh)) {
+      // Book II: the flat colours b2Paint and b2Gild lay on the ribbon (fl: the edge it deepens to, the body,
+      // the lit tone and its alpha, the sheen's alpha), so the crane runs on from its strand without a seam
+      var F;
+      if (r.nmm || r.leaf != null) {   // the leaf, or gilt dulled or draining (ribMix's leaf), as b2Gild has it
+        var lk = r.nmm ? 0 : r.leaf, LF = lk ? leafMix(r.leafTo, lk) : B2LEAF;
+        F = { edge: LF.edge, bd: LF.base, lit: LF.lit, la: 0.8, sheen: lk < 0.95 ? 1 - lk : 0 };
+      } else {
+        var rich = r.rich == null ? 1 : r.rich;
+        F = { edge: mix(r.sh, r.bd, 0.55), bd: r.bd, lit: mix(r.bd, r.lt, 0.45), la: 0.7, sheen: rich > 0.05 ? 0.6 * rich : 0 };
+      }
+      return { key: 'b2|' + F.edge + F.bd + F.lit + F.la + '|' + Math.round(F.sheen * 100), sh: F.edge, bd: F.bd, lt: F.lit, mo: 0, paint: true, fl: F };
+    }
     if (r && r.nmm) return { key: 'gilt', sh: r.sh, bd: r.bd, lt: r.lt, mo: 0, paint: true, gilt: r };
     if (r && r.sh) return { key: r.sh + r.bd + r.lt, sh: r.sh, bd: r.bd, lt: r.lt, mo: r.mo || 1, paint: true };
     if (o.flat) return { key: 'flat' + o.flat, sh: mix(o.flat, '#120800', 0.45), bd: o.flat, lt: mix(o.flat, '#fffbe8', 0.5) };
@@ -573,8 +689,10 @@
     var key = slot + '|' + ramp.key + '|' + Math.round(kc * 4000) + '|' + (rim ? rim.join(',') : '') + (ramp.paint && q != null ? '|q' + q : '');
     if (beastCache[key]) return beastCache[key];
     var P = prepBeast(slot); if (!P) return null;
-    var gilt = painted && ramp.gilt, Mo, CG, eF, hF, glint = null, gv = -1;
-    if (gilt) {   // the gilt's bands measured from the beast's outline, with the ribbon's pixel floors at this size
+    var fl = painted && BOOK === 2 ? ramp.fl || null : null;
+    var gilt = painted && ramp.gilt && !fl, Mo, CG, eF, hF, glint = null, gv = -1;
+    if (fl) Mo = null;   // Book II: laid flat (below), no tempera model
+    else if (gilt) {   // the gilt's bands measured from the beast's outline, with the ribbon's pixel floors at this size
       var wd = BEAST[slot].band * kc;   // the ribbon's width in device px
       eF = Math.round(Math.max(0.1, 1.4 / wd) * 200) / 200; hF = Math.round(Math.max(0.085, 1.6 / wd) * 200) / 200;
       Mo = beastModel(slot, q, giltLayers(eF, hF), eF + ',' + hF);
@@ -592,6 +710,17 @@
     var inkUp = !painted && ramp.key === 'bare' ? 0.6 : 0, IK = rgbOf(HAIR);
     if (painted) { S0 = rgbOf(ramp.sh); B0 = rgbOf(ramp.bd); L0 = rgbOf(ramp.lt); CT = rgbOf(mix(ramp.sh, HAIR, 0.3)); }
     if (gilt) CT = rgbOf(mix(ramp.gilt.bands[0], HAIR, 0.5));
+    // Book II: the band b2Paint/b2Gild lays, measured from the beast's outline. hw: the half width of the body
+    // in source px across (the art's band plus the rim's body, which together make the ribbon's body); the body
+    // deepens to the edge colour over its outer tenth, the lit tone lies where a copy moved toward the light
+    // shows past the inner four fifths, and the body fills the rest. Its outline takes the ribbon's ink
+    var FE, FB, FL, rimB = 0, fg = 0, fAA = 1, fux = 0, fuy = 0;
+    if (fl) {
+      FE = rgbOf(fl.edge); FB = rgbOf(fl.bd); FL = rgbOf(fl.lit); CT = rgbOf(B2INK);
+      rimB = rim && rim[4] === 'b2' ? rim[1] / kc : 0;
+      var fhw = B.band / 2 + rimB, fsh = Math.max(1.5 / kc, 0.14 * fhw), lv = beastLight(B, P.r, q);
+      fg = 0.2 * fhw; fAA = Math.max(0.5, 1 / kc); fux = lv[0] * fsh; fuy = lv[1] * fsh;
+    }
     for (i = 0; i < N; i++) {
       var qq = i * 4, a = P.fade[i] > 0 ? d[qq + 3] : 0;   // cut square at the neck; faded after the rim is on
       if (a < 1) { o[qq + 3] = 0; continue; }
@@ -601,7 +730,16 @@
         var ob = sstep(B.band / 2 + 3, B.band / 2 + 15, Math.abs(ya));   // out of the band (an ear): part of the head
         var xa = P.xa[i], hv = 1 - sstep(B.mod[0], B.mod[1], xa) * (1 - ob);   // 0 on the neck, 1 over the head
         var dl = (L - P.Lmed) / P.Lsp; dl = dl < -1 ? -1 : dl > 1 ? 1 : dl; dl = dl < 0 ? -Math.pow(-dl, 1.6) : Math.pow(dl, 1.6);
-        if (gilt) {   // the ribbon's bands run on up the neck; over the head the art's own light is laid in the same
+        if (fl) {
+          var De = P.D[i] + rimB, e0 = De / fg; e0 = e0 > 1 ? 1 : e0; e0 = e0 * e0 * (3 - 2 * e0);
+          pc[0] = FE[0] + (FB[0] - FE[0]) * e0; pc[1] = FE[1] + (FB[1] - FE[1]) * e0; pc[2] = FE[2] + (FB[2] - FE[2]) * e0;
+          var cs = (sampD(P, px - fux, py - fuy) + rimB - fg) / fAA + 0.5; cs = (cs < 0 ? 0 : cs > 1 ? 1 : cs) * fl.la;
+          if (cs > 0) { pc[0] += (FL[0] - pc[0]) * cs; pc[1] += (FL[1] - pc[1]) * cs; pc[2] += (FL[2] - pc[2]) * cs; }
+          var ci = (De - fg) / fAA + 0.5; ci = ci < 0 ? 0 : ci > 1 ? 1 : ci;
+          if (ci > 0) { pc[0] += (FB[0] - pc[0]) * ci; pc[1] += (FB[1] - pc[1]) * ci; pc[2] += (FB[2] - pc[2]) * ci; }
+          var fv = dl * B2_HEAD_LIGHT * hv, ft = fv < 0 ? FE : FL, fa = fv < 0 ? -fv : fv;   // a trace of the art's own light, over the head only
+          if (fa > 0) { pc[0] += (ft[0] - pc[0]) * fa; pc[1] += (ft[1] - pc[1]) * fa; pc[2] += (ft[2] - pc[2]) * fa; }
+        } else if (gilt) {   // the ribbon's bands run on up the neck; over the head the art's own light is laid in the same
           // hard steps (umber, red-brown, ochre, gold, pale gold), never blended softly between them
           var gv0 = Mo.m[i] * (1 - 0.4 * hv) + (1.2 + 1.6 * (dl + 1)) * 0.4 * hv;
           gv0 = gv0 < 0 ? 0 : gv0 > 5 ? 5 : gv0;
@@ -614,7 +752,7 @@
         var tg = v < 0 ? S0 : L0, av = v < 0 ? -v : v;
         pc[0] = B0[0] + (tg[0] - B0[0]) * av; pc[1] = B0[1] + (tg[1] - B0[1]) * av; pc[2] = B0[2] + (tg[2] - B0[2]) * av;
         }
-        var pa = gilt ? 0 : Mo.pen[i] * 0.5 * (1 - ob);
+        var pa = gilt || fl ? 0 : Mo.pen[i] * 0.5 * (1 - ob);
         if (pa > 0) { pc[0] += (PC[0] - pc[0]) * pa; pc[1] += (PC[1] - pc[1]) * pa; pc[2] += (PC[2] - pc[2]) * pa; }
         var kw = L >= 0.62 ? w : w * sstep(0.22, 0.62, L);   // the pixel's share of cream (an outline's soft edge: part)
         if (kw < 1) {
@@ -665,6 +803,10 @@
       if (rim[4] === 'b2') {   // Book II: a fine ink line, then the strand's own body colour, deepening outward
         var rb2 = ramp.key === 'bare' ? [RIB.bare.edge, RIB.bare.base] : ramp.gilt ? [B2LEAF.edge, B2LEAF.base] : [mix(ramp.bd, ramp.sh, 0.12), ramp.bd];
         rcols = [B2INK, rb2[0], mix(rb2[0], rb2[1], 0.6)];
+        if (fl) {   // the flat band's outer edge, at the depths the rim's two rings stand for (from its outline in)
+          var rB = rim[1] / kc, k1 = sstep(0, fg, 0.275 * rB), k2 = sstep(0, fg, 0.775 * rB);
+          rcols = [B2INK, mix(fl.edge, fl.bd, k1), mix(fl.edge, fl.bd, k2)];
+        }
       }
       [[rim[0], rcols[0]], [rim[1], rcols[1]], [rim[2], rcols[2]]].forEach(function (st) {
         if (!(st[0] > 0)) return;
@@ -712,6 +854,23 @@
     g.globalCompositeOperation = 'destination-in'; g.drawImage(c.mask, 0, 0);
     return (beastMot[key] = cv);
   }
+  // Book II: the ribbon's slanting sheen (b2Sheen's, laid in the page canvas's own pixels) cut to a flat beast's
+  // paint, so its glints run on across the neck and head. M: the copy's pixels to the device's; pcv: that canvas
+  var beastShn = {}, beastShnN = 0;
+  function beastSheen(c, M, pcv) {
+    if (!c.mask || !pcv || pcv.width < 2) return null;
+    var D = Math.max(pcv.width, pcv.height);
+    var key = c.key + '|' + D + '|' + [M.a, M.b, M.c, M.d, M.e, M.f].map(function (v) { return Math.round(v * 64); }).join(',');
+    if (beastShn[key] !== undefined) return beastShn[key];
+    if (++beastShnN > 160) { beastShn = {}; beastShnN = 1; }
+    var cv = document.createElement('canvas'); cv.width = c.cv.width; cv.height = c.cv.height;
+    var g = cv.getContext('2d');
+    try { var Mi = M.inverse(); g.setTransform(Mi.a, Mi.b, Mi.c, Mi.d, Mi.e, Mi.f); } catch (e) { return (beastShn[key] = null); }
+    var gr = g.createLinearGradient(0, 0, D, D * 0.6); b2SheenStops(gr);
+    g.fillStyle = gr; g.fillRect(-D, -D, 3 * D, 3 * D);
+    g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'destination-in'; g.drawImage(c.mask, 0, 0);
+    return (beastShn[key] = cv);
+  }
   // the scale of a painted beast in a tile of side 1: along its axis (fitted to the tile) and across it
   // (its band matched to the ribbon); null when the painted beast isn't ready
   function beastGeom(kind, band) {
@@ -749,7 +908,7 @@
     if (q == null) q = ((Math.round((o.angle || 0) / (Math.PI / 2)) % 4) + 4) % 4;
     var c0 = amt < 1 ? beastCanvas(slot, bare, kc, rim) : null, c1 = ramp && amt > 0 ? beastCanvas(slot, ramp, kc, rim, q) : null;
     if (!c0 && !c1) { if (!prepBeast(slot)) return false; }
-    if (!c1 && gilt && !o.mini) { warmBeast(slot, q); if (kind !== 'tail') warmBeast(BP + 'beast.headOpen', q); }
+    if (!c1 && gilt && !o.mini && BOOK !== 2) { warmBeast(slot, q); if (kind !== 'tail') warmBeast(BP + 'beast.headOpen', q); }
     var mir = q === 3 || q === 0;
     ctx.translate(x + w / 2, y + h / 2);
     if (o.q == null) ctx.rotate(o.angle || 0);
@@ -768,18 +927,25 @@
       if (!c) return;
       ctx.globalAlpha = i === 1 && c0 ? amt : 1;
       ctx.drawImage(c.cv, -c.pad / c.kc, -c.pad / c.kc, c.cv.width / c.kc, c.cv.height / c.kc);
-      if (i === 1 && still && !ramp.gilt) {   // the strand's mottle, pinned to the page, runs on over the beast
+      if (i === 1 && still && !ramp.gilt && !ramp.fl) {   // the strand's mottle, pinned to the page, runs on over the beast
         var Mc = ctx.getTransform().translate(-c.pad / c.kc, -c.pad / c.kc).scale(1 / c.kc), mot = beastMottle(c, Mc, dev);
         if (mot) {
           ctx.globalAlpha = Math.min(1, 0.75 * (ramp.mo || 1)) * (c0 ? amt : 1);
           ctx.drawImage(mot, -c.pad / c.kc, -c.pad / c.kc, c.cv.width / c.kc, c.cv.height / c.kc);
         }
       }
+      if (i === 1 && still && ramp.fl && ramp.fl.sheen > 0) {   // Book II: the ribbon's slanting sheen, fixed to the page
+        var Ms = ctx.getTransform().translate(-c.pad / c.kc, -c.pad / c.kc).scale(1 / c.kc), shn = beastSheen(c, Ms, ctx.canvas);
+        if (shn) {
+          ctx.globalAlpha = ramp.fl.sheen * (c0 ? amt : 1);
+          ctx.drawImage(shn, -c.pad / c.kc, -c.pad / c.kc, c.cv.width / c.kc, c.cv.height / c.kc);
+        }
+      }
     });
     ctx.globalAlpha = 1;
     if (kind !== 'tail' && o.blink > 0.6 && B.eye) {   // the lid drops over the eye
       var lr = amt >= 0.5 && ramp ? ramp : bare, ex = B.eye[0], ey = B.eye[1], er = B.eye[2] + 1.5;
-      ctx.fillStyle = lr.paint ? mix(lr.bd, lr.sh, 0.1) : beastAt(lr, 0.62); ctx.strokeStyle = lr.paint ? mix(lr.sh, HAIR, 0.3) : INK; ctx.lineWidth = 2.6; ctx.lineCap = 'round';
+      ctx.fillStyle = lr.paint ? mix(lr.bd, lr.sh, 0.1) : beastAt(lr, 0.62); ctx.strokeStyle = lr.fl ? B2INK : lr.paint ? mix(lr.sh, HAIR, 0.3) : INK; ctx.lineWidth = 2.6; ctx.lineCap = 'round';
       ctx.beginPath(); ctx.arc(ex, ey, er, 0, 6.2832); ctx.fill(); ctx.stroke();
       ctx.lineWidth = 3.4; ctx.beginPath(); ctx.moveTo(ex - er * 0.95, ey + 1); ctx.quadraticCurveTo(ex, ey + er * 0.6, ex + er * 0.95, ey + 1); ctx.stroke();
     }
@@ -1276,11 +1442,43 @@
   function b2Sprays(M, S, pad, band, initial, x0, y0) {
     var inm = M.kinds.map(function (k) { return k !== ' '; }), rect = inm.every(Boolean);
     if (initial && M.level && M.level.initial) { inm = inm.map(function () { return true; }); rect = true; }
-    var G = frameGeom(M.w, M.h, inm, S, x0 + pad, y0 + pad, 0), bb = b2Bar(band);   // square, as the board's ground is
-    // cands: for each diagonal, the corners facing it on the shape's outer edge (a stepped or cross-shaped board
-    // has several within a cell or so of each other); b2Margin takes the one with the most room
-    return { size: Math.max(80, Math.min(240, 0.3 * Math.min(M.w, M.h) * S)), pts: G.corners(bb.off + bb.t / 2, true),
-      cands: rect ? null : G.corners(bb.off + bb.t / 2, true, S * 1.6) };
+    var G = frameGeom(M.w, M.h, inm, S, x0 + pad, y0 + pad, 0), bb = b2Bar(band), off = bb.off + bb.t / 2;   // square, as the board's ground is
+    var size = Math.max(80, Math.min(240, 0.3 * Math.min(M.w, M.h) * S));
+    var cx = x0 + pad + M.w * S / 2, cy = y0 + pad + M.h * S / 2;
+    // where all four won't fit, two: the top two or the bottom two (mirror images across the board), else two
+    // opposite corners (turned half round the board's centre, as a diagonal band is), the nearest to true first
+    var pairsOf = function (P, all) {
+      var out = [];
+      [[0, 1, 0], [3, 2, 0], [1, 3, 1], [0, 2, 1]].forEach(function (t) {
+        (all ? P[t[0]] : [P[t[0]]]).forEach(function (p) { (all ? P[t[1]] : [P[t[1]]]).forEach(function (q) {
+          var cost = t[2] ? Math.abs(p.x + q.x - 2 * cx) + Math.abs(p.y + q.y - 2 * cy) : Math.abs(p.y - q.y) + Math.abs(p.x + q.x - 2 * cx);
+          out.push({ ci: [t[0], t[1]], p: [p, q], cost: cost, diag: t[2] });
+        }); });
+      });
+      return out;
+    };
+    if (rect) { var R = G.corners(off, true); return { size: size, pts: R, pairs: pairsOf(R) }; }
+    // a stepped or cross-shaped board has several corners facing each diagonal within a cell or so of the
+    // outermost. One of each, chosen from the shape alone (the same on every screen): the four that are most
+    // nearly mirror images of each other (the two top ones level, the two bottom ones level, each side's two
+    // one above the other); on a tie the widest four (a cross's side arms), then the outermost
+    var L = G.corners(off, true, S * 1.6), best = null, bk = null, sets = [];
+    L[0].forEach(function (a) { L[1].forEach(function (b) { L[2].forEach(function (c) { L[3].forEach(function (d) {
+      var k = [Math.abs(a.y - b.y) + Math.abs(d.y - c.y) + Math.abs(a.x - d.x) + Math.abs(b.x - c.x), -(b.x - a.x + c.x - d.x),
+        a.x + a.y - b.x + b.y - c.x - c.y + d.x - d.y];
+      sets.push({ k: k, p: [a, b, c, d] });
+      for (var i = 0; i < 3 && bk; i++) if (Math.abs(k[i] - bk[i]) > 0.5) break;
+      if (!bk || (i < 3 && k[i] < bk[i])) { bk = k; best = [a, b, c, d]; }
+    }); }); }); });
+    if (!best) { var C = G.corners(off, true); return { size: size, pts: C, pairs: pairsOf(C) }; }
+    // a board that is its own mirror image keeps those four corners (fewer if they lack room, never others);
+    // a lopsided one (a diagonal band) may try its next-best fours, then any two of its corners
+    var asym = bk[0] > 0.5, cmp = function (s, t) { for (var i = 0; i < 3; i++) if (Math.abs(s.k[i] - t.k[i]) > 0.5) return s.k[i] - t.k[i]; return 0; };
+    var alt = asym ? sets.filter(function (s) { return s.p.some(function (c, i) { return c !== best[i]; }); }).sort(cmp).slice(0, 24).map(function (s) { return s.p; }) : [];
+    var pairs = pairsOf(best).concat(asym ? pairsOf(L, true) : []);
+    pairs.forEach(function (p, i) { p.n = i; });
+    pairs.sort(function (s, t) { return Math.abs(s.cost - t.cost) > 0.5 ? s.cost - t.cost : s.diag - t.diag || s.n - t.n; });
+    return { size: size, pts: best, alt: alt, pairs: pairs };
   }
   // the painted gilt bar laid along each edge of the frame's outline at offset off, t thick: the painting
   // averaged along its length into one cross-section, stretched along each edge (clipped to its mitred quad,
@@ -1491,8 +1689,9 @@
     }
     if (!rib) return;
     if (dash) ctx.setLineDash(dash);
-    if (rib.nmm) { b2Gild(ctx, path, Wb, rib, dash, fx, px); if (dash) ctx.setLineDash([]); return; }
-    if (rib.sh) { paintBody(ctx, path, Wb, S, rib, dash, fx); if (dash) ctx.setLineDash([]); return; }
+    // (gilt dulled or draining, ribMix's leaf: still the flat leaf, fading toward the bare band, never the tube)
+    if (rib.nmm || rib.leaf != null) { b2Gild(ctx, path, Wb, rib, dash, fx, px); if (dash) ctx.setLineDash([]); return; }
+    if (rib.sh) { b2Paint(ctx, path, Wb, rib, dash, fx, px); if (dash) ctx.setLineDash([]); return; }
     // a flat painted band of warm vellum: level across, softening to a deeper tone only over its outer
     // eighth (fine strokes about a pixel apart, each an equal step of colour, so no band shows)
     var n = fx.mini ? 2 : Math.max(5, Math.min(18, Math.round(Wb * 0.07 / px))), inner = Wb * 0.86;
@@ -1521,13 +1720,17 @@
   }
   // Book II's gold: flat burnished leaf laid on the band, as in a Book of Hours. A warm gold body that deepens
   // a little over its outer fifth, a broad paler edge toward the light, soft burnish glints that slant across
-  // the whole board (one sheen for every strand, fixed to the page, so they line up from tile to tile) and a
-  // faint row of punched dots down the middle. The ribbon's own fine ink line outlines it
-  var B2LEAF = { edge: '#a9792b', base: '#d2a345', lit: '#e6c068', dot: 'rgba(104,64,18,0.3)' };
+  // the whole board (one sheen for every strand, fixed to the page, so they line up from tile to tile). The
+  // ribbon's own fine ink line outlines it
+  var B2LEAF = { edge: '#a9792b', base: '#d2a345', lit: '#e6c068' };
   function b2Sheen(ctx) {
     var m = ctx.getTransform(), cv = ctx.canvas, D = Math.max(cv.width, cv.height), q = m.inverse();
     function loc(x, y) { return [q.a * x + q.c * y + q.e, q.b * x + q.d * y + q.f]; }
-    var p0 = loc(0, 0), p1 = loc(D, D * 0.6), gr = ctx.createLinearGradient(p0[0], p0[1], p1[0], p1[1]), N = 7;
+    var p0 = loc(0, 0), p1 = loc(D, D * 0.6), gr = ctx.createLinearGradient(p0[0], p0[1], p1[0], p1[1]);
+    return b2SheenStops(gr);
+  }
+  function b2SheenStops(gr) {   // (shared with the flat beasts, beastSheen)
+    var N = 7;
     gr.addColorStop(0, 'rgba(255,238,184,0)');
     for (var k = 0; k < N; k++) {
       var c = (k + 0.5 + 0.3 * Math.sin(k * 2.7)) / N, hw = 0.022 + 0.012 * ((k * 5) % 3), a = 0.22 + 0.12 * ((k * 3) % 2);
@@ -1541,23 +1744,40 @@
   function b2Gild(ctx, path, w, rib, dash, fx, px) {
     function st(col, wid) { ctx.strokeStyle = col; ctx.lineWidth = wid; ctx.beginPath(); path(ctx); ctx.stroke(); }
     ctx.lineCap = 'butt';
+    var lk = rib.leaf || 0, LF = lk ? leafMix(rib.leafTo, lk) : B2LEAF;
     var n = fx.mini ? 2 : Math.max(5, Math.min(20, Math.round(w * 0.1 / px))), inner = w * 0.8;
     for (var i = 0; i < n; i++) {
       var t = i / n, e = t * t * (3 - 2 * t);
-      st(mix(B2LEAF.edge, B2LEAF.base, e), w * (1 - 0.2 * t));
+      st(mix(LF.edge, LF.base, e), w * (1 - 0.2 * t));
     }
-    if (fx.mini) { st(B2LEAF.base, inner); return; }
+    if (fx.mini) { st(LF.base, inner); return; }
     var sh = b2Shift(ctx, path, fx, dash);
-    ctx.globalAlpha = 0.8; sh(B2LEAF.lit, inner, Math.max(1.5 * px, w * 0.07)); ctx.globalAlpha = 1;
-    st(B2LEAF.base, inner);
-    if (ctx.getTransform && window.DOMMatrix) st(b2Sheen(ctx), w * 0.9);
-    if (!dash && fx.len) {   // punched dots, spaced evenly along each tile's length
-      var sp = Math.max(5 * px, w * 0.5), k = Math.max(1, Math.round(fx.len / sp));
-      sp = fx.len / k;
-      ctx.save(); ctx.lineCap = 'round'; ctx.setLineDash([0.01, sp]); ctx.lineDashOffset = -sp / 2;
-      st(B2LEAF.dot, Math.max(1.4 * px, w * 0.075));
-      ctx.restore();
+    ctx.globalAlpha = 0.8; sh(LF.lit, inner, Math.max(1.5 * px, w * 0.07)); ctx.globalAlpha = 1;
+    st(LF.base, inner);
+    if (lk < 0.95 && ctx.getTransform && window.DOMMatrix) { ctx.globalAlpha = 1 - lk; st(b2Sheen(ctx), w * 0.9); ctx.globalAlpha = 1; }
+  }
+  // the leaf part way to another band (ribMix of gilt: a dull or draining gilt strand)
+  function leafMix(to, k) {
+    return { edge: mix(B2LEAF.edge, to.edge, k), base: mix(B2LEAF.base, to.base, k), lit: mix(B2LEAF.lit, to.light, k) };
+  }
+  // Book II's coloured strands, laid flat in the same way as its gold: a level body of the pigment that deepens
+  // a little over its outer fifth, a soft tone of its tint along the lit edge, and the same slanting sheen,
+  // fainter on the paint than on the leaf. No modelling stripe and no penwork. A dull or draining strand
+  // (ribMix: rich below 1) loses the sheen with its colour
+  function b2Paint(ctx, path, w, rib, dash, fx, px) {
+    function st(col, wid) { ctx.strokeStyle = col; ctx.lineWidth = wid; ctx.beginPath(); path(ctx); ctx.stroke(); }
+    ctx.lineCap = 'butt';
+    var rich = rib.rich == null ? 1 : rib.rich, edge = mix(rib.sh, rib.bd, 0.55);
+    var n = fx.mini ? 2 : Math.max(5, Math.min(20, Math.round(w * 0.1 / px))), inner = w * 0.8;
+    for (var i = 0; i < n; i++) {
+      var t = i / n, e = t * t * (3 - 2 * t);
+      st(mix(edge, rib.bd, e), w * (1 - 0.2 * t));
     }
+    if (fx.mini) { st(rib.bd, inner); return; }
+    var sh = b2Shift(ctx, path, fx, dash);
+    ctx.globalAlpha = 0.7; sh(mix(rib.bd, rib.lt, 0.45), inner, Math.max(1.5 * px, w * 0.07)); ctx.globalAlpha = 1;
+    st(rib.bd, inner);
+    if (rich > 0.05 && ctx.getTransform && window.DOMMatrix) { ctx.globalAlpha = 0.6 * rich; st(b2Sheen(ctx), w * 0.9); ctx.globalAlpha = 1; }
   }
   function ribLayers(ctx, path, w, S, rib, edges, dash, stripe, fx) {
     var tm = ctx.getTransform ? ctx.getTransform() : { a: 1, b: 0 }, px = 1 / Math.max(1, Math.hypot(tm.a, tm.b));
@@ -1596,6 +1816,9 @@
       o.sh = mix(A.sh, Bb.sh, t); o.bd = mix(A.bd, Bb.bd, t); o.lt = mix(A.lt, Bb.lt, t);
       o.rich = (A.rich == null ? 1 : A.rich) * (1 - t) + (Bb.rich == null ? 1 : Bb.rich) * t;
     }
+    // gilt part way to b: Book II keeps drawing it as leaf (b2Gild), not as paint (Book I reads only sh/bd/lt)
+    if (a.nmm) { o.leaf = t; o.leafTo = b; }
+    else if (a.leaf != null) { o.leaf = a.leaf + (1 - a.leaf) * t; o.leafTo = b; }
     return o;
   }
 
@@ -2696,8 +2919,8 @@
     ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     // the sprays first, so the vine breaks round them. Each grows out of the gilt bar's outer corner: two painted
     // sprays, one hugging the outside of each arm of the bar, their roots in a gilt calyx the bar runs into.
-    // One size for the page, the largest every corner that takes a spray has room for (the text, drollery and
-    // page edge kept clear); a corner with no room for even a small one gets a hairline tendril alone
+    // The four are mirror images at one size, the largest all four have room for (the text, drollery and page
+    // edge kept clear); a corner left without one gets a hairline tendril alone
     var SP = opt && opt.sprays, sprays = [], bare = [], occ2 = null, occS = new Uint8Array(gw * gh);
     if (SP && images['b2.frame.corner.1']) {
       occ2 = new Uint8Array(gw * gh);
@@ -2722,42 +2945,51 @@
         });
         return ok ? out : null;
       };
-      var steps = [1, 0.88, 0.77, 0.67, 0.58, 0.5, 0.43, 0.37], base = SP.size * 0.74, pts = SP.pts.slice();
-      // per diagonal, every corner that could take a spray (a stepped or cross-shaped board has several) and the
-      // sizes each has room for; then the page's one size is the largest that the most diagonals can take, and
-      // each diagonal uses its roomiest corner that fits it (the outermost on a tie). The two smallest sizes only
-      // when nothing larger fits anywhere: two good sprays read better than four crammed against the page edge
-      var grid = pts.map(function (c, ci) {
-        var L = [c].concat((SP.cands && SP.cands[ci] || []).filter(function (o) { return Math.hypot(o.x - c.x, o.y - c.y) > 1; }));
-        return L.map(function (o) { return { c: o, f: steps.map(function (st) { return fit(o, ci, base * st); }) }; })
-          .map(function (e, i) { e.i = i; e.b = e.f.findIndex(Boolean); if (e.b < 0) e.b = 99; return e; })
-          .sort(function (a, b) { return a.b - b.b || a.i - b.i; });
-      });
-      var si = 0, cnt = -1;
-      steps.forEach(function (st, s) { var k = grid.filter(function (L) { return L.some(function (e) { return e.f[s]; }); }).length; if (k > cnt && (s < 6 || cnt < 1)) { cnt = k; si = s; } });
+      var steps, base = SP.size * 0.74, pts = SP.pts;
       var spR = function (f) { return Math.max(f.arms[0].art.st * f.arms[0].k, f.arms[1].art.st * f.arms[1].k) * 0.6 + 2; };
+      // on a phone, no spray reaches into the heading
       var inHd = function (f) {
         if (!f || !hd) return false;
         for (var n = 0, rr = spR(f); n < f.P.length; n += 2) if (f.P[n] > hd[0] - rr && f.P[n] < hd[2] + rr && f.P[n + 1] > hd[1] - rr && f.P[n + 1] < hd[3] + rr) return true;
         return false;
       };
-      grid.forEach(function (L, ci) {
-        var e = L.filter(function (e) { return e.f[si]; })[0];
-        if (!e) { bare.push(L[0].c); return; }
-        var f = e.f[si];
-        // on a phone, a spray that would reach into the heading shrinks (to 0.6 of the page's size at most), then
-        // slides along the board's side away from the heading or out past its corner; one that still can't clear
-        // leaves a bare tendril
-        if (inHd(f)) {
-          var c0 = e.c, sw0 = base * steps[si], g = null;
-          [0.9, 0.8, 0.7, 0.6].some(function (m) { g = fit(c0, ci, sw0 * m); return g && !inHd(g) ? true : (g = null, false); });
-          for (var k = 1; !g && k * 3 <= sw0 * 0.5; k++) {
-            var dy = c0.y < hd[3] + sw0 ? 1 : -1, dx = c0.x < W / 2 ? -1 : 1;
-            [[0, dy], [dx, 0]].some(function (v) { g = fit(Object.assign({}, c0, { x: c0.x + v[0] * k * 3, y: c0.y + v[1] * k * 3 }), ci, sw0 * 0.6); return g && !inHd(g) ? true : (g = null, false); });
-          }
-          if (!g) { bare.push(c0); return; }
-          f = g;
+      // the sprays at a set of b2Sprays' corners (indices), all one size: the largest every one of them has room
+      // for, down to the smallest of steps (0.6 of the page's size at first); null if even that doesn't fit them all
+      var together = function (set, P) {
+        for (var s = 0; s < steps.length; s++) {
+          var F = [];
+          for (var q = 0; q < set.length; q++) { var f = fit(P[q], set[q], base * steps[s]); if (!f || inHd(f)) break; f.ci = set[q]; F.push(f); }
+          if (F.length === set.length) return F;
         }
+        return null;
+      };
+      // the four corners shrink together, so they stay mirror images (a lopsided board may try its next-best
+      // four); where even the smallest won't fit four, a pair (b2Sprays' pairs, the truest first; of those as
+      // true, the one with room for the larger) and bare tendrils at the others
+      // A board tall enough to leave no room for even a pair at that size (a 9-row page on a desktop) takes them
+      // smaller still, the four together first as before, rather than none
+      var got = null, all4 = [0, 1, 2, 3], pts0 = pts;
+      [[1, 0.94, 0.88, 0.82, 0.77, 0.72, 0.67, 0.63, 0.6], [0.55, 0.5, 0.45, 0.43, 0.4, 0.37]].some(function (st) {
+        steps = st; pts = pts0;
+        if (pts.length !== 4) return (got = together(pts.map(function (c, i) { return i; }), pts));
+        [pts].concat(SP.alt || []).some(function (P) { got = together(all4, P); if (got) pts = P; return got; });
+        if (got) return got;
+        pts = pts0;
+        for (var g0 = 0; g0 < (SP.pairs || []).length && !got; ) {
+          var g1 = g0;
+          while (g1 < SP.pairs.length && Math.abs(SP.pairs[g1].cost - SP.pairs[g0].cost) <= 0.5 && SP.pairs[g1].diag === SP.pairs[g0].diag) {
+            var tg = together(SP.pairs[g1].ci, SP.pairs[g1].p);
+            if (tg && (!got || tg[0].sw > got[0].sw)) got = tg;
+            g1++;
+          }
+          g0 = g1;
+        }
+        return got;
+      });
+      got = got || [];
+      pts.forEach(function (c, ci) {
+        var f = got.filter(function (g) { return g.ci === ci; })[0];
+        if (!f) { bare.push(c); return; }
         var rr = spR(f);
         for (var n = 0; n < f.P.length; n += 2) { mark(f.P[n] - rr, f.P[n + 1] - rr, f.P[n] + rr, f.P[n + 1] + rr); markIn(occS, f.P[n] - rr, f.P[n + 1] - rr, f.P[n] + rr, f.P[n + 1] + rr); }
         sprays.push(f);
@@ -2926,7 +3158,7 @@
     ctx.restore();
     // what was laid, for checking the layout from the console
     ivyPage.last = { narrow: narrow, W: W, H: H, lr: lr, hud: hudB, hd: hd, avoid: avoid, runs: runs, leaves: leaves, curls: curls, flowers: stems, bare: bare,
-      sprays: sprays.map(function (f) { return { x: f.c.x, y: f.c.y, sw: f.sw, r: Math.max(f.arms[0].art.st * f.arms[0].k, f.arms[1].art.st * f.arms[1].k) * 0.6 + 2, P: f.P }; }) };
+      sprays: sprays.map(function (f) { return { ci: f.ci, x: f.c.x, y: f.c.y, sw: f.sw, r: Math.max(f.arms[0].art.st * f.arms[0].k, f.arms[1].art.st * f.arms[1].k) * 0.6 + 2, P: f.P }; }) };
     return true;
   }
   // lays the painted ivy for one page into ctx (the cached page background): a spray in each corner that has

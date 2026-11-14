@@ -315,6 +315,20 @@
       return cells;
     });
   }
+  /* The same breaks as stretches of ribbon, for the board's correction marks: for strand i, out[i] = [a, b]
+     index pairs into its pieces (two crossing visits that are both over or both under, with the joined,
+     unbroken stretch running forward from a to b, round the loop when b < a). A strand's pieces are always
+     one connected run, so this checks an open strand's stretches as soon as they join, before it closes. */
+  function weaveBreakSpans(M, tr, rots, ws) {
+    return tr.strands.map(function (s) {
+      var out = [];
+      visitPairs(M, s).forEach(function (pr) {
+        var a = pr[0], b = pr[1];
+        if (over(M, rots, ws, a.c, a.p) === over(M, rots, ws, b.c, b.p)) out.push([s.pieces.indexOf(a), s.pieces.indexOf(b)]);
+      });
+      return out;
+    });
+  }
   /* The weave a finished arrangement allows: crossings linked along strands into components; each
      component alternates one way or the other, or not at all; an inked crossing fixes its component.
      Returns { ways (0, 1, 2, 4… capped at cap), ws (one alternating weave, inked values honoured),
@@ -470,7 +484,7 @@
     prepare: prepare, neighbor: neighbor, trace: trace, isSolved: isSolved, solve: solve,
     cellRight: cellRight, wrongCells: wrongCells, weave: weave,
     // Book II
-    solModel: solModel, withKinds: withKinds, over: over, weaveBreaks: weaveBreaks, weaveSolve: weaveSolve,
+    solModel: solModel, withKinds: withKinds, over: over, weaveBreaks: weaveBreaks, weaveBreakSpans: weaveBreakSpans, weaveSolve: weaveSolve,
     solved2: solved2, cellRight2: cellRight2, wrong2: wrong2, solve2: solve2
   };
 });

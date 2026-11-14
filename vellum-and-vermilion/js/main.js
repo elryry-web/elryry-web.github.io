@@ -18,7 +18,7 @@
   };
   // Book II's cards (placeholders until phase 3 writes them)
   if (B2) RULES = {
-    1: { title: 'Over and Under', text: 'Tap a crossing to swap which ribbon lies on top. Every ribbon must go over, then under, all the way round. Crossings drawn in firm ink stay as they are.' },
+    1: { title: 'Over and Under', text: 'Tap a crossing to swap which ribbon lies on top. A ribbon goes over, then under, then over, all the way along. Crossings with an ink dot are fixed. Start there and work outward. A red slash marks two crossings in a row that go the same way. Flip one of them.' },
     2: { title: 'Loose Leaves', text: 'Pale tiles with a torn edge are loose leaves. Drag one onto another to swap them. A tap still turns it.' },
     3: { title: 'Sext', text: 'Both rules together. Some loose leaves are crossings.' },
     4: { title: 'Vespers', text: 'The new rules with the pigments, the beasts and the gilded twins.' },
@@ -392,8 +392,15 @@
     var gold = ART.PIG.gold.base, lap = ART.PIG.lapis.base;
     function loop(cx, cy, r, col) { ART.ribbon(g, function (gg) { gg.arc(cx, cy, r, 0, 6.283); }, 9, col); }
     if (q === 1 && !B2) { loop(70, 40, 24, gold); loop(130, 40, 24, gold); }
-    else if (B2 && q <= 4) {
-      // Book II placeholders: two rings woven over and under (q 1, 3, 4), and a loose leaf (q 2, 3, 4)
+    else if (B2 && q === 1) {
+      // one gold ribbon passing over, under, over three blue ones; the first crossing is inked (its dot)
+      var xs = [50, 100, 150], vert = function (x) { ART.ribbon(g, function (gg) { gg.moveTo(x, 6); gg.lineTo(x, 74); }, 9, lap); };
+      vert(xs[0]); vert(xs[2]);
+      ART.ribbon(g, function (gg) { gg.moveTo(12, 40); gg.lineTo(188, 40); }, 9, gold);
+      vert(xs[1]);
+      g.fillStyle = ART.HAIR; g.beginPath(); g.arc(xs[0], 40, 2.6, 0, 6.283); g.fill();
+    } else if (B2 && q <= 4) {
+      // Book II placeholders: two rings woven over and under (q 3, 4), and a loose leaf (q 2, 3, 4)
       if (q !== 2) {
         ART.ribbon(g, function (gg) { gg.arc(78, 40, 24, 0, 6.283); }, 9, gold);
         ART.ribbon(g, function (gg) { gg.arc(122, 40, 24, 0, 6.283); }, 9, lap);

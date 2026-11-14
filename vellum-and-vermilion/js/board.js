@@ -23,7 +23,7 @@
   var TURN_MS = 170, PRESS_MS = 450, DRAIN_MS = 420, ILLUM_MS = 2500;
   // Book II: a crossing's lift-and-swap, a loose leaf's slide home, a strand's fade to dull and back,
   // the distance a finger moves a leaf before it is dragged rather than tapped
-  var XFX_MS = 180, SLIDE_MS = 180, DULL_MS = 300, DRAG_PX = 12, CARET_MS = 250;
+  var XFX_MS = 180, SLIDE_MS = 180, DULL_MS = 300, DRAG_PX = 12, MARK_MS = 250;
 
   function easeOutBack(t) { var c1 = 1.5, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); }
   function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
@@ -49,7 +49,7 @@
   B.setLevel = function (level, saved) {
     saved = saved || {};
     var M = this.M = P.prepare(level);
-    this.xfx = {}; this.slide = {}; this.drag = null; this.breakCells = []; this.caretAt = {}; this._leafPaths = {};
+    this.xfx = {}; this.slide = {}; this.drag = null; this.breakCells = []; this.marks = []; this.markAt = {}; this._leafPaths = {};
     if (M.b2) this._restore2(saved); else this.weave = P.weave(M);
     this.isInitial = !!level.initial;
     this.groundName = ART.groundName(level); this.ground = ART.ground(this.groundName);
@@ -71,14 +71,13 @@
     this.tr = P.trace(M, this.rots);
     var t0 = saved.solved ? -1e9 : now() - 1e6;   // whole strands from a reload show already flooded
     this._jewels();
-    var br = M.b2 ? P.weaveBreaks(M, this.tr, this.rots, this.weave) : null, bc = {};
+    var br = M.b2 ? P.weaveBreaks(M, this.tr, this.rots, this.weave) : null;
     this.tr.strands.forEach(function (s, si) {
       if (!s.whole) return;
       var f = this.flood[s.key] = { t0: t0, origin: 0, color: s.color, disp: this._disp(s) };
-      if (br) { f.dull = br[si].length > 0; f.dt0 = -1e9; br[si].forEach(function (c) { bc[c] = 1; }); }
+      if (br) { f.dull = br[si].length > 0; f.dt0 = -1e9; }
     }, this);
-    this.breakCells = Object.keys(bc).map(Number);
-    this.breakCells.forEach(function (c) { this.caretAt[c] = -1e9; }, this);
+    if (M.b2) this._weaveMarks(-1e9);
     if (M.b2 ? P.solved2(M, this.rots, this.weave, this.tr) : this.tr.solved) { this.solved = true; this.locked = true; this.illum = { t0: -1e9 }; }
     this.letter = null;
     this.fit(this.fitW || 300, this.fitH || 300);
@@ -492,13 +491,12 @@
   B._refresh = function (origin) {
     var M = this.M, tr = this.tr = P.trace(M, this.rots), t = now(), self = this;
     var nowWhole = {}, bursts = 0;
-    // Book II: a whole strand whose weave breaks floods dull, with a caret on each breaking crossing
-    var br = M.b2 ? P.weaveBreaks(M, tr, this.rots, this.weave) : null, bc = {};
+    // Book II: a whole strand whose weave breaks floods dull (its correction marks: _weaveMarks)
+    var br = M.b2 ? P.weaveBreaks(M, tr, this.rots, this.weave) : null;
     tr.strands.forEach(function (s, si) {
       if (!s.whole) return;
       nowWhole[s.key] = 1;
       var dull = !!(br && br[si].length);
-      if (dull) br[si].forEach(function (c) { bc[c] = 1; });
       var f0 = self.flood[s.key];
       if (f0 && br && !!f0.dull !== dull) {   // the weave on a whole strand changed: fade to dull or burnish
         f0.dull = dull; f0.dt0 = t; self.busy(DULL_MS + 100);
@@ -540,12 +538,7 @@
       self.busy(DRAIN_MS + 50);
       if (self.cb.onStrandBroken && !f.dull) self.cb.onStrandBroken(f.color);
     });
-    if (br) {
-      var old = this.caretAt; this.caretAt = {};
-      this.breakCells = Object.keys(bc).map(Number);
-      this.breakCells.forEach(function (c) { self.caretAt[c] = old[c] !== undefined ? old[c] : t; });
-      if (this.breakCells.length) this.busy(CARET_MS + 50);
-    }
+    if (br) this._weaveMarks(t);
     if ((br ? P.solved2(M, this.rots, this.weave, tr) : tr.solved) && !this.solved) {
       this.solved = true; this.locked = true;
       if (this.cb.onSolved) setTimeout(function () { self.cb.onSolved(); }, 260);
@@ -893,7 +886,7 @@
         g.strokeRect(tx + ins, ty + ins, S - 2 * ins, S - 2 * ins);
       }
       flList.forEach(function (q) { self._drawTile(g, q, t); });
-      this._drawCarets(g, t);
+      this._drawMarks(g, t);
     }
     // faint glow where ends have met but the strand isn't whole yet (Book I only: on Book II's pale strands it
     // read as a yellow stain, and its ribbons show a met end plainly)
@@ -930,21 +923,62 @@
     var M = this.M, S = this.S;
     ART.draw(g, 'twinEmblem', this.pad + (m % M.w) * S + S * 0.085, this.pad + (m / M.w | 0) * S + S * 0.085, S * 0.15, S * 0.15, t, { kind: gi, glow: glow });
   };
-  // Book II: the scribe's correction mark, a small upright vermilion caret on each crossing where a whole
-  // strand's weave breaks (it fades in, and follows a crossing leaf as it moves)
-  B._drawCarets = function (g, t) {
-    var M = this.M, S = this.S, self = this;
-    if (!this.breakCells.length || this.solved) return;
-    g.save(); g.lineJoin = 'miter'; g.lineCap = 'round';
-    this.breakCells.forEach(function (c) {
-      var k = clamp((t - (self.caretAt[c] || 0)) / CARET_MS, 0, 1), off = self._offset(c, t);
+  /* Book II: the scribe's correction mark. Wherever two crossings in a row along a ribbon both go over or both
+     go under, one small vermilion slash crosses the ribbon midway along the stretch between them. Any stretch
+     whose tiles already join is checked (a strand's pieces are one joined run), so a mark shows while the
+     strand is still open. Each mark is kept in board units, with the cell(s) whose drag offset it follows,
+     and fades in once (markAt, by the pair of crossing visits). breakCells: the crossings of every mark. */
+  B._weaveMarks = function (t) {
+    var M = this.M, tr = this.tr, old = this.markAt, self = this, cells = {};
+    var spans = P.weaveBreakSpans(M, tr, this.rots, this.weave);
+    this.marks = []; this.markAt = {};
+    function ctr(c) { return [(c % M.w) + 0.5, (c / M.w | 0) + 0.5]; }
+    tr.strands.forEach(function (s, si) {
+      var pc = s.pieces, N = pc.length;
+      spans[si].forEach(function (sp) {
+        var i = sp[0], j = sp[1], L = ((j - i) % N + N) % N;
+        if (!L) return;
+        var A = pc[i], Bq = pc[j], key = A.c + ':' + A.p + '>' + Bq.c + ':' + Bq.p, x, y, tx, ty, follow;
+        cells[A.c] = 1; cells[Bq.c] = 1;
+        if (L % 2) {   // the middle falls on the join between two tiles: the shared edge's midpoint
+          var q0 = pc[(i + (L - 1) / 2) % N].c, q1 = pc[(i + (L + 1) / 2) % N].c, a0 = ctr(q0), a1 = ctr(q1);
+          x = (a0[0] + a1[0]) / 2; y = (a0[1] + a1[1]) / 2; tx = a1[0] - a0[0]; ty = a1[1] - a0[1]; follow = [q0, q1];
+        } else {       // the middle of one tile's piece: its centre (straight) or the middle of its quarter arc
+          var m = (i + L / 2) % N, c = pc[m].c, o = ctr(c), pv = ctr(pc[(m - 1 + N) % N].c), nx = ctr(pc[(m + 1) % N].c);
+          var e0 = [(pv[0] + o[0]) / 2, (pv[1] + o[1]) / 2], e1 = [(nx[0] + o[0]) / 2, (nx[1] + o[1]) / 2];
+          tx = e1[0] - e0[0]; ty = e1[1] - e0[1]; x = o[0]; y = o[1];
+          if (Math.abs(tx) > 1e-6 && Math.abs(ty) > 1e-6) {   // a corner: the arc round the cell corner K, radius half a cell
+            var K = [e0[0] + e1[0] - o[0], e0[1] + e1[1] - o[1]];
+            x = K[0] + (o[0] - K[0]) * Math.SQRT1_2; y = K[1] + (o[1] - K[1]) * Math.SQRT1_2;
+          }
+          follow = [c];
+        }
+        var tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl;
+        if (tx < -1e-6 || (Math.abs(tx) <= 1e-6 && ty < 0)) { tx = -tx; ty = -ty; }   // every slash leans the same way
+        self.marks.push({ key: key, x: x, y: y, tx: tx, ty: ty, follow: follow });
+        self.markAt[key] = old[key] !== undefined ? old[key] : t;
+      });
+    });
+    this.breakCells = Object.keys(cells).map(Number);
+    if (this.marks.length && t > 0) this.busy(MARK_MS + 50);   // (a restore passes t = -1e9: no fade)
+  };
+  B._drawMarks = function (g, t) {
+    var S = this.S, self = this;
+    if (!this.marks.length || this.solved) return;
+    var rw = S * 0.36, ed = this._edges(), half = rw / 2 + ed.E + ed.HL;
+    g.save(); g.lineCap = 'round';
+    this.marks.forEach(function (mk) {
+      var k = clamp((t - (self.markAt[mk.key] || 0)) / MARK_MS, 0, 1);
       if (k < 1) self.busy(40);
-      var x = self.pad + (c % M.w + 0.5) * S + (off ? off[0] : 0), y = self.pad + ((c / M.w | 0) + 0.5) * S + (off ? off[1] : 0);
-      var u = S * (0.12 + 0.03 * (1 - k));
+      var ox = 0, oy = 0;
+      mk.follow.forEach(function (c) { var o = self._offset(c, t); if (o) { ox += o[0] / mk.follow.length; oy += o[1] / mk.follow.length; } });
+      var x = self.pad + mk.x * S + ox, y = self.pad + mk.y * S + oy;
+      // the stroke runs across the ribbon, leaning a little along it: a short nick, two thirds of the way to its ink lines
+      var vx = -mk.ty * 0.84 + mk.tx * 0.54, vy = mk.tx * 0.84 + mk.ty * 0.54, u = (half + S * 0.05) * (2 / 3) * (1 + 0.2 * (1 - k));
       g.globalAlpha = k;
-      g.beginPath(); g.moveTo(x - u * 1.15, y + u * 0.75); g.lineTo(x, y - u * 0.95); g.lineTo(x + u * 1.15, y + u * 0.75);
-      g.strokeStyle = 'rgba(38,14,6,0.88)'; g.lineWidth = Math.max(3, S * 0.1); g.stroke();
-      g.strokeStyle = '#d8401f'; g.lineWidth = Math.max(1.6, S * 0.052); g.stroke();
+      g.beginPath(); g.moveTo(x - vx * u, y - vy * u); g.lineTo(x + vx * u, y + vy * u);
+      g.strokeStyle = 'rgba(38,14,6,0.85)'; g.lineWidth = Math.max(2.8, S * 0.085); g.stroke();
+      g.strokeStyle = '#d8401f'; g.lineWidth = Math.max(1.5, S * 0.046); g.stroke();
     });
     g.restore(); g.globalAlpha = 1;
   };
@@ -1150,6 +1184,14 @@
           g.save();
         }
       })(a, b);
+      if (inked) {   // Book II: an inked crossing's ribbons read a shade darker than the rest (multiplied, so any colour keeps its hue)
+        var ie2 = this._edges(), dw = rw + 2 * (ie2.E + ie2.HL);
+        // (strongest at the crossing, gone by the tile's edge, so no square shows where the tile ends)
+        var igr = g.createRadialGradient(0, 0, 0, 0, 0, h);
+        igr.addColorStop(0, 'rgba(150,118,86,0.3)'); igr.addColorStop(0.5, 'rgba(150,118,86,0.24)'); igr.addColorStop(1, 'rgba(150,118,86,0)');
+        g.save(); g.globalCompositeOperation = 'multiply'; g.strokeStyle = igr; g.lineWidth = dw; g.lineCap = 'butt';
+        g.beginPath(); piecePath(g, a, b, h, false); g.stroke(); g.restore();
+      }
       if (col.fill && col.frac >= 1 && !col.drain && !col.dull && !this.mini && !M.b2 && S >= 24) this._sliver(g, c, p, a, b, h, rw);
       if (bst != null) g.restore();
       if (lifting) g.restore();
@@ -1211,6 +1253,11 @@
           ART.draw(g, 'mark', pm[0] - ms / 2, pm[1] - ms / 2, ms, ms, t, { pigment: M.mark[c], gilt: true });
         }
       }
+    }
+    if (inked) {   // and a small ink dot at the centre marks the crossing as fixed, the place to start from
+      var dr = Math.min(S * 0.075, Math.max(2.8, S * 0.042));   // at least 2.8 css px across a phone's small tiles
+      g.fillStyle = 'rgba(255,248,230,0.5)'; g.beginPath(); g.arc(0, 0, dr + Math.max(0.8, S * 0.012), 0, 6.283); g.fill();
+      g.fillStyle = ART.HAIR; g.beginPath(); g.arc(0, 0, dr, 0, 6.283); g.fill();
     }
     g.restore();
     if (this.pins[c]) {
