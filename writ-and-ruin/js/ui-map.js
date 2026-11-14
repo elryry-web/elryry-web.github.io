@@ -16,6 +16,7 @@
     farpass: [340, 418, 42], stonefields: [228, 398, 58], oldbarrow: [100, 462, 42], saltmarsh: [88, 256, 50]
   };
   var CAMP = [372, 486];
+  var CAMP_GAP = 40;     // between the tents in camp, so each squad clears the next tent
   var WASH = 0.32;   // held-region wash over the painting
   var onBoard = false;   // set by svg(): drawing over the painting
 
@@ -125,11 +126,11 @@
 
   function esc(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
 
-  // the painted markers (art/ui-marker-*.png, cut by tools/prep-markers.py): a wooden block for a warband, a silver
-  // coin for an unbuilt site, a card back for a resident slot. The block and the card are tinted in the SVG, so the
+  // the painted markers (art/ui-marker-*.png, made by tools/prep-markers.py): a carved squad of three soldiers for a
+  // warband, a silver coin for an unbuilt site, a card back for a resident slot. The squad and the card are tinted in the SVG, so the
   // house colours can change: one shared filter per colour turns the art to its brightness and multiplies that by
   // the colour, so the grain and bevels still show.
-  var MARK = { block: 'art/ui-marker-block.png', coin: 'art/ui-marker-coin.png', card: 'art/ui-marker-card.png' };
+  var MARK = { troops: 'art/ui-marker-troops.png', coin: 'art/ui-marker-coin.png', card: 'art/ui-marker-card.png' };
   var tints = {};   // colour -> filter id, filled while the map is drawn and written into its <defs>
   function tint(col) {
     var id = 'wr-tint-' + col.replace('#', '');
@@ -145,10 +146,11 @@
     });
     return out ? '<defs>' + out + '</defs>' : '';
   }
-  // a warband counter: the wooden block tinted to its house, the count carved on its face
+  // a warband counter: the carved squad tinted to its house, 30 x 22.5 centred on x, y, with the count printed in ink
+  // on the middle soldier's plain chest (whose centre is 0.3 right of and 2.4 below the piece's)
   function counter(x, y, col, n, cls) {
-    return '<g class="' + (cls || 'band') + '"><image href="' + MARK.block + '" x="' + f1(x - 10) + '" y="' + f1(y - 10) + '" width="20" height="20" filter="' + tint(col) + '"/>' +
-      '<text x="' + f1(x - 0.4) + '" y="' + f1(y + 4.4) + '" text-anchor="middle" class="cnt" fill="' + A.textOn(col) + '">' + n + '</text></g>';
+    return '<g class="' + (cls || 'band') + '"><image href="' + MARK.troops + '" x="' + f1(x - 15) + '" y="' + f1(y - 11.25) + '" width="30" height="22.5" filter="' + tint(col) + '"/>' +
+      '<text x="' + f1(x + 0.3) + '" y="' + f1(y + 6.6) + '" text-anchor="middle" class="cnt">' + n + '</text></g>';
   }
   function stampAt(h, x, y, size) {
     var url = A.paintedUrl('house-' + h);
@@ -224,8 +226,9 @@
     Object.keys(g.bands).forEach(function (h) { if (g.bands[h] > 0) cs.push([A.houseCol(h), g.bands[h]]); });
     cs.sort(function (a, b2) { return (a[0] === fill ? -1 : 0) - (b2[0] === fill ? -1 : 0); });
     if (!owner && g.folk > 0) cs.push([P.bone, g.folk, 'folk']);
+    // two to a row right of the holder stamp, under the resident slots
     cs.forEach(function (c, k) {
-      var x = cx + 4 + (k % 2) * 22, y = cy + 10 + Math.floor(k / 2) * 22;
+      var x = cx + 16 + (k % 2) * 31, y = cy + 13 + Math.floor(k / 2) * 24;
       out += counter(x, y, c[0], c[1], c[2] ? 'folk' : 'band');
     });
     // a large invisible tap target
@@ -238,16 +241,16 @@
     s.order.forEach(function (h) {
       var n = s.houses[h].camp || 0;
       if (!n) return;
-      var x = CAMP[0] - k * 30, y = CAMP[1];
+      var x = CAMP[0] - k * CAMP_GAP, y = CAMP[1];
       out += '<g class="camp" data-region="camp"><path d="M' + (x - 14) + ' ' + (y + 10) + 'L' + x + ' ' + (y - 14) + 'L' + (x + 14) + ' ' + (y + 10) + 'Z" fill="' + A.houseCol(h) + '" transform="translate(1.6 1.2)"/>' +
         '<path d="M' + (x - 14) + ' ' + (y + 10) + 'L' + x + ' ' + (y - 14) + 'L' + (x + 14) + ' ' + (y + 10) + 'ZM' + x + ' ' + (y - 14) + 'V' + (y + 10) + '" fill="none" stroke="' + P.ink + '" stroke-width="2.4" stroke-linejoin="round"/>' +
         '<rect x="' + (x - 20) + '" y="' + (y - 20) + '" width="40" height="40" fill="transparent"/>' +
-        counter(x + 12, y - 12, A.houseCol(h), n) + '</g>';
+        counter(x + 14, y - 14, A.houseCol(h), n) + '</g>';
       k++;
     });
     if (out || (view.picks && view.picks.indexOf('camp') >= 0)) {
       // the label sits left of the leftmost tent (or of the pick ring), level with the tents
-      var lx = CAMP[0] - Math.max(k - 1, 0) * 30 - 22, ly = CAMP[1];
+      var lx = CAMP[0] - Math.max(k - 1, 0) * CAMP_GAP - 22, ly = CAMP[1];
       out = (painted ? '<rect x="' + (lx - 31) + '" y="' + (ly - 7) + '" width="34" height="13" fill="' + P.paper + '" stroke="' + P.ink + '" stroke-width="1.2"/>' : '') +
         '<text x="' + lx + '" y="' + (ly + 2.5) + '" text-anchor="end" class="tiny">camp</text>' + out;
       if (view.picks && view.picks.indexOf('camp') >= 0)
