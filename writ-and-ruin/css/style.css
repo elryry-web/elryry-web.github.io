@@ -288,6 +288,19 @@ body.sheet-up { overflow: hidden; }
 .annals { list-style: none; padding: 0; }
 .entry { display: flex; gap: 12px; align-items: flex-start; border-bottom: var(--line) solid var(--ink); padding: 10px 0; }
 .entry .vignette { flex: none; width: 110px; height: auto; }
+/* the painted vignette: framed like the site banner, cropped a little so the print's paper margin goes,
+   beside the words on a wide screen and above them on a phone; the winner's banner small in a corner */
+.entry .painted-vignette { position: relative; width: 200px; margin: 2px 0 0; aspect-ratio: 4 / 3; overflow: hidden;
+  border: 3px solid var(--ink); box-shadow: 3px 3px 0 var(--ink); background: var(--bone); }
+.painted-vignette img { position: absolute; left: -5%; top: -5%; width: 110%; height: 110%; max-width: none; object-fit: cover; display: block; }
+.painted-vignette .vg-stamp { position: absolute; right: 6px; bottom: 6px; line-height: 0; padding: 3px; background: var(--paper);
+  border: 2px solid var(--ink); box-shadow: 2px 2px 0 var(--ink); }
+.painted-vignette .vg-stamp img, .painted-vignette .vg-stamp svg { position: static; width: 26px; height: auto; display: block; }
+@media (max-width: 540px) {
+  .entry:has(.painted-vignette) { flex-direction: column; }
+  .entry .painted-vignette { width: 100%; max-width: 360px; aspect-ratio: 16 / 9; }
+  .painted-vignette .vg-stamp img, .painted-vignette .vg-stamp svg { width: 32px; }
+}
 .entry h2 { margin-top: 0; }
 
 /* ---------------------------------------------------------------- larger screens */

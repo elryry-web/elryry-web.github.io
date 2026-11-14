@@ -231,11 +231,14 @@
   function cand(a) { a.house = 'player'; return E.check(age(), a); }
   // Ryan's site painting across the top of a sheet, cropped wide; the % is how far down the subject sits
   var SITE_FOCUS = { crown: 35, saltmarsh: 55, riverford: 60, ashwood: 70, highpasture: 60, stonefields: 60, oldbarrow: 70, farpass: 35 };
+  // the same for the wild land an unbuilt region shows (bare-*): the region's own painting, not a faded structure
+  var BARE_FOCUS = { saltmarsh: 50, riverford: 60, ashwood: 60, highpasture: 55, stonefields: 60, oldbarrow: 70 };
   function siteBanner(r, built) {
-    var url = A.paintedUrl && A.paintedUrl('site-' + r);
+    var bare = !built && A.paintedUrl && A.paintedUrl('bare-' + r), url = bare || (A.paintedUrl && A.paintedUrl('site-' + r));
     if (!url) return '';
-    return '<figure class="sitebanner' + (built ? '' : ' unbuilt') + '"><span class="sb-clip"><img src="' + url + '" alt="' + esc(REG[r].site) +
-      (built ? '' : ', not yet built') + '" loading="lazy" style="object-position:50% ' + (SITE_FOCUS[r] || 50) + '%"></span>' +
+    return '<figure class="sitebanner' + (built ? '' : bare ? ' bare' : ' unbuilt') + '"><span class="sb-clip"><img src="' + url + '" alt="' +
+      (bare ? esc(REG[r].name) + ' before the ' + esc(REG[r].site) : esc(REG[r].site) + (built ? '' : ', not yet built')) +
+      '" loading="lazy" style="object-position:50% ' + ((bare ? BARE_FOCUS : SITE_FOCUS)[r] || 50) + '%"></span>' +
       (built ? '' : '<span class="sitetag">Not yet built</span>') + '</figure>';
   }
   // a march button's words: a rival region with no warbands in it is taken by the march, so say so

@@ -3,7 +3,7 @@
  * art/manifest.json (made by tools/prep-art.py) replaces these slot by slot, and these stay as the fallback.
  *   art('house/varrow')  heraldic stamp      art('site/crown')  site glyph
  *   art('suit/Lore')     suit glyph          art('card/drover') card glyph (suit, or relic)
- *   art('annals/3')      Annals vignette
+ *   art('annals/3', entry)  Annals vignette: the painting for how the age ended (annals-seize, ...), else carved
  * window.WR_ART. Needs WR_DATA.
  */
 (function (root) {
@@ -204,7 +204,17 @@
   // than a shield. Measure again if a banner is repainted.
   var BANNER_SCALE = { gullwing: 1.12, lantern: 1.2, synod: 1.12, moss: 1.12 };
   function bannerScale(h) { return BANNER_SCALE[h] || 1; }
+  // the painted Annals vignette for an entry: one per way the age ended, with the winner's banner small in a
+  // corner. null while it is not painted (or not loaded), and the carved vignette stands in.
+  function annalsSlot(entry) { return entry ? 'annals-' + (entry.winner ? entry.how : 'none') : null; }
+  function paintedVignette(entry) {
+    var url = painted[annalsSlot(entry)];
+    if (!url) return null;
+    return '<figure class="vignette painted-vignette"><img src="' + url + '" alt="" loading="lazy" decoding="async">' +
+      (entry.winner ? '<span class="vg-stamp">' + art('house/' + entry.winner, { size: 26 }) + '</span>' : '') + '</figure>';
+  }
   function art(slot, opts) {
+    if (slot.indexOf('annals/') === 0) return paintedVignette(opts) || vignette(opts);
     var url = paintedUrl(slot);
     if (url && slot.indexOf('house/') === 0 && opts && opts.size) opts = { size: Math.round(opts.size * bannerScale(slot.slice(6))) };
     // a site painting is a landscape: squeezed into an icon it reads as mud, so small sites keep the glyph
@@ -222,6 +232,6 @@
 
   root.WR_ART = { PAL: PAL, HOUSE: HOUSE, houseCol: houseCol, textOn: textOn, SUIT_COL: SUIT_COL, suitCol: suitCol, cardSuit: cardSuit,
     hash: hash, rng: rng, blob: blob, blobPoints: blobPoints, smooth: smooth, gouges: gouges, f1: f1,
-    stamp: stamp, suitGlyph: suitGlyph, siteGlyph: siteGlyph, SITE_GLYPH: SITE_GLYPH, card: card, vignette: vignette,
+    stamp: stamp, suitGlyph: suitGlyph, siteGlyph: siteGlyph, SITE_GLYPH: SITE_GLYPH, card: card, vignette: vignette, annalsSlot: annalsSlot,
     art: art, painted: painted, paintedUrl: paintedUrl, bannerScale: bannerScale, onPainted: onPainted, noPortrait: noPortrait };
 })(typeof self !== 'undefined' ? self : this);
