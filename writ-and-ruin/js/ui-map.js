@@ -12,7 +12,7 @@
   // and the same positions are used when the painting is missing and the map is drawn in code.
   var W = 420, H = 521;
   var POS = {
-    crown: [203, 255, 60], riverford: [108, 128, 46], ashwood: [280, 108, 62], highpasture: [322, 228, 52],
+    crown: [198, 258, 53], riverford: [108, 128, 46], ashwood: [280, 108, 62], highpasture: [322, 228, 52],
     farpass: [340, 418, 42], stonefields: [228, 398, 58], oldbarrow: [100, 462, 42], saltmarsh: [88, 256, 50]
   };
   var CAMP = [372, 486];
