@@ -5,7 +5,6 @@
   --head: 'IM Fell English', 'Alegreya', Georgia, 'Times New Roman', serif;
   --body: 'Alegreya', Georgia, 'Times New Roman', serif;
   --line: 2.5px;
-  --off: 1px;        /* misregistration of the colour block: it covers 1px of the 2.5px right and bottom line */
   --gap: 10px;
   --bar-h: 94px;     /* phones: the action bar is two rows of five */
 }
@@ -31,31 +30,30 @@ small { font-size: .78em; }
 b.big { font-size: 1.9rem; font-family: var(--head); line-height: 1; }
 svg { display: block; }
 
-/* ---------------------------------------------------------------- carved buttons */
+/* ---------------------------------------------------------------- plank buttons */
+/* Every button is a woodcut plank (art/ui-plank-*.png as a 9-slice): the image is drawn 8px deep at the ends and
+   edges over a thin transparent border, so its outline keeps its natural weight on a small button and the box
+   is the same size as a plain 2.5px-ruled one. It stands on a hard ink shadow and, pressed, sinks 2px onto it.
+   Cream is the default; .go/.end/.green are the green plank (the one main action in a place); .red has a
+   vermilion outline (assault, poison, raze, start anew); .active is the ochre plank, held down (a chosen mode
+   or toggle); .off is dashed and flat, so it reads as unavailable at a glance. tools/prep-planks.py makes the
+   rust and ochre planks from the cream one. */
 .btn {
   position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   min-height: 44px; min-width: 44px; padding: 8px 14px; margin: 3px;
   font: 600 1rem/1.15 var(--body); color: var(--ink); background: transparent;
-  border: var(--line) solid var(--ink); border-radius: 3px 6px 4px 7px / 6px 3px 7px 4px;
-  cursor: pointer; z-index: 0; text-align: center; -webkit-tap-highlight-color: transparent;
-}
-/* the colour block sits a little off the carved line */
-.btn::before {
-  content: ''; position: absolute; inset: 0; transform: translate(var(--off), var(--off));
-  background: var(--bone); border-radius: inherit; z-index: -1;
+  border: var(--line) solid transparent; border-radius: 0;
+  border-image: url(../art/ui-plank-cream.png) 40 fill / 8px stretch; box-shadow: 3px 3px 0 var(--ink);
+  transition: transform .06s, box-shadow .06s;
+  cursor: pointer; text-align: center; -webkit-tap-highlight-color: transparent;
 }
 .btn small { font-weight: 400; opacity: .85; }
-.btn:active { transform: translate(1px, 1px); }
+.btn:active, .btn.active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
 .btn:focus-visible { outline: 3px dashed var(--ochre); outline-offset: 3px; }
-.btn.go::before { background: var(--moss); }
-.btn.go { color: var(--ink); }
-.btn.red::before { background: var(--rust); }
-.btn.red { color: var(--paper); }
-.btn.end::before { background: var(--slate); }
-.btn.active::before { background: var(--ochre); }
-.btn.active { box-shadow: inset 0 0 0 2px var(--ink); }
-.btn.off { color: rgba(23, 20, 15, .45); border-style: dashed; }
-.btn.off::before { background: transparent; }
+.btn.go, .btn.end, .btn.green { border-image-source: url(../art/ui-plank-green.png); }
+.btn.active { border-image-source: url(../art/ui-plank-ochre.png); }
+.btn.red { border-image-source: url(../art/ui-plank-rust.png); color: var(--rust); }
+.btn.off { color: rgba(23, 20, 15, .45); border: var(--line) dashed rgba(23, 20, 15, .5); border-image: none; box-shadow: none; transform: none; }
 .btn.big { font-size: 1.12rem; min-height: 52px; padding: 10px 22px; }
 .btn.small { min-height: 44px; padding: 4px 10px; font-size: .9rem; }
 .btn.icon { font-size: 1.3rem; padding: 4px; width: 44px; }
@@ -317,7 +315,7 @@ body.on-title { padding: 6px; }   /* a little paper round the frame */
 /* the tagline between two shields, the divider between the lion and the stag */
 .herald { display: grid; grid-template-columns: 46px minmax(0, 1fr) 46px; column-gap: 6px; align-items: center; justify-items: center;
   max-width: 34em; margin: 0 auto 8px; }
-.tagline { font-size: 1.05rem; margin: 0; }
+.tagline { font-size: 1.05rem; margin: 0; text-wrap: balance; }
 .hd { display: block; background: center / contain no-repeat; }
 .hd.shield-lion { width: 36px; height: 46px; background-image: url(../art/ui-shield-lion.png); }
 .hd.shield-eagle { width: 36px; height: 46px; background-image: url(../art/ui-shield-eagle.png); }
@@ -341,17 +339,11 @@ body.on-title::before {
   content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
   background: radial-gradient(ellipse 85% 75% at 50% 45%, transparent 55%, rgba(90, 70, 50, .12) 82%, rgba(60, 44, 28, .3) 100%);
 }
-/* plank buttons, reusable on any .btn: .plank is the cream woodcut plank, .plank.green the green one (art/ui-plank-*.png as a
-   9-slice, so it fits any width). It stands on a hard ink shadow and, pressed, sinks 2px onto it like a stamp.
-   An optional <i class="plank-icon pi-crown|pi-quill|pi-book|pi-scroll"> first inside it sits over its left end. */
-.btn.plank { min-height: 50px; padding: 2px 44px; border: 10px solid transparent; border-radius: 0;
-  border-image: url(../art/ui-plank-cream.png) 40 fill / 10px stretch; box-shadow: 3px 3px 0 var(--ink); transition: transform .06s, box-shadow .06s; }
-.btn.plank.green { border-image-source: url(../art/ui-plank-green.png); }
-.btn.plank::before { content: none; }
+/* the title page's planks: taller, with room at the left for an icon (<i class="plank-icon pi-crown|pi-quill|pi-book|pi-scroll">
+   first inside the button) that overhangs the plank's end, and the outline drawn 10px deep */
+.btn.plank { min-height: 50px; padding: 2px 44px; border-width: 10px; border-image-width: 10px; }
 .btn.plank.big { min-height: 58px; padding: 2px 46px; }
-.btn.plank:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
-.btn.plank.off { border: var(--line) dashed rgba(23, 20, 15, .5); border-image: none; padding: 9.5px 51.5px; box-shadow: none; }
-.btn.plank.off:active { transform: none; }
+.btn.plank.off { border-width: var(--line); padding: 9.5px 51.5px; }
 .plank-icon { position: absolute; left: -18px; top: 50%; width: 56px; height: 48px; margin-top: -24px; pointer-events: none;
   background: center / contain no-repeat; }
 .btn.plank.off .plank-icon { left: -10.5px; opacity: .45; }
