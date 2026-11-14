@@ -1,148 +1,38 @@
 'use strict';
 /* =====================================================================
-   QUILL & SIGIL — custom.js (v177; moved out of the game after v179)
-   Custom levels: made in the level editor (quill-and-sigil-editor/index.html) and shared as a link that holds the whole
-   level (quill-and-sigil-editor/play.html#level=<code>; a test play adds &edit=1). The code is the level's JSON,
-   deflated and written in base64url ("1…"), or plain ("0…") where the browser has no CompressionStream.
-   The game itself (quill-and-sigil/) has no custom-level code and never loads this file. Two pages do:
-   - the editor, for the codec only (no Game there);
-   - play.html, which writes the game's own index.html into itself (its scripts loaded from ../quill-and-sigil/) and adds
-     this file after main.js. There the level plays outside the folio, as LEVELS[-1] (an array property, so
-     LEVELS.length, the folio and every lesson index are untouched), and the player's save is never written. Leaving the
-     level (the title, the folio, To the Lessons) goes to the real game; after a test play, back to the editor.
+   QUILL & SIGIL — custom.js (v177; moved out of the game after v179; v183: the codec moved into the game)
+   The level editor's side of custom levels. Since v183 the game plays shared levels itself: the editor's Share link is
+   the game's own address, quill-and-sigil/#level=<code>, and the game keeps them in its folio (Shared Levels). The
+   codec (the level format, its checks, the link's code) lives in the game's js/shared.js (LevelCode), which both pages
+   that use this file load first; Custom is LevelCode plus what the editor and its test play need:
+   - on the editor page (no Game there): the codec, and WON_KEY, where a test play records a win;
+   - on play.html, which writes the game's own index.html into itself (its scripts loaded from ../quill-and-sigil/) and
+     adds this file after main.js: test play (#level=<code>&edit=1). The level is played by the game's Game.startShared
+     with no code, so it never joins the player's shared levels; the player's save is never written, and every way out
+     (the title, the folio, the win card's button) goes back to the editor. play.html without edit=1 is an old shared
+     link, and play.html sends it on to the game before this file is ever loaded.
    ===================================================================== */
 const Custom = (() => {
-  const SIG = ['gale', 'stone', 'flame', 'tide', 'frost', 'luna'];
-  const T_OK = /^[ 0-9_=~*]*$/, O_OK = /^[.#IBDGfOC]*$/;
-  const MAXW = 32, MAXH = 32;
   const WON_KEY = 'quillsigil.editor.won';
-
-  const b64u = {
-    enc(bytes) {
-      let s = '';
-      for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
-      return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    },
-    dec(str) {
-      str = str.replace(/-/g, '+').replace(/_/g, '/'); while (str.length % 4) str += '=';
-      const b = atob(str), u = new Uint8Array(b.length);
-      for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i);
-      return u;
-    },
-  };
-  async function pipe(bytes, stream) {
-    const r = new Response(new Blob([bytes]).stream().pipeThrough(stream));
-    return new Uint8Array(await r.arrayBuffer());
-  }
-  const str = (v, n) => typeof v === 'string' ? v.replace(/[\u0000-\u0009\u000b-\u001f]/g, '').slice(0, n) : '';
-  const int = (v, lo, hi, d) => Number.isFinite(+v) ? Math.max(lo, Math.min(hi, Math.round(+v))) : d;
-
-  /* a level from anywhere (a link, pasted JSON, the editor's store) made safe and complete, or an Error thrown */
-  function sanitize(o) {
-    if (!o || typeof o !== 'object') throw new Error('not a level');
-    const t = Array.isArray(o.t) ? o.t.map(r => String(r)) : null;
-    if (!t || !t.length || t.length > MAXH) throw new Error('the map is missing');
-    const W = Math.max(...t.map(r => r.length));
-    if (!(W >= 1 && W <= MAXW)) throw new Error('the map is the wrong size');
-    if (!t.every(r => T_OK.test(r))) throw new Error('the map holds unknown ground');
-    const H = t.length;
-    const tt = t.map(r => r.padEnd(W, ' '));
-    const oo = [];
-    for (let y = 0; y < H; y++) {
-      const r = Array.isArray(o.o) && typeof o.o[y] === 'string' ? o.o[y] : '';
-      if (!O_OK.test(r)) throw new Error('the map holds unknown things');
-      oo.push(r.slice(0, W).padEnd(W, '.'));
-    }
-    const all = oo.join('');
-    if ((all.match(/O/g) || []).length !== 1) throw new Error('a level needs one orb');
-    if (!/G/.test(all)) throw new Error('a level needs a font');
-    const sigils = SIG.filter(id => Array.isArray(o.sigils) && o.sigils.includes(id));
-    if (!sigils.length) throw new Error('a level needs at least one sigil');
-    const L = {
-      id: 'custom', name: str(o.name, 40).trim() || 'A Custom Lesson', lesson: str(o.lesson, 700), hint: str(o.hint, 400),
-      sigils, par: int(o.par, 1, 30, 1), t: tt, o: oo, custom: true,
-    };
-    const ink = int(o.ink, 0, 30, 0); if (ink) L.ink = Math.max(ink, 1);
-    if (o.combos) {
-      L.combos = true;
-      if (Array.isArray(o.centers)) { const c = sigils.filter(id => o.centers.includes(id)); if (c.length) L.centers = c; }
-      if (o.ringOf && typeof o.ringOf === 'object') {
-        const r = {};
-        for (const id of sigils) if (Array.isArray(o.ringOf[id])) r[id] = sigils.filter(s => o.ringOf[id].includes(s));
-        if (Object.keys(r).length) L.ringOf = r;
-      }
-    }
-    if (Array.isArray(o.flows)) {
-      L.flows = o.flows.slice(0, 400).filter(f => f && typeof f === 'object').map(f => ({
-        x0: int(f.x0, 0, W - 1, 0), x1: int(f.x1, 0, W - 1, 0), y0: int(f.y0, 0, H - 1, 0), y1: int(f.y1, 0, H - 1, 0),
-        dx: int(f.dx, -1, 1, 0), dy: int(f.dy, -1, 1, 0), s: Math.max(0.5, Math.min(12, +f.s || 3)),
-      })).filter(f => f.dx || f.dy);
-      if (!L.flows.length) delete L.flows;
-    }
-    return L;
-  }
-  /* the level as it travels: the lesson format's own keys, nothing the game adds (id, roman, nudge) */
-  function wire(L) {
-    const w = { name: L.name, lesson: L.lesson || undefined, hint: L.hint || undefined, sigils: L.sigils, par: L.par, ink: L.ink || undefined };
-    if (L.combos) { w.combos = true; if (L.centers) w.centers = L.centers; if (L.ringOf) w.ringOf = L.ringOf; }
-    w.t = L.t; w.o = L.o; if (L.flows && L.flows.length) w.flows = L.flows;
-    return JSON.parse(JSON.stringify(w));
-  }
-  async function encode(L) {
-    const raw = new TextEncoder().encode(JSON.stringify(wire(L)));
-    if (typeof CompressionStream === 'function') {
-      try { return '1' + b64u.enc(await pipe(raw, new CompressionStream('deflate-raw'))); } catch (e) { }
-    }
-    return '0' + b64u.enc(raw);
-  }
-  async function decode(code) {
-    code = String(code || '').trim();
-    const k = code[0], bytes = b64u.dec(code.slice(1));
-    let raw;
-    if (k === '1') {
-      if (typeof DecompressionStream !== 'function') throw new Error('this browser cannot open the link');
-      raw = await pipe(bytes, new DecompressionStream('deflate-raw'));
-    } else if (k === '0') raw = bytes;
-    else throw new Error('the link is not a level');
-    return sanitize(JSON.parse(new TextDecoder().decode(raw)));
-  }
-  /* what a test play proves: the map and the rules, not the words or the par (so setting the par to the maker's own
-     count, or retitling, keeps sharing open) */
-  function fingerprint(L) {
-    const s = JSON.stringify([L.sigils, L.combos || false, L.centers || null, L.ringOf || null, L.ink || 0, L.t, L.o, L.flows || null]);
-    let h = 0x811c9dc5;
-    for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193) >>> 0;
-    return h.toString(36) + '.' + s.length.toString(36);
-  }
-  const codeFromHash = h => { const m = /[#&]level=([A-Za-z0-9_-]+)/.exec(h || ''); return m ? m[1] : null; };
-  const API = { sanitize, wire, encode, decode, fingerprint, codeFromHash, WON_KEY, SIG };
+  const API = Object.assign({}, LevelCode, { WON_KEY });
 
   /* ---------------- the play page's side (play.html, with the game loaded into it) ---------------- */
   if (typeof Game === 'undefined' || typeof LEVELS === 'undefined' || typeof Save === 'undefined') return API;
 
-  const C = { on: false, L: null, edit: false, code: '', busy: 0 };
+  const C = { on: false, L: null, code: '', busy: 0 };
   const start0 = Game.start, show0 = Game.showScreen;
   // this page never writes the player's save, nor the game's "lesson in play" for a reload: those belong to the game
   Save.save = function () { };
   Game.playing = function () { };
-  // a custom level counts as coming after every lesson: the outer circle is taught (ringTaught, ink.js) and a sigil it
-  // leaves out reads "unused this lesson", not "not yet learned"
-  const indexOf0 = LEVELS.indexOf;
-  LEVELS.indexOf = function (x) { return x && x === this[-1] ? this.length : indexOf0.apply(this, arguments); };
 
-  // the ways out: to the editor after a test play, to the real game from a shared level (the folio and the title live
-  // there, under the game's own address and save)
-  const go = rel => { C.on = false; location.href = new URL(rel, location.href).href; };
-  const toEditor = () => go('index.html');
-  const toGame = () => go('../quill-and-sigil/');
-  const out = () => (C.edit ? toEditor() : toGame());
+  const toEditor = () => { C.on = false; location.href = new URL('index.html', location.href).href; };
 
   Game.start = function (i) {
-    if (i === -1 && C.L) {
-      C.on = true; LEVELS[-1] = C.L;
+    if (i === -1 && C.L && this.shared) {
+      C.on = true;
       start0.call(this, -1);
-      document.getElementById('lnum').textContent = C.edit ? 'Custom level · test play' : 'Custom level';
-      if (C.edit && !document.getElementById('bCustBack')) {
+      document.getElementById('lnum').textContent = 'Custom level · test play';
+      if (!document.getElementById('bCustBack')) {
         const b = document.createElement('button');
         b.className = 'btn ghost'; b.id = 'bCustBack'; b.title = 'Back to the level editor (your work is kept)';
         b.innerHTML = '✎ <span>Editor</span>';
@@ -151,32 +41,31 @@ const Custom = (() => {
       }
       return;
     }
-    out(); // (a lesson of the game is played in the game)
+    toEditor(); // (a lesson of the game is played in the game)
   };
-  Game.title = out;
-  Game.lessons = out;
-  Game.next = out;
+  Game.title = toEditor;
+  Game.lessons = toEditor;
+  Game.next = toEditor;
   const win0 = Game.win;
   Game.win = function () {
-    const r = win0.apply(this, arguments); // (its Save.won and Save.data.at stay in this page: Save.save is held off)
-    if (C.on && C.edit) try { localStorage.setItem(WON_KEY, JSON.stringify({ fp: fingerprint(C.L), casts: this.casts, at: Date.now() })); } catch (e) { }
+    const r = win0.apply(this, arguments); // (a test play has no code, so the game's shared list is not touched)
+    if (C.on) try { localStorage.setItem(WON_KEY, JSON.stringify({ fp: LevelCode.fingerprint(C.L), casts: this.casts, at: Date.now() })); } catch (e) { }
     return r;
   };
-  // the win card of a custom level: its own title, no next lesson, and the way back to the editor after a test play
+  // the win card of a test play: its own title, and the way back to the editor
   Game.showScreen = function (id) {
     const r = show0.apply(this, arguments);
     if (id === 'win' && C.on) {
-      document.getElementById('winTitle').innerHTML = decoHTML(C.edit ? 'Test Play Complete' : 'Custom Level Complete');
-      const tally = `${this.casts} seal${this.casts === 1 ? '' : 's'} cast. The maker's mark is ${C.L.par}.`;
-      document.getElementById('winText').textContent = C.edit ? `${tally} Sharing is open in the editor.` : tally;
+      document.getElementById('winTitle').innerHTML = decoHTML('Test Play Complete');
+      const wt = document.getElementById('winText'); wt.textContent += ' Sharing is open in the editor.';
       const nx = document.getElementById('bNext'); nx.style.display = '';
-      nx.textContent = C.edit ? '✎ Back to the Editor' : 'Play Quill & Sigil →';
+      nx.textContent = '✎ Back to the Editor';
       const fm = document.getElementById('bWinMenu'); if (fm) fm.style.display = 'none'; // (the folio is the game's)
     }
     return r;
   };
 
-  // a link that cannot be played: said at the top, with the way to the game (the title page behind it leads there too)
+  // a link that cannot be played: said at the top, with the way back to the editor
   function note(msg) {
     let el = document.getElementById('custNote');
     if (!el) {
@@ -185,23 +74,23 @@ const Custom = (() => {
       document.body.append(el);
     }
     el.textContent = msg + ' ';
-    const a = document.createElement('a'); a.href = new URL('../quill-and-sigil/', location.href).href;
-    a.textContent = 'Play Quill & Sigil'; a.style.color = '#e8c27a';
+    const a = document.createElement('a'); a.href = new URL('index.html', location.href).href;
+    a.textContent = 'Back to the editor'; a.style.color = '#e8c27a';
     el.append(a); el.style.display = '';
   }
   async function boot() {
-    const code = codeFromHash(location.hash);
-    if (!code) { note('This page plays a custom level from a shared link, and this link holds no level.'); return; }
+    const code = LevelCode.codeFromHash(location.hash);
+    if (!code) { note('This page test-plays a level from the editor, and this link holds no level.'); return; }
     const n = ++C.busy;
     try {
-      const L = await decode(code);
+      const L = await LevelCode.decode(code);
       if (n !== C.busy) return;
-      C.L = L; C.code = code; C.edit = /[#&]edit=1/.test(location.hash);
+      C.L = L; C.code = code;
       const el = document.getElementById('custNote'); if (el) el.style.display = 'none';
-      Game.start(-1);
+      Game.startShared(L, null);
     } catch (e) {
       console.warn('custom level', e);
-      note(`This custom level link could not be opened (${e.message || 'damaged'}).`);
+      note(`This test play link could not be opened (${e.message || 'damaged'}).`);
     }
   }
   window.addEventListener('hashchange', boot);

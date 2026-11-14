@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Quill &amp; Sigil · Custom Level</title>
+<title>Quill &amp; Sigil · Test Play</title>
 <meta name="theme-color" content="#120d26">
 <link rel="icon" type="image/png" sizes="192x192" href="../quill-and-sigil/icons/icon-192.png">
 <style>
@@ -15,7 +15,9 @@
 <body>
 <p id="msg">Opening the level…</p>
 <!--
-  The play page for custom levels: shared links (play.html#level=<code>) and test play from the editor (&edit=1).
+  The editor's test play page (play.html#level=<code>&edit=1). Since v183 a shared level is played by the game itself
+  (quill-and-sigil/#level=<code>, kept in its folio under Shared Levels), so a link here without edit=1 (a link shared
+  before v183) is sent on to the game at once, with its level.
   It has no game of its own. It fetches the game's index.html from ../quill-and-sigil/, points its <base> there (so the
   game's scripts, art and icons load from the game's folder), adds custom.js after the game's scripts, and writes the
   result over this page. The game's markup, CSS and engine therefore exist once, in the game.
@@ -24,13 +26,20 @@
   - the game's manifest link is dropped, so this page does not offer to install itself as the game;
   - the tab's "lesson in play" (sessionStorage, used by the game to reopen a lesson after a reload) is cleared first,
     so a lesson played earlier in this tab is not opened under the custom level.
-  custom.js holds the save off, and sends every way out to the game (or, after a test play, to the editor).
+  - QS_PLAY_PAGE is set, so the game's own #level= reading (shared.js) leaves the level to custom.js.
+  custom.js holds the save off, plays the level outside the player's shared levels, and sends every way out to the editor.
 -->
 <script>
 (function () {
   'use strict';
   var here = location.href;
   var GAME = new URL('../quill-and-sigil/', here).href;
+  // an old shared link (no edit=1): the game plays it now, and adds it to the player's folio
+  if (!/[#&]edit=1(&|$)/.test(location.hash)) {
+    var m = /[#&]level=([A-Za-z0-9_-]+)/.exec(location.hash);
+    location.replace(GAME + (m ? '#level=' + m[1] : ''));
+    return;
+  }
   var CUSTOM = new URL('js/custom.js', here).href;
   function fail(why) {
     var m = document.getElementById('msg');
@@ -48,11 +57,12 @@
     var v = (/js\/main\.js\?v=(\d+)/.exec(html) || [])[1] || String(Date.now());
     var head =
       '<base href="' + GAME + '">' +
+      '<script>window.QS_PLAY_PAGE = true;<\/script>' +
       '<script>try { if (navigator.serviceWorker) navigator.serviceWorker.register = function () {' +
       ' return Promise.reject(new Error("no service worker on the play page")); }; } catch (e) { }<\/script>';
     html = html.replace(/<head[^>]*>/i, function (m) { return m + head; })
       .replace(/<link[^>]*rel="manifest"[^>]*>/i, '')
-      .replace(/<title>[\s\S]*?<\/title>/i, '<title>Quill &amp; Sigil · Custom Level</title>')
+      .replace(/<title>[\s\S]*?<\/title>/i, '<title>Quill &amp; Sigil · Test Play</title>')
       .replace(/<\/body>/i, '<script src="' + CUSTOM + '?v=' + v + '"><\/script>\n</body>');
     document.open();
     document.write(html);

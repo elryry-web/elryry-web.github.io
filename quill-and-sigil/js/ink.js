@@ -20,11 +20,14 @@ const SIGN_NOTES = {
   ring: ' An outer circle around the seal widens the spell; around Luna, it doubles how far the float carries.',
   combos: 'A sign points the spell as the world lies; each barb across it adds strength. On Luna, the sign and barbs aim and strengthen only what rides on its ring. Each place on the ring holds one mark. A small sigil in a slot infuses the spell: behind the sign (red) it acts at once, where what the spell moves stands as the spell takes hold; beside it (blue), along the way, once it has left that spot and until it comes to rest; ahead of it (green), on arrival, where it comes to rest. Fire, frost, water or stone at once or on arrival flares once, round that spot; along the way it rides with what the spell moves and touches what it passes. On the ring of a gust, Petra along the way turns what the wind moves to stone; at once or on arrival, stone rises under it. Luna on a ring floats what the spell holds ten tiles for each Luna. On the ring of fire, stone, ice or water, each Ventus carries every arm two tiles farther. Only Ventus and Luna in the centre keep time: around stone, fire, ice or water the slots stay gold.',
 };
+// a level's place in the book; a custom level (a shared one, or the editor's test play) counts as coming after every
+// lesson, so the outer circle is taught and every sigil is known there (v183: was custom.js's LEVELS.indexOf patch)
+const levelAt = L => L && L.custom ? LEVELS.length : LEVELS.indexOf(L);
 // has the outer circle been taught yet? (Featherfall II teaches it; before that nothing mentions or shows it)
 function ringTaught(L = Game.level) {
   if (!L || typeof LEVELS === 'undefined') return true;
   const at = LEVELS.findIndex(l => l.name === 'Featherfall II');
-  return at < 0 || LEVELS.indexOf(L) >= at;
+  return at < 0 || levelAt(L) >= at;
 }
 const signNotes = L => L && L.combos ? SIGN_NOTES.combos : SIGN_NOTES.plain + (ringTaught(L) ? SIGN_NOTES.ring : '');
 function hexA(hex, a) {
@@ -548,10 +551,10 @@ function lessonRules() {
 }
 /* (v178) has the player met this sigil? Yes if a lesson up to the one in play brings it in, or a lesson they have won
    does (back on an early lesson, they still know what they learned later). With no lesson in play, or in a custom
-   level (custom.js counts it as after every lesson), every sigil is known. A sigil not yet met is never named or shown. */
+   level (levelAt counts it as after every lesson), every sigil is known. A sigil not yet met is never named or shown. */
 function sigilKnown(id, L = typeof Game !== 'undefined' && Game.level) {
   if (!L || typeof LEVELS === 'undefined') return true;
-  const at = LEVELS.indexOf(L); if (at < 0) return true;
+  const at = levelAt(L); if (at < 0) return true;
   const won = i => typeof Save !== 'undefined' && !!Save.starsAt && Save.starsAt(i) > 0;
   return LEVELS.some((l, i) => l.sigils.includes(id) && (i <= at || won(i)));
 }
@@ -902,13 +905,22 @@ function shortSpell(sp) {
    ===================================================================== */
 const Satchel = {
   list: [], max: 9, KEY: 'quillsigil.satchel.v1',
+  /* (v183) a shared level has a satchel of its own: it starts empty, is never saved, and lasts while that level is
+     replayed; the player's own satchel (main) is put aside meanwhile and comes back untouched */
+  main: null, ownKey: null, own: null,
+  enterShared(key) {
+    if (!this.main) this.main = this.list;
+    if (this.ownKey !== key || !this.own) { this.own = []; this.ownKey = key; }
+    this.list = this.own;
+  },
+  leaveShared() { if (this.main) { this.list = this.main; this.main = null; } },
   load() {
     try {
       const s = JSON.parse(localStorage.getItem(this.KEY));
       if (Array.isArray(s)) this.list = s.filter(e => e && Array.isArray(e.strokes) && e.strokes.length).slice(0, this.max);
     } catch (e) { }
   },
-  save() { try { localStorage.setItem(this.KEY, JSON.stringify(this.list.map(e => ({ strokes: e.strokes })))); } catch (e) { } },
+  save() { if (this.main) return; try { localStorage.setItem(this.KEY, JSON.stringify(this.list.map(e => ({ strokes: e.strokes })))); } catch (e) { } },
   draftOf(strokes) { const d = new Draft(); for (const s of strokes) d.add(JSON.parse(JSON.stringify(s))); return d; },
   add(strokes) {
     if (this.list.length >= this.max) return false;
@@ -2354,7 +2366,7 @@ const Grim = {
       g.globalAlpha = 0.32;
       const r = 10 * s * k, cy = y + US * k / 2;
       // a sigil some earlier lesson taught is only unused here, not unlearned (the user: "not yet learned" was wrong for those)
-      const at = typeof LEVELS === 'undefined' ? -1 : LEVELS.indexOf(lv);
+      const at = typeof LEVELS === 'undefined' ? -1 : levelAt(lv);
       // (v178) one the player has not met yet is an empty circle: its shape and name wait for its lesson
       const taught = id => at > 0 && sigilKnown(id, lv);
       const groups = [[unknown.filter(taught), 'unused this lesson'], [unknown.filter(id => !taught(id)), 'not yet learned']].filter(q => q[0].length);

@@ -932,7 +932,7 @@ const Game = {
     this.coverAt = id === 'win' || id === 'note' || id === 'levels' ? performance.now() : 0;
   },
   title() {
-    this.state = 'title'; this.level = null; this.playing(null);
+    this.state = 'title'; this.level = null; this.playing(null); this.leaveShared();
     loadWorld(TITLE_LEVEL);
     for (const c of World.cells) if (c.feat === 'brazier') c.lit = true;
     const f = World.fonts[0], b = makeBody('orb', f.x + 0.5, f.y + 0.5, 1);
@@ -954,6 +954,7 @@ const Game = {
   // (v175) the lesson in play, kept for this tab only: a reload of the page (the browser putting a heavy tab away and
   // bringing it back, or a refresh) opens that lesson again rather than the title. null: none in play.
   playing(i) {
+    if (i != null) Shared.playing(null);
     try { if (i == null) sessionStorage.removeItem('quillsigil.playing'); else sessionStorage.setItem('quillsigil.playing', Save.idOf(i)); } catch (e) { }
   },
   wasPlaying() {
@@ -963,11 +964,18 @@ const Game = {
       return i >= 0 && i < Save.unlocked() ? i : -1;
     } catch (e) { return -1; }
   },
-  lessons() {
+  lessons(openAt) {
     // the button at the head of the folio goes back to the lesson you were on: one left mid-play carries on where it
-    // stood, one just won goes on to the next, and from the title page it is the furthest lesson open
+    // stood, one just won goes on to the next, and from the title page it is the furthest lesson open.
+    // openAt (v183): an item of the book to open at instead (a shared level, 's' + its place, or 'add')
     const from = this.state;
-    if (from !== 'menu') {
+    if (from !== 'menu' && this.shared) {
+      // (v183) a shared level is left for the folio: the button goes on with the lessons, as from the title page, and the
+      // book opens at the Shared Levels page that holds the level (its seal there now, if it was just won)
+      this.resumeMid = false; this.resumeTo = this.resumeAt();
+      if (openAt == null && this.shared.code) openAt = Shared.item(this.shared.code);
+      this.leaveShared();
+    } else if (from !== 'menu') {
       this.resumeMid = !!this.level && from !== 'won'; // (the title page has no lesson loaded)
       this.resumeTo = this.resumeMid ? this.idx : from === 'won' ? Math.min(LEVELS.length - 1, this.idx + 1) : this.resumeAt();
     }
@@ -978,7 +986,22 @@ const Game = {
     $('#hud').classList.remove('show');
     this.showScreen('levels');
     // the folio is an open book, turned by a swipe, the arrows or the arrow keys; it opens on the lesson ahead
-    Folio.build(this.resumeTo);
+    Folio.build(this.resumeTo, openAt);
+  },
+  /* (v183) a shared level (shared.js): played as LEVELS[-1], like the editor's test play, outside the campaign. The
+     save's lessons, its "where you left off" and the satchel of kept spells are not touched: the level has a satchel of
+     its own, kept while it is replayed and dropped when another shared level is played. code: null for a test play */
+  startShared(L, code) {
+    LEVELS[-1] = L;
+    this.shared = { code, L };
+    Satchel.enterShared(code || 'test');
+    Folio.addDraft = '';
+    this.start(-1);
+    if (code) Shared.playing(code);
+  },
+  leaveShared() {
+    if (this.shared && this.shared.code) Shared.playing(null);
+    this.shared = null; Satchel.leaveShared();
   },
   resumeLesson() {
     if (!(this.resumeMid && this.level && this.idx === this.resumeTo)) { this.start(this.resumeTo); return; }
@@ -994,18 +1017,25 @@ const Game = {
     this.closeSatchel(); this.closeNotes();
     $('#aimbar').classList.remove('show'); $('#bGrimoire').classList.remove('hidden');
     // Restarting (or replaying) the same lesson keeps the last drawing for Recall.
-    if (i !== this.idx) { Grim.lastStrokes = null; this.hint = 0; } // (the hint already shown stays shown on a restart)
+    if (i >= 0) this.leaveShared(); // (v183) a lesson of the campaign: its own satchel back
+    // (v183) a shared level is told from another by its code, as a lesson by its place
+    const key = i < 0 ? 's:' + (this.shared ? this.shared.code : '') : i;
+    if (key !== this.levelKey) { Grim.lastStrokes = null; this.hint = 0; } // (the hint already shown stays shown on a restart)
+    this.levelKey = key;
     this.tapped = false;
     this.idx = i; this.level = LEVELS[i]; this.casts = 0; this.history = []; this.winT = 0; this.held = null;
     // (v175) remembered at once, so the title's Continue and a reload of the page both come back to this lesson
-    if (Save.data.at !== Save.idOf(i)) { Save.data.at = Save.idOf(i); Save.save(); }
-    this.playing(i);
+    // (v183) a shared level (i -1) is not a place in the lessons: the save and the tab's lesson in play are left alone
+    if (i >= 0) {
+      if (Save.data.at !== Save.idOf(i)) { Save.data.at = Save.idOf(i); Save.save(); }
+      this.playing(i);
+    } else this.playing(null);
     Grim.draft.clear(); Grim.resetHist(); Grim.ghost = null; Grim.bookDirty = true; Grim.inkDirty = true;
     parts.length = 0;
     loadWorld(this.level);
     $('#note').classList.remove('show');
     VIEW.z = 1; fitCamera(innerWidth, innerHeight);
-    $('#lnum').textContent = `Lesson ${this.level.roman}`;
+    $('#lnum').textContent = i < 0 ? 'Shared level' : `Lesson ${this.level.roman}`;
     $('#par').textContent = this.level.par;
     $('#ltitle').innerHTML = decoHTML(this.level.name);
     this.updateCasts();
@@ -1148,35 +1178,41 @@ const Game = {
       const a = Math.random() * TAU, sp = 1 + Math.random() * 4;
       emit({ x: f.x + .5, y: f.y + .5, z: f.h + 0.4, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, vz: 2 + Math.random() * 7, grav: 4, drag: 0.8, life: 2 + Math.random(), size: 4 + Math.random() * 4, color: ['#ffd27a', '#8ff4ff', '#ffffff', '#cdb0ff'][i % 4], kind: 'glow' });
     }
-    const L = this.level, par = L.par;
+    const L = this.level, par = L.par, sh = this.shared;
     const stars = this.casts <= par ? 3 : this.casts <= par + 2 ? 2 : 1;
-    Save.won(this.idx, stars);
-    // (v175) where the player left off is now the lesson after this one; a reload on the win card goes to the title
-    Save.data.at = Save.idOf(Math.min(LEVELS.length - 1, this.idx + 1)); Game.playing(null);
-    Save.save();
-    const last = this.idx === LEVELS.length - 1, wonIdx = this.idx;
+    if (sh) {
+      // (v183) a shared level: its best goes into the shared list (shared.js), never into the save
+      if (sh.code) { Shared.won(sh.code, this.casts); Shared.playing(null); }
+    } else {
+      Save.won(this.idx, stars);
+      // (v175) where the player left off is now the lesson after this one; a reload on the win card goes to the title
+      Save.data.at = Save.idOf(Math.min(LEVELS.length - 1, this.idx + 1)); Game.playing(null);
+      Save.save();
+    }
+    const last = !sh && this.idx === LEVELS.length - 1, wonIdx = this.idx;
     // (the lesson's wax seal, as its folio entry shows it, fetched now so it is ready when the card stamps it)
-    const seal = sealLook(wonIdx), sealSrc = `art/seal-${seal.n + 1}.png?v=2`; new Image().src = sealSrc;
+    const seal = sh ? (sh.code ? sharedSeal(sh.code) : sealPick(L.name, -1)) : sealLook(wonIdx), sealSrc = `art/seal-${seal.n + 1}.png?v=2`; new Image().src = sealSrc;
     setTimeout(() => {
-      if (this.state !== 'won' || this.idx !== wonIdx) return; // the player has already moved on
+      if (this.state !== 'won' || this.idx !== wonIdx || this.shared !== sh) return; // the player has already moved on
       // the last lesson of each folio says so; the very last closes the book
-      const end = L.folioEnd || (last && { title: 'The Folio is Complete', text: 'Your seals have carried the light across the sky. The master closes the folio.' });
-      $('#winTitle').innerHTML = decoHTML(end ? end.title : 'Lesson Complete');
-      const tally = `${this.casts} seal${this.casts === 1 ? '' : 's'} cast. The master's mark is ${par}.`;
+      const end = !sh && (L.folioEnd || (last && { title: 'The Folio is Complete', text: 'Your seals have carried the light across the sky. The master closes the folio.' }));
+      $('#winTitle').innerHTML = decoHTML(end ? end.title : sh ? 'Shared Level Complete' : 'Lesson Complete');
+      const cast = this.casts ? `${this.casts} seal${this.casts === 1 ? '' : 's'} cast.` : 'No seals cast.';
+      const tally = sh ? (par ? `${cast} The maker's mark is ${par}.` : cast) : `${cast} The master's mark is ${par}.`;
       $('#winText').textContent = end ? `${end.text} ${tally}` : tally;
-      $('#bNext').style.display = last ? 'none' : '';
+      $('#bNext').style.display = last || sh ? 'none' : ''; // (a shared level has no next: the folio is the way on)
       // the seal pressed into the divider (CSS: #win .stamp.go, #win .sheet.thud), started afresh on every win, with a
       // soft thud as it lands (560ms: the press's contact in stampPress)
-      const st = $('#winSeal'), sh = $('#win .sheet');
-      st.classList.remove('go'); sh.classList.remove('thud');
+      const st = $('#winSeal'), sheet = $('#win .sheet');
+      st.classList.remove('go'); sheet.classList.remove('thud');
       st.style.backgroundImage = `url(${sealSrc})`; st.style.setProperty('--tilt', seal.tilt + 'deg'); st.style.setProperty('--sz', seal.size);
       void st.offsetWidth;
-      st.classList.add('go'); sh.classList.add('thud');
+      st.classList.add('go'); sheet.classList.add('thud');
       this.showScreen('win');
       setTimeout(() => { if (this.state === 'won' && this.idx === wonIdx) Sfx.play('bump', 0.7); }, 560);
     }, 1300);
   },
-  next() { if (this.idx < LEVELS.length - 1) this.start(this.idx + 1); else this.lessons(); },
+  next() { if (!this.shared && this.idx < LEVELS.length - 1) this.start(this.idx + 1); else this.lessons(); },
 
   /* ----- the satchel of kept spells ----- */
   renderSatchel() {
@@ -1210,11 +1246,11 @@ const Game = {
     // the painted look dresses the leaf as the codex page (the old look ◐ keeps the plain sheet)
     const illum = !(typeof CLASSIC !== 'undefined' && CLASSIC.on) && !!GART.page;
     $('#notes').classList.toggle('illum', illum);
-    $('#nNum').textContent = `Lesson ${L.roman}`;
+    $('#nNum').textContent = this.idx < 0 ? 'Shared level' : `Lesson ${L.roman}`;
     $('#nTitle span').innerHTML = decoHTML(L.name); $('#nTitle span').style.fontSize = '';
-    const nt = $('#nText'); nt.textContent = illum ? L.lesson.slice(1) : L.lesson;
+    const cap = illum && !!L.lesson, nt = $('#nText'); nt.textContent = cap ? L.lesson.slice(1) : L.lesson || '';
     // (the drop cap's capital is chiselled gold drawn on a canvas, as on the desktop page; its lapis field is 50px)
-    if (illum) { const c = document.createElement('span'); c.className = 'cap'; c.append(goldCapCanvas(L.lesson[0], 50)); nt.prepend(c); }
+    if (cap) { const c = document.createElement('span'); c.className = 'cap'; c.append(goldCapCanvas(L.lesson[0], 50)); nt.prepend(c); }
     const box = $('#nSigils'); box.innerHTML = '';
     let ahead = 0;
     for (const id of SIGIL_ORDER) {
@@ -1818,7 +1854,7 @@ window.addEventListener('keydown', e => {
     else if (digit >= 0 && Satchel.list[digit]) Grim.loadStrokes(Satchel.list[digit].strokes);
   } else if (Game.state === 'aim') {
     if (k === 'Escape') Game.backToPage();
-  } else if (Game.state === 'menu' && (k === 'ArrowLeft' || k === 'ArrowRight')) {
+  } else if (Game.state === 'menu' && (k === 'ArrowLeft' || k === 'ArrowRight') && !(e.target && e.target.tagName === 'INPUT')) {
     e.preventDefault(); Folio.go(Folio.at + (k === 'ArrowRight' ? 1 : -1));
   } else if (Game.state === 'won' && k === 'Enter') Game.next();
 });
@@ -1842,25 +1878,35 @@ const numHTML = r => [...r].map(c => `<img src="art/num-${c}.png?v=1" width="${N
 // size, all from a hash of the lesson's name (not its place in the list), so a lesson always gets the same seal. A lesson whose pick
 // matches the lesson before it in the same folio steps on to the next seal, so neighbours differ.
 const SEAL_N = 6, sealLooks = [], SEAL_FIT = [1, 0.997, 1.007, 0.977, 0.987, 0.984];
-function sealLook(i) {
-  if (sealLooks[i]) return sealLooks[i];
+// sealPick (v183): the look from a key (a lesson's name; a shared level's code), stepping past seal `avoid` (the
+// neighbour's, or -1)
+function sealPick(key, avoid) {
   let h = 0x811c9dc5;
-  for (const ch of LEVELS[i].name) h = Math.imul(h ^ ch.codePointAt(0), 0x01000193) >>> 0;
+  for (const ch of key) h = Math.imul(h ^ ch.codePointAt(0), 0x01000193) >>> 0;
   const next = () => { h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d) >>> 0; h = Math.imul(h ^ (h >>> 12), 0x297a2d39) >>> 0; h = (h ^ (h >>> 15)) >>> 0; return h / 4294967296; };
   let n = Math.floor(next() * SEAL_N);
-  if (i > 0 && !LEVELS[i].opens && sealLook(i - 1).n === n) n = (n + 1) % SEAL_N;
+  if (n === avoid) n = (n + 1) % SEAL_N;
   const lerp = (a, b) => a + (b - a) * next();
   // (v182) each seal picture's phoenix stamp measures 149.5-154px of 256, so SEAL_FIT brings every stamp to seal-1's
   // size and the random part stays within ±1%: the wax may differ, the phoenixes differ by about 2% at most
-  return (sealLooks[i] = { n, tilt: lerp(-8, 8).toFixed(1), size: (SEAL_FIT[n] * lerp(0.99, 1.01)).toFixed(3) });
+  return { n, tilt: lerp(-8, 8).toFixed(1), size: (SEAL_FIT[n] * lerp(0.99, 1.01)).toFixed(3) };
 }
-const sealHTML = i => {
-  const k = sealLook(i);
-  return `<i class="seal" title="Finished" style="background-image:url(art/seal-${k.n + 1}.png?v=2);--tilt:${k.tilt}deg;--sz:${k.size}"></i>`;
-};
+function sealLook(i) {
+  if (sealLooks[i]) return sealLooks[i];
+  return (sealLooks[i] = sealPick(LEVELS[i].name, i > 0 && !LEVELS[i].opens ? sealLook(i - 1).n : -1));
+}
+// (v183) the seals of the shared levels, in the list's order, each differing from the one before it
+const sharedSeals = () => { let prev = -1; return Shared.all().map(e => { const k = sealPick(e.code, prev); prev = k.n; return k; }); };
+const sharedSeal = code => sharedSeals()[Shared.indexOf(code)] || sealPick(code, -1);
+const sealTag = k => `<i class="seal" title="Finished" style="background-image:url(art/seal-${k.n + 1}.png?v=2);--tilt:${k.tilt}deg;--sz:${k.size}"></i>`;
+const sealHTML = i => sealTag(sealLook(i));
+const escHTML = t => String(t).replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 const Folio = {
   views: [], sheets: [], at: 0, mode: 'single', anim: null, turn: null, resumeTo: 0,
-  build(resumeTo) { this.resumeTo = resumeTo; this.finish(); this.render(); this.go(this.viewOf(resumeTo), true); },
+  addDraft: '', // (v183) what was typed in the Add a level line, kept while the book is drawn again
+  build(resumeTo, at) { this.resumeTo = resumeTo; this.finish(); this.render(); this.go(this.viewOf(at == null ? resumeTo : at), true); },
+  // (v183) the open book drawn again (a shared level added, removed or refused), at the leaf that holds `item`
+  reopen(item) { if (Game.state !== 'menu') return; this.finish(); this.render(); this.go(this.viewOf(item), true); },
   render() { this.layout(); this.paginate(); },
   // the book's size, its border widths and the sizes of the writing, from the room the screen gives it
   layout() {
@@ -1903,12 +1949,47 @@ const Folio = {
   x(px) { const g = this.g; return px <= g.b[3] ? px * this.s : px >= g.w - g.b[1] ? this.W - (g.w - px) * this.s : this.bl + (px - g.b[3]) * this.mx; },
   y(py) { const g = this.g; return py <= g.b[0] ? py * this.s : py >= BOOK.h - g.b[2] ? this.H - (BOOK.h - py) * this.s : this.bt + (py - g.b[0]) * this.my; },
   entryHTML(i) {
+    if (typeof i === 'string') return this.sharedHTML(i);
     const L = LEVELS[i], locked = i >= Save.unlocked(), done = !!Save.starsAt(i);
     const label = `Lesson ${L.roman}: ${locked ? 'locked' : L.name}${done ? ', finished' : ''}`;
     return `<button class="lentry${locked ? ' locked' : ''}${done ? ' done' : ''}${i === this.resumeTo ? ' here' : ''}" data-i="${i}" aria-label="${label}"${locked ? ' aria-disabled="true"' : ''}>`
       + `<span class="ltext"><span class="lnum">${numHTML(L.roman)}</span><span class="lname">${locked ? '· locked ·' : L.name}</span></span>`
       + `${done ? sealHTML(i) : '<i></i>'}</button>`;
   },
+  /* (v183) the Shared Levels section, after the last folio: a level shared with the player ('s' + its place in the
+     list: its name, the best count and the seal once won, a ✕ to remove it after asking), the words for an empty list
+     ('empty'), and the Add a level line ('add': a link or a code pasted, with the reason under it if it was refused) */
+  sharedHTML(it) {
+    if (it === 'empty') return '<p class="bk-empty">Levels people share with you appear here. Open a shared link, or paste one below.</p>';
+    if (it === 'add') {
+      return '<div class="bk-add"><div class="bk-addl">Add a level</div><div class="bk-addrow">'
+        + `<input class="bk-addin" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste a link or code" aria-label="A level link or code" value="${escHTML(this.addDraft)}">`
+        + `<button type="button" class="bk-addgo">Add</button></div><div class="bk-addmsg" role="status">${escHTML(Shared.state.msg)}</div></div>`;
+    }
+    const k = +it.slice(1), e = Shared.all()[k];
+    if (!e) return '';
+    const name = escHTML(e.name), best = `${e.best ? e.best : 'no'} seal${e.best === 1 ? '' : 's'}`;
+    return `<div class="lentry shared${e.won ? ' done' : ''}" role="button" tabindex="0" data-s="${k}" aria-label="${name}${e.won ? `, finished, best ${best}` : ''}">`
+      + `<span class="ltext"><span class="lname">${name}</span>${e.won ? `<span class="lbest">Best: ${best}</span>` : ''}</span>`
+      + `${e.won ? sealTag((this.sSeals || sharedSeals())[k]) : '<i></i>'}`
+      + '<button type="button" class="sdel" title="Remove this level" aria-label="Remove this level">✕</button>'
+      + '<span class="lask">Remove this level from your folio? <button type="button" class="sno">Keep</button> <button type="button" class="syes">Remove</button></span></div>';
+  },
+  // a tap on a shared level's row: play it, or the ✕ and its question
+  sharedTap(t, el) {
+    const k = +el.dataset.s;
+    if (t.closest('.sdel')) { el.classList.add('asking'); el.querySelector('.syes').focus(); return; }
+    if (t.closest('.sno')) { el.classList.remove('asking'); el.focus(); return; }
+    if (t.closest('.syes')) {
+      Shared.remove(k); Sfx.play('smudge');
+      const n = Shared.all().length;
+      this.reopen(n ? 's' + Math.min(k, n - 1) : 'empty');
+      return;
+    }
+    if (el.classList.contains('asking')) return;
+    Shared.play(k);
+  },
+  addLevel(input) { this.addDraft = input.value; Shared.open(input.value); },
   // the lessons written onto leaves: each folio starts a new leaf under its title (in a spread that may be the right
   // page) and fills it before going on to the next, under a running head; only a folio's last leaf is left part empty.
   // Each leaf is measured whole as it fills (title, lessons, page number), and a lesson goes on only while the leaf
@@ -1923,6 +2004,10 @@ const Folio = {
     m.style.cssText = `width:${colW}px;bottom:auto`; book.appendChild(m);
     const folios = [];
     LEVELS.forEach((L, i) => { if (L.opens || !folios.length) folios.push({ title: L.opens || 'The Folio', items: [] }); folios[folios.length - 1].items.push(i); });
+    // (v183) then the levels shared with the player, oldest first, and the line to add one
+    const sh = Shared.all();
+    this.sSeals = sharedSeals();
+    folios.push({ title: 'Shared Levels', items: (sh.length ? sh.map((e, k) => 's' + k) : ['empty']).concat('add') });
     const leaves = [];
     for (const F of folios) {
       for (let j = 0; j < F.items.length;) {
@@ -2060,6 +2145,7 @@ const Folio = {
   let t0 = 0, moved = 0; // for a tap on a page corner: how long the press lasted and how far it wandered
   book.addEventListener('pointerdown', e => {
     if (id !== null || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    if (e.target.closest && e.target.closest('.bk-add')) return; // (v183) a press in the Add a level line is for its field
     id = e.pointerId; x0 = e.clientX; y0 = e.clientY; dx = 0; mode = 0; swallow = false; dir = 0; t0 = performance.now(); moved = 0;
   });
   book.addEventListener('pointermove', e => {
@@ -2116,9 +2202,19 @@ const Folio = {
     Folio.go(Folio.at + d);
   });
   book.addEventListener('click', e => {
+    if (Folio.anim) return;
+    if (e.target.closest('.bk-addgo')) { Sfx.init(); Folio.addLevel(e.target.closest('.bk-add').querySelector('.bk-addin')); return; }
     const el = e.target.closest('.lentry');
-    if (!el || el.classList.contains('locked') || Folio.anim) return;
-    Sfx.init(); Game.start(+el.dataset.i);
+    if (!el || el.classList.contains('locked')) return;
+    Sfx.init();
+    if (el.classList.contains('shared')) Folio.sharedTap(e.target, el); else Game.start(+el.dataset.i);
+  });
+  // (v183) Enter in the Add a level field adds; Enter or Space on a shared level's row (not a button) plays it
+  book.addEventListener('keydown', e => {
+    if (Game.state !== 'menu' || Folio.anim) return;
+    const t = e.target;
+    if (t.classList.contains('bk-addin') && e.key === 'Enter') { e.preventDefault(); Sfx.init(); Folio.addLevel(t); }
+    else if (t.classList.contains('shared') && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); t.click(); }
   });
   // a new size of screen lays the book out again, on the leaf that holds the lessons shown now
   let rt = 0;
@@ -2306,6 +2402,8 @@ resize();
   const back = Game.wasPlaying();
   Game.title();
   if (back >= 0) Game.start(back);
+  // (v183) a shared level's link (#level= on the game's address), or a shared level left in play by a reload
+  Shared.boot();
 }
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { Grim.bookDirty = true; Grim.fitButtons(); });
 ['700 30px "Cinzel Decorative"', '30px "Pinyon Script"', 'italic 16px "IM Fell English"', '600 12px Cinzel', '700 30px Cinzel'].forEach(f => { try { document.fonts.load(f).then(() => { Grim.bookDirty = true; }); } catch (e) { } });
