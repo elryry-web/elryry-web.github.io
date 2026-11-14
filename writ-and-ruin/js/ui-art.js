@@ -124,10 +124,18 @@
   function cardSuit(id) { var c = D.CARDS[id]; return c.relic ? 'Relic' : c.suit; }
   function suitCol(suit) { return suit === 'Relic' ? PAL.ochre : SUIT_COL[suit]; }
 
-  // a card: suit block with glyph, name, cost, text
-  function card(id, extra) {
-    var c = D.CARDS[id], suit = cardSuit(id);
-    return '<div class="card" data-card="' + id + '"><div class="card-glyph" style="--suit:' + suitCol(suit) + '">' + art('card/' + id) + '</div>' +
+  // a card: suit block with glyph (or the resident's painted portrait), name, cost, text.
+  // opts.pic: 'thumb' (the default) a head-and-shoulders crop for lists, loaded lazily;
+  //           'full' the whole portrait, for a resident offered or shown on its own.
+  function card(id, extra, opts) {
+    var c = D.CARDS[id], suit = cardSuit(id), url = painted[(c.relic ? 'relic-' : 'res-') + id];
+    var pic = opts && opts.pic === 'full' ? 'full' : 'thumb';
+    // a relic's painting is a cut-out, shown whole on the bare card with no frame
+    var face = url && c.relic ? '<div class="card-relic ' + pic + '"><img src="' + url + '" alt="" decoding="async"></div>' :
+      url ? '<div class="card-pic ' + pic + '" style="--suit:' + suitCol(suit) + '"><img src="' + url + '" alt=""' +
+        (pic === 'thumb' ? ' loading="lazy"' : '') + ' decoding="async" onerror="WR_ART.noPortrait(this,\'' + id + '\')"></div>' :
+      '<div class="card-glyph" style="--suit:' + suitCol(suit) + '">' + art('card/' + id) + '</div>';
+    return '<div class="card' + (url ? ' has-pic pic-' + pic : '') + '" data-card="' + id + '">' + face +
       '<div class="card-body"><div class="card-name">' + c.name + (c.relic ? '' : ' <span class="cost">' + c.cost + 's</span>') + '</div>' +
       '<div class="card-suit">' + (c.relic ? 'Relic' : c.suit) + '</div><div class="card-text">' + c.text + '</div>' + (extra || '') + '</div></div>';
   }
@@ -160,9 +168,13 @@
     try {
       fetch('art/manifest.json', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (m) {
         if (!m || typeof m !== 'object') return;
+        var portraits = false;
         Object.keys(m).forEach(function (slot) {
           var url = m[slot];
           if (typeof url !== 'string') return;
+          // resident portraits are many and shown one card at a time: listed now, fetched by the card's own
+          // (lazy) img, and dropped back to the suit block by noPortrait if one fails to load
+          if (slot.indexOf('res-') === 0) { painted[slot] = url; portraits = true; return; }
           var im = new Image();
           var once = false;
           var done = function () { if (once) return; once = true; painted[slot] = url; arrived(); };
@@ -171,8 +183,21 @@
           im.onload = function () { if (im.decode) { im.decode().then(done, done); setTimeout(done, 800); } else done(); };
           im.src = url;
         });
+        if (portraits) arrived();
       }).catch(function () {});
     } catch (e) { /* file:// or no fetch: stay with the drawn art */ }
+  }
+  // a portrait that failed to load: forget it and put the suit block back in its place
+  function noPortrait(img, id) {
+    delete painted['res-' + id];
+    var box = img.parentNode, cardEl = box && box.parentNode;
+    if (!cardEl) return;
+    var g = document.createElement('div');
+    g.className = 'card-glyph';
+    g.style.setProperty('--suit', suitCol(cardSuit(id)));
+    g.innerHTML = art('card/' + id);
+    cardEl.replaceChild(g, box);
+    cardEl.classList.remove('has-pic', 'pic-full', 'pic-thumb');
   }
   // The painted flag, lozenge and rounds carry less ink than a shield at the same width (tools/prep-art.py
   // trims each to its edges), so at stamp size they read a size smaller. They are drawn wider, never taller
@@ -198,5 +223,5 @@
   root.WR_ART = { PAL: PAL, HOUSE: HOUSE, houseCol: houseCol, textOn: textOn, SUIT_COL: SUIT_COL, suitCol: suitCol, cardSuit: cardSuit,
     hash: hash, rng: rng, blob: blob, blobPoints: blobPoints, smooth: smooth, gouges: gouges, f1: f1,
     stamp: stamp, suitGlyph: suitGlyph, siteGlyph: siteGlyph, SITE_GLYPH: SITE_GLYPH, card: card, vignette: vignette,
-    art: art, painted: painted, paintedUrl: paintedUrl, bannerScale: bannerScale, onPainted: onPainted };
+    art: art, painted: painted, paintedUrl: paintedUrl, bannerScale: bannerScale, onPainted: onPainted, noPortrait: noPortrait };
 })(typeof self !== 'undefined' ? self : this);

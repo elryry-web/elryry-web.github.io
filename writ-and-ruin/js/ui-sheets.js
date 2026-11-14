@@ -204,7 +204,7 @@
             if (!D.CARDS[id].siteOnly) ac.push(btn('To your retinue', function () { U.doAction({ type: 'keep', card: id, to: 'retinue' }); }, { cls: 'go', off: E.check(s, { type: 'keep', house: 'player', card: id, to: 'retinue' }) }));
             ac.push(btn('Leave at the site', function () { U.doAction({ type: 'keep', card: id, to: 'site' }); }, { cls: D.CARDS[id].siteOnly ? 'go' : '', off: E.check(s, { type: 'keep', house: 'player', card: id, to: 'site' }) }));
           }
-          return A.card(id, (D.CARDS[id].siteOnly ? '<p class="note">Works only at its site. It does nothing in a retinue.</p>' : '') + '<div class="row">' + ac.join('') + '</div>');
+          return A.card(id, (D.CARDS[id].siteOnly ? '<p class="note">Works only at its site. It does nothing in a retinue.</p>' : '') + '<div class="row">' + ac.join('') + '</div>', { pic: 'full' });
         }).join('') + '</div>' +
         '<p class="muted">A resident left at the site can be recruited later by whoever has warbands there.</p>' +
         '<div class="row">' + btn('Keep no more', function () { U.doAction({ type: 'keep', card: null }); }) + '</div>';
@@ -266,12 +266,12 @@
     var slots = E.slotsOf(s, r);
     out.push('<h3>Residents <small>' + g.residents.length + ' of ' + slots + ' slots</small></h3>');
     if (!g.residents.length) out.push('<p class="muted">No one lives here now. Searching can find someone.</p>');
-    else out.push('<div class="cards">' + g.residents.map(function (id) {
+    else out.push('<div class="cards solo">' + g.residents.map(function (id) {
       var a = { type: 'recruit', region: r, card: id }, m = my ? cand(a) : 'not your turn';
       var cost = E.recruitCost(s, 'player', id);
       var show = my && E.bandsAt(s, 'player', r) > 0;
-      if (D.CARDS[id].siteOnly) return A.card(id, '<p class="muted">Works only at its site' + (g.owner === 'player' ? ': it guards your region.' : ', for whoever holds the region.') + ' It cannot be recruited.</p>');
-      return A.card(id, show ? '<div class="row">' + btn('Recruit for ' + cost + 's', function () { U.doAction({ type: 'recruit', region: r, card: id }); }, { cls: mode === 'recruit' ? 'go' : '', off: m }) + '</div>' : '');
+      if (D.CARDS[id].siteOnly) return A.card(id, '<p class="muted">Works only at its site' + (g.owner === 'player' ? ': it guards your region.' : ', for whoever holds the region.') + ' It cannot be recruited.</p>', { pic: 'full' });
+      return A.card(id, show ? '<div class="row">' + btn('Recruit for ' + cost + 's', function () { U.doAction({ type: 'recruit', region: r, card: id }); }, { cls: mode === 'recruit' ? 'go' : '', off: m }) + '</div>' : '', { pic: 'full' });
     }).join('') + '</div>');
     if (!my) {
       out.push(U.busy ? '<p class="muted">A rival is moving. You can act on your turn.</p>' : '');
@@ -613,7 +613,7 @@
       out.push('<p>Banish ' + needB + ' cards from the world deck for good, and admit ' + needA + ' from the Vault. Chosen: ' + rk.banish.length + ' of ' + needB + ' banished, ' + rk.admit.length + ' of ' + needA + ' admitted.</p>');
       out.push('<h3>Admit from the Vault</h3><div class="cards">' + o.offer.map(function (id) {
         var on = rk.admit.indexOf(id) >= 0;
-        return A.card(id, '<div class="row">' + btn(on ? 'Admitted ✓' : 'Admit', function () { toggle(rk.admit, id, needA); }, { cls: on ? 'active' : '' }) + '</div>');
+        return A.card(id, '<div class="row">' + btn(on ? 'Admitted ✓' : 'Admit', function () { toggle(rk.admit, id, needA); }, { cls: on ? 'active' : '' }) + '</div>', { pic: 'full' });
       }).join('') + '</div>');
       out.push('<h3>Banish from the world deck</h3><div class="cards">' + o.deck.map(function (id) {
         var on = rk.banish.indexOf(id) >= 0;
