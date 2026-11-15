@@ -387,6 +387,16 @@
     // never muster into an upkeep next turn's silver cannot pay
     if (a.type === 'muster' && E.upkeep(c, h) > E.upkeep(s, h) &&
         c.houses[h].silver + E.income(c, h) < E.upkeep(c, h)) return -1e4;
+    // a house musters in each region once a turn: warbands raised in a quiet region can still march next door this turn
+    if (a.type === 'muster' && c.houses[h].hours > 0) {
+      var mv = evaluate(c, h);
+      E.legalActions(c, h, { few: true }).forEach(function (b) {
+        if (b.type !== 'march' || b.from !== a.region || !E.holds(c, h, b.to)) return;
+        var v2 = evaluate(tryApply(c, b), h) - 0.25;
+        if (v2 > mv) mv = v2;
+      });
+      return mv;
+    }
     return evaluate(c, h);
   }
   function isWeakest(s, d) {

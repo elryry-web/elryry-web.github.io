@@ -314,6 +314,8 @@
   function musterMax(s, h, r) {
     return N.musterMax + (has(s, h, 'drillCaptain') ? 1 : 0) + (law(s, 'levy') ? 1 : 0) + (r && s.regions[r] && workHere(s, h, 'musterField', r) ? WORK.musterField.muster : 0);
   }
+  // true when h has already mustered in r this turn (once per region per turn)
+  function musteredHere(s, h, r) { var m = s.houses[h].flags.mustered; return !!(m && m[r]); }
   function musterCost(s, h, r, count) {
     var c = count - (has(s, h, 'brewer') ? 1 : 0) - (r === 'ashwood' && siteOn(s, 'ashwood') ? 1 : 0);
     return Math.max(0, c);
@@ -596,6 +598,7 @@
       case 'muster': {
         if (!s.regions[a.region] || !holds(s, h, a.region)) return err('not your region');
         if (!(a.count >= 1 && a.count <= musterMax(s, h, a.region))) return err('bad count');
+        if (musteredHere(s, h, a.region)) return err('already mustered here this turn');
         if (hours < 1) return err('no hours');
         if (!opts.ignoreHours && hs.silver < musterCost(s, h, a.region, a.count)) return err('not enough silver');
         return null;
@@ -765,11 +768,12 @@
         add({ type: 'search', region: r });
       }
       if (holds(s, h, r)) {
-        var mx = musterMax(s, h, r), cs = opts.few ? [mx, 1] : counts(mx);
+        // a house musters in each region at most once a turn
+        var mx = musterMax(s, h, r), cs = musteredHere(s, h, r) ? [] : opts.few ? [mx, 1] : counts(mx);
         if (opts.few && !opts.ignoreHours) {
           // the most this house can pay for
           var afford = mx; while (afford > 1 && musterCost(s, h, r, afford) > hs.silver) afford--;
-          cs = afford > 1 ? [afford, 1] : [1];
+          if (cs.length) cs = afford > 1 ? [afford, 1] : [1];
         }
         cs.forEach(function (c) { add({ type: 'muster', region: r, count: c }); });
         if (!siteOn(s, r)) add({ type: 'build', region: r });
@@ -827,6 +831,7 @@
       case 'muster': {
         var mc = musterCost(s, h, a.region, a.count);
         hs.silver -= mc; hs.hours -= 1;
+        (hs.flags.mustered = hs.flags.mustered || {})[a.region] = true;
         s.regions[a.region].bands[h] = bandsAt(s, h, a.region) + a.count;
         ev.push({ type: 'muster', house: h, region: a.region, count: a.count, silver: mc });
         break;
@@ -1732,7 +1737,7 @@
     endChances: endChances, fortuneLeft: fortuneLeft, peekFortune: peekFortune, assaultOdds: assaultOdds, lossRange: lossRange, battleLosses: battleLosses,
     battlePreview: battlePreview, attackBonus: attackBonus, defenceOf: defenceOf, lastStand: lastStand, returnSpots: returnSpots,
     marchDests: marchDests, enterMode: enterMode, emptyOfOthers: emptyOfOthers, watched: watched, dugIn: dugIn,
-    musterCost: musterCost, musterMax: musterMax, recruitCost: recruitCost, recruitReach: recruitReach, poachFrom: poachFrom, searchSilver: searchSilver, assaultHours: assaultHours, bellHolder: bellHolder,
+    musterCost: musterCost, musterMax: musterMax, musteredHere: musteredHere, recruitCost: recruitCost, recruitReach: recruitReach, poachFrom: poachFrom, searchSilver: searchSilver, assaultHours: assaultHours, bellHolder: bellHolder,
     pactsBetween: pactsBetween, intentLabel: intentLabel, pactsBrokenBy: pactsBrokenBy, grudge: grudge, loreCount: loreCount,
     // utilities
     clone: clone, rnd: rnd, rint: rint, shuffle: shuffle, DATA: D

@@ -55,6 +55,7 @@
     'return first': 'You hold no region: return first.',
     'once per turn': 'You have already treated this turn.',
     'already dug in': 'You have already dug in here this turn.',
+    'already mustered here this turn': 'You have already mustered here this turn.',
     'newly returned: safe until their turn': 'That house has just returned there. It is safe until its next turn.',
     'empty: march instead': 'No one defends it: march in instead.',
     'the truce': 'No assaults in the first round.',
@@ -768,7 +769,8 @@
     if (kind === 'assault' && E.truce(s)) return E.truce(s);
     if (hs.hours < 1 && kind !== 'march') return 'no hours';
     if (kind === 'march') return hs.hours < 1 ? 'no hours' : 'None of your warbands can march anywhere.';
-    if (kind === 'muster') return 'not enough silver';
+    if (kind === 'muster') return IDS.some(function (r) { return E.holds(s, 'player', r) && !E.musteredHere(s, 'player', r); }) ? 'not enough silver' :
+      'You have mustered in every region you hold this turn.';
     if (kind === 'assault') {
       var why = hs.hours < 2 && !(E.has(s, 'player', 'bannerClerk') && !hs.flags.clerk) ? 'assault costs 2 moons; have ' + hs.hours : 'None of your warbands stand next to a region you can assault.';
       var u = unguardedNote(s, legalNow(s));

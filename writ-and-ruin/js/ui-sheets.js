@@ -329,6 +329,7 @@
     if (E.holds(s, 'player', r)) {
       var mm = cand({ type: 'muster', region: r, count: 1 });
       acts.push(['muster', btn('Muster here… <small>' + E.musterCost(s, 'player', r, 1) + 's each</small>', function () { musterSheet(r); }, { off: mm })]);
+      if (E.musteredHere(s, 'player', r)) acts.push(['muster', '<p class="muted">You have already mustered here this turn.</p>']);
       if (!built) acts.push(['build', btn('Build the ' + esc(R.site) + ' <small>' + E.buildCost(r) + 's, 1 moon</small>', function () { U.doAction({ type: 'build', region: r }); }, { cls: 'go', off: cand({ type: 'build', region: r }) })]);
       if (!hs.flags.returnDue) hs.retinue.forEach(function (id) {
         if (D.CARDS[id].relic) return;
@@ -524,7 +525,7 @@
         '<li><span><b>Foretell.</b> Fulfil your secret prophecy. It is claimed the same way.</span></li>' +
         '<li><span><b>Depart.</b> From the ' + ordinal(N.departFrom) + ' round, hold the Far Pass with enough warbands since the start of your turn and carry the relics it needs, then depart.</span></li>' +
         '<li><span><b>Seat.</b> If the age ends with no other winner, the house holding the Crown hold wins.</span></li></ul>' +
-        '<h3>Your turn</h3><p>You get moons each turn to spend on actions. March (1 moon), muster (1 moon and silver), assault (2 moons), recruit, search and treat. ' +
+        '<h3>Your turn</h3><p>You get moons each turn to spend on actions. March (1 moon), muster (1 moon and silver), assault (2 moons), recruit, search and treat. You can muster in each region once a turn. ' +
           'Build a structure in a region you hold (1 moon and silver). Station a resident from your retinue in an empty slot of a region you hold (1 moon). Dig in (1 moon): +1 defence in a region you hold until your next turn. Tap a region to see what you can do there.</p>' +
         '<p>Recruit a resident in a region you hold, where your warbands stand, or in a region next to them. Taking one from a region another house holds is poaching: it costs ' + N.poachSilver + ' more silver, and that house takes a grudge against you. You cannot poach from a house you have a pact with. A rival that means to poach from you shows it first, like an assault.</p>' +
         '<h3>Structures</h3><p>The Citadel and the Waystone are landmarks. They stand from the start and can never be razed. ' +
