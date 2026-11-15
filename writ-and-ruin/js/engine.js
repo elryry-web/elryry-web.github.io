@@ -1468,6 +1468,23 @@
     s.fortune = shuffle(s, N.fortune.slice());
     var props = shuffle(s, D.PROPHECIES.map(function (p) { return p.id; }));
     s.order.forEach(function (h, i) { s.houses[h].prophecyOptions = [props[2 * i], props[2 * i + 1]]; });
+    // the house holding the Crown hold is never dealt a prophecy that needs it to lose the Crown (5 and 10):
+    // each is swapped for the first fit one left undealt, or else traded with the next house's fit option
+    var holder = s.regions.crown.owner, unfit = [5, 10];
+    if (holder && s.houses[holder]) {
+      var mine = s.houses[holder].prophecyOptions, spare = props.slice(2 * s.order.length);
+      mine.forEach(function (id, k) {
+        if (unfit.indexOf(id) < 0) return;
+        var j = spare.findIndex(function (x) { return unfit.indexOf(x) < 0; });
+        if (j >= 0) { mine[k] = spare[j]; spare[j] = id; return; }
+        s.order.some(function (o) {
+          if (o === holder) return false;
+          var theirs = s.houses[o].prophecyOptions, q = theirs.findIndex(function (x) { return unfit.indexOf(x) < 0; });
+          if (q < 0) return false;
+          mine[k] = theirs[q]; theirs[q] = id; return true;
+        });
+      });
+    }
     c.age = s; c.reckoning = null;
     return s;
   }
