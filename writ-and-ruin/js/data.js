@@ -85,7 +85,7 @@
     { id: 'fenLantern', name: 'Fen Lantern', suit: 'Wild', cost: 2, text: 'Search in Old Barrow or Saltmarsh draws 2 more.' },
     { id: 'cutpurse', name: 'Cutpurse', suit: 'Shade', cost: 1, text: 'When you win a battle, take 1 silver from the loser.' },
     { id: 'whisperer', name: 'Whisperer', suit: 'Shade', cost: 2, text: 'Treat costs 0 moons.' },
-    { id: 'smugglerQueen', name: 'Smuggler Queen', suit: 'Shade', cost: 3, text: "March into a rival's region without a battle if it has 1 warband or fewer; it holds there with yours." },
+    { id: 'smugglerQueen', name: 'Smuggler Queen', suit: 'Shade', cost: 3, text: "March into a rival's region guarded by 1 warband or fewer without a battle. The region becomes yours; their warband falls back." },
     { id: 'poisoner', name: 'Poisoner', suit: 'Shade', cost: 4, text: 'Once per age, remove one resident from any site or retinue to the bottom of the deck.' },
     { id: 'forger', name: 'Forger', suit: 'Shade', cost: 2, text: 'Breaking a pact gives no grudge.' },
     { id: 'maskedEnvoy', name: 'Masked Envoy', suit: 'Shade', cost: 3, text: 'Rivals accept your pacts as if you held 1 more region.' }

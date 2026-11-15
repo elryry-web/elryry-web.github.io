@@ -57,7 +57,8 @@
         var t = [];
         t.push(owned ? 'You hold ' + rn(to) + '.' : (s.regions[to].owner ? 'Held by ' + whoLow(s.regions[to].owner) + (H.unguarded(s, to) ? ', with no warbands there. You take it when you march in.' : '.') : 'No house holds it: you take it when you march in.'));
         if (mode === 'hermit') t.push('The Antlered Hermit lets you pass the free folk.');
-        if (mode === 'smuggle') t.push('The Smuggler Queen slips you in past a lone warband.');
+        if (mode === 'smuggle') t.push('The Smuggler Queen takes it without a battle; their warband falls back.' +
+          (E.pactsBrokenBy(s, 'player', s.regions[to].owner).length ? ' This breaks your pact with ' + whoLow(s.regions[to].owner) + '.' : ''));
         if (E.watched(s, to) && !owned) t.push('The Smuggler Queen walks you past ' + whoseLow(s.regions[to].owner) + ' Town Watch. You take it when you march in.');
         var free = E.marchFree(s, 'player', from, to);
         t.push((free ? 'Costs no moons' : 'Costs 1 moon') + (E.law(s, 'tolls') && !owned ? ' and 1 silver toll' : '') + '.');
@@ -454,11 +455,14 @@
     var target = null;
     U.openSheet(function () {
       var s = age(), hs = me(), legal = H.legalNow(s).filter(function (a) { return a.type === 'treat'; });
-      var out = ['<h2>Treat with a rival</h2><p>Offer one pact a turn. It costs 1 moon. The rival answers at once.</p>'];
+      var out = ['<h2>Treat with a rival</h2><p>Offer one pact a turn. It costs 1 moon. The rival answers at once. A house with no land can’t make pacts, and its pacts end when it loses its last region.</p>'];
       out.push('<div class="row wrap">' + s.order.filter(function (h) { return h !== 'player'; }).map(function (h) {
         return btn(stamp(h, 18) + ' ' + who(h), function () { target = h; U.redrawSheet(); }, { cls: target === h ? 'active' : '' });
       }).join('') + '</div>');
-      if (target) {
+      if (target && (!E.nHeld(s, 'player') || !E.nHeld(s, target))) {
+        out.push('<p class="warn">' + (!E.nHeld(s, 'player') ? 'You hold no land' : esc(who(target)) + ' holds no land') +
+          '. A house with no land can’t make pacts.</p>');
+      } else if (target) {
         var have = E.pactsBetween(s, 'player', target);
         if (have.length) out.push('<p class="muted">Already agreed: ' + have.map(function (p) { return p.type === 'foe' ? 'common cause against ' + whoLow(p.foe) : p.type; }).join(', ') + '.</p>');
         var opts = [

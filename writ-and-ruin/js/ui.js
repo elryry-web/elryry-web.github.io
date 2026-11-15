@@ -195,7 +195,10 @@
       case 'landless': return W + (h === 'player' ? ' hold' : ' holds') + ' no region and must return.';
       case 'return': return W + ' returned with ' + ev.count + ' warbands to ' + rn(ev.camp ? 'camp' : ev.region) + '.';
       case 'march': return W + ' marched ' + ev.count + ' from ' + rn(ev.from) + ' to ' + rn(ev.to) + (ev.via ? ' by way of ' + rn(ev.via) : '') +
-        (ev.took ? ' and took it' + (ev.took === 'free folk' ? '' : ' from ' + whoLow(ev.took, s)) : '') + '.';
+        (ev.took ? ' and took it' + (ev.took === 'free folk' ? '' : ' from ' + whoLow(ev.took, s)) : '') +
+        (ev.mode === 'smuggle' ? ' with the Smuggler Queen, without a battle' : '') + '.' +
+        (ev.retreat ? ' ' + whose(ev.took, s) + ' warband ' + (ev.retreat.to ? 'fell back to ' + rn(ev.retreat.to) + '.' : 'had nowhere to fall back to and scattered.') : '') +
+        (ev.relic ? ' ' + W + ' took the relic ' + cardName(ev.relic) + '.' : '');
       case 'muster': return W + ' mustered ' + ev.count + ' in ' + rn(ev.region) + (ev.silver ? ' for ' + ev.silver + ' silver' : '') + '.';
       case 'battle': {
         var d = ev.defender ? whoLow(ev.defender, s) : 'the free folk';
@@ -222,6 +225,13 @@
       case 'pactOffered': return W + ' offered ' + whoLow(ev.target, s) + ' ' + pactWords(ev.offer, s) + '.';
       case 'pactAccepted': return W + ' accepted ' + pactWords(ev.pact.type === 'tribute' ? { type: 'tribute', payer: ev.pact.payer, payee: ev.pact.payee } : ev.pact, s) + ' with ' + whoLow(ev.from, s) + '.';
       case 'pactRefused': return W + ' refused ' + whoseLow(ev.from, s) + ' offer.';
+      case 'pactEnded': {
+        var po = ev.pact.a === ev.house ? ev.pact.b : ev.pact.a, pn = PACT_NAME[ev.pact.type] || 'a pact';
+        pn = pn.replace(/^a /, '');
+        if (po === 'player') return 'Your ' + pn + ' with ' + whoLow(ev.house, s) + ' ends: they hold no land.';
+        if (ev.house === 'player') return 'Your ' + pn + ' with ' + whoLow(po, s) + ' ends: you hold no land.';
+        return 'The ' + pn + ' between ' + whoLow(ev.pact.a, s) + ' and ' + whoLow(ev.pact.b, s) + ' ends: ' + whoLow(ev.house, s) + ' holds no land.';
+      }
       case 'pactExpired': return 'The ' + (ev.pact.type === 'tribute' ? 'tribute' : 'truce') + ' between ' + whoLow(ev.pact.a, s) + ' and ' + whoLow(ev.pact.b, s) + ' ran out.';
       case 'depart': return W + ' departed by the Far Pass.';
       case 'poison': return W + ' poisoned ' + cardName(ev.card) + '.';

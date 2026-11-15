@@ -692,6 +692,8 @@
       case 'treat': {
         if (hs.flags.treated) return err('once per turn');
         if (!s.houses[a.target] || a.target === h) return err('no such rival');
+        if (!nHeld(s, h)) return err('you hold no land');
+        if (!nHeld(s, a.target)) return err(s.houses[a.target].short + ' holds no land');
         if (hours < treatHours(s, h)) return err('no hours');
         var ex = pactsBetween(s, h, a.target).filter(function (p) { return p.type === a.pact; });
         if (ex.length) return err('already agreed');
@@ -945,7 +947,17 @@
         ev.push({ type: 'seeProphecy', house: h, target: a.target, prophecy: s.houses[a.target].prophecy });
         break;
     }
+    endLandlessPacts(s, ev);
     return ev;
+  }
+  // a house that holds no region makes no pacts: when it loses its last region, all its pacts end at once (no grudge)
+  function endLandlessPacts(s, ev) {
+    if (!s.pacts || !s.pacts.length) return;
+    s.pacts = s.pacts.filter(function (p) {
+      var gone = !nHeld(s, p.a) ? p.a : !nHeld(s, p.b) ? p.b : null;
+      if (gone) ev.push({ type: 'pactEnded', pact: p, house: gone });
+      return !gone;
+    });
   }
 
   // ---------------------------------------------------------------- undo
@@ -1014,10 +1026,21 @@
     var prev = dst.owner;
     if (prev === 'player') useWarned(s, h, a.to);
     dst.bands[h] = (dst.bands[h] || 0) + a.count;
+    var M = { type: 'march', house: h, from: a.from, to: a.to, via: dest.via, count: a.count, mode: mode, free: free, silver: silver,
+      took: (mode === 'empty' || mode === 'hermit' || mode === 'smuggle') ? (prev || 'free folk') : null, retreat: null, relic: null };
     if (mode === 'empty' || mode === 'hermit') { setOwner(s, a.to, h, 'march'); dst.folk = 0; }
+    var after = [];
+    if (mode === 'smuggle') {
+      // the Smuggler Queen takes a lightly held region with no battle: a hostile act, like an assault that won.
+      // No battle means no defence bonus (Iron Key, Wall Warden, Gate Porter, last stand, digging in) can stop her.
+      takeFrom(s, h, prev, a.to, dst.bands[prev] || 0, a.relic, M);
+      setOwner(s, a.to, h, 'smuggle');
+      breakPacts(s, h, prev, a.to, after);   // after the take, so the Hanging Judge spares the new region if it can
+      settle(s, a.to);
+    }
     if (a.from !== 'camp') settle(s, a.from);
-    ev.push({ type: 'march', house: h, from: a.from, to: a.to, via: dest.via, count: a.count, mode: mode, free: free, silver: silver,
-      took: (mode === 'empty' || mode === 'hermit') ? (prev || 'free folk') : null });
+    ev.push(M);
+    after.forEach(function (e) { ev.push(e); });
   }
 
   function doAssault(s, a, ev) {
@@ -1056,23 +1079,7 @@
     var src = camp ? null : s.regions[from];
     if (win) {
       lose(n);
-      if (d) {
-        var left = (g.bands[d] || 0) - defLoss;
-        delete g.bands[d];
-        if (left > 0) {
-          var back = null;
-          REG[to].adj.forEach(function (r) { if (holds(s, d, r) && (!back || bandsAt(s, d, r) > bandsAt(s, d, back))) back = r; });
-          if (back) { s.regions[back].bands[d] = bandsAt(s, d, back) + left; E.retreat = { to: back, count: left }; }
-          else E.retreat = { to: null, count: left };
-        }
-        addGrudge(s, d, h, N.grudgeTaken);
-        if (to === 'crown') hs.tookCrown = true;
-        var dh = s.houses[d];
-        if (dh.relics.length && !has(s, d, 'fence')) {
-          var pick = (a.relic && dh.relics.indexOf(a.relic) >= 0) ? a.relic : bestRelicFor(s, h, dh.relics);
-          dh.relics.splice(dh.relics.indexOf(pick), 1); hs.relics.push(pick); E.relic = pick;
-        }
-      }
+      if (d) takeFrom(s, h, d, to, (g.bands[d] || 0) - defLoss, a.relic, E);
       g.folk = 0;
       setOwner(s, to, h, 'assault');
       var surv = n - attLoss;
@@ -1095,6 +1102,26 @@
     }
     s.history.battles++;
     ev.push(E);
+  }
+  // h takes region `to` from house d (by assault or the Smuggler Queen): d's `left` warbands there fall back to its
+  // neighbouring region with the most of its warbands (or scatter if it holds none next door), d bears a grudge,
+  // and h takes one of d's relics. The event E gets retreat and relic.
+  function takeFrom(s, h, d, to, left, relic, E) {
+    var g = s.regions[to], hs = s.houses[h];
+    delete g.bands[d];
+    if (left > 0) {
+      var back = null;
+      REG[to].adj.forEach(function (r) { if (holds(s, d, r) && (!back || bandsAt(s, d, r) > bandsAt(s, d, back))) back = r; });
+      if (back) { s.regions[back].bands[d] = bandsAt(s, d, back) + left; E.retreat = { to: back, count: left }; }
+      else E.retreat = { to: null, count: left };
+    }
+    addGrudge(s, d, h, N.grudgeTaken);
+    if (to === 'crown') hs.tookCrown = true;
+    var dh = s.houses[d];
+    if (dh.relics.length && !has(s, d, 'fence')) {
+      var pick = (relic && dh.relics.indexOf(relic) >= 0) ? relic : bestRelicFor(s, h, dh.relics);
+      dh.relics.splice(dh.relics.indexOf(pick), 1); hs.relics.push(pick); E.relic = pick;
+    }
   }
   var RELIC_ORDER = ['waystoneShard', 'antlerCrown', 'ninthBanner', 'ironKey', 'drownedBell', 'saltCodex'];
   function bestRelicFor(s, h, list) {
@@ -1148,6 +1175,10 @@
     var who = cap(s.houses[h].short), R = function (r) { return REG[r] ? (r === 'crown' || r === 'farpass' ? 'the ' : '') + REG[r].name : r; };
     if (!it) return who + ': no plan';
     var w = it.why && s.houses[it.why.house], base = intentBase(it, who, R);
+    // a march into a rival's guarded region is the Smuggler Queen's take: say so
+    var tg = it.type === 'march' && s.regions[it.to];
+    if (tg && tg.owner && tg.owner !== h && (tg.bands[tg.owner] || 0) > 0 && has(s, h, 'smugglerQueen'))
+      base = who + ': march ' + it.count + ' to take ' + R(it.to) + ' (Smuggler Queen)';
     if (!w) return base;
     var you = it.why.house === 'player', them = you ? 'you' : w.short, theirs = you ? 'your' : w.short + "'s";
     return base + (it.why.kind === 'depart' ? ' to stop ' + them + ' departing' :

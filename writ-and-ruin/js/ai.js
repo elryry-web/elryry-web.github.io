@@ -364,8 +364,17 @@
       } else if (t.folk) v += t.folk * o.p;
       return v;
     }
+    var queen = a.type === 'march' && E.enterMode(s, h, a.to) === 'smuggle';
     c = tryApply(s, a);
     if (c.pending && c.pending.type === 'search') c.pending = null;
+    // a Smuggler Queen take: a sure win with no battle, weighed like an assault (grudges, broken pacts, the weakest)
+    if (queen) {
+      var qd = s.regions[a.to].owner, qv = evaluate(c, h) + t.fight + 0.35 * E.grudge(s, h, qd);
+      var qb = E.pactsBrokenBy(s, h, qd).length;
+      if (qb) qv -= qb * (t.breakCost + (s.houses[h].broke ? 0.5 : 0)) + (E.has(s, h, 'forger') ? -t.breakCost * 0.6 : 0);
+      if (t.weakest && isWeakest(s, qd)) qv += t.weakest;
+      return qv;
+    }
     // a structure pays only while the region stays held: discount it by how exposed the region is
     if (a.type === 'build') {
       var gap = pressure(s, h, a.region) + 1 - E.defenceOf(s, a.region, null);
