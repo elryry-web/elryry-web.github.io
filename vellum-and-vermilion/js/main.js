@@ -18,7 +18,7 @@
   };
   // Book II's cards (placeholders until phase 3 writes them)
   if (B2) RULES = {
-    1: { title: 'Over and Under', text: 'Tap a crossing to swap which ribbon lies on top. A ribbon goes over, then under, then over, all the way along. Crossings with an ink dot are fixed. Start there and work outward. A red slash marks two crossings in a row that go the same way. Flip one of them.' },
+    1: { title: 'Over and Under', text: 'Tap a crossing to swap which ribbon lies on top. A ribbon goes over, then under, then over, all the way along. Crossings with an ink dot are fixed. Start there and work outward. Red arrows mark two crossings in a row that go the same way. Flip one of them.' },
     2: { title: 'Loose Leaves', text: 'Pale tiles with a torn edge are loose leaves. Drag one onto another to swap them. A tap still turns it.' },
     3: { title: 'Sext', text: 'Both rules together. Some loose leaves are crossings.' },
     4: { title: 'Vespers', text: 'The new rules with the pigments, the beasts and the gilded twins.' },
