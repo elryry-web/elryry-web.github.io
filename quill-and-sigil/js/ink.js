@@ -1975,14 +1975,15 @@ const Grim = {
     this.inkDirty = true;
     this.updateStatus();
   },
-  // (v180) Undo takes back the last thing done to the page: a stroke, or a whole page laid at once (Recall, a kept
-  // spell, or Delete's blot). Those last are kept in hist, each with the page it replaced and the stroke count it left, so Undo
-  // restores that page once every stroke drawn since has been taken back. Cleared when the page is inscribed or a
-  // lesson starts (resetHist).
+  // (v180) Undo takes back the last thing done to the page. (v185) It always goes a stroke at a time, a page laid at
+  // once (Recall, a kept spell) included, as before v180. A page laid over ink, or Delete's blot, keeps the page it
+  // replaced in hist (n: 0), and Undo brings that page back once the laid page is wiped clean. A page laid on a
+  // clean page keeps nothing, so Undo turns back into Recall when the last stroke goes. Cleared when the page is
+  // inscribed or a lesson starts (resetHist).
   hist: [],
   resetHist() { this.hist = []; this.syncButtons(); },
   replacePage(strokes) {
-    this.hist.push({ was: JSON.parse(JSON.stringify(this.draft.strokes)), n: strokes.length });
+    if (this.draft.strokes.length) this.hist.push({ was: JSON.parse(JSON.stringify(this.draft.strokes)), n: 0 });
     if (this.hist.length > 30) this.hist.shift();
     this.draft.clear(); for (const s of strokes) this.draft.add(JSON.parse(JSON.stringify(s)));
     this.inkDirty = true; this.updateStatus();
