@@ -377,13 +377,19 @@
     if (r <= N.truceRounds + 1 && law(s, 'longPeace')) return 'the Long Peace';
     return null;
   }
+  // during the truce each house may take one unclaimed region in all (hs.truceTaken, set when it does; its start and a
+  // landless return don't count). Returns the reason it may take no more, or null.
+  function truceFull(s, h) {
+    var t = truce(s);
+    return t && s.houses[h] && s.houses[h].truceTaken ? t + ': one region' : null;
+  }
   function enterMode(s, h, r) {
     var g = s.regions[r];
     if (g.owner === h) return 'own';
     if (sheltered(s, h, r)) return null;
     // during the truce a march goes only into an unheld region (no smuggling); the Hermit still walks past free folk
     if (truce(s)) {
-      if (g.owner) return null;
+      if (g.owner || truceFull(s, h)) return null;
       if (emptyOfOthers(s, h, r)) return 'empty';
       return g.folk > 0 && !othersPresent(s, h, r) && has(s, h, 'antleredHermit') ? 'hermit' : null;
     }
@@ -523,6 +529,8 @@
   function setOwner(s, r, h, how) {
     var g = s.regions[r];
     if (g.owner === h) return;
+    // the truce: a house's one unclaimed region (a landless return is not a claim)
+    if (!g.owner && how !== 'return' && truce(s) && s.houses[h]) s.houses[h].truceTaken = r;
     g.owner = h; g.folk = 0;
     delete g.dug;   // digging in ends when the region changes hands
     if (r === 'crown') s.history.crown.push({ house: h, round: s.round, how: how });
@@ -594,6 +602,7 @@
         if (!(a.count >= 1 && a.count <= have)) return err('not enough warbands');
         var ok = marchDests(s, h, a.from).filter(function (d) { return d.to === a.to; })[0];
         if (!ok && s.regions[a.to].owner && s.regions[a.to].owner !== h && truce(s)) return err(truce(s) + ': held');
+        if (!ok && !s.regions[a.to].owner && truceFull(s, h)) return err(truceFull(s, h));
         if (!ok) return err('cannot march there');
         if (!warnedFor(s, h, a.to)) return err('not its declared plan');
         if (!marchFree(s, h, a.from, a.to) && hours < 1) return err('no hours');
@@ -616,6 +625,7 @@
         if (holds(s, h, a.to)) return err('already yours');
         // the truce: no assault on a house's region or its warbands; unheld land kept only by free folk may be taken
         if (truce(s) && (s.regions[a.to].owner || othersPresent(s, h, a.to))) return err(truce(s));
+        if (truceFull(s, h)) return err(truceFull(s, h));
         if (sheltered(s, h, a.to)) return err('newly returned: safe until their turn');
         if (emptyOfOthers(s, h, a.to)) return err('empty: march instead');
         // no unannounced assaults on you: a rival may assault your region only as the plan it showed when you ended your turn
@@ -1355,7 +1365,7 @@
     inAge.forEach(function (h) {
       s.houses[h] = { id: h, name: c.houses[h].name, short: c.houses[h].short, temper: c.houses[h].temperament, ai: h !== 'player' || !!opts.allAI, silver: N.startSilver, retinue: [], relics: [],
         prophecy: null, prophecyOptions: [], attackWins: 0, broke: false, brokeKnown: false, tookCrown: false,
-        hours: 0, turns: 0, flags: {}, once: {}, known: {}, intent: null, intent2: null, then: null, warned: null, warned2: null, camp: 0 };
+        hours: 0, turns: 0, flags: {}, once: {}, known: {}, intent: null, intent2: null, then: null, warned: null, warned2: null, camp: 0, truceTaken: null };
     });
     var works = c.world.works || {};
     IDS.forEach(function (r) {
@@ -1738,7 +1748,7 @@
     income: income, leanBonus: leanBonus, hoursFor: hoursFor, heldBy: heldBy, nHeld: nHeld, bandsAt: bandsAt, totalBands: totalBands,
     buildCost: buildCost, SAVE_VERSION: SAVE_VERSION, holdfastOf: holdfastOf, nextStarts: nextStarts, seatAfter: seatAfter, holdfastsAfter: holdfastsAfter,
     workAt: workAt, workHere: workHere, workFor: workFor, regionName: regionName, siteSentence: siteSentence, startPlan: startPlan, nextRivals: nextRivals, nextHouses: nextHouses, startLines: startLines, startTag: startTag, reckoningGroups: reckoningGroups, marchFree: marchFree, rulerKept: rulerKept, richestNeighbours: richestNeighbours,
-    has: has, hasAt: hasAt, siteAt: siteAt, siteOnly: siteOnly, upkeep: upkeep, boardBands: boardBands, holds: holds, adjacent: adjacent, slotsOf: slotsOf, siteOn: siteOn, law: law, truce: truce,
+    has: has, hasAt: hasAt, siteAt: siteAt, siteOnly: siteOnly, upkeep: upkeep, boardBands: boardBands, holds: holds, adjacent: adjacent, slotsOf: slotsOf, siteOn: siteOn, law: law, truce: truce, truceFull: truceFull,
     prophecyProgress: prophecyProgress, progress: progress, threat: threat, checkVictory: checkVictory, claimStanding: claimStanding, departNeeds: departNeeds,
     endChances: endChances, fortuneLeft: fortuneLeft, peekFortune: peekFortune, assaultOdds: assaultOdds, lossRange: lossRange, battleLosses: battleLosses,
     battlePreview: battlePreview, attackBonus: attackBonus, defenceOf: defenceOf, lastStand: lastStand, returnSpots: returnSpots,

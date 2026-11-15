@@ -58,9 +58,11 @@
     'already mustered here this turn': 'You have already mustered here this turn.',
     'newly returned: safe until their turn': 'That house has just returned there. It is safe until its next turn.',
     'empty: march instead': 'No one defends it: march in instead.',
-    'the truce': "The truce: in the first round no house may attack another house's land. Unclaimed land held only by folk can still be taken.",
+    'the truce': "The truce: in the first round no house may attack another house's land. Each house may take one unclaimed region held only by folk.",
+    'the truce: one region': "The truce: each house may take only one unclaimed region.",
     'the truce: held': "The truce: in the first round no house may take another house's region.",
-    'the Long Peace': "The Long Peace: the truce holds in the second round too. Unclaimed land held only by folk can still be taken.",
+    'the Long Peace': "The Long Peace: the truce holds in the second round too. Each house may take one unclaimed region held only by folk in the two rounds.",
+    'the Long Peace: one region': "The Long Peace: each house may take only one unclaimed region in the first two rounds.",
     'the Long Peace: held': "The Long Peace: in the second round too, no house may take another house's region.",
     'already yours': 'You already hold it.',
     'not neighbours': 'Those regions are not neighbours.',
@@ -751,7 +753,7 @@
     var u = undoTop(s);
     // once you have moved, the tap-a-region reminder gives way to the Undo plank
     return '<div class="hint mine' + (u ? ' can-undo' : '') + '"><span><b>Your turn.</b> ' + plural(hs.hours, 'moon') + ' left, ' + hs.silver + ' silver.' +
-      (u ? '' : ' Tap a region for its actions.') + (E.truce(s) ? ' ' + plain(E.truce(s)) : '') + '</span>' +
+      (u ? '' : ' Tap a region for its actions.') + (E.truce(s) ? ' ' + plain(E.truceFull(s, 'player') || E.truce(s)) : '') + '</span>' +
       (u ? btn('Undo ' + esc(u.label), undo, { cls: 'small undo' }) : '') + '</div>';
   }
 
@@ -766,7 +768,7 @@
       return 'You already have every pact you could offer.';
     }
     if (kind === 'depart') return E.check(s, { type: 'depart', house: 'player' }) || 'You cannot depart now.';
-    if (kind === 'assault' && E.truce(s)) return E.truce(s);
+    if (kind === 'assault' && E.truce(s)) return E.truceFull(s, 'player') || E.truce(s);
     if (hs.hours < 1 && kind !== 'march') return 'no hours';
     if (kind === 'march') return hs.hours < 1 ? 'no hours' : 'None of your warbands can march anywhere.';
     if (kind === 'muster') return IDS.some(function (r) { return E.holds(s, 'player', r) && !E.musteredHere(s, 'player', r); }) ? 'not enough silver' :

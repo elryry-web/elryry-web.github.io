@@ -375,7 +375,7 @@
     }
     if (!acts.length) {
       out.push('<p class="muted">' + (mine ? 'Nothing more to do here this turn.' : !E.recruitReach(s, 'player', r) ? 'You have no warbands here or next to it. March in from a neighbour.' :
-        E.truce(s) ? esc(plain(E.truce(s))) : 'Your warbands next door cannot march or assault here this turn.') + '</p>');
+        E.truce(s) ? esc(plain(E.truceFull(s, 'player') || E.truce(s))) : 'Your warbands next door cannot march or assault here this turn.') + '</p>');
       return out.join('');
     }
     // the current mode first
@@ -544,7 +544,7 @@
         '<b>Lean holdings:</b> while you hold ' + (N.incomeFloor === 3 ? '1 or 2' : '1 to ' + (N.incomeFloor - 1)) + ' regions, they still give you ' + N.incomeFloor + ' silver. ' +
         'Then you pay upkeep: 1 silver for every ' + N.upkeepPer + ' warbands on the board. ' +
         'Each silver you cannot pay disbands 1 warband from your largest stack.</p>' +
-        '<h3>The first round</h3><p>The truce: in the first round no house may attack another house’s land or warbands. Unclaimed land held only by folk can still be taken: assault it, or march in if no folk are left.</p>' +
+        '<h3>The first round</h3><p>The truce: in the first round no house may attack another house’s land or warbands. Each house may take one unclaimed region held only by folk: assault it, or march in if no folk are left.</p>' +
         '<h3>The age ends</h3><p>After round ' + N.lastRound + ' at the latest. After round ' + N.endDraws[0].round + ' there is a 1 in ' + N.endDraws[0].of + ' chance it ends early.</p>';
     });
   };

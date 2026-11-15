@@ -143,7 +143,7 @@
   // tags: which ways of winning an age draw this law into the Reckoning's offer.
   var LAWS = [
     { id: 'tolls', name: 'Tolls', text: "Marching into a region you don't hold costs 1 silver.", tags: ['seize', 'seat'] },
-    { id: 'longPeace', name: 'The Long Peace', text: 'The truce holds in round 2 too.', tags: ['seat', 'foretell'] },
+    { id: 'longPeace', name: 'The Long Peace', text: 'The truce holds in round 2 too. Each house still takes one unclaimed region at most.', tags: ['seat', 'foretell'] },
     { id: 'openRoads', name: 'Open Roads', text: 'Depart needs only 3 warbands.', tags: ['depart'] },
     { id: 'levy', name: 'Levy', text: 'Muster places 1 more warband.', tags: ['seize'] },
     { id: 'charter', name: 'Free Folk Charter', text: 'Free folk guard every unheld region with 2.', tags: ['seat', 'depart'] },
@@ -201,7 +201,7 @@
     folk: 1, folkCrown: 2,
     claimFrom: 6, rotate: 1,
     // the truce lasts this many rounds: no house attacks another house's land or warbands; unheld land kept only by
-    // free folk may still be assaulted (the Long Peace adds one round)
+    // free folk may still be taken, one region per house in all (the Long Peace adds one round)
     truceRounds: 1,
     // the Waystone opens for departing in this round
     departFrom: 7,
