@@ -93,7 +93,7 @@
 
   // The Vault: residents not yet in the world. Admitted two at a time by the Reckoning.
   var VAULT = [
-    { id: 'gatePorter', name: 'Gate Porter', suit: 'Order', cost: 2, text: '+1 defence in the Crown hold.' },
+    { id: 'gatePorter', name: 'Gate Porter', suit: 'Order', cost: 2, text: '+1 defence in the Crown hold and every region next to it.' },
     { id: 'levySergeant', name: 'Levy Sergeant', suit: 'Order', cost: 3, text: "+1 attack when assaulting a rival's region." },
     { id: 'peatCutter', name: 'Peat Cutter', suit: 'Hearth', cost: 1, text: '+1 income while you hold 2 regions or fewer.' },
     { id: 'woolFactor', name: 'Wool Factor', suit: 'Hearth', cost: 3, text: '+1 income for each of High Pasture and the Far Pass you hold.' },

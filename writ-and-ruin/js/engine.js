@@ -455,7 +455,7 @@
       if (siteAt(s, d, 'wallWarden', r)) v++;
       if (siteAt(s, d, 'moorHound', r)) v++;
       if (s.houses[d].relics.indexOf('ironKey') >= 0 && (g.bands[d] || 0) > 0) v++;
-      if (r === 'crown' && has(s, d, 'gatePorter')) v++;
+      if ((r === 'crown' || D.CROWN_NEIGHBOURS.indexOf(r) >= 0) && has(s, d, 'gatePorter')) v++;
       if ((r === 'saltmarsh' || r === 'oldbarrow') && has(s, d, 'ditchEel')) v++;
       v += lastStand(s, r);
       if (dugIn(s, r)) v++;   // dug in until the start of that house's next turn
