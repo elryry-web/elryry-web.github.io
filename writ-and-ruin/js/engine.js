@@ -1356,10 +1356,13 @@
     return c;
   }
 
-  // the Crown hold's neighbours, richest structure first; skip leaves some out
-  function richestNeighbours(built, skip) {
-    skip = skip || [];
+  // the Crown hold's neighbours, richest structure first; skip leaves some out.
+  // avoid: regions taken only when too few others are left (other houses' holdfasts)
+  function richestNeighbours(built, skip, avoid) {
+    skip = skip || []; avoid = avoid || [];
     return D.CROWN_NEIGHBOURS.filter(function (r) { return skip.indexOf(r) < 0; }).slice().sort(function (x, y) {
+      var ax = avoid.indexOf(x) >= 0 ? 1 : 0, ay = avoid.indexOf(y) >= 0 ? 1 : 0;
+      if (ax !== ay) return ax - ay;
       var ix = built[x] ? REG[x].siteIncome : 0, iy = built[y] ? REG[y].siteIncome : 0;
       if (ix !== iy) return iy - ix;
       // between unbuilt regions, the one whose structure would pay most
@@ -1434,13 +1437,20 @@
     var hf = c.holdfast || {};
     function open(r) { return r !== 'crown' && !s.regions[r].owner; }
     var edgeOrder = D.EDGE_STARTS.concat(['stonefields', 'ashwood', 'riverford', 'farpass', 'highpasture', 'saltmarsh', 'oldbarrow'].filter(function (r) { return D.EDGE_STARTS.indexOf(r) < 0; }));
-    // houses with a holdfast go first: on it, or on a free neighbour of it (an edge start preferred)
-    var rest = [];
+    // houses with a holdfast go first. Every one whose holdfast is free starts on it; then the ones whose holdfast
+    // is taken start on a free neighbour of it: not another house's holdfast if they can help it, an edge start first
+    var rest = [], moved = [];
     others.forEach(function (h) {
       var home = hf[h];
       if (!home || h === fh || !REG[home]) { rest.push(h); return; }
       if (open(home)) { place(h, home, N.startBands); s.starts[h] = { why: 'holdfast', region: home }; return; }
+      moved.push(h);
+    });
+    moved.forEach(function (h) {
+      var home = hf[h], theirs = inAge.filter(function (o) { return o !== h && hf[o]; }).map(function (o) { return hf[o]; });
       var nb = REG[home].adj.filter(open).sort(function (x, y) {
+        var tx = theirs.indexOf(x) >= 0 ? 1 : 0, ty = theirs.indexOf(y) >= 0 ? 1 : 0;
+        if (tx !== ty) return tx - ty;
         var ex = D.EDGE_STARTS.indexOf(x) >= 0 ? 0 : 1, ey = D.EDGE_STARTS.indexOf(y) >= 0 ? 0 : 1;
         return ex !== ey ? ex - ey : IDS.indexOf(x) - IDS.indexOf(y);
       });
@@ -1607,7 +1617,7 @@
   // the next age's three rivals: the ruler and the winner if they are rivals, then up to two houses with a grudge
   // against the winner (strongest first, ties at random), then at random. Drawn once, when the Reckoning begins.
   function drawRivals(c, R) {
-    var s = c.age, ruler = seatAfter(c).ruler, rivals = [], fill;
+    var s = c.age, ruler = rulerAfter(c), rivals = [], fill;
     var pool = D.HOUSES.map(function (H) { return H.id; });
     [R.winner, ruler].forEach(function (h) { if (h && h !== 'player' && rivals.indexOf(h) < 0) rivals.push(h); });
     if (R.winner) {
@@ -1631,12 +1641,17 @@
   function nextHouses(c, R) { return ['player'].concat(nextRivals(c, R)); }
 
   // who holds the Seat next age and its three regions. The winner rules; after a Departure, whoever held the Crown hold.
-  // The ruler keeps the Crown hold's neighbours it held, most warbands first; the richest fill the rest.
-  function seatAfter(c) {
+  // The ruler keeps the Crown hold's neighbours it held, most warbands first; the richest fill the rest,
+  // passing over the holdfasts of the other houses of the next age while enough other neighbours are left.
+  function rulerAfter(c) {
     var R = c.reckoning, s = c.age;
-    var ruler = (R.how === 'depart' ? s.regions.crown.owner : (R.winner || s.regions.crown.owner)) || null;
+    return (R.how === 'depart' ? s.regions.crown.owner : (R.winner || s.regions.crown.owner)) || null;
+  }
+  function seatAfter(c) {
+    var ruler = rulerAfter(c);
     if (!ruler) return { ruler: null, kept: [], regions: [] };
-    var kept = rulerKept(s, ruler), nb = kept.concat(richestNeighbours(c.world.built, kept));
+    var hf = holdfastsAfter(c), avoid = nextHouses(c).filter(function (h) { return h !== ruler && hf[h]; }).map(function (h) { return hf[h]; });
+    var kept = rulerKept(c.age, ruler), nb = kept.concat(richestNeighbours(c.world.built, kept, avoid));
     return { ruler: ruler, kept: kept, regions: ['crown', nb[0], nb[1]] };
   }
   // the holdfasts after this age: where each house of the age had the most warbands; a house with none keeps its old one

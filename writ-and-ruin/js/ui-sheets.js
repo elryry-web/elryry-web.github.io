@@ -608,9 +608,13 @@
           D.WORKS.map(function (wk) { return '<li>' + A.art('work/' + wk.id, { size: 22 }) + '<span><b>' + esc(wk.name) + '.</b> ' + esc(wk.text) + '</span></li>'; }).join('') + '</ul>' +
         '<h3>The Reckoning</h3><p>When a house wins an age, it makes one change to the valley. It may build or raze a structure, or raise or raze a great work. ' +
           'Then it changes the world deck and writes a law for the ages to come.</p>' +
+        '<p>A house that wins by Seize, Foretell or the Seat rules the next age. It starts on the Crown hold and two of its neighbours. ' +
+          'A house that Departs leaves for its free hold instead. Then whoever held the Crown hold when the age ended rules.</p>' +
         '<h3>Holdfasts</h3><p>When an age ends, each house records its holdfast: the region where it had the most warbands. ' +
           'Next age it starts there. If the ruler or another house has it, the house starts beside it instead. ' +
-          'The ruler starts in the Crown hold, with the neighbours of the Crown hold it held at the end of the last age.</p>' +
+          'Houses on a free holdfast are placed first. A house moved beside its holdfast never takes another house’s free holdfast.</p>' +
+        '<p>The ruler starts in the Crown hold, with the neighbours of the Crown hold it held at the end of the last age. ' +
+          'If it held fewer than two, the richest others fill the gap. It passes over another house’s holdfast unless too few others are left.</p>' +
         '<h3>Silver</h3><p>Each turn starts with income: 1 silver for each region you hold, plus your sites and residents. ' +
         '<b>Lean holdings:</b> while you hold ' + (N.incomeFloor === 3 ? '1 or 2' : '1 to ' + (N.incomeFloor - 1)) + ' regions, they still give you ' + N.incomeFloor + ' silver. ' +
         'Then you pay upkeep: 1 silver for every ' + N.upkeepPer + ' warbands on the board. ' +
@@ -809,7 +813,7 @@
     } else if (o.step === 'banish') {
       var needB = Math.min(o.banish, o.deck.length), needA = o.admit;
       var tally = '<p class="rk-tally"><span class="lbl">Chosen</span>' + chip('Banished', rk.banish.length, needB) + chip('Admitted', rk.admit.length, needA) + '</p>';
-      out.push('<p class="rk-lead">Banish ' + needB + ' cards from the world deck for good, and admit ' + needA + ' from the Vault.</p><p class="rk-hint">Relics can't be banished.</p>' + tally);
+      out.push('<p class="rk-lead">Banish ' + needB + ' cards from the world deck for good, and admit ' + needA + ' from the Vault.</p><p class="rk-hint">Relics can’t be banished.</p>' + tally);
       out.push('<h3>Admit from the Vault</h3><div class="cards">' + o.offer.map(function (id) {
         var on = rk.admit.indexOf(id) >= 0;
         return A.card(id, '<div class="row">' + btn(on ? 'Admitted ✓' : 'Admit', function () { toggle(rk.admit, id, needA); }, { cls: on ? 'active' : '' }) + '</div>', { pic: 'full' });
