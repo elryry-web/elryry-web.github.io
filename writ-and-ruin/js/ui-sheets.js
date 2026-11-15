@@ -249,10 +249,56 @@
     // With Assault chosen from the bar, an unguarded rival region is taken by marching, not by assault: say so.
     if (U.mode && U.mode.kind === 'assault' && r !== 'camp' && H.isMyTurn(s) && H.unguarded(s, r) &&
         H.legalNow(s).some(function (a) { return a.type === 'march' && a.to === r; })) toast(cap(rn(r)) + ' is unguarded: march in to take it (1 moon).');
+    // With another action chosen from the bar (or a landless return due), a region where it can be taken
+    // goes straight to it: the same sheets the region sheet's buttons open.
+    var plan = H.isMyTurn(s) && U.mode ? H.pickPlan(s, H.legalNow(s), U.mode, r) : null;
+    if (plan) {
+      if (plan.act) { U.doAction(plan.act); return; }
+      U.selected = r === 'camp' ? null : r;
+      if (plan.kind === 'march' && plan.to.length === 1) marchSheet(r, plan.to[0]);
+      else if (plan.kind === 'assault' && plan.from.length === 1) assaultSheet(plan.from[0], r);
+      else pickChooser(plan);
+      U.render();
+      return;
+    }
     U.openSheet(function () { return regionHtml(r); }, { wide: true, onClose: function () { U.selected = null; } });
     U.render();
   };
   function cand(a) { a.house = 'player'; return E.check(age(), a); }
+  // a short sheet for a pick on the map with more than one way to go: where to march, where to assault
+  // from, or which resident to recruit. Its buttons are the region sheet's own.
+  function pickChooser(plan) {
+    U.openSheet(function () {
+      var s = age(), out = [];
+      if (plan.kind === 'march') {
+        var dests = plan.from === 'camp' ? [] : E.marchDests(s, 'player', plan.from);
+        out.push('<h2>March from ' + rn(plan.from) + '</h2><p>Where to?</p><div class="actlist">' + plan.to.map(function (to) {
+          var d = dests.filter(function (x) { return x.to === to; })[0];
+          return btn(marchLabel(s, to, d && d.via), function () { marchSheet(plan.from, to); });
+        }).join('') + '</div>');
+      } else if (plan.kind === 'assault') {
+        out.push('<h2>Assault ' + rn(plan.to) + '</h2><p>From where?</p><div class="actlist">' + plan.from.map(function (from) {
+          return btn('Assault from ' + rn(from) + '…', function () { assaultSheet(from, plan.to); }, { cls: 'red' });
+        }).join('') + '</div>');
+      } else {
+        out.push('<h2>Recruit in ' + rn(plan.region) + '</h2><p>Choose a resident.</p><div class="cards solo">' + plan.cards.map(function (id) {
+          return residentCard(s, plan.region, id, true, 'recruit');
+        }).join('') + '</div>');
+      }
+      out.push('<div class="row">' + btn('Cancel', function () { U.closeSheet(); U.render(); }) + '</div>');
+      return out.join('');
+    }, { wide: plan.kind === 'recruit', onClose: function () { U.selected = null; } });
+  }
+  // a resident at region r, with its Recruit (or Poach) button when it is the player's turn and r is in reach
+  function residentCard(s, r, id, my, mode) {
+    var g = s.regions[r], a = { type: 'recruit', region: r, card: id }, m = my ? cand(a) : 'not your turn';
+    var cost = E.recruitCost(s, 'player', id, r), from = E.poachFrom(s, 'player', r), reach = E.recruitReach(s, 'player', r);
+    var show = my && !!reach;
+    var note = !show ? '' : from ? '<p class="note">Poaching: +' + N.poachSilver + ' silver, and ' + who(from) + ' takes a grudge.</p>' :
+      reach !== r ? '<p class="muted">You have no warbands here. Your warbands next door in ' + esc(rn(reach)) + ' let you recruit.</p>' : '';
+    if (D.CARDS[id].siteOnly) return A.card(id, '<p class="muted">Works only at its site' + (g.owner === 'player' ? ': it guards your region.' : ', for whoever holds the region.') + ' It cannot be recruited.</p>', { pic: 'full' });
+    return A.card(id, show ? note + '<div class="row">' + btn((from ? 'Poach for ' : 'Recruit for ') + cost + 's', function () { U.doAction({ type: 'recruit', region: r, card: id }); }, { cls: mode === 'recruit' ? 'go' : '', off: m }) + '</div>' : '', { pic: 'full' });
+  }
   // Ryan's site painting across the top of a sheet, cropped wide; the % is how far down the subject sits
   var SITE_FOCUS = { crown: 35, saltmarsh: 55, riverford: 60, ashwood: 70, highpasture: 60, stonefields: 60, oldbarrow: 70, farpass: 35 };
   // the same for the wild land an unbuilt region shows (bare-*): the region's own painting, not a faded structure
@@ -305,15 +351,7 @@
     var slots = E.slotsOf(s, r);
     out.push('<h3>Residents <small>' + g.residents.length + ' of ' + slots + ' slots</small></h3>');
     if (!g.residents.length) out.push('<p class="muted">No one lives here now. Searching can find someone.</p>');
-    else out.push('<div class="cards solo">' + g.residents.map(function (id) {
-      var a = { type: 'recruit', region: r, card: id }, m = my ? cand(a) : 'not your turn';
-      var cost = E.recruitCost(s, 'player', id, r), from = E.poachFrom(s, 'player', r), reach = E.recruitReach(s, 'player', r);
-      var show = my && !!reach;
-      var note = !show ? '' : from ? '<p class="note">Poaching: +' + N.poachSilver + ' silver, and ' + who(from) + ' takes a grudge.</p>' :
-        reach !== r ? '<p class="muted">You have no warbands here. Your warbands next door in ' + esc(rn(reach)) + ' let you recruit.</p>' : '';
-      if (D.CARDS[id].siteOnly) return A.card(id, '<p class="muted">Works only at its site' + (g.owner === 'player' ? ': it guards your region.' : ', for whoever holds the region.') + ' It cannot be recruited.</p>', { pic: 'full' });
-      return A.card(id, show ? note + '<div class="row">' + btn((from ? 'Poach for ' : 'Recruit for ') + cost + 's', function () { U.doAction({ type: 'recruit', region: r, card: id }); }, { cls: mode === 'recruit' ? 'go' : '', off: m }) + '</div>' : '', { pic: 'full' });
-    }).join('') + '</div>');
+    else out.push('<div class="cards solo">' + g.residents.map(function (id) { return residentCard(s, r, id, my, mode); }).join('') + '</div>');
     if (!my) {
       out.push(U.busy ? '<p class="muted">A rival is moving. You can act on your turn.</p>' : U.peek ? '<p class="muted">Nothing can be done until you answer.</p>' : '');
       return out.join('');
@@ -456,8 +494,12 @@
     U.openSheet(function () {
       var s = age(), hs = me(), legal = H.legalNow(s).filter(function (a) { return a.type === 'treat'; });
       var out = ['<h2>Treat with a rival</h2><p>Offer one pact a turn. It costs 1 moon. The rival answers at once. A house with no land can’t make pacts, and its pacts end when it loses its last region.</p>'];
+      var landless = !E.nHeld(s, 'player');
       out.push('<div class="row wrap">' + s.order.filter(function (h) { return h !== 'player'; }).map(function (h) {
-        return btn(stamp(h, 18) + ' ' + who(h), function () { target = h; U.redrawSheet(); }, { cls: target === h ? 'active' : '' });
+        // a house with no land can't make pacts: say so on the button itself
+        var off = landless ? 'You hold no land, so you can’t make pacts.' :
+          !E.nHeld(s, h) ? who(h) + ' holds no land, so it can’t make pacts.' : null;
+        return btn(stamp(h, 18) + ' ' + who(h), function () { target = h; U.redrawSheet(); }, { cls: target === h ? 'active' : '', off: off });
       }).join('') + '</div>');
       if (target && (!E.nHeld(s, 'player') || !E.nHeld(s, target))) {
         out.push('<p class="warn">' + (!E.nHeld(s, 'player') ? 'You hold no land' : esc(who(target)) + ' holds no land') +

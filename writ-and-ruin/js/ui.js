@@ -509,6 +509,30 @@
     });
     return out;
   }
+  // What a tap on region r does while an action is chosen from the bar (m is U.mode), or null when that
+  // action cannot be taken there (the region sheet opens instead). Muster and station are handled in
+  // U.regionSheet. The plan is one of:
+  //   { act }                       search, dig in, return, or recruit the one resident in reach: done at once
+  //   { kind: 'recruit', cards }    several residents to recruit: a chooser of just those
+  //   { kind: 'march', to }         marches from r: the destinations
+  //   { kind: 'assault', from }     assaults on r: the regions they can come from
+  function pickPlan(s, legal, m, r) {
+    if (!m || !r) return null;
+    var k = m.kind, list = [];
+    function add(v) { if (list.indexOf(v) < 0) list.push(v); }
+    legal.forEach(function (a) {
+      if (a.type !== k) return;
+      if (k === 'march') { if (a.from === r) add(a.to); }
+      else if (k === 'assault') { if (a.to === r) add(a.from); }
+      else if (k === 'recruit') { if (a.region === r) add(a.card); }
+      else if ((k === 'search' || k === 'dig' || k === 'return') && a.region === r) add(r);
+    });
+    if (!list.length) return null;
+    if (k === 'search' || k === 'dig' || k === 'return') return { act: { type: k, region: r } };
+    if (k === 'recruit') return list.length === 1 ? { act: { type: 'recruit', region: r, card: list[0] } } : { kind: k, region: r, cards: list };
+    if (k === 'march') return { kind: k, from: r, to: list };
+    return { kind: k, to: r, from: list };
+  }
   // a region a rival holds with no warbands in it: it cannot be assaulted, but a march in takes it
   function unguarded(s, r) {
     var g = s.regions[r];
@@ -856,7 +880,7 @@
     if (k === 'depart') return U.departConfirm();
     U.mode = { kind: k };
     var legal = legalNow(s), p = picks(s, legal);
-    if (p.length === 1) { U.mode = { kind: k }; render(); U.regionSheet(p[0]); return; }
+    if (p.length === 1) { render(); U.regionSheet(p[0]); return; }
     render();
   }
 
@@ -931,7 +955,7 @@
   // exports for ui-sheets.js and for tests
   U.h = { esc: esc, cap: cap, age: age, me: me, who: who, whoLow: whoLow, whose: whose, whoseLow: whoseLow, rn: rn, cardName: cardName, planWhen: planWhen, dangerRows: dangerRows, dangerSummary: dangerSummary, intents: intents, planLabel: planLabel, listAnd: listAnd, plural: plural,
     stamp: stamp, btn: btn, K: K, peekBtn: peekBtn, plain: plain, toast: toast, save: save, hasSave: hasSave, logLine: logLine, describe: describe,
-    pactWords: pactWords, screenFor: screenFor, isMyTurn: isMyTurn, legalNow: legalNow, bars: bars, unguarded: unguarded };
+    pactWords: pactWords, screenFor: screenFor, isMyTurn: isMyTurn, legalNow: legalNow, bars: bars, unguarded: unguarded, pickPlan: pickPlan };
   U.go = go; U.render = render; U.pump = pump; U.skipAhead = skip; U.doAction = doAction; U.undoMove = undo; U.newCampaign = newCampaign; U.nextAge = nextAge;
   U.openSheet = openSheet; U.redrawSheet = redrawSheet; U.closeSheet = closeSheet; U.sheetIsOpen = sheetIsOpen; U.take = take;
   U.loadSave = loadSave; U.KEY = KEY;

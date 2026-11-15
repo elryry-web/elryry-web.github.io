@@ -103,6 +103,7 @@ svg { display: block; }
 .hint { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 4px 8px; border: 2px solid var(--ink); background: var(--bone); font-size: .92rem; }
 .hint span { flex: 1; }
 .hint.rival { cursor: pointer; }
+.hint > svg, .hint > img, .pk-title > svg, .pk-title > img, .chip-top > svg, .chip-top > img { flex: none; }
 .hint.warn { background: var(--paper); border-color: var(--rust); color: var(--ink); }
 .hint.pickhint { background: var(--ochre); }
 .hint.mine { background: var(--paper); }
@@ -157,7 +158,7 @@ svg { display: block; }
 .rows { list-style: none; padding: 0; margin: 4px 0; }
 .rows li { display: flex; align-items: flex-start; gap: 6px; padding: 5px 0; border-bottom: 1px solid rgba(23, 20, 15, .25); font-size: .92rem; }
 .rows li:last-child { border-bottom: 0; }
-.rows li svg { flex: none; margin-top: 1px; }
+.rows li svg, .rows li > img { flex: none; margin-top: 1px; }
 .rows .claim { font-weight: 600; color: var(--rust); }
 .rows .claim.good { color: var(--moss); }
 .rows .urg { color: var(--rust); }
@@ -165,7 +166,8 @@ svg { display: block; }
 .plainlist li { display: block; }
 .prophecy { font-style: italic; }
 .loglist { list-style: none; margin: 4px 0; padding: 0; max-height: 300px; overflow-y: auto; font-size: .88rem; }
-.loglist li { display: flex; gap: 6px; padding: 3px 0; border-bottom: 1px dotted rgba(23, 20, 15, .3); }
+.loglist li { display: flex; align-items: flex-start; gap: 6px; padding: 3px 0; border-bottom: 1px dotted rgba(23, 20, 15, .3); }
+.loglist li > svg, .loglist li > img { flex: none; margin-top: 2px; }   /* a house stamp keeps its shape when the entry wraps */
 .loglist li.round { font-family: var(--head); font-size: 1rem; border-bottom: 2px solid var(--ink); padding-top: 8px; }
 .loglist li.battle { font-weight: 600; }
 .loglist li.me { color: var(--peat); }
