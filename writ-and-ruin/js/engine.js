@@ -434,6 +434,7 @@
     if (d) s.pacts.forEach(function (p) {
       if (p.type === 'foe' && p.foe === d && (p.a === h || p.b === h)) b++;
     });
+    if (d && wronged(s, h, d)) b++;   // righteous anger: d broke a pact with h this age
     return b;
   }
   function defenceOf(s, r, attacker) {
@@ -477,6 +478,10 @@
       return false;
     });
   }
+  // righteous anger: a has +1 attack against b until the age ends, because b broke a pact with a (one bonus per pair)
+  function wronged(s, a, b) {
+    return !!(s.wrongs && s.wrongs.some(function (w) { return w.house === a && w.breaker === b; }));
+  }
   function grudge(s, a, b) { return (s.memory[a] && s.memory[a][b]) ? s.memory[a][b].grudge : 0; }
   function addGrudge(s, a, b, n) {
     var m = s.memory[a][b];
@@ -506,8 +511,11 @@
     var hs = s.houses[h], forger = has(s, h, 'forger');
     s.pacts = s.pacts.filter(function (p) { return broken.indexOf(p) < 0; });
     hs.broke = true;
+    // the Forger hides the break: no grudge, and no righteous anger
+    var anger = !forger && !wronged(s, d, h);
     if (!forger) { hs.brokeKnown = true; addGrudge(s, d, h, N.grudgeBreak); }
-    broken.forEach(function (p) { ev.push({ type: 'pactBroken', house: h, wronged: d, pact: p, grudge: forger ? 0 : N.grudgeBreak }); });
+    if (anger) (s.wrongs || (s.wrongs = [])).push({ house: d, breaker: h, round: s.round });
+    broken.forEach(function (p, i) { ev.push({ type: 'pactBroken', house: h, wronged: d, pact: p, grudge: forger ? 0 : N.grudgeBreak, anger: anger && i === 0 }); });
     if (has(s, d, 'hangingJudge')) {
       var l1 = removeBands(s, h, 2, avoid);
       ev.push({ type: 'judge', house: d, breaker: h, lost: l1 });
@@ -1389,7 +1397,7 @@
     opts = opts || {};
     c.ageNo++;
     var s = { ageNo: c.ageNo, rng: (Math.floor(rnd(c) * 4294967296) >>> 0) || 7, phase: 'prophecy', round: 0, turn: 0,
-      order: [], houses: {}, regions: {}, deck: [], fortune: [], pacts: [], pactSeq: 0, pending: null, claims: {},
+      order: [], houses: {}, regions: {}, deck: [], fortune: [], pacts: [], pactSeq: 0, wrongs: [], pending: null, claims: {},
       memory: clone(c.memory), laws: c.world.laws.slice(), ruler: c.next.ruler || null, freeHold: c.world.freeHold,
       winner: null, winType: null, endRound: null, history: { crown: [], battles: 0, returns: [] } };
     var inAge = ['player'].concat(c.next.rivals);
@@ -1785,7 +1793,7 @@
     battlePreview: battlePreview, attackBonus: attackBonus, defenceOf: defenceOf, lastStand: lastStand, returnSpots: returnSpots,
     marchDests: marchDests, enterMode: enterMode, emptyOfOthers: emptyOfOthers, watched: watched, dugIn: dugIn,
     musterCost: musterCost, musterMax: musterMax, musteredHere: musteredHere, recruitCost: recruitCost, recruitReach: recruitReach, poachFrom: poachFrom, searchSilver: searchSilver, assaultHours: assaultHours, bellHolder: bellHolder,
-    pactsBetween: pactsBetween, intentLabel: intentLabel, pactsBrokenBy: pactsBrokenBy, grudge: grudge, loreCount: loreCount,
+    pactsBetween: pactsBetween, intentLabel: intentLabel, pactsBrokenBy: pactsBrokenBy, wronged: wronged, grudge: grudge, loreCount: loreCount,
     // utilities
     clone: clone, rnd: rnd, rint: rint, shuffle: shuffle, DATA: D
   };

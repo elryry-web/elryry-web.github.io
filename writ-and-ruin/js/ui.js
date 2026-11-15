@@ -207,7 +207,8 @@
           (ev.winner === 'attacker' ? W + ' took it.' : 'The assault failed.') + (fn ? ' ' + fn : '');
       }
       case 'assaultCollapsed': return whose(h, s) + ' assault on ' + rn(ev.to) + ' came to nothing.';
-      case 'pactBroken': return W + ' broke ' + (PACT_NAME[ev.pact.type] || 'a pact') + ' with ' + whoLow(ev.wronged, s) + '.';
+      case 'pactBroken': return W + ' broke ' + (PACT_NAME[ev.pact.type] || 'a pact') + ' with ' + whoLow(ev.wronged, s) + '.' +
+        (ev.anger ? ' ' + who(ev.wronged, s) + (ev.wronged === 'player' ? ' have' : ' has') + ' +1 attack against ' + whoLow(h, s) + ' until the age ends.' : '');
       case 'judge': return whose(ev.house, s) + ' Hanging Judge cost ' + whoLow(ev.breaker, s) + ' ' + plural(ev.lost.length, 'warband') + '.';
       case 'oath': return 'The Broken Word cost ' + whoLow(h, s) + ' ' + ev.lost.length + ' warbands.';
       case 'recruit':

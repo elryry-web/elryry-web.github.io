@@ -58,7 +58,7 @@
         t.push(owned ? 'You hold ' + rn(to) + '.' : (s.regions[to].owner ? 'Held by ' + whoLow(s.regions[to].owner) + (H.unguarded(s, to) ? ', with no warbands there. You take it when you march in.' : '.') : 'No house holds it: you take it when you march in.'));
         if (mode === 'hermit') t.push('The Antlered Hermit lets you pass the free folk.');
         if (mode === 'smuggle') t.push('The Smuggler Queen takes it without a battle; their warband falls back.' +
-          (E.pactsBrokenBy(s, 'player', s.regions[to].owner).length ? ' This breaks your pact with ' + whoLow(s.regions[to].owner) + '.' : ''));
+          (E.pactsBrokenBy(s, 'player', s.regions[to].owner).length ? ' This breaks your pact with ' + whoLow(s.regions[to].owner) + '.' + angerWarn(s, s.regions[to].owner) : ''));
         if (E.watched(s, to) && !owned) t.push('The Smuggler Queen walks you past ' + whoseLow(s.regions[to].owner) + ' Town Watch. You take it when you march in.');
         var free = E.marchFree(s, 'player', from, to);
         t.push((free ? 'Costs no moons' : 'Costs 1 moon') + (E.law(s, 'tolls') && !owned ? ' and 1 silver toll' : '') + '.');
@@ -89,6 +89,11 @@
       label: 'Muster'
     });
   }
+  // the righteous anger a break would give d against you, as a sentence ('' if none: the Forger hides it, or d has it already)
+  function angerWarn(s, d) {
+    if (!d || E.has(s, 'player', 'forger') || E.wronged(s, d, 'player')) return '';
+    return ' ' + who(d) + ' will get +1 attack against you until the age ends.';
+  }
   function assaultSheet(from, to) {
     var s = age(), hs = me(), max = from === 'camp' ? hs.camp : E.bandsAt(s, 'player', from);
     var n = max;
@@ -112,6 +117,7 @@
         ' If you lose, your survivors stay in ' + rn(from) + '.</p>' +
         (pv.lastStand ? '<p class="note"><b>Last stand:</b> this is ' + whoseLow(pv.defender) + " only region, so it defends with +" + pv.lastStand + '. That is counted above.</p>' : '') +
         (pv.watch ? '<p class="note"><b>Town Watch:</b> ' + who(pv.defender) + "'s Town Watch keeps it, so it defends at " + N.townWatch + ' (counted above).</p>' : '') +
+        (pv.defender && E.wronged(s, 'player', pv.defender) ? '<p class="note"><b>Righteous anger:</b> +1 attack. ' + esc(who(pv.defender)) + ' broke a pact with you this age. That is counted above.</p>' : '') +
         (pv.dug ? '<p class="note"><b>Dug in:</b> +1 defence until ' + whoseLow(pv.defender) + ' next turn. That is counted above.</p>' : '') +
         (pv.peek != null ? '<p class="note"><b>Star Reader:</b> the next fortune card is a <b>' + pv.peek + '</b>. You will draw it.</p>' : '') +
         '<p class="fortune-line"><span class="lbl">Fortune left</span> ' + [0, 1, 2, 3].map(function (v) { return '<span class="fc"><b>' + v + '</b>×' + (left[v] || 0) + '</span>'; }).join('') +
@@ -120,7 +126,7 @@
         '<p class="losses">Warbands lost: you <b>' + lossWords(o.attLoss) + '</b>, ' + (pv.defender ? esc(whoLow(pv.defender)) : 'the folk') + ' <b>' + lossWords(o.defLoss) + '</b></p>' +
         (extra.length ? '<p class="note">' + esc(extra.join(' ')) + ' That is counted in the chance.</p>' : '') +
         '<p>Costs ' + plural(E.assaultHours(s, 'player', to), 'moon') + (E.bellHolder(s, 'player', to) ? ' (the Drowned Bell)' : '') + '.</p>' +
-        (broke.length ? '<p class="warn">This breaks your ' + broke.map(function (pc) { return pc.type === 'foe' ? 'common cause' : pc.type; }).join(' and ') + ' with ' + whoLow(pv.defender) + '. They will hold a grudge.</p>' : '') +
+        (broke.length ? '<p class="warn">This breaks your ' + broke.map(function (pc) { return pc.type === 'foe' ? 'common cause' : pc.type; }).join(' and ') + ' with ' + whoLow(pv.defender) + '. They will hold a grudge.' + esc(angerWarn(s, pv.defender)) + '</p>' : '') +
         (m ? '<p class="warn">' + esc(plain(m)) + '</p>' : '') +
         '<div class="row">' + btn('Commit to the assault', function () { U.doAction({ type: 'assault', from: from, to: to, count: n }); }, { cls: 'go', off: m }) +
         btn('Cancel', function () { U.closeSheet(); U.render(); }) + '</div>';
@@ -205,7 +211,7 @@
     U.peek = null;
     U.openSheet(function () {
       return '<h2>' + stamp(P.from, 28) + ' An offer from ' + who(P.from) + '</h2><p>' + esc(offerWords(o)) + '</p>' +
-        '<p class="muted">Breaking a pact is allowed, but the wronged house holds a grudge.</p>' +
+        '<p class="muted">Breaking a pact is allowed, but the wronged house holds a grudge. It also gets +1 attack against the breaker until the age ends.</p>' +
         '<div class="row">' + btn('Accept', accept, { cls: 'go' }) + btn('Refuse', refuse) + '</div>' +
         '<div class="row">' + H.peekBtn({ title: H.whose(P.from) + (demand ? ' demand' : ' offer'), house: P.from, reopen: U.offerDialog,
           answers: [['Accept', accept, 'go'], ['Refuse', refuse]] }) + '</div>';
@@ -478,11 +484,18 @@
       out.push('<h3>Retinue</h3>' + (hs.retinue.length ? '<div class="cards">' + hs.retinue.map(function (id) { return A.card(id); }).join('') + '</div>' : '<p class="muted">None.</p>'));
       if (hs.relics.length) out.push('<h3>Relics</h3><div class="cards">' + hs.relics.map(function (id) { return A.card(id); }).join('') + '</div>');
       var pacts = s.pacts.filter(function (pc) { return pc.a === h || pc.b === h; });
-      out.push('<h3>Pacts</h3>' + (pacts.length ? '<ul class="rows">' + pacts.map(function (pc) {
+      var rows = pacts.map(function (pc) {
         var other = pc.a === h ? pc.b : pc.a;
         var t = pc.type === 'truce' ? 'Truce with ' + whoLow(other) : pc.type === 'tribute' ? who(pc.payer) + ' pays ' + whoLow(pc.payee) + ' tribute' : 'Common cause with ' + whoLow(other) + ' against ' + whoLow(pc.foe);
         return '<li><span>' + esc(t) + (pc.until < 99 ? ' (to the end of round ' + pc.until + ')' : ' (until the age ends)') + '</span></li>';
-      }).join('') + '</ul>' : '<p class="muted">None.</p>'));
+      });
+      // righteous anger, either way: a broken pact gives the wronged house +1 attack against the breaker until the age ends
+      (s.wrongs || []).forEach(function (w) {
+        if (w.house !== h && w.breaker !== h) return;
+        rows.push('<li><span><b>Righteous anger:</b> ' + esc(who(w.house) + (w.house === 'player' ? ' have' : ' has') + ' +1 attack against ' + whoLow(w.breaker) + ' until the age ends. ' +
+          who(w.breaker) + ' broke a pact with ' + whoLow(w.house) + '.') + '</span></li>');
+      });
+      out.push('<h3>Pacts</h3>' + (rows.length ? '<ul class="rows">' + rows.join('') + '</ul>' : '<p class="muted">None.</p>'));
       // its shown moves in order: the first is its next move, the second comes after that
       var plan = mine ? [] : [hs.intent, hs.then].filter(Boolean);
       plan.forEach(function (it, i) { out.push((i ? '' : '<h3>Plan</h3>') + '<p>' + esc(H.planWhen(E.intentLabel(s, h, it), i > 0)) + '.</p>'); });
@@ -513,6 +526,8 @@
       } else if (target) {
         var have = E.pactsBetween(s, 'player', target);
         if (have.length) out.push('<p class="muted">Already agreed: ' + have.map(function (p) { return p.type === 'foe' ? 'common cause against ' + whoLow(p.foe) : p.type; }).join(', ') + '.</p>');
+        if (E.wronged(s, 'player', target)) out.push('<p class="note">' + esc(who(target)) + ' broke a pact with you. You have +1 attack against ' + esc(whoLow(target)) + ' until the age ends.</p>');
+        if (E.wronged(s, target, 'player')) out.push('<p class="note">You broke a pact with ' + esc(whoLow(target)) + '. ' + esc(who(target)) + ' has +1 attack against you until the age ends.</p>');
         var opts = [
           [{ pact: 'truce' }, 'Truce', 'For ' + N.pactRounds + ' rounds neither of you assaults the other.'],
           [{ pact: 'tribute', payer: 'player' }, 'Pay tribute', 'You pay ' + whoLow(target) + ' 1 silver a round for ' + N.pactRounds + ' rounds; they do not assault you.'],
@@ -580,6 +595,8 @@
         '<h3>Your turn</h3><p>Each turn you get ' + N.hoursBase + ' moons, minus 1 for each region you hold, but never fewer than ' + N.hoursMin + '. You spend moons on actions. March (1 moon), muster (1 moon and silver), assault (2 moons), recruit, search and treat. You can muster in each region once a turn. ' +
           'Build a structure in a region you hold (1 moon and silver). Station a resident from your retinue in an empty slot of a region you hold (1 moon). Dig in (1 moon): +1 defence in a region you hold until your next turn. Tap a region to see what you can do there.</p>' +
         '<p>Recruit a resident in a region you hold, where your warbands stand, or in a region next to them. Taking one from a region another house holds is poaching: it costs ' + N.poachSilver + ' more silver, and that house takes a grudge against you. You cannot poach from a house you have a pact with. A rival that means to poach from you shows it first, like an assault.</p>' +
+        '<h3>Pacts</h3><p>Treat with a rival (1 moon) to offer it a truce, tribute or common cause. The rival answers at once. Breaking a pact is allowed, but the wronged house holds a grudge. ' +
+          'If a house breaks a pact with you, you get +1 attack against it until the age ends.</p>' +
         '<h3>Structures</h3><p>The Citadel and the Waystone are landmarks. They stand from the start and can never be razed. ' +
           'The other six regions start undeveloped: no effect, no site income and 1 slot. In the first age the Toll Bridge and the Charcoal Kilns already stand. ' +
           'A built structure gives its effect and a second slot. ' +

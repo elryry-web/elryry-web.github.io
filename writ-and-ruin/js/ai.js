@@ -34,6 +34,8 @@
   var AIM = { player: 4, threat: 2 };
   // poaching: grudge, the cost of the grudge the holder takes (more if it already holds one)
   var POACH = { grudge: 0.4 };
+  // breaking a pact: the cost of the righteous anger the wronged house gains (+1 attack against the breaker for the age)
+  var ANGER = 0.8;
   function tem(s, h) { var hs = s.houses[h]; return T[hs.temper || 'player']; }
   function temperOf(c, h) { return c.houses[h].temperament; }
 
@@ -337,6 +339,14 @@
     E.applyAction(c, a);
     return c;
   }
+  // what h loses by breaking its pacts with d: its temperament's dislike of breaking, and the wronged house's
+  // righteous anger (none when the Forger hides the break, or d already has it)
+  function breakCost(s, h, d, t) {
+    var n = E.pactsBrokenBy(s, h, d).length;
+    if (!n) return 0;
+    var forger = E.has(s, h, 'forger');
+    return n * (t.breakCost + (s.houses[h].broke ? 0.5 : 0)) + (forger ? -t.breakCost * 0.6 : 0) + (!forger && !E.wronged(s, d, h) ? ANGER : 0);
+  }
   function actionValue(s, h, a, base) {
     var t = tem(s, h), v, c;
     if (a.type === 'depart') return 5000;
@@ -358,8 +368,7 @@
       v += t.fight * o.p;
       if (d) {
         v += 0.35 * E.grudge(s, h, d);
-        var broken = E.pactsBrokenBy(s, h, d).length;
-        if (broken) v -= broken * (t.breakCost + (s.houses[h].broke ? 0.5 : 0)) + (E.has(s, h, 'forger') ? -t.breakCost * 0.6 : 0);
+        v -= breakCost(s, h, d, t);
         if (t.weakest && isWeakest(s, d)) v += t.weakest;
       } else if (t.folk) v += t.folk * o.p;
       return v;
@@ -370,8 +379,7 @@
     // a Smuggler Queen take: a sure win with no battle, weighed like an assault (grudges, broken pacts, the weakest)
     if (queen) {
       var qd = s.regions[a.to].owner, qv = evaluate(c, h) + t.fight + 0.35 * E.grudge(s, h, qd);
-      var qb = E.pactsBrokenBy(s, h, qd).length;
-      if (qb) qv -= qb * (t.breakCost + (s.houses[h].broke ? 0.5 : 0)) + (E.has(s, h, 'forger') ? -t.breakCost * 0.6 : 0);
+      qv -= breakCost(s, h, qd, t);
       if (t.weakest && isWeakest(s, qd)) qv += t.weakest;
       return qv;
     }
@@ -515,15 +523,31 @@
     sc += (E.nHeld(s, f) + (E.has(s, f, 'maskedEnvoy') ? 1 : 0)) * 0.25 - 0.5;
     return sc;
   }
+  // a shown move of h's that would assault (or take with the Smuggler Queen) a region o holds
+  function hits(s, it, o) {
+    return !!(it && (it.type === 'assault' || it.type === 'march') && it.to && s.regions[it.to] && s.regions[it.to].owner === o);
+  }
+  // honesty: h makes no pact with a house it means to assault (its shown moves)
+  function meansToAssault(s, h, o) {
+    var hs = s.houses[h];
+    return hits(s, hs.intent, o) || hits(s, hs.then, o) || hits(s, hs.intent2, o);
+  }
   function respondChoice(s, h) {
-    return { type: 'respond', house: h, accept: pactScore(s, h, s.pending.offer) > 0 };
+    var o = s.pending.offer;
+    return { type: 'respond', house: h, accept: !meansToAssault(s, h, o.from) && pactScore(s, h, o) > 0 };
   }
 
   // a pact worth offering this turn, or null
   function treatChoice(s, h) {
     var hs = s.houses[h];
     if (hs.flags.treated || hs.hours < (E.has(s, h, 'whisperer') ? 0 : 1)) return null;
-    var t = tem(s, h), best = null, bv = 0;
+    var t = tem(s, h), best = null, bv = 0, plan;
+    // honesty: no offer to a house h means to assault, shown or in the move it will declare as this turn ends
+    function bars(o) {
+      if (meansToAssault(s, h, o)) return true;
+      if (plan === undefined) plan = planIntent(s, h).intent;
+      return hits(s, plan, o);
+    }
     var leader = null, lt = 0;
     s.order.forEach(function (o) { if (o !== h) { var q = E.threat(s, o); if (q > lt) { lt = q; leader = o; } } });
     s.order.forEach(function (o) {
@@ -536,7 +560,7 @@
         if (E.check(s, a)) return;
         var off = { type: a.pact, from: h, to: o, foe: a.foe, payer: a.payer, payee: a.payer === o ? h : o };
         var acc = pactScore(s, o, off);
-        if (acc <= 0) return;
+        if (acc <= 0 || bars(o)) return;
         var worth = a.pact === 'truce' ? 0.6 + t.truce * 0.5 - (E.grudge(s, h, o) * 0.3) : a.pact === 'foe' ? lt * 2 : 1.2;
         if (a.pact === 'truce') {
           // a truce is worth what the target threatens us with
@@ -1012,7 +1036,7 @@
 
   return {
     decide: decide, whoActs: whoActs, run: run, act: act, respond: respond, reckoningChoice: reckoningChoice,
-    evaluate: evaluate, odds: odds, planIntent: planIntent, snapshot: snapshot, replan: replan, intentAction: intentAction, ahead: ahead, pactScore: pactScore, chooseProphecy: chooseProphecy,
+    evaluate: evaluate, odds: odds, planIntent: planIntent, snapshot: snapshot, replan: replan, intentAction: intentAction, ahead: ahead, pactScore: pactScore, meansToAssault: meansToAssault, breakCost: breakCost, treatChoice: treatChoice, respondChoice: respondChoice, chooseProphecy: chooseProphecy,
     dangers: function (s, h) { setGuess(s, h); return dangers(s, h); },
     digChoice: function (s, h) { setGuess(s, h); return digChoice(s, h, evaluate(s, h)); },
     TEMPERAMENTS: T, AIM: AIM, BUILD: BUILD, RK: RK, WORK_LIKE: WORK_LIKE, WORK_HELD: WORK_HELD
