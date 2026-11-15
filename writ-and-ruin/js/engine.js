@@ -1503,7 +1503,11 @@
       IDS.forEach(function (r) { if (works[r]) o.push({ kind: 'razeWork', region: r, work: works[r] }); });
       return { step: 'build', options: o };
     }
-    if (R.step === 'banish') return { step: 'banish', deck: c.world.deck.slice(), banish: 2, offer: R.vaultOffer.slice(), admit: Math.min(2, R.vaultOffer.length) };
+    if (R.step === 'banish') {
+      // relics can't be banished: they never return, and Depart and prophecies need them
+      var banishable = c.world.deck.filter(function (id) { return !CARDS[id].relic; });
+      return { step: 'banish', deck: banishable, banish: Math.min(2, banishable.length), offer: R.vaultOffer.slice(), admit: Math.min(2, R.vaultOffer.length) };
+    }
     if (R.step === 'law') return { step: 'law', options: R.lawOffer.slice(), standing: c.world.laws.slice(), max: D.MAX_LAWS };
     return { step: R.step };
   }
@@ -1530,9 +1534,10 @@
       ev.push({ type: 'reckonSite', choice: R.site });
       R.step = 'banish';
     } else if (R.step === 'banish') {
-      var ban = (choice.banish || []).filter(function (id, i, a) { return c.world.deck.indexOf(id) >= 0 && a.indexOf(id) === i; }).slice(0, 2);
+      var banishable = c.world.deck.filter(function (id) { return !CARDS[id].relic; });
+      var ban = (choice.banish || []).filter(function (id, i, a) { return banishable.indexOf(id) >= 0 && a.indexOf(id) === i; }).slice(0, 2);
       var adm = (choice.admit || []).filter(function (id, i, a) { return R.vaultOffer.indexOf(id) >= 0 && a.indexOf(id) === i; }).slice(0, 2);
-      if (ban.length < 2 && c.world.deck.length > 2) throw new Error('banish two cards');
+      if (ban.length < Math.min(2, banishable.length)) throw new Error('banish two cards');
       if (adm.length < Math.min(2, R.vaultOffer.length)) throw new Error('admit two cards');
       ban.forEach(function (id) { c.world.deck.splice(c.world.deck.indexOf(id), 1); c.world.lost.push(id); });
       adm.forEach(function (id) { c.world.vault.splice(c.world.vault.indexOf(id), 1); c.world.deck.push(id); });

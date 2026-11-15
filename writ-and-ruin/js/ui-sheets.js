@@ -809,7 +809,7 @@
     } else if (o.step === 'banish') {
       var needB = Math.min(o.banish, o.deck.length), needA = o.admit;
       var tally = '<p class="rk-tally"><span class="lbl">Chosen</span>' + chip('Banished', rk.banish.length, needB) + chip('Admitted', rk.admit.length, needA) + '</p>';
-      out.push('<p class="rk-lead">Banish ' + needB + ' cards from the world deck for good, and admit ' + needA + ' from the Vault.</p>' + tally);
+      out.push('<p class="rk-lead">Banish ' + needB + ' cards from the world deck for good, and admit ' + needA + ' from the Vault.</p><p class="rk-hint">Relics can't be banished.</p>' + tally);
       out.push('<h3>Admit from the Vault</h3><div class="cards">' + o.offer.map(function (id) {
         var on = rk.admit.indexOf(id) >= 0;
         return A.card(id, '<div class="row">' + btn(on ? 'Admitted ✓' : 'Admit', function () { toggle(rk.admit, id, needA); }, { cls: on ? 'active' : '' }) + '</div>', { pic: 'full' });
