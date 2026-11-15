@@ -1681,11 +1681,12 @@ const Grim = {
       // upright: the circle takes nearly the page's full width (the width is what limits it) and the book grows
       // as tall as it needs — header, circle, then the status, the buttons' row (as tall as it measured) and the
       // bottom border: the row stands just above the bottom corner bosses (v181: Undo · Keep · Satchel, and Inscribe
-      // under it between the bosses, in room the bosses already take, so only the row is counted)
+      // under it between the bosses, in room the bosses already take, so only the row is counted; v184: Inscribe is a
+      // full 42px plaque like the row, taller than that strip, so the row stands higher by the difference, inscLift)
       const HEAD = 128 + (L.legend ? 14 : 0), pad = 4;
       const bw = Math.min(vw - 4, 640), pw = bw - pad * 2;
       // (the status: the name clear of the ring and two lines of read-back, as statusAt places them — more on wider pages)
-      const FOOT = Math.max(64, 78 * pw / 520 + 15) + (this.btnH || 42) + pw * 0.035 + pw * 0.14 * 0.9 + 4;
+      const FOOT = Math.max(64, 78 * pw / 520 + 15) + (this.btnH || 42) + (this.inscLift || 0) + pw * 0.035 + pw * 0.14 * 0.9 + 4;
       // the whole drawing circle stays inside the page's border (margin m, plus room for the vine's leaves)
       const m = pw * 0.035;
       const size = Math.max(160, Math.min((pw - 2 * (m + 9)) * 0.99 / L.fr, vh - 4 - pad * 2 - HEAD - FOOT));
@@ -1762,23 +1763,26 @@ const Grim = {
     const bossTop = P.y + P.h - B.m - B.bs * 0.9, gap = 4;
     const ix0 = P.x + B.m + B.bs * 0.9 + gap, ix1 = P.x + P.w - B.m - B.bs * 0.9 - gap;
     const iy0 = bossTop, iy1 = P.y + P.h - B.m - B.vh - 1.5 - 3, foot = iy1 - iy0 >= 20 && ix1 - ix0 >= 120;
+    // (v184) Inscribe is as tall as the row's plaques, its foot on the bottom knotwork: where the strip between the
+    // bosses is shorter than that, it rises above the bosses' tops and the row stands higher by as much (lift)
+    const IH = 42, lift = foot ? Math.max(0, Math.round(IH - (iy1 - iy0))) : 0;
     pb.classList.toggle('foot', foot);
     pb.style.left = (P.x + inset) + 'px'; pb.style.width = (P.w - inset * 2) + 'px';
     if (foot) {
-      Object.assign(ib.style, { left: (ix0 - P.x - inset) + 'px', width: (ix1 - ix0) + 'px', height: (iy1 - iy0) + 'px' });
-      pb.style.setProperty('--ib', Math.min(9, Math.round((iy1 - iy0) * 0.22)) + 'px'); // (a slimmer frame on the shorter plaque)
+      Object.assign(ib.style, { left: (ix0 - P.x - inset) + 'px', width: (ix1 - ix0) + 'px', height: (iy1 - iy0 + lift) + 'px' });
+      pb.style.setProperty('--ib', Math.min(9, Math.round((iy1 - iy0 + lift) * 0.22)) + 'px'); // (a slimmer frame only on a shorter plaque)
     } else for (const k of ['left', 'top', 'width', 'height']) ib.style[k] = '';
     this.fitButtons(); // (again, now the row has its width: measured before it, the plaques were still as wide as the last layout left them)
     if (pb.style.display === 'flex') {
       const h = pb.offsetHeight;
-      if (h && Math.abs(h - (this.btnH || 42)) > 2 && (this._relaid = (this._relaid || 0) + 1) < 4) {
-        this.btnH = h; this.layout(); this.bookDirty = true; this.inkDirty = true; this._relaid = 0;
+      if (h && (Math.abs(h - (this.btnH || 42)) > 2 || Math.abs(lift - (this.inscLift || 0)) > 1) && (this._relaid = (this._relaid || 0) + 1) < 4) {
+        this.btnH = h; this.inscLift = lift; this.layout(); this.bookDirty = true; this.inkDirty = true; this._relaid = 0;
         return;
       }
     }
-    const top = bossTop - gap - (this.btnH || 42);
+    const top = bossTop - lift - gap - (this.btnH || 42);
     pb.style.top = top + 'px';
-    if (foot) ib.style.top = (iy0 - top) + 'px';
+    if (foot) ib.style.top = (iy0 - lift - top) + 'px';
   },
   // (v180) the lesson's name at the head of a phone's page (codexStrip draws it): its size and place, shrunk if need be
   // so the name and the ❦ (Notes) beside it fit between the top corner bosses; the pair is centred on the page
