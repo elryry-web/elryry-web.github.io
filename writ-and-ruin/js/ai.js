@@ -487,9 +487,15 @@
   }
 
   function keepChoice(s, h) {
-    var P = s.pending, best = { type: 'keep', house: h, card: null }, bv = evaluate(s, h);
+    var P = s.pending, best = { type: 'keep', house: h, card: null }, bv = evaluate(s, h), t = tem(s, h);
+    // with every slot full, replace only the least valuable resident there, and only with a card worth more
+    function least(list) {
+      return list.slice().sort(function (x, y) { return cardValue(t, x) - cardValue(t, y); })[0];
+    }
+    var worstR = least(s.houses[h].retinue), worstS = least(s.regions[P.region].residents);
     E.legalActions(s, h).forEach(function (a) {
       if (a.type !== 'keep' || a.card == null) return;
+      if (a.replace != null && (a.replace !== (a.to === 'retinue' ? worstR : worstS) || cardValue(t, a.card) <= cardValue(t, a.replace))) return;
       var c = tryApply(s, a);
       if (c.pending) c.pending = null;
       var v = evaluate(c, h) + (a.to === 'site' ? 0.2 : 0);

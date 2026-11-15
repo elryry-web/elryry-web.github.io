@@ -591,9 +591,22 @@
         if (P.type !== 'search' || P.house !== h) return err('no search to finish');
         if (a.card == null) return null;
         if (P.cards.indexOf(a.card) < 0) return err('not drawn');
-        if (isRelic(a.card)) return a.to === 'retinue' ? null : err('relics go to the retinue');
-        if (a.to === 'retinue') return siteOnly(a.card) ? err('stays at its site') : hs.retinue.length < N.retinueMax ? null : err('retinue full');
-        if (a.to === 'site') return s.regions[P.region].residents.length < slotsOf(s, P.region) ? null : err('no empty slot');
+        if (isRelic(a.card)) return a.replace != null ? err('relics need no slot') : a.to === 'retinue' ? null : err('relics go to the retinue');
+        // with no empty slot of the kind chosen, the kept card may replace a resident there (it goes to the bottom of the deck)
+        if (a.to === 'retinue') {
+          if (siteOnly(a.card)) return err('stays at its site');
+          var roomR = hs.retinue.length < N.retinueMax;
+          if (a.replace == null) return roomR ? null : err('retinue full');
+          if (roomR) return err('there is room: no need to replace');
+          return hs.retinue.indexOf(a.replace) >= 0 ? null : err('not in your retinue');
+        }
+        if (a.to === 'site') {
+          var gk = s.regions[P.region], roomS = gk.residents.length < slotsOf(s, P.region);
+          if (a.replace == null) return roomS ? null : err('no empty slot');
+          if (roomS) return err('there is room: no need to replace');
+          if (gk.owner !== h) return err('not your region');
+          return gk.residents.indexOf(a.replace) >= 0 ? null : err('not at this site');
+        }
         return err('keep where?');
       }
       return err('waiting on ' + P.type);
@@ -768,7 +781,11 @@
     if (P) {
       if (P.type === 'offer' && P.to === h) { add({ type: 'respond', accept: true }); add({ type: 'respond', accept: false }); }
       if (P.type === 'search' && P.house === h) {
-        P.cards.forEach(function (c) { add({ type: 'keep', card: c, to: 'retinue' }); add({ type: 'keep', card: c, to: 'site' }); });
+        P.cards.forEach(function (c) {
+          add({ type: 'keep', card: c, to: 'retinue' }); add({ type: 'keep', card: c, to: 'site' });
+          hs.retinue.forEach(function (o) { add({ type: 'keep', card: c, to: 'retinue', replace: o }); });
+          s.regions[P.region].residents.forEach(function (o) { add({ type: 'keep', card: c, to: 'site', replace: o }); });
+        });
         add({ type: 'keep', card: null });
       }
       return out;
@@ -1167,9 +1184,12 @@
     if (a.card != null) {
       P.cards.splice(P.cards.indexOf(a.card), 1);
       if (isRelic(a.card)) hs.relics.push(a.card);
-      else if (a.to === 'retinue') hs.retinue.push(a.card);
-      else s.regions[P.region].residents.push(a.card);
-      ev.push({ type: 'keep', house: a.house, card: a.card, to: a.to, region: P.region });
+      else {
+        var into = a.to === 'retinue' ? hs.retinue : s.regions[P.region].residents;
+        if (a.replace != null) { into[into.indexOf(a.replace)] = a.card; s.deck.push(a.replace); }   // the replaced one goes to the bottom
+        else into.push(a.card);
+      }
+      ev.push({ type: 'keep', house: a.house, card: a.card, to: a.to, region: P.region, replaced: a.replace != null ? a.replace : null });
       P.keep--;
     }
     if (a.card == null || P.keep <= 0 || !P.cards.length) {

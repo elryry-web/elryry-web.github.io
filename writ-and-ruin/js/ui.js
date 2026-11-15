@@ -81,6 +81,9 @@
     'not landless': 'You still hold land.',
     'not a free region': 'Warbands stand there: you cannot return there.',
     'no empty slot': 'The site has no empty slot.',
+    'relics need no slot': 'A relic needs no slot. It replaces no one.',
+    'there is room: no need to replace': 'There is an empty slot: no one needs replacing.',
+    'not at this site': 'That resident is not at this site.',
     'relics go to the retinue': 'A relic stays with you, not at a site.',
     'waiting on offer': 'Waiting for an answer to a pact offer.',
     'waiting on search': 'Finish your search first.',
@@ -222,7 +225,9 @@
       case 'keep':
         if (!ev.card) return h === 'player' ? 'You kept nothing more.' : null;
         return W + ' kept ' + (h === 'player' || D.CARDS[ev.card].relic || ev.to === 'site' ? cardName(ev.card) : 'a card') +
-          (ev.to === 'site' ? ' at ' + rn(ev.region) : '') + '.';
+          (ev.to === 'site' ? ' at ' + rn(ev.region) : '') +
+          (ev.replaced && (h === 'player' || ev.to === 'site') ? ' in place of ' + cardName(ev.replaced) + ', who went to the bottom of the world deck' :
+            ev.replaced ? ' and sent one of its retinue to the bottom of the world deck' : '') + '.';
       case 'pactOffered': return W + ' offered ' + whoLow(ev.target, s) + ' ' + pactWords(ev.offer, s) + '.';
       case 'pactAccepted': return W + ' accepted ' + pactWords(ev.pact.type === 'tribute' ? { type: 'tribute', payer: ev.pact.payer, payee: ev.pact.payee } : ev.pact, s) + ' with ' + whoLow(ev.from, s) + '.';
       case 'pactRefused': return W + ' refused ' + whoseLow(ev.from, s) + ' offer.';

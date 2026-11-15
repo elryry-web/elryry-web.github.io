@@ -233,12 +233,22 @@
           var relic = D.CARDS[id].relic, ac = [];
           if (relic) ac.push(btn('Take the relic', function () { U.doAction({ type: 'keep', card: id, to: 'retinue' }); }, { cls: 'go', off: E.check(s, { type: 'keep', house: 'player', card: id, to: 'retinue' }) }));
           else {
-            if (!D.CARDS[id].siteOnly) ac.push(btn('To your retinue', function () { U.doAction({ type: 'keep', card: id, to: 'retinue' }); }, { cls: 'go', off: E.check(s, { type: 'keep', house: 'player', card: id, to: 'retinue' }) }));
-            ac.push(btn('Leave at the site', function () { U.doAction({ type: 'keep', card: id, to: 'site' }); }, { cls: D.CARDS[id].siteOnly ? 'go' : '', off: E.check(s, { type: 'keep', house: 'player', card: id, to: 'site' }) }));
+            // with no empty slot of that kind, offer to replace each resident there that can be replaced
+            var keepTo = function (to, label, cls, list, where) {
+              var plainA = { type: 'keep', house: 'player', card: id, to: to }, why = E.check(s, plainA);
+              var swaps = why ? list.filter(function (o) { return !E.check(s, { type: 'keep', house: 'player', card: id, to: to, replace: o }); }) : [];
+              if (!swaps.length) { ac.push(btn(label, function () { U.doAction({ type: 'keep', card: id, to: to }); }, { cls: cls, off: why })); return; }
+              swaps.forEach(function (o) {
+                ac.push(btn('Replace ' + esc(cardName(o)) + where, function () { U.doAction({ type: 'keep', card: id, to: to, replace: o }); }, { cls: cls }));
+              });
+            };
+            if (!D.CARDS[id].siteOnly) keepTo('retinue', 'To your retinue', 'go', hs.retinue, ' in your retinue');
+            keepTo('site', 'Leave at the site', D.CARDS[id].siteOnly ? 'go' : '', s.regions[P.region].residents, ' at the site');
           }
           return A.card(id, (D.CARDS[id].siteOnly ? '<p class="note">Works only at its site. It does nothing in a retinue.</p>' : '') + '<div class="row">' + ac.join('') + '</div>', { pic: 'full' });
         }).join('') + '</div>' +
-        '<p class="muted">A resident left at the site can be recruited later by whoever holds the region, or has warbands there or next door.</p>' +
+        '<p class="muted">A resident left at the site can be recruited later by whoever holds the region, or has warbands there or next door. ' +
+        'When your retinue or the site is full, the card you keep can replace a resident there (at the site only if you hold the region). The replaced one goes to the bottom of the world deck.</p>' +
         '<div class="row">' + btn('Keep no more', function () { U.doAction({ type: 'keep', card: null }); }) + '</div>';
     }, { modal: true, wide: true });
   };
