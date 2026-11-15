@@ -544,7 +544,7 @@
         '<b>Lean holdings:</b> while you hold ' + (N.incomeFloor === 3 ? '1 or 2' : '1 to ' + (N.incomeFloor - 1)) + ' regions, they still give you ' + N.incomeFloor + ' silver. ' +
         'Then you pay upkeep: 1 silver for every ' + N.upkeepPer + ' warbands on the board. ' +
         'Each silver you cannot pay disbands 1 warband from your largest stack.</p>' +
-        '<h3>The first round</h3><p>No assaults in the first round. You may march only into your own regions, or into a region no one holds or guards.</p>' +
+        '<h3>The first round</h3><p>The truce: in the first round no house may attack another house’s land or warbands. Unclaimed land held only by folk can still be taken: assault it, or march in if no folk are left.</p>' +
         '<h3>The age ends</h3><p>After round ' + N.lastRound + ' at the latest. After round ' + N.endDraws[0].round + ' there is a 1 in ' + N.endDraws[0].of + ' chance it ends early.</p>';
     });
   };

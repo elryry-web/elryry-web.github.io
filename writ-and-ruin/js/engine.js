@@ -367,7 +367,8 @@
     var g = s.regions[r];
     return !!(g && g.owner && g.owner !== h && s.houses[g.owner].refuge === r);
   }
-  // the truce of the first round: no assaults, and a march goes only into your own region or one no one holds or guards.
+  // the truce of the first round: no house attacks another house's land. A march goes only into your own region or an
+  // unheld one; an assault only on an unheld region defended by its free folk alone (no other house's warbands there).
   // A plan is judged by the round its house will make it in (planRound, set by the AI).
   // Returns the reason, or null once the truce is over.
   function truce(s) {
@@ -380,8 +381,12 @@
     var g = s.regions[r];
     if (g.owner === h) return 'own';
     if (sheltered(s, h, r)) return null;
-    // during the truce a march goes only into a region no one holds or guards (no Hermit, no smuggling)
-    if (truce(s)) return !g.owner && emptyOfOthers(s, h, r) ? 'empty' : null;
+    // during the truce a march goes only into an unheld region (no smuggling); the Hermit still walks past free folk
+    if (truce(s)) {
+      if (g.owner) return null;
+      if (emptyOfOthers(s, h, r)) return 'empty';
+      return g.folk > 0 && !othersPresent(s, h, r) && has(s, h, 'antleredHermit') ? 'hermit' : null;
+    }
     if (emptyOfOthers(s, h, r)) return 'empty';
     // the Smuggler Queen walks past a Town Watch and takes the region, as if no one kept it
     if (watched(s, r) && !othersPresent(s, h, r) && has(s, h, 'smugglerQueen')) return 'empty';
@@ -606,10 +611,11 @@
       case 'assault': {
         var camp = a.from === 'camp';
         if ((!camp && !s.regions[a.from]) || !s.regions[a.to]) return err('no such region');
-        if (truce(s)) return err(truce(s));
         if (!adjacent(a.from, a.to)) return err('not neighbours');
         if (!(a.count >= 1 && a.count <= (camp ? hs.camp || 0 : bandsAt(s, h, a.from)))) return err('not enough warbands');
         if (holds(s, h, a.to)) return err('already yours');
+        // the truce: no assault on a house's region or its warbands; unheld land kept only by free folk may be taken
+        if (truce(s) && (s.regions[a.to].owner || othersPresent(s, h, a.to))) return err(truce(s));
         if (sheltered(s, h, a.to)) return err('newly returned: safe until their turn');
         if (emptyOfOthers(s, h, a.to)) return err('empty: march instead');
         // no unannounced assaults on you: a rival may assault your region only as the plan it showed when you ended your turn
