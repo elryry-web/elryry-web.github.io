@@ -451,7 +451,13 @@
       out.push('<header class="rhead"><span class="sitebox">' + stamp(h, 40) + '</span><div><h2>' + esc(hs.name) + '</h2><p class="muted">' +
         (mine ? 'Your house' : esc(cap(hs.temper)) + ' temper') + (s.ruler === h ? ' · ruled at the start of the age' : '') + '</p></div></header>');
       out.push('<p class="facts">' + hs.silver + ' silver · ' + plural(E.nHeld(s, h), 'region') + ' · ' + plural(E.totalBands ? E.totalBands(s, h) : 0, 'warband') + ' · ' +
-        plural(hs.hours && s.order[s.turn] === h ? hs.hours : E.hoursFor(s, h), 'moon') + ' a turn' + (hs.camp ? ' · ' + hs.camp + ' camped' : '') +
+        (function () {
+          // on its own turn the house shows what is left of its allowance, not the left-over as if it were the allowance
+          var per = E.hoursFor(s, h);
+          if (s.phase !== 'play' || s.order[s.turn] !== h) return plural(per, 'moon') + ' a turn';
+          var total = Math.max(per, hs.hours);
+          return hs.hours + ' of ' + plural(total, 'moon') + ' left this turn';
+        })() + (hs.camp ? ' · ' + hs.camp + ' camped' : '') +
         '<br>Income ' + E.income(s, h) + ' silver a turn' + (E.leanBonus(s, h) ? ' (lean holdings +' + E.leanBonus(s, h) + ')' : '') + ' · upkeep ' + E.upkeep(s, h) + ' silver a turn' +
         (function () {
           var st = D.REGION_IDS.filter(function (r) { return E.holds(s, h, r) && E.siteOn(s, r); }).map(function (r) { return REG[r].site; });
@@ -571,7 +577,7 @@
         '<li><span><b>Foretell.</b> Fulfil your secret prophecy. It is claimed the same way.</span></li>' +
         '<li><span><b>Depart.</b> From the ' + ordinal(N.departFrom) + ' round, hold the Far Pass with enough warbands since the start of your turn and carry the relics it needs, then depart.</span></li>' +
         '<li><span><b>Seat.</b> If the age ends with no other winner, the house holding the Crown hold wins.</span></li></ul>' +
-        '<h3>Your turn</h3><p>You get moons each turn to spend on actions. March (1 moon), muster (1 moon and silver), assault (2 moons), recruit, search and treat. You can muster in each region once a turn. ' +
+        '<h3>Your turn</h3><p>Each turn you get ' + N.hoursBase + ' moons, minus 1 for each region you hold, but never fewer than ' + N.hoursMin + '. You spend moons on actions. March (1 moon), muster (1 moon and silver), assault (2 moons), recruit, search and treat. You can muster in each region once a turn. ' +
           'Build a structure in a region you hold (1 moon and silver). Station a resident from your retinue in an empty slot of a region you hold (1 moon). Dig in (1 moon): +1 defence in a region you hold until your next turn. Tap a region to see what you can do there.</p>' +
         '<p>Recruit a resident in a region you hold, where your warbands stand, or in a region next to them. Taking one from a region another house holds is poaching: it costs ' + N.poachSilver + ' more silver, and that house takes a grudge against you. You cannot poach from a house you have a pact with. A rival that means to poach from you shows it first, like an assault.</p>' +
         '<h3>Structures</h3><p>The Citadel and the Waystone are landmarks. They stand from the start and can never be razed. ' +
