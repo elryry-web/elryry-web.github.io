@@ -79,6 +79,11 @@
     }
     return false;
   }
+  // whether h has read o's prophecy: by its Bell Seer this age, or while it holds the Salt Codex
+  function knows(s, h, o) {
+    var hs = s.houses[h];
+    return !!(hs && o !== h && s.houses[o] && ((hs.known && hs.known[o]) || has(s, h, 'saltCodex')));
+  }
   // "here" effects: in the retinue (anywhere), or at the site of region r while h holds it
   function hasAt(s, h, id, r) {
     var hs = s.houses[h];
@@ -825,7 +830,7 @@
       IDS.forEach(function (r) { s.regions[r].residents.forEach(function (c) { add({ type: 'poison', card: c }); }); });
       s.order.forEach(function (t) { s.houses[t].retinue.forEach(function (c) { add({ type: 'poison', card: c }); }); });
     }
-    if (has(s, h, 'bellSeer') && !hs.once.bellSeer) s.order.forEach(function (t) { if (t !== h) add({ type: 'seeProphecy', target: t }); });
+    if (has(s, h, 'bellSeer') && !hs.once.bellSeer) s.order.forEach(function (t) { if (t !== h && !knows(s, h, t)) add({ type: 'seeProphecy', target: t }); });
     return out;
   }
 
@@ -1133,7 +1138,7 @@
       dh.relics.splice(dh.relics.indexOf(pick), 1); hs.relics.push(pick); E.relic = pick;
     }
   }
-  var RELIC_ORDER = ['waystoneShard', 'antlerCrown', 'ninthBanner', 'ironKey', 'drownedBell', 'saltCodex'];
+  var RELIC_ORDER = ['waystoneShard', 'antlerCrown', 'ninthBanner', 'ironKey', 'saltCodex', 'drownedBell'];
   function bestRelicFor(s, h, list) {
     var sorted = list.slice().sort(function (x, y) { return RELIC_ORDER.indexOf(x) - RELIC_ORDER.indexOf(y); });
     return sorted[0];
@@ -1800,7 +1805,7 @@
     battlePreview: battlePreview, attackBonus: attackBonus, defenceOf: defenceOf, lastStand: lastStand, returnSpots: returnSpots,
     marchDests: marchDests, enterMode: enterMode, emptyOfOthers: emptyOfOthers, watched: watched, dugIn: dugIn,
     musterCost: musterCost, musterMax: musterMax, musteredHere: musteredHere, recruitCost: recruitCost, recruitReach: recruitReach, poachFrom: poachFrom, searchSilver: searchSilver, assaultHours: assaultHours, bellHolder: bellHolder,
-    pactsBetween: pactsBetween, intentLabel: intentLabel, pactsBrokenBy: pactsBrokenBy, wronged: wronged, grudge: grudge, loreCount: loreCount,
+    pactsBetween: pactsBetween, intentLabel: intentLabel, pactsBrokenBy: pactsBrokenBy, wronged: wronged, grudge: grudge, loreCount: loreCount, knows: knows,
     // utilities
     clone: clone, rnd: rnd, rint: rint, shuffle: shuffle, DATA: D
   };

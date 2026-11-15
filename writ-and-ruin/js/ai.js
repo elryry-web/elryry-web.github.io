@@ -163,7 +163,7 @@
   function suspects(s, h, o) {
     var hs = s.houses[h], po = s.houses[o].prophecy;
     if (!po) return [];
-    if (hs.known && hs.known[o]) return [po];
+    if (E.knows(s, h, o)) return [po];
     var mine = hs.prophecyOptions || [];
     return D.PROPHECIES.map(function (p) { return p.id; }).filter(function (id) { return mine.indexOf(id) < 0; });
   }
@@ -579,7 +579,7 @@
     // Bell Seer: look at the leader's prophecy
     if (E.has(s, h, 'bellSeer') && !hs.once.bellSeer) {
       var tgt = null, tv = -1;
-      s.order.forEach(function (o) { if (o !== h && !hs.known[o]) { var q = E.threat(s, o); if (q > tv) { tv = q; tgt = o; } } });
+      s.order.forEach(function (o) { if (o !== h && !E.knows(s, h, o)) { var q = E.threat(s, o); if (q > tv) { tv = q; tgt = o; } } });
       if (tgt) return { type: 'seeProphecy', house: h, target: tgt };
     }
     // Poisoner: strike the leader's best resident

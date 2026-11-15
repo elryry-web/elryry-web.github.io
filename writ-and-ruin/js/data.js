@@ -116,7 +116,7 @@
     { id: 'ironKey', name: 'The Iron Key', relic: true, text: '+1 defence in any region where you have warbands.' },
     { id: 'drownedBell', name: 'The Drowned Bell', relic: true, text: "Rivals' assaults against you cost 1 more moon." },
     { id: 'antlerCrown', name: 'The Antler Crown', relic: true, text: '+1 moon each turn.' },
-    { id: 'saltCodex', name: 'The Salt Codex', relic: true, text: 'Counts as a Lore resident.' },
+    { id: 'saltCodex', name: 'The Salt Codex', relic: true, text: "Counts as a Lore resident. You see every rival's prophecy." },
     { id: 'ninthBanner', name: 'The Ninth Banner', relic: true, text: '+1 attack.' },
     { id: 'waystoneShard', name: 'The Waystone Shard', relic: true, text: 'Depart needs 1 relic instead of 2.' }
   ];

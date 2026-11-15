@@ -469,7 +469,7 @@
           var st = D.REGION_IDS.filter(function (r) { return E.holds(s, h, r) && E.siteOn(s, r); }).map(function (r) { return REG[r].site; });
           return '<br>Structures: ' + (st.length ? esc(listAnd(st)) : 'none');
         })() + '</p>');
-      var dn = E.departNeeds(s, h), seenP = hs.prophecy && (mine || meH.known[h]) ? E.prophecyProgress(s, h, hs.prophecy) : null;
+      var dn = E.departNeeds(s, h), seenP = hs.prophecy && (mine || E.knows(s, 'player', h)) ? E.prophecyProgress(s, h, hs.prophecy) : null;
       out.push('<div class="progress">' + ['seize', 'foretell', 'depart', 'seat'].map(function (k) {
         var words = { seize: 'Seize: hold ' + N.seizeRegions + ' regions',
           foretell: 'Foretell: fulfil the prophecy' + (seenP ? ' (' + seenP.have + ' of ' + seenP.need + ')' : ''),
@@ -480,7 +480,7 @@
       if (claim) out.push('<p class="warn">' + (mine ? 'You have' : who(h) + ' has') + ' a claim to ' + (claim.kind === 'seize' ? 'seize the valley' : 'the age by prophecy') +
         (claim.waiting.length ? '. It stands unless ' + listAnd(claim.waiting.map(function (k) { return whoLow(k); })) + ' break it on their turns.' : '. It wins at the start of the next turn.') + '</p>');
       if (mine && hs.prophecy) out.push('<p><span class="lbl">Prophecy</span> “' + esc(prophecyText(hs.prophecy)) + '”</p>');
-      else if (!mine) out.push('<p><span class="lbl">Prophecy</span> ' + (meH.known[h] && hs.prophecy ? '“' + esc(prophecyText(hs.prophecy)) + '” (read by your Bell Seer)' : 'Secret. The bar shows how close it seems.') + '</p>');
+      else if (!mine) out.push('<p><span class="lbl">Prophecy</span> ' + (E.knows(s, 'player', h) && hs.prophecy ? '“' + esc(prophecyText(hs.prophecy)) + '” (' + (meH.known[h] ? 'read by your Bell Seer' : 'read in your Salt Codex') + ')' : 'Secret. The bar shows how close it seems.') + '</p>');
       out.push('<h3>Retinue</h3>' + (hs.retinue.length ? '<div class="cards">' + hs.retinue.map(function (id) { return A.card(id); }).join('') + '</div>' : '<p class="muted">None.</p>'));
       if (hs.relics.length) out.push('<h3>Relics</h3><div class="cards">' + hs.relics.map(function (id) { return A.card(id); }).join('') + '</div>');
       var pacts = s.pacts.filter(function (pc) { return pc.a === h || pc.b === h; });
