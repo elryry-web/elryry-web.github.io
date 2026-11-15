@@ -251,11 +251,13 @@
   // counts them), so the win chance and the losses always agree.
   // Returns { p, tide, attWitch, defWitch, attLoss, defLoss } (defWitch is the defending house, or null;
   // attLoss[k] / defLoss[k] are the chances that side loses exactly k).
+  // Losses: the loser loses the margin, at least 1. A tie (the defender holds) costs both sides 1, and so does an
+  // attacker's win by exactly 1. A defender who wins outright loses none. defBands is the defending warbands or folk.
   function battleLosses(at, dt, n, defBands) {
     var win = at > dt, diff = Math.abs(at - dt), al, dl;
-    if (win) { dl = Math.min(defBands, Math.max(1, diff)); al = diff === 1 ? 1 : 0; }
-    else { al = Math.min(n, Math.max(1, diff)); dl = diff === 1 ? Math.min(defBands, 1) : 0; }
-    return { win: win, att: Math.min(al, n), def: dl };
+    if (win) { dl = diff; al = diff === 1 ? 1 : 0; }
+    else { al = Math.max(1, diff); dl = diff === 0 ? 1 : 0; }
+    return { win: win, att: Math.min(al, n), def: Math.min(dl, defBands) };
   }
   function assaultOdds(s, a) {
     var h = a.house, hs = s.houses[h], pv = battlePreview(s, a), d = pv.defender, att = pv.attack, def = pv.defence;

@@ -112,7 +112,7 @@
         '<div class="versus"><div class="vs-side"><span class="lbl">Your attack</span><b class="big">' + pv.attack + '</b></div><span class="vs">against</span>' +
         '<div class="vs-side"><span class="lbl">Their defence</span><b class="big">' + pv.defence + '</b></div></div>' +
         '<p>Each side then draws a fortune card (0 to 3) and adds it. You draw first. The higher total wins, and a tie goes to the defender.</p>' +
-        '<p>The loser loses as many warbands as it lost by, at least 1. If the margin is exactly 1, the winner loses 1 too.</p>' +
+        '<p>The loser loses as many warbands as it lost by, at least 1. A tie costs both sides 1, and so does an attacker’s win by exactly 1.</p>' +
         '<p>If you win, your surviving warbands move into ' + rn(to) + (pv.watch ? ' and take it from ' + who(pv.defender) + '.' : pv.defender ? ' and ' + who(pv.defender) + "'s survivors fall back to a neighbouring region " + who(pv.defender) + ' holds (with none, they scatter).' : ' and the free folk who are left scatter.') +
         ' If you lose, your survivors stay in ' + rn(from) + '.</p>' +
         (pv.lastStand ? '<p class="note"><b>Last stand:</b> this is ' + whoseLow(pv.defender) + " only region, so it defends with +" + pv.lastStand + '. That is counted above.</p>' : '') +
@@ -595,6 +595,8 @@
         '<h3>Your turn</h3><p>Each turn you get ' + N.hoursBase + ' moons, minus 1 for each region you hold, but never fewer than ' + N.hoursMin + '. You spend moons on actions. March (1 moon), muster (1 moon and silver), assault (2 moons), recruit, search and treat. You can muster in each region once a turn. ' +
           'Build a structure in a region you hold (1 moon and silver). Station a resident from your retinue in an empty slot of a region you hold (1 moon). Dig in (1 moon): +1 defence in a region you hold until your next turn. Tap a region to see what you can do there.</p>' +
         '<p>Recruit a resident in a region you hold, where your warbands stand, or in a region next to them. Taking one from a region another house holds is poaching: it costs ' + N.poachSilver + ' more silver, and that house takes a grudge against you. You cannot poach from a house you have a pact with. A rival that means to poach from you shows it first, like an assault.</p>' +
+        '<h3>Battles</h3><p>In an assault, each side adds a fortune card (0 to 3) to its attack or defence. The higher total wins, and a tie goes to the defender. ' +
+          'The loser loses as many warbands as it lost by, at least 1. A tie costs both sides 1, and so does an attacker’s win by exactly 1.</p>' +
         '<h3>Pacts</h3><p>Treat with a rival (1 moon) to offer it a truce, tribute or common cause. The rival answers at once. Breaking a pact is allowed, but the wronged house holds a grudge. ' +
           'If a house breaks a pact with you, you get +1 attack against it until the age ends.</p>' +
         '<h3>Structures</h3><p>The Citadel and the Waystone are landmarks. They stand from the start and can never be razed. ' +
