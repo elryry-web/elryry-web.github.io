@@ -318,15 +318,15 @@
         case 'muster': case 'search': case 'return': at = it.region; break;
       }
       if (at) { var m = markerAt(at, x.second); if (m) circles.push([m[0] + 0.7, m[1] + 0.6, 13]); return; }
-      var ag = from && arrowGeom(from, to, false);
+      var ag = from && arrowGeom(from, to, false, sideOf(view, from, to));
       if (!ag) return;
-      var c = ag.c;
-      for (var t = 0; t <= 1.001; t += 0.05) { var q = qpt(c, t); circles.push([q[0], q[1], hw]); }
-      var tx = c[4] - c[2], ty = c[5] - c[3], tl = Math.sqrt(tx * tx + ty * ty) || 1;
-      circles.push([c[4] - tx / tl * ag.s * 0.4, c[5] - ty / tl * ag.s * 0.4, ag.s * 0.9]);
+      var step = Math.max(1, Math.floor(ag.pts.length / 20));
+      for (var k = 0; k < ag.pts.length; k += step) circles.push([ag.pts[k][0], ag.pts[k][1], hw]);
+      var e = ag.pts[ag.pts.length - 1]; circles.push([e[0], e[1], hw]);
+      circles.push([ag.x2 - ag.hx * ag.s * 0.4, ag.y2 - ag.hy * ag.s * 0.4, ag.s * 0.9]);
       circles.push([ag.mx, ag.my - 1, 12]);
-      circles.push([ag.mx + 11, ag.my + 7, 9]);
-      if (it.revised) circles.push([ag.mx - 12, ag.my - 12, 9]);
+      circles.push([ag.mx + 11 * ag.fx, ag.my + 7, 9]);
+      if (it.revised) circles.push([ag.rx, ag.my - 12, 9]);
     });
     return { boxes: boxes, circles: circles };
   }
@@ -478,35 +478,133 @@
     });
     return best.c;
   }
-  // an arrow's fixed geometry: its course c, head size s, and the spot mx, my on it for the house stamp.
-  // The board never moves, so each is worked out once.
+  // The roads' centrelines, traced from the roads drawn over the board (base(): each road's curve sampled
+  // evenly by length), from just inside one region's outline to just inside the other's. Keyed 'lo|hi' (names
+  // in alphabetical order), running from lo to hi; a plan between the two follows its road, reversed as needed.
+  var ROADS = {
+    'crown|saltmarsh': [[163, 283], [159, 303], [150, 320], [132, 326], [118, 312], [113, 293]],
+    'ashwood|crown': [[256, 155], [248, 174], [238, 192], [228, 209], [217, 226]],
+    'crown|riverford': [[171, 224], [158, 207], [146, 190], [134, 173], [124, 154]],
+    'crown|stonefields': [[212, 294], [221, 311], [225, 329], [225, 348]],
+    'riverford|saltmarsh': [[109, 163], [113, 181], [111, 198], [103, 215]],
+    'oldbarrow|saltmarsh': [[100, 428], [100, 408], [100, 387], [99, 366], [97, 345], [96, 324], [93, 304]],
+    'ashwood|riverford': [[227, 119], [208, 124], [188, 126], [168, 128], [148, 127]],
+    'ashwood|highpasture': [[334, 130], [355, 138], [371, 155], [381, 175], [388, 197], [389, 220], [378, 236]],
+    'highpasture|stonefields': [[299, 272], [289, 293], [278, 314], [266, 334], [254, 354]],
+    'farpass|highpasture': [[332, 379], [327, 357], [324, 335], [322, 313], [321, 290], [322, 268]],
+    'oldbarrow|stonefields': [[138, 446], [155, 439], [171, 431], [187, 421]],
+    'farpass|stonefields': [[308, 419], [297, 424], [286, 423], [276, 418]],
+    'camp|farpass': [[372, 476], [371, 467], [364, 460], [357, 454]]
+  };
+  // the road's waypoints from one region to the other (null if no road is traced between them)
+  function roadPath(from, to) {
+    var rev = from > to, pts = ROADS[rev ? to + '|' + from : from + '|' + to];
+    if (!pts) return null;
+    pts = pts.map(function (q) { return q.slice(); });
+    return rev ? pts.reverse() : pts;
+  }
+  // shift a course sideways by off units (to the right of travel for off > 0)
+  function shiftPath(pts, off) {
+    return pts.map(function (q, i) {
+      var a = pts[Math.max(i - 1, 0)], b = pts[Math.min(i + 1, pts.length - 1)], dx = b[0] - a[0], dy = b[1] - a[1], l = Math.sqrt(dx * dx + dy * dy) || 1;
+      return [q[0] - dy / l * off, q[1] + dx / l * off];
+    });
+  }
+  // a smooth course through the waypoints (Catmull-Rom as cubics): [[x0, y0, c1x, c1y, c2x, c2y, x1, y1], ...]
+  function smoothPath(pts) {
+    var segs = [];
+    for (var i = 0; i < pts.length - 1; i++) {
+      var p0 = pts[Math.max(i - 1, 0)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(i + 2, pts.length - 1)];
+      segs.push([p1[0], p1[1], p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6, p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6, p2[0], p2[1]]);
+    }
+    return segs;
+  }
+  function cpt(g, t) {   // a point on the cubic g
+    var u = 1 - t;
+    return [u * u * u * g[0] + 3 * u * u * t * g[2] + 3 * u * t * t * g[4] + t * t * t * g[6], u * u * u * g[1] + 3 * u * u * t * g[3] + 3 * u * t * t * g[5] + t * t * t * g[7]];
+  }
+  // points along a course of cubics, n to a segment, with the running length: { pts, len }
+  function sampleSegs(segs, n) {
+    var pts = [], len = [0];
+    segs.forEach(function (g, i) { for (var k = i ? 1 : 0; k <= n; k++) pts.push(cpt(g, k / n)); });
+    for (var i = 1; i < pts.length; i++) len.push(len[i - 1] + Math.sqrt(Math.pow(pts[i][0] - pts[i - 1][0], 2) + Math.pow(pts[i][1] - pts[i - 1][1], 2)));
+    return { pts: pts, len: len };
+  }
+  // the point a fraction f of the way along a sampled course, by length
+  function atLength(sm, f) {
+    var L = sm.len, want = L[L.length - 1] * f, i = 0;
+    while (i < L.length - 2 && L[i + 1] < want) i++;
+    var a = sm.pts[i], b = sm.pts[i + 1], k = (want - L[i]) / ((L[i + 1] - L[i]) || 1);
+    return [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k];
+  }
+  // an arrow's fixed geometry: its path d, points along it (pts), its end x2, y2 with heading hx, hy, head size s,
+  // and the spot mx, my on it for the house stamp. A plan between road neighbours follows the road (side: shifted
+  // that many units to the right of travel, when a plan runs the other way on the same road); any other takes
+  // its own curve. The board never moves, so each is worked out once.
   var courses = {};
-  function arrowGeom(from, to, wide) {
+  function arrowGeom(from, to, wide, side) {
     var p = from === 'camp' ? [CAMP[0], CAMP[1], 10] : POS[from], q = POS[to];
     if (!p || !q) return null;
-    var s = wide ? 13 : 10, key = from + '>' + to + ':' + s;
+    var s = wide ? 13 : 10, key = from + '>' + to + ':' + s + ':' + (side || 0);
     if (courses[key]) return courses[key];
-    var c = course(p, q, s), mx, my;
-    // the house stamp sits on the curve with the count bubble below right of it: slide both along the curve
-    // to the first spot where neither touches a name chip
+    var road = roadPath(from, to), d, sm, x2, y2, tx, ty;
+    if (road) {
+      if (side) road = shiftPath(road, side);
+      var segs = smoothPath(road), last = segs[segs.length - 1];
+      d = 'M' + f1(segs[0][0]) + ' ' + f1(segs[0][1]) + segs.map(function (g) { return 'C' + f1(g[2]) + ' ' + f1(g[3]) + ' ' + f1(g[4]) + ' ' + f1(g[5]) + ' ' + f1(g[6]) + ' ' + f1(g[7]); }).join('');
+      sm = sampleSegs(segs, 8);
+      x2 = last[6]; y2 = last[7]; tx = x2 - last[4]; ty = y2 - last[5];
+    } else {
+      var c = course(p, q, s);
+      d = 'M' + f1(c[0]) + ' ' + f1(c[1]) + 'Q' + f1(c[2]) + ' ' + f1(c[3]) + ' ' + f1(c[4]) + ' ' + f1(c[5]);
+      sm = { pts: [], len: [0] };
+      for (var k = 0; k <= 40; k++) {
+        sm.pts.push(qpt(c, k / 40));
+        if (k) sm.len.push(sm.len[k - 1] + Math.sqrt(Math.pow(sm.pts[k][0] - sm.pts[k - 1][0], 2) + Math.pow(sm.pts[k][1] - sm.pts[k - 1][1], 2)));
+      }
+      x2 = c[4]; y2 = c[5]; tx = x2 - c[2]; ty = y2 - c[3];
+    }
+    var tl = Math.sqrt(tx * tx + ty * ty) || 1, mx, my, fx = 1, ag0 = 1;
+    // the house stamp sits at the middle of the path by length, with the count bubble below right of it; if
+    // either would touch a name chip, both slide along the path to the nearest spot clear of it. Two plans on
+    // one road stand their stamps off the road, each on its own right, so the two sit side by side.
     [0.5, 0.42, 0.58, 0.34, 0.66, 0.26, 0.74, 0.18].some(function (t, i) {
-      var m = qpt(c, t);
-      var clear = !labelHits(m[0], m[1], 10) && !labelHits(m[0] + 11, m[1] + 7, 8.5) && !labelHits(m[0] - 12, m[1] - 12, 8);
-      if (clear || i === 0) { mx = m[0]; my = m[1]; }
+      var m = atLength(sm, t);
+      if (side) {
+        var a = atLength(sm, Math.max(t - 0.05, 0)), b = atLength(sm, Math.min(t + 0.05, 1)), ux = b[0] - a[0], uy = b[1] - a[1], ul = Math.sqrt(ux * ux + uy * uy) || 1;
+        m = [m[0] - uy / ul * side * 2.2, m[1] + ux / ul * side * 2.2];
+        fx = uy > 0 ? -1 : 1;   // (the count and '!' go on the stamp's far side from the road)
+      }
+      var clear = !labelHits(m[0], m[1], 10) && !labelHits(m[0] + 11 * fx, m[1] + 7, 8.5) && !labelHits(m[0] + (side ? 12 : -12) * fx, m[1] - 12, 8);
+      if (clear || i === 0) { mx = m[0]; my = m[1]; ag0 = fx; }
       return clear;
     });
-    return (courses[key] = { c: c, s: s, mx: mx, my: my });
+    return (courses[key] = { d: d, pts: sm.pts, x2: x2, y2: y2, hx: tx / tl, hy: ty / tl, s: s, mx: mx, my: my, fx: ag0, rx: mx + (side ? 12 : -12) * ag0, road: !!road });
+  }
+  // the plan arrows (assault, march, poach) in view, as [from, to] pairs
+  function planArrows(view) {
+    var out = [];
+    (view.intents || []).forEach(function (x) {
+      var it = x.intent;
+      if (!it) return;
+      if (it.type === 'assault' || it.type === 'march') out.push([it.from, it.to]);
+      else if (it.type === 'poach' && it.from && it.from !== it.region) out.push([it.region, it.from]);
+    });
+    return out;
+  }
+  // how far a plan from -> to sits off its road: when another plan runs the other way along it, each keeps to its right
+  var TWO_WAY = 4.5;
+  function sideOf(view, from, to) {
+    return roadPath(from, to) && planArrows(view).some(function (a) { return a[0] === to && a[1] === from; }) ? TWO_WAY : 0;
   }
   // an arrow cut from one region toward another, in a house colour
-  function arrow(from, to, col, dashed, label, h, wide, revised) {
-    var ag = arrowGeom(from, to, wide);
+  function arrow(from, to, col, dashed, label, h, wide, revised, side) {
+    var ag = arrowGeom(from, to, wide, side);
     if (!ag) return '';
-    var s = ag.s, c = ag.c, x1 = c[0], y1 = c[1], cx = c[2], cy = c[3], x2 = c[4], y2 = c[5], mx = ag.mx, my = ag.my;
-    // arrow head along the last segment
-    var tx = x2 - cx, ty = y2 - cy, tl = Math.sqrt(tx * tx + ty * ty), hx = tx / tl, hy = ty / tl;
+    var s = ag.s, x2 = ag.x2, y2 = ag.y2, hx = ag.hx, hy = ag.hy, mx = ag.mx, my = ag.my, d = ag.d, bx = mx + 11 * ag.fx;
+    // arrow head along the path's last heading
     var head = 'M' + f1(x2 + hx * 4) + ' ' + f1(y2 + hy * 4) + 'L' + f1(x2 - hx * s - hy * s * 0.7) + ' ' + f1(y2 - hy * s + hx * s * 0.7) +
       'L' + f1(x2 - hx * s + hy * s * 0.7) + ' ' + f1(y2 - hy * s - hx * s * 0.7) + 'Z';
-    var d = 'M' + f1(x1) + ' ' + f1(y1) + 'Q' + f1(cx) + ' ' + f1(cy) + ' ' + f1(x2) + ' ' + f1(y2);
     var w = wide ? 6 : 4.5;
     var out = '<g class="arrow' + (wide ? ' live' : '') + '">' +
       (onBoard ? '<path d="' + d + '" stroke="' + P.paper + '" stroke-opacity="0.7" stroke-width="' + (w + 7) + '" fill="none" stroke-linecap="round"/>' : '') +
@@ -514,8 +612,8 @@
       '<path d="' + d + '" stroke="' + col + '" stroke-width="' + w + '" fill="none" stroke-linecap="round"' + (dashed ? ' stroke-dasharray="' + (typeof dashed === 'string' ? dashed : '10 7') + '"' : '') + '/>' +
       '<path d="' + head + '" fill="' + col + '" stroke="' + P.ink + '" stroke-width="2" stroke-linejoin="round"/>';
     if (h) out += stampAt(h, mx, my, 16);
-    if (label != null) out += '<circle cx="' + f1(mx + 11) + '" cy="' + f1(my + 7) + '" r="7.5" fill="' + P.paper + '" stroke="' + P.ink + '" stroke-width="1.6"/><text x="' + f1(mx + 11) + '" y="' + f1(my + 10.6) + '" text-anchor="middle" class="tiny b">' + label + '</text>';
-    if (revised) out += newPlan(mx - 12, my - 12);
+    if (label != null) out += '<circle cx="' + f1(bx) + '" cy="' + f1(my + 7) + '" r="7.5" fill="' + P.paper + '" stroke="' + P.ink + '" stroke-width="1.6"/><text x="' + f1(bx) + '" y="' + f1(my + 10.6) + '" text-anchor="middle" class="tiny b">' + label + '</text>';
+    if (revised) out += newPlan(ag.rx, my - 12);
     return out + '</g>';
   }
   // dug in: a small shield in the holder's colour with '+1', on the corner of the holder stamp
@@ -550,22 +648,22 @@
       (revised ? newPlan(x + 11, y - 10) : '') + '</g>';
   }
   // a later move (a second move, or one the Owl shows) is drawn dashed and dimmer
-  function intentMark(s, h, it, second) {
-    var m = intentMark1(s, h, it, second);
+  function intentMark(s, h, it, second, view) {
+    var m = intentMark1(s, h, it, second, view || {});
     return m && second ? '<g class="later" opacity="0.6"><title>After that</title>' + m + '</g>' : m;
   }
-  function intentMark1(s, h, it, second) {
+  function intentMark1(s, h, it, second, view) {
     if (!it) return '';
     var col = A.houseCol(h), rv = !!it.revised;
     switch (it.type) {
-      case 'assault': return arrow(it.from, it.to, col, second, it.count, h, false, rv);
-      case 'march': return arrow(it.from, it.to, col, true, it.count, h, false, rv);
+      case 'assault': return arrow(it.from, it.to, col, second, it.count, h, false, rv, sideOf(view, it.from, it.to));
+      case 'march': return arrow(it.from, it.to, col, true, it.count, h, false, rv, sideOf(view, it.from, it.to));
       case 'muster': return marker(it.region, h, '+', second, rv);
       case 'search': return marker(it.region, h, '?', second, rv);
       case 'return': return marker(it.region, h, '↵', second, rv);
       case 'depart': return marker('farpass', h, '↑', second, rv);
       // a poach: a dotted line carrying the resident out of the region toward the taker's warbands
-      case 'poach': return it.from && it.from !== it.region ? arrow(it.region, it.from, col, '2 7', null, h, false, rv) : marker(it.region, h, '−', second, rv);
+      case 'poach': return it.from && it.from !== it.region ? arrow(it.region, it.from, col, '2 7', null, h, false, rv, sideOf(view, it.region, it.from)) : marker(it.region, h, '−', second, rv);
     }
     return '';
   }
@@ -581,7 +679,7 @@
     var avoid = clearOf(s, view, !!board);
     D.REGION_IDS.forEach(function (r) { out += region(s, r, view, !!board, avoid); });
     out += camp(s, view, !!board);
-    (view.intents || []).forEach(function (x) { out += intentMark(s, x.house, x.intent, x.second); });
+    (view.intents || []).forEach(function (x) { out += intentMark(s, x.house, x.intent, x.second, view); });
     var fl = view.flash;
     if (fl && fl.from && fl.to && fl.from !== fl.to) out += arrow(fl.from, fl.to, A.houseCol(fl.house), false, null, null, true);
     // carved frame
@@ -596,6 +694,7 @@
     return out;
   }
 
-  root.WR_MAP = { svg: svg, POS: POS, CAMP: CAMP, squads: squads, clearOf: clearOf,
+  root.WR_MAP = { svg: svg, POS: POS, CAMP: CAMP, squads: squads, clearOf: clearOf, ROADS: ROADS, roadPath: roadPath,
+    arrowGeom: arrowGeom, midpoint: function (pts) { return atLength(sampleSegs(smoothPath(pts), 8), 0.5); },
     depth: function (r, x, y) { return depth(field(r), x, y); } };
 })(typeof self !== 'undefined' ? self : this);
