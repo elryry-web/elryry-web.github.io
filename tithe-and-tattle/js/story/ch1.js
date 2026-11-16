@@ -264,5 +264,5 @@ STORY.push({
       logic: ['pairOr', 'clement', 'wystan', 'wed', 'reeds'] }
   ],
   solution: { wystan: ['wed', 'willow', 'kit'], odo: ['mon', 'sluice', 'nothing'], clement: ['tue', 'reeds', 'otter'], anselm: ['thu', 'pool', 'traps'] },
-  epilogue: "Brother Clement saw an otter at the reed bed on Tuesday and called it lutra. I saw Kit with a sack at the willow on Wednesday. On Thursday Brother Anselm saw Hob setting his traps at the black pool, ten yards inside the abbey's water. The Prior went to the mill on Friday, and Hob said the water had moved."
+  epilogue: "Brother Clement saw an otter at the reed bed on Tuesday and called it lutra. I saw Kit with a sack at the willow on Wednesday. On Thursday Brother Anselm saw Hob setting his traps at the black pool, ten yards inside the abbey's water. On Friday the Prior put it to Hob, who said the water must have moved."
 });
