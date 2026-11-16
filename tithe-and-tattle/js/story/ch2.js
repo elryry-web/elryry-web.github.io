@@ -10,7 +10,7 @@ STORY.push({
   characters: ['Brother Wystan', 'Will Hayward', 'Brother Odo', 'Father Simon', 'Hob', 'Margery Baxter'],
   size: '3×4',
   grade: 'Apprentice',
-  chapterIntro: "The old bell cracked before I came. Since then we have struck it on the rim with a mallet, and Brother Odo says that is as good as ringing it. In November word came that the new bell was waiting on the quay at Lynn, cast and paid for, mostly, and Piers Carter said he would fetch it the week after Martinmas, once the pigs were in.",
+  chapterIntro: "The old bell cracked before I came. Since then we have struck it on the rim with a mallet, and Brother Odo says that is as good as ringing it. In November word came that the new bell was waiting on the quay at Lynn, cast and paid for — mostly. Piers Carter said he would fetch it the week after Martinmas, once the pigs were in.",
   intro: "Will Hayward keeps the hedges and the common. From Michaelmas to Martinmas he also watches the pigs that go into Mardle Wood for the acorns, and takes the pannage for Dame Isabel by a rule of his own, a penny for a hog, a halfpenny for a young one and something else again for a sow. I asked him to say it twice and wrote it down differently both times. On the last day four owners came to fetch their pigs home.",
   task: 'Can you work out how many pigs each owner had in the wood, and what each paid?',
   categories: [
