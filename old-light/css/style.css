@@ -38,7 +38,7 @@ input { font: inherit; color: var(--ink); background: var(--bg1); border: 1px so
 .title-rings i:nth-child(3) { width: 70px; height: 70px; border: 1.5px solid rgba(166, 228, 239, 0.55); border-radius: 50%; animation: fade 6s ease-in-out infinite; }
 @keyframes breathe { 50% { transform: translate(-50%, -50%) scale(1.06); opacity: 0.6; } }
 @keyframes fade { 50% { opacity: 0.25; } }
-h1 { position: relative; font-weight: 400; font-size: clamp(34px, 9vw, 64px); letter-spacing: 0.3em; margin: 0 0 6px 0.3em; white-space: nowrap; color: #e7eef2; text-shadow: 0 0 28px rgba(166, 228, 239, 0.18); }
+h1 { position: relative; font-weight: 400; font-size: clamp(28px, 8vw, 64px); letter-spacing: 0.24em; margin: 0 0 6px 0.24em; max-width: 100%; overflow-wrap: normal; text-align: center; color: #e7eef2; text-shadow: 0 0 28px rgba(166, 228, 239, 0.18); }
 .tag { position: relative; color: var(--cyan); opacity: 0.8; margin: 0 0 40px; letter-spacing: 0.04em; }
 .title-btns { position: relative; display: flex; flex-direction: column; gap: 12px; align-items: center; }
 button.big { min-height: 52px; min-width: 240px; font-size: 15px; letter-spacing: 0.12em; text-transform: uppercase; background: rgba(10, 17, 23, 0.8); }
