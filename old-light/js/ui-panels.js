@@ -24,7 +24,8 @@
     $('sSeed').oninput = function () { var v = parseInt($('sSeed').value, 10); if (v > 0) setupSel.seed = v; };
     $('sStart').onclick = function () {
       U.set.lastScen = setupSel.scn; U.set.lastSide = setupSel.side; U.save();
-      startBattle(setupSel.scn, setupSel.side, setupSel.seed);
+      var sc = U.D.SCENARIOS[setupSel.scn];   // the tutorial fixes its side and seed
+      if (sc.tutorial) startBattle(setupSel.scn, sc.side || 'A', sc.seed || 1); else startBattle(setupSel.scn, setupSel.side, setupSel.seed);
     };
     $('sScen').onclick = function (e) { var b = e.target.closest('[data-scn]'); if (!b) return; setupSel.scn = b.getAttribute('data-scn'); drawSetup(); };
     $('sSide').onclick = function (e) { var b = e.target.closest('[data-side]'); if (!b) return; setupSel.side = b.getAttribute('data-side'); drawSetup(); };
@@ -97,6 +98,7 @@
       sh += '<button data-side="' + S + '"' + (setupSel.side === S ? ' class="on"' : '') + '><b>Side ' + S + '</b><span>' + esc(names.join(', ')) + '</span></button>';
     });
     $('sSide').innerHTML = sh;
+    ['sSideH', 'sSide', 'sSeedH', 'sSeedRow'].forEach(function (id) { $(id).style.display = sc.tutorial ? 'none' : ''; });
   }
   function startBattle(scn, side, seed) {
     show('battle'); closePops(); $('end').classList.remove('on');
@@ -269,7 +271,7 @@
   }
   function helmTab(st, s) {
     var m = s.orders.man || { type: 'coast' }, t = m.type, E = U.E;
-    var h = '<div class="sec"><h4>Manoeuvre <em>' + esc(manText(s)) + '</em></h4>' + tgtLine(s) + '<div class="chips">' +
+    var h = '<div class="sec man"><h4>Manoeuvre <em>' + esc(manText(s)) + '</em></h4>' + tgtLine(s) + '<div class="chips">' +
       btn('man:close', 'Close to', t === 'close') + btn('man:hold', 'Hold range', t === 'hold') + btn('man:break', 'Break off', t === 'break') + btn('man:match', 'Match vel.', t === 'match') + btn('man:cold', 'Go cold', t === 'cold') + btn('man:coast', 'Coast', t === 'coast') + btn('man:manual', 'Manual burn', t === 'manual' || st.manual) + '</div>';
     if (t === 'close' || t === 'hold') h += '<div class="row stepper">' + btn('rng:-1', '&minus;') + '<span>' + U.fmtKm(m.range || 0) + '</span>' + btn('rng:1', '+') + '</div>';
     if (st.manual) h += '<p class="note">Drag on the plot from the ship toward the burn. Length sets the G, up to the limit.</p>';

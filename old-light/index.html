@@ -28,10 +28,10 @@
     <div class="setup-body">
       <h3>Scenario</h3>
       <div id="sScen" class="scen-list"></div>
-      <h3>Your side</h3>
+      <h3 id="sSideH">Your side</h3>
       <div id="sSide" class="side-pick"></div>
-      <h3>Seed</h3>
-      <div class="seed-row"><input id="sSeed" type="number" inputmode="numeric" min="1" max="999999"><button id="sRand">Random</button></div>
+      <h3 id="sSeedH">Seed</h3>
+      <div id="sSeedRow" class="seed-row"><input id="sSeed" type="number" inputmode="numeric" min="1" max="999999"><button id="sRand">Random</button></div>
     </div>
     <footer class="setup-foot"><button id="sStart" class="big prime">Start</button></footer>
   </div>
@@ -57,6 +57,7 @@
     <div id="threats" class="threats"></div>
     <div id="banner" class="banner"><span id="bannerText"></span><button id="bannerGo">Resume</button></div>
     <div id="card" class="card"></div>
+    <div id="tut" class="tut"></div>
     <div id="log" class="log"></div>
     <div class="plot-btns">
       <button id="bManual" class="icon" title="Manual burn: drag from the ship">&#8599;</button>
@@ -83,5 +84,6 @@
 <script src="js/ui-plot.js"></script>
 <script src="js/ui-panels.js"></script>
 <script src="js/ui-main.js"></script>
+<script src="js/ui-tutor.js"></script>
 </body>
 </html>

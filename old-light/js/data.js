@@ -190,6 +190,9 @@
   // ---------------------------------------------------------------- skirmish scenarios
   // ships: loadout, side, position (km), velocity (km/s), heading (deg). Sides A and B; doctrine is the default fleet AI.
   var SCENARIOS = {
+    // the tutorial is the frigate duel (ships and sides copied in below) with a fixed seed, side A, an enemy captain
+    // who is never bold (sides.B.bold false), and the pauses in TUTORIAL
+    tutorial: { name: 'Tutorial', text: 'The frigate duel, with pauses that explain each part of the screen.', tutorial: true, seed: 5, side: 'A' },
     duel: { name: 'Frigate duel', text: 'Two frigates of the same class meet across 200,000 km.',
       sides: { A: { doctrine: 'auto', faction: 'arbitration' }, B: { doctrine: 'auto', faction: 'arbitration' } },
       planets: [],
@@ -235,6 +238,36 @@
         { load: 'gunFrigate', side: 'B', name: 'Tithe', x: 60000, y: -6000, vx: -3, vy: 0, h: 180 }
       ] }
   };
+
+  (function () {
+    var t = SCENARIOS.tutorial, d = JSON.parse(JSON.stringify(SCENARIOS.duel));
+    t.sides = d.sides; t.planets = d.planets; t.ships = d.ships; t.sides.B.bold = false;
+  })();
+
+  // the tutorial's cards, in the order they usually fire. ui-tutor.js decides when each one shows; highlight names the
+  // part of the screen it outlines (null for none)
+  var TUTORIAL = [
+    { id: 'plot', highlight: null, title: 'The plot',
+      body: 'Your ship, Patience, is the solid amber mark on the plot. The bar at the bottom right gives the scale. Pinch or scroll to zoom, and drag to pan.' },
+    { id: 'time', highlight: 'time', title: 'Time',
+      body: 'Time is paused, but your orders still work. These buttons run the clock from ×1 up to ×1000. Auto runs fast while nothing is near and slows down as the enemy gets close.' },
+    { id: 'helm', highlight: 'man', title: 'Helm orders',
+      body: 'The Helm tab sets your ship\'s course. Close to, Hold range and Break off steer relative to the target. Patience starts with orders to close in.' },
+    { id: 'gbands', highlight: 'gbands', title: 'G limit and crew',
+      body: 'Your crew, not the hull, sets the G limit on how hard your ship burns. A name under a band means that band would strain or hurt that officer. The Crew tab shows each officer\'s strain and health.' },
+    { id: 'contact', highlight: 'card', title: 'Light lag',
+      body: 'The hollow cyan mark shows where the enemy was when its light left. At this range that light is less than a second old. This card lists what your sensors know about the contact.' },
+    { id: 'lost', highlight: 'card', title: 'Track lost',
+      body: 'The enemy cut its drive, and a cold ship is hard to see from this far. The plot now guesses its position from its last course, and the dashed ring shows how far off that guess may be. Keep closing, and your sensors will find it again.' },
+    { id: 'guns', highlight: 'guns', title: 'Guns',
+      body: 'The Guns tab and the aim label on the plot give each weapon\'s chance to hit and its time to impact. A solid slug does full damage but rarely hits a ship that is dodging. A canister bursts into a wide cloud of light fragments that is hard to dodge.' },
+    { id: 'threats', highlight: 'threats', title: 'Incoming fire',
+      body: 'Red lines are enemy rounds aimed at your ship. This strip gives each round\'s time to impact and its chance to hit if you do not dodge. Evasion on the Helm tab sets how hard your ship dodges.' },
+    { id: 'damage', highlight: 'meters', title: 'Damage, heat and fuel',
+      body: 'Hits wear down armour and systems, which the Ship tab lists. Heat climbs while your lasers fire, and extending the radiators sheds it faster. Δv is your fuel budget, and a ship that runs low leaves the fight.' },
+    { id: 'end', highlight: null, title: 'The tutorial is over',
+      body: 'The other skirmishes add missiles, drones, more ships and a convoy to guard. The ? button at the top explains the plot at any time.' }
+  ];
 
   // ---------------------------------------------------------------- crew
   var ORIGINS = {
@@ -288,5 +321,5 @@
   };
 
   return { NUM: NUM, HULLS: HULLS, MODS: MODS, TIERS: TIERS, ARMOUR: ARMOUR, DRONES: DRONES, LOADOUTS: LOADOUTS, SCENARIOS: SCENARIOS,
-    ORIGINS: ORIGINS, STATIONS: STATIONS, STATION_NAMES: STATION_NAMES, ABILITIES: ABILITIES, CAST: CAST, FACTIONS: FACTIONS, NAMES: NAMES };
+    ORIGINS: ORIGINS, STATIONS: STATIONS, STATION_NAMES: STATION_NAMES, ABILITIES: ABILITIES, CAST: CAST, FACTIONS: FACTIONS, NAMES: NAMES, TUTORIAL: TUTORIAL };
 });

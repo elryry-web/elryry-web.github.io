@@ -383,7 +383,8 @@
       // a bold captain (seeded per ship), or one pressing a worse-hurt foe, pushes at Brace to close from well outside its band;
       // a ship with loaded rails pushes at Brace until its canister reaches (the gunner has lately seen canMinHits
       // fragments on the hull); gGuard weighs the crew
-      if (mem.bold == null) mem.bold = coin(w.seed, 'bold|' + s.id) < N.boldP;
+      // a scenario side with bold: false (the tutorial's enemy) never draws a bold captain
+      if (mem.bold == null) { var sd = w.scn && w.scn.sides && w.scn.sides[s.side]; mem.bold = !(sd && sd.bold === false) && coin(w.seed, 'bold|' + s.id) < N.boldP; }
       var kin = s.mods.some(function (m) { return m.kind === 'rail' && m.state < 2 && m.ammo > 0; });
       var canIn = mem.canOk != null && w.t - mem.canOk < N.canHold;
       var boldPush = tgt && d < N.pushR && d > 2 * R && (mem.bold || tgt.hp / tgt.hpMax < s.hp / s.hpMax - 0.1);

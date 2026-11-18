@@ -245,3 +245,18 @@ button.fire { border-color: var(--red); color: #ffb9b0; background: var(--redBg)
 .eo-r.down .ef { color: var(--orange); }
 .eo-r.dead b { color: var(--dim); }
 .eo-r.dead .ef { color: var(--red); }
+/* tutorial card (styled like the pause notice) and the outline on the part of the screen it describes */
+.tut { position: absolute; left: 50%; transform: translateX(-50%); width: min(360px, calc(100% - 16px)); z-index: 9; display: none; background: rgba(30, 22, 8, 0.95); border: 1px solid var(--amber2); color: #ffe2b0; border-radius: 6px; padding: 9px 12px 8px; box-shadow: 0 4px 18px rgba(0, 0, 0, 0.6); }
+.tut.on { display: block; }
+.tut.mid { top: 50%; transform: translate(-50%, -50%); }
+.tut.bottom { bottom: 52px; }
+.tut h4 { margin: 0 0 4px; font-size: 13px; font-weight: 600; color: var(--amber); letter-spacing: 0.04em; }
+.tut p { margin: 0; font-size: 12.5px; line-height: 1.45; }
+.tut-btns { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 8px; }
+.tut-btns .prime { min-width: 84px; }
+.tut-skip { margin-right: auto; border-color: transparent; background: none; color: var(--dim); font-size: 11.5px; text-decoration: underline; padding-left: 0; }
+#battle.tut-on #banner { display: none; }
+#battle.tut-low #card { top: auto; bottom: 8px; z-index: 8; }
+#battle.tut-hi-time #timeCtl, #battle.tut-hi-man #pBody .sec.man, #battle.tut-hi-gbands #pBody .gbands, #battle.tut-hi-gbands #pTabs button[data-a="tab:crew"],
+#battle.tut-hi-card #card, #battle.tut-hi-threats #threats, #battle.tut-hi-meters #pHead .meters { outline: 2px solid var(--amber); outline-offset: 3px; border-radius: 6px; box-shadow: 0 0 14px rgba(255, 181, 74, 0.45); }
+#battle.tut-hi-guns #pBody { outline: 2px solid var(--amber); outline-offset: -3px; box-shadow: inset 0 0 14px rgba(255, 181, 74, 0.3); }

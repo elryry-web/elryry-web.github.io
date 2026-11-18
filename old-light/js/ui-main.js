@@ -129,8 +129,9 @@
     U.panels.onStart(); U.plot.onStart();
     U.pause(st.why, null, true);
     computeThreats();
+    if (U.tutor) U.tutor.start(scnKey);
   };
-  U.quit = function () { st = null; };
+  U.quit = function () { if (U.tutor) U.tutor.stop(); st = null; };
 
   // ---------------------------------------------------------------- orders from the panel
   U.order = function (o, ships) {
@@ -346,6 +347,7 @@
   var FACE = { nose: 'the nose', flank: 'the flank', tail: 'the tail' };
   function onEvent(e) {
     var P = st.P, mine = e.side === P, w = st.w;
+    if (U.tutor) U.tutor.ev(e);
     switch (e.type) {
       case 'contact':
         if (!mine) return;
@@ -447,13 +449,14 @@
         while (st.acc >= 1) {
           E.step(w, 1); st.acc -= 1; afterTick();
           if (w.t % 5 === 0 || L <= 10) computeThreats();
+          if (U.tutor) U.tutor.tick();
           var L2 = st.speed === 'auto' ? st.autoL : L;
           if (L2 < L) { st.acc = Math.min(st.acc, 1); L = L2; }
           if (st.paused || w.over) { st.acc = 0; break; }
           if (performance.now() - t0 > 9) { st.acc = Math.min(st.acc, 1); break; }
         }
         st.frac = Math.max(0, Math.min(1, st.acc));
-        if (w.over && !st.over) { flushAgg(true); st.over = true; st.paused = true; setTimeout(function () { if (st && !st.endShown) { st.endShown = true; U.panels.end(); } }, 900); }
+        if (w.over && !st.over) { flushAgg(true); st.over = true; st.paused = true; setTimeout(function () { if (st && !st.endShown) { st.endShown = true; if (!(U.tutor && U.tutor.atEnd(U.panels.end))) U.panels.end(); } }, 900); }
       } else st.frac = 0;
       if (st.paused && ts - (st.thrTs || 0) > 250) { st.thrTs = ts; computeThreats(); }
       st.fx = st.fx.filter(function (f) { return f.until > ts; });
