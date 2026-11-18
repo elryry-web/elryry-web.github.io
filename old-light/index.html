@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="theme-color" content="#06090c">
+<title>Old Light</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<section id="title" class="screen on">
+  <div class="title-glass">
+    <div class="title-rings" aria-hidden="true"><i></i><i></i><i></i></div>
+    <h1>Old Light</h1>
+    <p class="tag">Every contact on the plot is where it was.</p>
+    <div class="title-btns">
+      <button id="tSkirmish" class="big prime">Skirmish</button>
+      <button id="tCampaign" class="big" disabled>Campaign <small>coming soon</small></button>
+    </div>
+    <button id="tSound" class="snd">Sound: on</button>
+  </div>
+</section>
+
+<section id="setup" class="screen">
+  <div class="setup-glass">
+    <header class="setup-head"><button id="sBack" class="ghost">&lsaquo; Back</button><h2>Skirmish</h2></header>
+    <div class="setup-body">
+      <h3>Scenario</h3>
+      <div id="sScen" class="scen-list"></div>
+      <h3>Your side</h3>
+      <div id="sSide" class="side-pick"></div>
+      <h3>Seed</h3>
+      <div class="seed-row"><input id="sSeed" type="number" inputmode="numeric" min="1" max="999999"><button id="sRand">Random</button></div>
+    </div>
+    <footer class="setup-foot"><button id="sStart" class="big prime">Start</button></footer>
+  </div>
+</section>
+
+<section id="battle" class="screen">
+  <div id="plotWrap">
+    <canvas id="plot"></canvas>
+    <div id="topbar">
+      <div class="tb-row tb-main">
+        <button id="bMenu" class="icon" aria-label="Menu">&#8801;</button>
+        <div id="clock" class="clock">T+0:00:00</div>
+        <div id="scnName" class="scn-name"></div>
+        <button id="bHelp" class="icon" aria-label="Help">?</button>
+        <button id="bSet" class="icon" aria-label="Settings">&#9881;</button>
+      </div>
+      <div class="tb-row tb-time" id="timeCtl">
+        <button id="bPause" class="icon" aria-label="Pause">&#10074;&#10074;</button>
+        <button data-sp="1">&times;1</button><button data-sp="10">&times;10</button><button data-sp="100">&times;100</button><button data-sp="1000">&times;1000</button><button data-sp="auto">Auto</button>
+        <span id="autoNow" class="auto-now"></span>
+      </div>
+    </div>
+    <div id="threats" class="threats"></div>
+    <div id="banner" class="banner"><span id="bannerText"></span><button id="bannerGo">Resume</button></div>
+    <div id="card" class="card"></div>
+    <div id="log" class="log"></div>
+    <div class="plot-btns">
+      <button id="bManual" class="icon" title="Manual burn: drag from the ship">&#8599;</button>
+      <button id="bFollow" class="icon" title="Follow the selected ship">&#9678;</button>
+      <button id="bFit" class="icon" title="Fit the plot">&#9634;</button>
+    </div>
+  </div>
+  <aside id="panel">
+    <div id="grab" class="grab"><i></i></div>
+    <div id="pHead"></div>
+    <div id="pTabs" class="tabs"></div>
+    <div id="pBody" class="pbody"></div>
+  </aside>
+  <div id="menu" class="pop"></div>
+  <div id="settings" class="pop"></div>
+  <div id="help" class="overlay"></div>
+  <div id="end" class="overlay"></div>
+</section>
+
+<script src="js/data.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/ui-plot.js"></script>
+<script src="js/ui-panels.js"></script>
+<script src="js/ui-main.js"></script>
+</body>
+</html>
