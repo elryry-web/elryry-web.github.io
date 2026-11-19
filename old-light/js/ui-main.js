@@ -119,7 +119,7 @@
       if (r === 'cargo') man = { type: 'coast' };
       else if (r === 'carrier') man = { type: 'hold', target: null, range: P2.hold, vmax: P2.holdV || P2.vmax };
       else if (r === 'missile') man = { type: 'hold', target: null, range: P2.hold, vmax: P2.vmax };
-      else man = { type: 'close', target: null, range: P2.hold, vmax: P2.vmax };
+      else man = { type: 'close', target: null, range: P2.hold, vmax: P2.vmax, auto: true, pass: 'auto' };
       E.order(w, s.id, { man: man, gLimit: P2.gLimit, evasion: 'auto' });
       U.pc(s);
     });
@@ -241,8 +241,11 @@
     var t = u2 > 1e-9 ? -(rx * ux + ry * uy) / u2 : null; return t != null && t > 0 ? t : null;
   };
   // an Approach or Hold whose drive points away from the target while still closing: the flip to brake
+  // the range fight as the helm sees it (ai.js helmInfo): best range, the enemy's, and whether it stops or passes
+  U.helm = function (s) { return st && st.w ? AI.helmInfo(st.w, s) : null; };
+  U.passing = function (s) { var m = s.orders.man, h = E.active(s) && m && (m.type === 'close' || m.type === 'hold') ? U.helm(s) : null; return !!(h && h.mode === 'pass'); };
   U.braking = function (s) {
-    var m = s.orders.man, tr = U.targetOf(s); if (!m || (m.type !== 'close' && m.type !== 'hold') || !tr || !E.active(s)) return false;
+    var m = s.orders.man, tr = U.targetOf(s); if (!m || (m.type !== 'close' && m.type !== 'hold') || !tr || !E.active(s) || U.passing(s)) return false;
     var dx = tr.ex - s.x, dy = tr.ey - s.y, d = hyp(dx, dy) || 1, a = hyp(s.ax || 0, s.ay || 0), cl = -(dx * (tr.vx - s.vx) + dy * (tr.vy - s.vy)) / d;
     return a > 0.05 * G && cl > 0.2 && ((s.ax || 0) * dx + (s.ay || 0) * dy) / (a * d) < -0.5;
   };
@@ -485,6 +488,9 @@
       s.mods.forEach(function (m) { if (m.kind === 'rail' && m.state < 2 && m.ammo <= 0 && !m.__dry) { m.__dry = 1; U.addLog(s.name + ': ' + (m.def.name.charAt(0).toLowerCase() + m.def.name.slice(1)) + ' dry, no rounds left.', 'bad'); } });
       var b = U.braking(s); if (b && !s.__brk && gate('brk' + s.id, 600)) U.addLog(s.name + ' flips to brake: the drive faces ' + ((U.targetOf(s) || {}).id || 'the enemy') + '. ' + (s.mods.some(function (m) { return m.kind === 'rail' && !m.def.spinal || m.kind === 'laser'; }) ? 'Turrets still bear.' : 'The spinal swings round to fire.'), 'see');
       s.__brk = b;
+      var ps = U.passing(s);
+      if (ps && !s.__pass) { var hi = U.helm(s) || {}, tn = (U.targetOf(s) || {}).id || 'the enemy'; U.addLog(s.name + ' passes ' + tn + ' at ' + Math.round(hi.vr || 0) + ' km/s. ' + (hi.why === 'fuel' ? 'Stopping would leave too little Δv.' : hi.why === 'order' ? 'Its guns fire as it goes.' : 'Stopping would gain nothing.'), 'see'); }
+      s.__pass = ps;
     });
   }
 

@@ -88,18 +88,29 @@
   function helm(w, v, M, s, mem) {
     var c = s.ctl, o = s.orders.man || { type: 'coast' }, aL = E.accLimit(s), ax = 0, ay = 0, az = 0;
     if (o.gMax != null) aL = Math.min(aL, o.gMax * G);   // a gentle course: a carrier servicing drones steers under the service G
-    var g = goal(w, v, s, o);
-    if (g && g.manual) { ax = g.ax; ay = g.ay; }
+    // Approach and Hold on a ship: the range fight sets the range (Auto) and decides who pays for the stop
+    var trS = (o.type === 'close' || o.type === 'hold') && o.target ? E.trackOf(w, s.side, o.target) : null, pass = null;
+    if (trS && trS.kind === 'ship') {
+      var rf = rangeFight(w, s, trS, mem);
+      if (o.auto && rf && rf.R) o.range = rf.R;
+      pass = rangeHelm(w, s, mem, o, trS, aL);
+    } else if (mem.ps) mem.ps.mode = null;
+    var g = pass ? null : goal(w, v, s, o);
+    if (pass) { ax = pass.ax; ay = pass.ay; }
+    else if (g && g.manual) { ax = g.ax; ay = g.ay; }
     else if (g) {
+      if (g.ship && mem.ps && mem.ps.ret) g.vmax = Math.min(g.vmax != null ? g.vmax : N.vmax, N.passRetV);
       var rx = g.x - s.x, ry = g.y - s.y, r = hyp(rx, ry);
       // a stand-off point read off a light-lagged track wanders with the track noise: near enough is good enough, or the helm chases the noise and burns its fuel
       var rr = Math.max(0, r - (g.tol || 0));
       var vb = Math.sqrt(2 * aL * N.planFrac * rr), vm = Math.min(g.vmax != null ? g.vmax : N.vmax, vb);
       var ux = r > 1e-6 ? rx / r : 0, uy = r > 1e-6 ? ry / r : 0;
-      // closing on a ship that is closing on us: take the closing speed it adds, up to what we can still brake from.
-      // Matching the target's velocity plus our own closing speed, two ships that both close chase each other's
-      // velocity and burn their tanks dry side by side.
-      if (g.accept) { var vrel = (s.vx - g.vx) * ux + (s.vy - g.vy) * uy; if (vrel > vm) vm = Math.min(vrel, Math.max(vm, vb)); }
+      // closing on a ship that is closing on us, this helm never burns against the speed the other ship brings:
+      // it keeps that closing speed up to what it can still brake from, and past the stop curve it brakes only when
+      // rangeHelm has decided this ship pays for the stop. It adds only its own half of the closing speed it wants
+      // (up to vm / 2 of its own), so two helms that want different speeds settle instead of chasing each other's
+      // velocity and burning their tanks dry side by side.
+      if (g.ship && g.cT > 1) { var vrel = (s.vx - g.vx) * ux + (s.vy - g.vy) * uy; if (vrel > vm) vm = Math.min(vrel, Math.max(vm, vb)); else vm = Math.min(vm, Math.max(vrel, g.cT + vm / 2)); }
       var dvx = g.vx + ux * vm - s.vx, dvy = g.vy + uy * vm - s.vy, dl = hyp(dvx, dvy);
       if (dl > N.deadband) { var a = Math.min(aL, dl / N.helmTau); ax = dvx / dl * a; ay = dvy / dl * a; }
     }
@@ -188,7 +199,99 @@
     if (t === 'match') return { x: s.x, y: s.y, vx: T.vx, vy: T.vy, vmax: 0 };
     if (t === 'break') return { x: s.x + ux * 1e9, y: s.y + uy * 1e9, vx: T.vx, vy: T.vy, vmax: o.vmax || 40 };
     var R = o.range != null ? o.range : 5000;
-    return { x: T.x + ux * R, y: T.y + uy * R, vx: T.vx, vy: T.vy, vmax: o.vmax, tol: R * N.holdTol, accept: t === 'close' };
+    // cT: the target's own closing speed (its velocity toward us)
+    return { x: T.x + ux * R, y: T.y + uy * R, vx: T.vx, vy: T.vy, vmax: o.vmax, tol: R * N.holdTol, ship: !!(tr && tr.kind === 'ship'), cT: T.vx * ux + T.vy * uy };
+  }
+
+  // ---------------------------------------------------------------- the range fight
+  // Each gun ship works out where it wants to fight its target: at each candidate range, the share of the target's
+  // health it deals a second (engine rateAt, from both ships' working guns) less the share of its own it takes,
+  // plus rfTie x the share dealt. Cached; refreshed every rfRefresh s or when either ship's guns, ammo, health or
+  // gunnery crew change. reach: past this neither ship does much, and a pass is over once the range opens past it.
+  var RCAND = [1000, 1500, 2000, 2500, 3000, 4000, 5000, 6000, 7000, 8000, 10000, 12000, 15000, 20000, 25000, 30000];
+  function gunKey(s) {
+    var k = '';
+    for (var i = 0; i < s.mods.length; i++) { var m = s.mods[i]; if (m.kind === 'rail' || m.kind === 'laser') k += m.state + (m.kind === 'laser' || m.ammo > 0 ? 'a' : 'd'); }
+    return k + Math.round(4 * s.hp / s.hpMax) + Math.round(4 * (s.st ? s.st.guns : 1));
+  }
+  function rangeFight(w, s, tr, mem) {
+    var T = tr && tr.kind === 'ship' ? w.idx[tr.oid] : null; if (!T || T.kind !== 'ship') return null;
+    var key = tr.id + '|' + gunKey(s) + '|' + gunKey(T), c = mem.rf;
+    if (c && c.key === key && w.t - c.t < N.rfRefresh) return c;
+    var hs = Math.max(1, s.hp), ht = Math.max(1, T.hp), best = null, bt = null, top = 0, topO = 0, rows = [];
+    for (var i = 0; i < RCAND.length; i++) {
+      var R = RCAND[i], o = E.rateAt(s, T, R), n = E.rateAt(T, s, R), e = o / ht - n / hs, a = e + N.rfTie * o / ht, b = -e + N.rfTie * n / hs;
+      rows.push([R, o, n]); top = Math.max(top, o, n); topO = Math.max(topO, o);
+      if (!best || a > best.a + 1e-12) best = { R: R, a: a, e: e, o: o, n: n };
+      if (!bt || b > bt.b + 1e-12) bt = { R: R, b: b };
+    }
+    // outgunned at every range, the best score is out of everyone's reach, which is no fight at all. Breaking off is
+    // the commander's call, so the helm fights where the trade is least bad: the most dealt for each share taken.
+    function trade(j, k) { var q = null; for (var r = 0; r < rows.length; r++) { var x = rows[r][j] / (j === 1 ? ht : hs), y = rows[r][k] / (k === 1 ? ht : hs), v = x / (y + 1e-9); if (x > 0 && (!q || v > q.v * (1 + 1e-6))) q = { R: rows[r][0], v: v, o: rows[r][1], n: rows[r][2] }; } return q; }
+    if (best.o <= 0) { var q = trade(1, 2); if (q) best = { R: q.R, e: q.o / ht - q.n / hs, o: q.o, n: q.n }; }
+    if (!(rows.filter(function (r) { return r[0] === bt.R; })[0][2] > 0)) { var q2 = trade(2, 1); if (q2) bt = { R: q2.R }; }
+    var reach = RCAND[0];
+    for (i = 0; i < rows.length; i++) if (Math.max(rows[i][1], rows[i][2]) > 0.05 * top) reach = rows[i][0];
+    // guns that cannot hurt the target at any range give no best range, and the doctrine band holds
+    mem.rf = topO > 0 ? { key: key, t: w.t, tgt: tr.id, R: best.R, edge: best.e, deal: best.o / ht, out: best.o, inn: best.n, theirs: bt.R, reach: 1.2 * Math.max(reach, best.R, bt.R) }
+      : { key: key, t: w.t, tgt: tr.id, R: null, theirs: top > 0 ? bt.R : null, reach: top > 0 ? 1.2 * Math.max(reach, bt.R) : 0, noHurt: top > 0 };
+    return mem.rf;
+  }
+  // Closing on a ship that is also closing, no helm brakes for the other side. This helm stops at its own range only
+  // when the stop is worth its cost (the whole closing speed, since the other ship may not brake). Auto stops when
+  // the edge at its range is at least rfEdge of what it deals and it keeps reserveDv + passMargin after the stop,
+  // when the stop is cheap (under stopFree), or after passMax passes (the anti-stalemate rule). Else it passes:
+  // it holds its course and slides passOff x its range wide of the line for the dodge. It fires as it goes. Once the
+  // range opens past reach it turns back at passRetV and decides again. The order's pass ('auto', 'brake', 'pass')
+  // is the player's override. Returns a burn for a pass, or null to fly the Approach or Hold as usual.
+  function rangeHelm(w, s, mem, o, tr, aL) {
+    var P = mem.ps || (mem.ps = { n: 0, tgt: null, mode: null, ret: false, why: null });
+    if (P.tgt !== tr.id) { P.tgt = tr.id; P.n = 0; P.mode = null; P.ret = false; }
+    var dx = tr.ex - s.x, dy = tr.ey - s.y, d = hyp(dx, dy) || 1, ux = dx / d, uy = dy / d;
+    var rvx = s.vx - tr.vx, rvy = s.vy - tr.vy, Vc = rvx * ux + rvy * uy, vr = hyp(rvx, rvy), cT = -(tr.vx * ux + tr.vy * uy);
+    var R = o.range || 5000, rf = mem.rf && mem.rf.tgt === tr.id ? mem.rf : null, reach = Math.max(rf && rf.reach || 0, 2 * R);
+    P.Vc = Vc; P.vr = vr; P.d = d; P.cT = cT;
+    if (P.ret && d < 1.5 * R) P.ret = false;
+    var st = w.stats.rf || (w.stats.rf = { pass: { A: 0, B: 0 }, brake: { A: 0, B: 0 } });
+    if (P.mode === 'pass') {
+      if (vr < 4) P.mode = null;   // the other ship paid for the stop
+      else if (Vc < -1 && d > reach) { P.mode = null; P.n++; P.ret = true; st.pass[s.side]++; }
+    }
+    var vb = Math.sqrt(2 * aL * N.planFrac * Math.max(0, d - R));
+    if (P.mode !== 'pass') {
+      if (Vc <= N.stopFree || d <= R || cT <= 1) { if (P.mode) P.mode = null; return null; }   // not a closing engagement worth a choice
+      // until the stop curve comes up, fly the approach as usual; at the curve choose, and hold the choice
+      // (half a stop wastes what was paid for it)
+      if (!P.mode && Vc < 0.9 * vb) return null;
+      if (!P.mode) {
+        var pick = o.pass === 'brake' || o.pass === 'pass' ? o.pass : null, why = 'order';
+        if (!pick) {
+          var spare = E.dvLeft(s) - vr - N.reserveDv;
+          if (P.n >= N.passMax) { pick = 'brake'; why = 'passes'; }
+          else if (spare < N.passMargin) { pick = 'pass'; why = 'fuel'; }
+          else if (rf && rf.R && rf.edge >= N.rfEdge * rf.deal) { pick = 'brake'; why = 'edge'; }
+          else { pick = 'pass'; why = 'even'; }
+        }
+        if (pick === 'brake' && P.mode !== 'brake') st.brake[s.side]++;
+        P.mode = pick; P.why = why;
+      }
+      if (P.mode !== 'pass') return null;
+    }
+    // the pass: no burn along the line; slide wide of it so the closest approach is about passOff x the range. The
+    // slide is spread over the time left (1.5 x the constant push that would just make it), not a hard jink.
+    var tc = vr > 1e-6 ? (dx * rvx + dy * rvy) / (vr * vr) : 0, mx = dx - rvx * tc, my = dy - rvy * tc, m = hyp(mx, my);
+    var b = Math.max(300, Math.min(3000, N.passOff * R)), ax = 0, ay = 0;
+    if (tc > 20 && m < b) {
+      var lx = m > 1 ? -mx / m : uy, ly = m > 1 ? -my / m : -ux, a = Math.min(aL, 3 * (b - m) / (tc * tc));
+      ax = lx * a; ay = ly * a;
+    }
+    return { ax: ax, ay: ay };
+  }
+  // what the helm is doing about the range fight, for the UI: { R, theirs, mode, why, passes, Vc, vr, d, cT }
+  function helmInfo(w, s) {
+    var M = w.ai && w.ai.side && w.ai.side[s.side], mem = M && M.ship && M.ship[s.id]; if (!mem) return null;
+    var rf = mem.rf, P = mem.ps || {}, tg = s.orders.man && s.orders.man.target;
+    return { R: rf && rf.tgt === tg ? rf.R : null, theirs: rf && rf.tgt === tg ? rf.theirs : null, noHurt: !!(rf && rf.tgt === tg && rf.noHurt), mode: P.tgt === tg ? P.mode : null, why: P.why, passes: P.n || 0, Vc: P.Vc, vr: P.vr, d: P.d, cT: P.cT };
   }
   // dodging costs: a hard jink lays no spinal and launches no missiles, and a jinking turret shoots wide.
   // Against slugs the helm weighs what dodging saves (engine threatPreview, in heavy-slug units) against what
@@ -377,9 +480,9 @@
         E.order(w, s.id, { man: man, gLimit: d < P.breakAt ? 'brace' : P.gLimit });
         return;
       }
-      // brawler and sniper: close to their band; a sniper with dry rails but live lasers becomes a brawler
-      var R = P.hold;
-      if (role === 'sniper' && !s.mods.some(function (m) { return m.kind === 'rail' && m.state < 2 && m.ammo > 0; })) R = DOC.brawler.hold;
+      // the range fight sets the range against this target; without one, the doctrine band
+      var rf = tgt ? rangeFight(w, s, tgt, mem) : null, R = rf && rf.R ? rf.R : P.hold;
+      if (!(rf && rf.R) && role === 'sniper' && !s.mods.some(function (m) { return m.kind === 'rail' && m.state < 2 && m.ammo > 0; })) R = DOC.brawler.hold;
       // a bold captain (seeded per ship), or one pressing a worse-hurt foe, pushes at Brace to close from well outside its band;
       // a ship with loaded rails pushes at Brace until its canister reaches (the gunner has lately seen canMinHits
       // fragments on the hull); gGuard weighs the crew
@@ -431,6 +534,8 @@
     // ward: the barges, else the carrier, else nobody
     v.own.forEach(function (o) { var r = M.role[o.id]; if (o !== s && E.active(o) && (r === 'cargo' || r === 'carrier') && !ward) ward = o; });
     var own = roleOf(s), band = own === 'brawler' ? DOC.brawler.hold : own === 'missile' ? 300000 : DOC.sniper.hold;
+    var emem = M.ship[s.id], erf = tgt && own !== 'missile' && emem ? rangeFight(w, s, tgt, emem) : null;
+    if (erf && erf.R) band = erf.R;
     if (!ward) { E.order(w, s.id, { man: { type: 'close', target: tgt ? tgt.id : null, range: band, vmax: P.vmax }, gLimit: 'combat' }); return; }
     var dw = tgt ? hyp(tgt.ex - ward.x, tgt.ey - ward.y) : 1e18;
     // carrier escorts go in once the strike is out; convoy escorts go in when raiders come near the barges
@@ -498,5 +603,5 @@
     E.order(w, s.id, { man: man, gLimit: 'cruise' });
   }
 
-  return { attach: attach, think: think, DOC: DOC, roleOf: roleOf };
+  return { attach: attach, think: think, DOC: DOC, roleOf: roleOf, rangeFight: rangeFight, helmInfo: helmInfo };
 });

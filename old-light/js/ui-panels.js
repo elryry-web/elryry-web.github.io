@@ -180,7 +180,11 @@
     var doc = U.doc(s), man = s.orders.man || {}, rng = man.range || doc.hold || 12000;
     if (k === 'man') {
       var t = p[1]; st.manual = false;
-      if (t === 'close' || t === 'hold') U.order({ man: { type: t, target: '@', range: rng, vmax: doc.vmax || 20 } });
+      // Approach and Hold keep the ship's range choice (Best or Set) and its stop choice (Auto, Brake, Pass through)
+      if (t === 'close' || t === 'hold') {
+        var was = man.type === 'close' || man.type === 'hold', au = was ? man.auto !== false : true, hi = au ? U.helm(s) : null;
+        U.order({ man: { type: t, target: '@', range: hi && hi.R ? hi.R : rng, vmax: doc.vmax || 20, auto: au, pass: was && man.pass ? man.pass : 'auto' } });
+      }
       else if (t === 'break') U.order({ man: { type: 'break', target: '@', vmax: 40 } });
       else if (t === 'match') U.order({ man: { type: 'match', target: '@' } });
       else if (t === 'cold') U.order({ man: { type: 'cold' }, radiators: 'retract' });
@@ -188,10 +192,14 @@
       else if (t === 'manual') { if (st.sel === 'all') { U.addLog('Pick one ship for a manual burn.', ''); return; } st.manual = true; U.addLog('Drag on the plot from the ship toward the burn. Longer is harder.', ''); }
       return;
     }
+    if (k === 'rng' && p[1] === 'auto') {
+      ships.forEach(function (x) { var m = x.orders.man, hi = U.helm(x); if (m && (m.type === 'close' || m.type === 'hold')) { m.auto = true; if (hi && hi.R) m.range = hi.R; } }); U.sfx('click'); return;
+    }
+    if (k === 'pass') { ships.forEach(function (x) { var m = x.orders.man; if (m && (m.type === 'close' || m.type === 'hold')) m.pass = p[1]; }); U.sfx('click'); return; }
     if (k === 'rng') {
       var i = 0; while (i < RANGES.length - 1 && RANGES[i] < rng - 1) i++;
       if (RANGES[i] > rng + 1 && +p[1] < 0) i--; i = Math.max(0, Math.min(RANGES.length - 1, i + (+p[1] > 0 ? (RANGES[i] > rng + 1 ? 0 : 1) : (RANGES[i] < rng - 1 ? 0 : -1))));
-      ships.forEach(function (x) { var m = x.orders.man; if (m && (m.type === 'close' || m.type === 'hold')) m.range = RANGES[i]; }); U.sfx('click'); return;
+      ships.forEach(function (x) { var m = x.orders.man; if (m && (m.type === 'close' || m.type === 'hold')) { m.range = RANGES[i]; m.auto = false; } }); U.sfx('click'); return;
     }
     if (k === 'tgtauto') { ships.forEach(function (x) { U.pc(x).tgt = null; }); U.setTarget(null); return; }
     if (k === 'gl') { U.order({ gLimit: p[1] }); return; }
@@ -241,6 +249,7 @@
     var m = s.orders.man || { type: 'coast' }, tg = m.target ? ' ' + m.target : '';
     // the flip to brake points the nose away from the enemy: say so, or it reads as a retreat
     if (U.braking(s)) { var tr = U.targetOf(s), dx = tr.ex - s.x, dy = tr.ey - s.y, d = Math.hypot(dx, dy) || 1, cl = -(dx * (tr.vx - s.vx) + dy * (tr.vy - s.vy)) / d; return 'Braking to stop ' + U.fmtKm(m.range) + ' from' + (tg || ' the enemy') + ': closing ' + cl.toFixed(1) + ' km/s, drive toward the enemy'; }
+    if (U.passing(s)) { var hp = U.helm(s) || {}; return 'Passing' + (tg || ' the enemy') + ' at ' + (hp.vr || 0).toFixed(1) + ' km/s: holding course, guns firing'; }
     switch (m.type) {
       case 'close': return 'Approaching to within ' + U.fmtKm(m.range) + ' of' + (tg || ' the enemy');
       case 'hold': return 'Holding ' + U.fmtKm(m.range) + ' from' + (tg || ' the enemy');
@@ -281,7 +290,7 @@
     var m = s.orders.man || { type: 'coast' }, t = m.type, E = U.E;
     var h = '<div class="sec man"><h4>Manoeuvre <em>' + esc(manText(s)) + '</em></h4>' + tgtLine(s) + '<div class="chips">' +
       btn('man:close', 'Approach', t === 'close') + btn('man:hold', 'Hold range', t === 'hold') + btn('man:break', 'Break off', t === 'break') + btn('man:match', 'Match vel.', t === 'match') + btn('man:cold', 'Go cold', t === 'cold') + btn('man:coast', 'Coast', t === 'coast') + btn('man:manual', 'Manual burn', t === 'manual' || st.manual) + '</div>';
-    if (t === 'close' || t === 'hold') h += '<div class="row stepper">' + btn('rng:-1', '&minus;') + '<span>' + U.fmtKm(m.range || 0) + '</span>' + btn('rng:1', '+') + '</div>';
+    if (t === 'close' || t === 'hold') h += rangeRows(st, s, m);
     if (st.manual) h += '<p class="note">Drag on the plot from the ship toward the burn. Length sets the G, up to the limit.</p>';
     var tr = U.targetOf(s);
     if (tr) { var dx = tr.ex - s.x, dy = tr.ey - s.y, d = Math.hypot(dx, dy) || 1, cl = -(dx * (tr.vx - s.vx) + dy * (tr.vy - s.vy)) / d; h += '<p class="note">' + U.fmtKm(d) + ' to ' + esc(tr.id) + ', ' + (cl >= 0 ? 'closing ' : 'opening ') + Math.abs(cl).toFixed(1) + ' km/s</p>'; }
@@ -292,6 +301,25 @@
     var ev = s.orders.evasion, rd = s.orders.radiators || 'auto';
     h += '<div class="sec"><h4>Evasion</h4><div class="chips">' + ['auto', 'off', 'light', 'hard'].map(function (k) { return btn('ev:' + k, k[0].toUpperCase() + k.slice(1), ev === k); }).join('') + '</div></div>';
     h += '<div class="sec"><h4>Radiators <em>' + (s.radOut ? 'out' : 'in') + '</em></h4><div class="chips">' + ['auto', 'extend', 'retract'].map(function (k) { return btn('rad:' + k, k[0].toUpperCase() + k.slice(1), rd === k); }).join('') + '</div><p class="note">Out sheds heat but shows on enemy sensors and can be shot away.</p></div>';
+    return h;
+  }
+  // Approach and Hold: the range stepper (Best or Set), the best range against the target, the stop choice, and a
+  // warning when the target keeps closing without braking
+  function rangeRows(st, s, m) {
+    var H = U.D.HELM_HELP, au = m.auto !== false, pm = m.pass || 'auto', hi = U.helm(s) || {}, tr = U.targetOf(s);
+    var h = '<div class="row stepper">' + btn('rng:-1', '&minus;') + '<span>' + U.fmtKm(m.range || 0) + (au ? ' · best' : '') + '</span>' + btn('rng:1', '+') + hbtn('rng:auto', 'Best', au, H.range.auto) + '</div>';
+    h += helpLine(au ? H.range.auto : H.range.set);
+    if (tr && hi.R) h += '<p class="note">Best range vs ' + esc(tr.id) + ': about ' + U.fmtKm(hi.R) + (hi.theirs ? ' (theirs: about ' + U.fmtKm(hi.theirs) + ')' : '') + '.</p>';
+    else if (tr && hi.noHurt) h += '<p class="note">Your guns can' + "'" + 't hurt ' + esc(tr.id) + ' at any range.</p>';
+    h += '<div class="row"><span class="lbl">At range</span><div class="chips">' + [['auto', 'Auto'], ['brake', 'Brake'], ['pass', 'Pass through']].map(function (a) { return hbtn('pass:' + a[0], a[1], pm === a[0], H.pass[a[0]]); }).join('') + '</div></div>';
+    h += helpLine(H.pass[pm]);
+    // the target's own closing speed over the last 20 s: if it is not falling, the target is not braking
+    if (tr && hi.cT != null) {
+      var pc = U.pc(s), hs = pc.cTh || (pc.cTh = []); if (!hs.length || st.w.t - hs[hs.length - 1][0] >= 5) hs.push([st.w.t, hi.cT, tr.id]); while (hs.length > 6) hs.shift();
+      var old = hs[0], d = hi.d || 0, vc = hi.Vc || 0;
+      if (old[2] === tr.id && st.w.t - old[0] >= 15 && hi.cT > 1 && hi.cT >= old[1] - 0.3 && vc > 2 && d > (m.range || 0) && hi.mode !== 'pass')
+        h += '<p class="note warn">' + esc(tr.name || tr.id) + ' isn' + "'" + 't braking. Stopping costs about ' + Math.round(hi.vr || vc) + ' km/s, or you pass at ' + Math.round(hi.vr || vc) + ' km/s in ' + Math.max(1, Math.round(d / vc / 60)) + ' min.</p>';
+    }
     return h;
   }
   function groupsOf(s) {

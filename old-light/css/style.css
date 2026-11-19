@@ -166,13 +166,15 @@ button.big small { display: block; font-size: 10px; letter-spacing: 0.08em; colo
 .stepper span { min-width: 8.5em; text-align: center; color: var(--ink); }
 .tgt { color: var(--cyan); }
 .note { color: var(--dim); font-size: 11px; margin-top: 4px; }
+.note.warn { color: #ffcf8a; }
+.man .ghelp { color: var(--dim); font-size: 10.5px; line-height: 1.3; margin: 2px 0 4px; }
 .wg { border: 1px solid var(--line); border-radius: 6px; padding: 7px 8px 8px; margin-top: 8px; background: rgba(5, 9, 12, 0.35); }
 .wg-h { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
 .wg-h b { font-weight: 600; color: #e2ebf0; }
 .wg-h span { color: var(--dim); font-size: 11px; }
 .wg-h .hc { margin-left: auto; font-size: 15px; color: var(--amber); font-variant-numeric: tabular-nums; }
 .wg-h .hc.lo { color: var(--dim); }
-.wg .lbl { color: var(--dim); font-size: 10.5px; min-width: 4.6em; }
+.wg .lbl, .man .lbl { color: var(--dim); font-size: 10.5px; min-width: 4.6em; }
 .wg .chips button { min-height: 40px; }
 .wg .ghelp { color: var(--dim); font-size: 10.5px; line-height: 1.3; margin: 2px 0 2px calc(4.6em + 6px); }
 .wg .ghelp b { color: #cfd9df; font-weight: 600; }

@@ -279,7 +279,7 @@
       chevron(ctx, x, y, ang, s.hull === 'carrier' || s.hull === 'cruiser' || s.hull === 'barge' ? 10 : 8, true);
       if (on) { ctx.strokeStyle = C.amberD + '0.7)'; circ(x, y, 15); ctx.stroke(); }
       var thrN = (st.thr[s.id] || []).length;
-      label(x, y, s.name + (s.status !== 'ok' ? ' (' + s.status + ')' : U.braking(s) ? ' · braking' : ''), on ? C.amber : C.amberD + '0.75)', on ? 10 : 7);
+      label(x, y, s.name + (s.status !== 'ok' ? ' (' + s.status + ')' : U.braking(s) ? ' · braking' : U.passing(s) ? ' · passing' : ''), on ? C.amber : C.amberD + '0.75)', on ? 10 : 7);
       if (thrN) { ctx.strokeStyle = C.redD + '0.6)'; ctx.setLineDash([2, 3]); circ(x, y, 19); ctx.stroke(); ctx.setLineDash([]); }
     });
 

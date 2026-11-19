@@ -64,6 +64,13 @@
     tpPlan: [0.005, 0.0001],                     // x, km/s2: how far a ship's own plan strays from its present burn (threatPreview)
     tpSeg: 4,                                   // s: threatPreview's correlation time of a dodge (fitted to real dodges)
     reserveDv: 12, dryDv: 12, dryReach: 8000, fleeDv: 3,                              // km/s the helm keeps back except to break off or dodge
+    // the range fight: a gun ship's best range against its target (ai.js rangeFight, from engine rateAt) is refreshed every
+    // rfRefresh s; the score is the edge (share of the target's health dealt a second less the share of ours taken) plus
+    // rfTie x the share dealt, so equal ships pick the range where the fight is quickest. Closing on a ship that is also
+    // closing, the helm stops only when the edge at its range is at least rfEdge of what it deals and it keeps
+    // reserveDv + passMargin after paying the whole closing speed; else it passes, aiming passOff x its range wide, and
+    // comes back at passRetV. A stop under stopFree km/s is always taken; after passMax passes it always stops.
+    rfRefresh: 30, rfTie: 0.25, rfEdge: 0.1, passMargin: 10, stopFree: 8, passMax: 2, passRetV: 8, passOff: 0.6,
     // gunnery
     aimErr: 2e-6,                               // aim error (rad) at zero crew effectiveness loss scale: error = aimErr*range*(1/eff-1)
     kinPts: 1,                                  // points per GJ of kinetic energy
@@ -192,7 +199,7 @@
   var SCENARIOS = {
     // the tutorial is the frigate duel (ships and sides copied in below) with a fixed seed, side A, an enemy captain
     // who is never bold (sides.B.bold false), and the pauses in TUTORIAL
-    tutorial: { name: 'Tutorial', text: 'The frigate duel, with pauses that explain each part of the screen.', tutorial: true, seed: 5, side: 'A' },
+    tutorial: { name: 'Tutorial', text: 'The frigate duel, with pauses that explain each part of the screen.', tutorial: true, seed: 15, side: 'A' },
     duel: { name: 'Frigate duel', text: 'Two frigates of the same class meet across 200,000 km.',
       sides: { A: { doctrine: 'auto', faction: 'arbitration' }, B: { doctrine: 'auto', faction: 'arbitration' } },
       planets: [],
@@ -252,7 +259,7 @@
     { id: 'time', highlight: 'time', title: 'Time',
       body: 'Time is paused, but your orders still work. These buttons run the clock from ×1 up to ×1000. Auto runs fast while nothing is near and slows down as the enemy gets close.' },
     { id: 'helm', highlight: 'man', title: 'Helm orders',
-      body: 'The Helm tab sets your ship\'s course. Approach, Hold range and Break off steer relative to the target. Patience starts with orders to approach.' },
+      body: 'Approach and Hold range on the Helm tab steer for the best range against the target. Auto stops there only when the fight favours you. Otherwise the ship fires as it passes.' },
     { id: 'gbands', highlight: 'gbands', title: 'G limit and crew',
       body: 'Your crew, not the hull, sets the G limit on how hard your ship burns. A name under a band means that band would strain or hurt that officer. The Crew tab shows each officer\'s strain and health.' },
     { id: 'contact', highlight: 'card', title: 'Light lag',
@@ -271,6 +278,19 @@
 
   // the Guns tab's help: one line per choice, shown under its row for the selected choice and as each button's
   // tooltip. {t} is the doctrine's Auto threshold in percent. Every claim follows the code (HANDOFF "Fire rules").
+  // the Helm tab's help for the range fight (ai.js rangeFight, rangeHelm), in the style of GUN_HELP
+  var HELM_HELP = {
+    pass: {
+      auto: 'Auto: stops at the range only when the fight there favours you. Otherwise it passes and turns back.',
+      brake: 'Brake: pays the whole closing speed to stop at the range. The enemy saves its own fuel.',
+      pass: 'Pass through: holds course past the enemy and fires as it goes. Then it turns back for another run.'
+    },
+    range: {
+      auto: 'Best: the range where your guns gain most on the enemy\'s. It updates as both ships take damage.',
+      set: 'Set: the helm keeps this range until you press Best again.'
+    }
+  };
+
   var GUN_HELP = {
     thr: {
       auto: 'Auto: fires at {t}% or better, as an AI captain would.',
@@ -351,5 +371,5 @@
   };
 
   return { NUM: NUM, HULLS: HULLS, MODS: MODS, TIERS: TIERS, ARMOUR: ARMOUR, DRONES: DRONES, LOADOUTS: LOADOUTS, SCENARIOS: SCENARIOS,
-    ORIGINS: ORIGINS, STATIONS: STATIONS, STATION_NAMES: STATION_NAMES, ABILITIES: ABILITIES, CAST: CAST, FACTIONS: FACTIONS, NAMES: NAMES, TUTORIAL: TUTORIAL, GUN_HELP: GUN_HELP };
+    ORIGINS: ORIGINS, STATIONS: STATIONS, STATION_NAMES: STATION_NAMES, ABILITIES: ABILITIES, CAST: CAST, FACTIONS: FACTIONS, NAMES: NAMES, TUTORIAL: TUTORIAL, GUN_HELP: GUN_HELP, HELM_HELP: HELM_HELP };
 });

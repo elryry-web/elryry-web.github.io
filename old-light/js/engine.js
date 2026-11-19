@@ -1670,6 +1670,37 @@
     }
     return null;
   }
+  // rateAt(s, T, R): points a second ship s expects to put on ship T held R km away, from the same models the
+  // gunnery quotes with (no live track: a steady target that dodges at Combat when it sees a round, Hard against
+  // a ship with rails, Light under lasers alone). Each rail takes the better of a canister and a solid round and
+  // only counts when the gunner would fire it (canMinHits fragments, or the doctrine's 3% for a solid); lasers
+  // lose intensity past focus (laserThr) and smear on the dodge. Armour sheds by type. PD only shoots small craft.
+  function rateAt(s, T, R) {
+    var r = T.r || 0.06, aT = Math.min(maxAcc(T), N.gCap.combat * G), sig = (N.angRes[s.tiers.sensors] || 2e-6) * R, aim = N.aimErr * R * crewAim(s) * aimMul(s);
+    var am = N.armourMul[(T.ar && T.ar.type) || 'composite'], rails = false, out = 0, i, m;
+    for (i = 0; i < s.mods.length; i++) if (s.mods[i].kind === 'rail' && s.mods[i].state < 2 && s.mods[i].ammo > 0) rails = true;
+    for (i = 0; i < s.mods.length; i++) {
+      m = s.mods[i]; if (m.state === 2) continue;
+      var k = m.state === 1 ? 0.5 : 1;
+      if (m.kind === 'rail' && m.ammo > 0) {
+        var u = m.def.muzzle, Tf = R / u, s0 = hyp3(sig, sig / N.velBaseline * Tf, aim);
+        var see = 1 - Math.exp(-Math.max(0, Tf - N.dodgeLead) / N.dodgeT), pm = Math.max(N.mixFloor, see);
+        var cap = N.capK * N.capA * Math.pow(Math.max(maxAcc(T), 1e-9) / N.capA, N.capExp) * 0.5 * sqr(Math.max(0, Tf - N.capLead));
+        var sb = bandSig(aT, 'combat', Tf), cd = canDesign(r, Tf, [hyp(sb, s0), hyp(sb, s0)], [hyp3(sb, s0, cap), hyp3(sb, s0, cap)], pm);
+        var e = 0.5 * m.def.kg * u * u / 1000, can = cd.c.exp >= N.canMinHits ? cd.c.exp * e / cd.n * N.fragK / am.frag : 0;
+        var vj = N.evVel.hard * aT * Math.SQRT1_2, ev = N.gunEvK * vj * Tf / Math.sqrt(1 + Tf / N.evSegEst) * (1 - 0.5 * readOf(s)), sw = hyp3(s0, hyp(ev, sb), cap);
+        var pS = pInterval(-r, r, sw) * pInterval(-r * PI / 4, r * PI / 4, sw);   // a round in flight is dodged: the jink is always in the spread
+        var sol = pS >= 0.03 ? pS * e * N.kinPts / am.kin : 0;
+        out += k * Math.max(can, sol) / m.def.cycle;
+      } else if (m.kind === 'laser') {
+        var vl = (rails ? N.evVel.hard : N.evVel.light) * aT, tl = 2 * R / C + N.beamLag;
+        var q = hyp(sig, N.lasJK * vl / N.evTau * 0.5 * tl * tl), kk = (r + R * N.laserDiv) / Math.max(q, 1e-9);
+        var pl = Math.max(0, erf(kk / Math.SQRT2) - Math.sqrt(2 / PI) * kk * Math.exp(-kk * kk / 2));
+        out += k * m.def.dps * laserFall(m.def, R) * smearF(vl, R) * pl / am.laser;
+      }
+    }
+    return out * (1 - N.bleed);
+  }
   function relSpeed(s, sol, u) { return hyp3(s.vx + sol.dx * u - sol.tvx, s.vy + sol.dy * u - sol.tvy, s.vz + sol.dz * u - sol.tvz); }
 
   // ---------------------------------------------------------------- orders
@@ -1874,7 +1905,7 @@
   function events(w) { var e = w.ev; w.ev = []; return e; }
 
   return {
-    create: create, step: step, order: order, view: view, events: events, hitEstimate: hitEstimate, fire: fire, threatPreview: threatPreview,
+    create: create, step: step, order: order, view: view, events: events, hitEstimate: hitEstimate, fire: fire, threatPreview: threatPreview, rateAt: rateAt,
     mass: mass, dvLeft: dvLeft, accLimit: accLimit, maxAcc: maxAcc, gCap: gCap, thrustAvail: thrustAvail, capable: capable, offensive: offensive, active: active,
     wingStrength: wingStrength, queued: queued, byId: byId, modOf: modOf, trackOf: trackOf, arand: arand, erf: erf, hyp: hyp, hyp3: hyp3, angDiff: angDiff, bandOf: bandOf,
     solve: solve, spreadOf: spreadOf, axisChance: axisChance, patternChance: patternChance, gridAxes: gridAxes, histAt: histAt, makeShip: makeShip, enemyOf: enemyOf, reindex: reindex,
