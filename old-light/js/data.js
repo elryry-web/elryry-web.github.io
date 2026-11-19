@@ -252,7 +252,7 @@
     { id: 'time', highlight: 'time', title: 'Time',
       body: 'Time is paused, but your orders still work. These buttons run the clock from ×1 up to ×1000. Auto runs fast while nothing is near and slows down as the enemy gets close.' },
     { id: 'helm', highlight: 'man', title: 'Helm orders',
-      body: 'The Helm tab sets your ship\'s course. Close to, Hold range and Break off steer relative to the target. Patience starts with orders to close in.' },
+      body: 'The Helm tab sets your ship\'s course. Approach, Hold range and Break off steer relative to the target. Patience starts with orders to approach.' },
     { id: 'gbands', highlight: 'gbands', title: 'G limit and crew',
       body: 'Your crew, not the hull, sets the G limit on how hard your ship burns. A name under a band means that band would strain or hurt that officer. The Crew tab shows each officer\'s strain and health.' },
     { id: 'contact', highlight: 'card', title: 'Light lag',

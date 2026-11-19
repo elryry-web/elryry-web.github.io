@@ -234,7 +234,7 @@
   function manText(s) {
     var m = s.orders.man || { type: 'coast' }, tg = m.target ? ' ' + m.target : '';
     switch (m.type) {
-      case 'close': return 'Closing to ' + U.fmtKm(m.range) + ' of' + (tg || ' the enemy');
+      case 'close': return 'Approaching to within ' + U.fmtKm(m.range) + ' of' + (tg || ' the enemy');
       case 'hold': return 'Holding ' + U.fmtKm(m.range) + ' from' + (tg || ' the enemy');
       case 'break': return 'Breaking off from' + (tg || ' the enemy');
       case 'match': return 'Matching velocity with' + (tg || ' the target');
@@ -272,7 +272,7 @@
   function helmTab(st, s) {
     var m = s.orders.man || { type: 'coast' }, t = m.type, E = U.E;
     var h = '<div class="sec man"><h4>Manoeuvre <em>' + esc(manText(s)) + '</em></h4>' + tgtLine(s) + '<div class="chips">' +
-      btn('man:close', 'Close to', t === 'close') + btn('man:hold', 'Hold range', t === 'hold') + btn('man:break', 'Break off', t === 'break') + btn('man:match', 'Match vel.', t === 'match') + btn('man:cold', 'Go cold', t === 'cold') + btn('man:coast', 'Coast', t === 'coast') + btn('man:manual', 'Manual burn', t === 'manual' || st.manual) + '</div>';
+      btn('man:close', 'Approach', t === 'close') + btn('man:hold', 'Hold range', t === 'hold') + btn('man:break', 'Break off', t === 'break') + btn('man:match', 'Match vel.', t === 'match') + btn('man:cold', 'Go cold', t === 'cold') + btn('man:coast', 'Coast', t === 'coast') + btn('man:manual', 'Manual burn', t === 'manual' || st.manual) + '</div>';
     if (t === 'close' || t === 'hold') h += '<div class="row stepper">' + btn('rng:-1', '&minus;') + '<span>' + U.fmtKm(m.range || 0) + '</span>' + btn('rng:1', '+') + '</div>';
     if (st.manual) h += '<p class="note">Drag on the plot from the ship toward the burn. Length sets the G, up to the limit.</p>';
     var tr = U.targetOf(s);
