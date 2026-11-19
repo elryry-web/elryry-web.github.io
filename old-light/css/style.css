@@ -111,7 +111,7 @@ button.big small { display: block; font-size: 10px; letter-spacing: 0.08em; colo
 .log div:nth-last-child(n+3) { opacity: 0.55; }
 .log div:nth-last-child(n+5) { opacity: 0.3; }
 .log i { font-style: normal; color: var(--dim); margin-right: 6px; }
-.log .bad { color: #ff9d92; } .log .good { color: var(--amber); } .log .see { color: var(--cyan); }
+.log .bad { color: #ff9d92; } .log .good { color: var(--amber); } .log .see { color: var(--cyan); } .log .own { color: rgba(255,181,74,0.75); }
 .plot-btns { position: absolute; right: 6px; bottom: 8px; display: flex; gap: 6px; }
 .plot-btns button { background: var(--glass); }
 

@@ -145,6 +145,12 @@
         ctx.strokeStyle = C.amberD + '0.22)'; ctx.setLineDash(nm === 'laser focus' ? [] : [2, 5]); circ(cx, cy, r); ctx.stroke(); ctx.setLineDash([]);
         label(cx + r * 0.7071, cy - r * 0.7071, nm + ' ' + U.fmtR(R), C.amberD + '0.6)', 1, 4, 0);
       });
+      // the range the helm is closing to or holding: braking for it is why the nose swings away from the enemy
+      var mo = sel.orders.man;
+      if (mo && (mo.type === 'close' || mo.type === 'hold') && mo.range > 0) {
+        var rh = mo.range / cam.s;
+        if (rh > 6 && rh < 4 * Math.max(W, H)) { ctx.strokeStyle = C.amberD + (U.braking(sel) ? '0.5)' : '0.25)'); ctx.setLineDash([6, 4]); circ(cx, cy, rh); ctx.stroke(); ctx.setLineDash([]); label(cx - rh * 0.7071, cy + rh * 0.7071, (mo.type === 'close' ? 'approach ' : 'hold ') + U.fmtR(mo.range), C.amberD + '0.7)', 2, 4, 0); }
+      }
       var lz = sel.mods.filter(function (m) { return m.kind === 'laser' && m.state < 2; })[0];
       if (lz) { var R2 = lz.def.focus / Math.sqrt(U.N.laserThr), r2 = R2 / cam.s; if (r2 > 6 && r2 < 4 * Math.max(W, H)) { ctx.strokeStyle = C.amberD + '0.12)'; ctx.setLineDash([1, 6]); circ(cx, cy, r2); ctx.stroke(); ctx.setLineDash([]); label(cx + r2 * 0.7071, cy - r2 * 0.7071, 'laser reach', C.amberD + '0.45)', 0, 4, 0); } }
     }
@@ -180,7 +186,7 @@
     });
 
     // rounds in flight: theirs that are aimed at us are red
-    var thrLab = new Map(), thrSv = st.thrSv || new Map();
+    var thrLab = new Map(), thrSv = st.thrSv || new Map(), ownSv = new Map();
     w.slugs.forEach(function (p) {
       var x = sx(p.x + p.vx * f), y = sy(p.y + p.vy * f); if (x < -20 || x > W + 20 || y < -20 || y > H + 20) return;
       var mine = p.side === st.P; if (!mine && !(p.known <= w.t)) return; if (p.kind === 'pen' && !mine) return;
@@ -189,11 +195,33 @@
       ctx.strokeStyle = mine ? C.amberD + '0.45)' : thr ? C.redD + '0.7)' : C.cyanD + '0.35)'; line(x, y, x - p.vx / sp * tl2, y + p.vy / sp * tl2);
       ctx.fillStyle = mine ? C.amber : thr ? C.red : C.cyanD + '0.7)'; ctx.fillRect(x - 1, y - 1, 2, 2);
       if (thr && !thrLab.has(thr)) { thrLab.set(thr, 1); label(x, y, (thr.wk === 'canister' ? 'canister ' : thr.n > 1 ? 'salvo ' : 'round ') + U.fmtEta(thr.eta), C.red, 9); }
+      // ours: one entry per salvo (a burst of solids, or one canister and its fragments), led by its first round
+      if (mine && p.kind !== 'pen' && p.sv) {
+        var o = ownSv.get(p.sv), eta = U.etaTo(p.x, p.y, p.vx, p.vy, U.trackByOid(p.tgt));
+        if (eta == null) return;
+        if (!o) ownSv.set(p.sv, o = { x: x, y: y, eta: eta, n: 0, what: p.wk === 'canister' ? 'canister' : p.wk === 'spinal' ? 'spinal' : 'slug' });
+        if (p.kind !== 'frag') o.n++; if (eta < o.eta) { o.eta = eta; o.x = x; o.y = y; }
+      }
+    });
+    // own salvos close together on screen share one amber label: kind, count, time to the soonest impact
+    var ownL = []; ownSv.forEach(function (o) { ownL.push(o); });
+    groupNear(ownL, function (o) { return o.what; }).forEach(function (G) {
+      var n = 0, eta = Infinity, lead = G.items[0];
+      G.items.forEach(function (o) { n += o.what === 'slug' ? o.n : 1; if (o.eta < eta) { eta = o.eta; lead = o; } });
+      label(lead.x, lead.y, G.key + (n > 1 ? ' ×' + n : '') + ' ' + U.fmtEta(eta), C.amber, 6);
     });
     // missiles: ours amber, theirs red with an ETA
+    var ownM = [];
     w.missiles.forEach(function (m) {
       if (!m.alive || m.side !== st.P) return; var x = sx(m.x + m.vx * f), y = sy(m.y + m.vy * f);
       ctx.fillStyle = C.amber; ctx.strokeStyle = C.amberD + '0.4)'; var sp = Math.hypot(m.vx, m.vy) || 1; line(x, y, x - m.vx / sp * 8, y + m.vy / sp * 8); diamond(ctx, x, y, 2.5); ctx.fill();
+      var tr = U.track(m.tgt) || (w.idx[m.tgt] && U.trackByOid(m.tgt)), eta = null;
+      if (tr) { var dx = tr.ex - m.x, dy = tr.ey - m.y, d = Math.hypot(dx, dy), cl = -(dx * (tr.vx - m.vx) + dy * (tr.vy - m.vy)) / (d || 1); if (cl > 0.1) eta = d / cl; }
+      ownM.push({ x: x, y: y, eta: eta, tgt: m.tgt });
+    });
+    groupNear(ownM, function (o) { return o.tgt; }).forEach(function (G) {
+      var eta = Infinity; G.items.forEach(function (o) { if (o.eta != null && o.eta < eta) eta = o.eta; });
+      label(G.x, G.y, (G.n > 1 ? 'missiles ×' + G.n : 'missile') + (eta < Infinity ? ' ' + U.fmtEta(eta) : ''), C.amber, 6);
     });
     var own = U.ownShips().filter(U.E.active);
     tl.forEach(function (c) {
@@ -251,7 +279,7 @@
       chevron(ctx, x, y, ang, s.hull === 'carrier' || s.hull === 'cruiser' || s.hull === 'barge' ? 10 : 8, true);
       if (on) { ctx.strokeStyle = C.amberD + '0.7)'; circ(x, y, 15); ctx.stroke(); }
       var thrN = (st.thr[s.id] || []).length;
-      label(x, y, s.name + (s.status !== 'ok' ? ' (' + s.status + ')' : ''), on ? C.amber : C.amberD + '0.75)', on ? 10 : 7);
+      label(x, y, s.name + (s.status !== 'ok' ? ' (' + s.status + ')' : U.braking(s) ? ' · braking' : ''), on ? C.amber : C.amberD + '0.75)', on ? 10 : 7);
       if (thrN) { ctx.strokeStyle = C.redD + '0.6)'; ctx.setLineDash([2, 3]); circ(x, y, 19); ctx.stroke(); ctx.setLineDash([]); }
     });
 
@@ -281,11 +309,25 @@
   function drawSolution(st, s, f, ts) {
     if (!s || !U.E.active(s) || st.sel === 'all') return;
     var tr = U.targetOf(s); if (!tr) return;
-    var m = s.mods.filter(function (m) { return m.kind === 'rail' && m.state < 2 && m.ammo > 0; })[0] || s.mods.filter(function (m) { return m.kind === 'laser' && m.state < 2; })[0];
-    if (!m) return;
-    var key = s.id + m.id + tr.id;
-    if (ts - fsCache.t > 250 || fsCache.key !== key) { var g = U.grp(s, m.key); fsCache = { t: ts, key: key, est: U.E.hitEstimate(st.w, s, m.id, tr.id, { n: m.kind === 'rail' ? U.railN(m, g) : 1, ammo: g.ammo === 'canister' ? 'canister' : undefined }), kind: m.kind }; }
-    var e = fsCache.est; if (!e || !e.ok || e.ix == null) return;
+    // quote the gun that is doing the work: a rail the gunnery computer would fire now (best chance first, with the
+    // ammo it would pick), else a laser on this target, else the best rail quote marked 'holding'. With the nose
+    // turned away to brake, the spinal quotes near nothing while the turret keeps firing canister astern.
+    if (ts - fsCache.t > 250 || fsCache.sid !== s.id + tr.id) {
+      var best = null, bestH = null, lz = null;
+      s.mods.forEach(function (m) {
+        if (m.state === 2) return;
+        if (m.kind === 'laser') { if (!lz || m.target === tr.id) lz = m; return; }
+        if (m.kind !== 'rail' || m.ammo <= 0) return;
+        var pl = U.railPlan(st.w, s, m, tr, U.grp(s, m.key)); if (!pl || pl.est.ix == null) return;
+        if (pl.fire && (!best || pl.est.chance > best.pl.est.chance)) best = { m: m, pl: pl };
+        if (!bestH || pl.est.chance > bestH.pl.est.chance) bestH = { m: m, pl: pl };
+      });
+      var pick = best || (lz && lz.target === tr.id ? null : bestH);
+      if (pick) fsCache = { t: ts, sid: s.id + tr.id, est: pick.pl.est, kind: 'rail', what: pick.pl.what, hold: !pick.pl.fire, m: pick.m };
+      else if (lz) fsCache = { t: ts, sid: s.id + tr.id, est: U.E.hitEstimate(st.w, s, lz.id, tr.id, {}), kind: 'laser', m: lz };
+      else fsCache = { t: ts, sid: s.id + tr.id, est: null };
+    }
+    var e = fsCache.est, m = fsCache.m; if (!e || !e.ok || e.ix == null) return;
     var x = sx(e.ix), y = sy(e.iy), x0 = sx(s.x + s.vx * f), y0 = sy(s.y + s.vy * f);
     // a laser past its reach gets no chance printed: armour sheds what is left of the beam
     var isL = fsCache.kind === 'laser', far = isL && (e.dmgFactor <= 0 || (e.range != null && e.range > m.def.focus / Math.sqrt(U.N.laserThr)));
@@ -293,7 +335,8 @@
     var r = Math.max(4, (e.spread || 0) / cam.s);
     ctx.strokeStyle = far ? 'rgba(255,241,176,0.3)' : 'rgba(255,241,176,0.75)'; line(x - 6, y, x - 2, y); line(x + 2, y, x + 6, y); line(x, y - 6, x, y - 2); line(x, y + 2, x, y + 6);
     if (r > 6 && !far) { ctx.strokeStyle = 'rgba(255,241,176,0.35)'; ctx.setLineDash([2, 3]); circ(x, y, r); ctx.stroke(); ctx.setLineDash([]); }
-    var txt = isL ? (far ? 'aim: laser out of range' : 'aim: laser ' + U.pct(e.chance) + ' to hit') : 'aim: ' + (m.def.spinal ? 'spinal ' : 'railgun ') + U.pct(e.chance) + ' to hit · impact ' + U.fmtEta(e.tti);
+    var WN = { spinal: 'spinal ', canister: 'canister ', slug: 'railgun ' };
+    var txt = isL ? (far ? 'aim: laser out of range' : 'aim: laser ' + U.pct(e.chance) + ' to hit') : 'aim: ' + WN[fsCache.what] + U.pct(e.chance) + ' to hit · impact ' + U.fmtEta(e.tti) + (fsCache.hold ? ' · holding' : '');
     label(x, y, txt, far ? 'rgba(255,241,176,0.6)' : C.laser, 9, 9, 10);
   }
   function drawManual(s, f) {

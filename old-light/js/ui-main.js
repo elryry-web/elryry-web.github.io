@@ -184,27 +184,44 @@
   U.rackLoad = rackLoad;
   U.railThr = function (s, m, g) { if (g.thr === 'hold') return null; if (g.thr === 'auto') { var P2 = U.doc(s); return m.def.spinal ? P2.spinal : P2.rail; } return g.thr; };
   U.railN = function (m, g) { if (m.def.spinal) return 1; var n = g.n === 'auto' ? 4 : g.n; return Math.max(1, Math.min(n, m.ammo)); };
-  function railShot(w, s, m, tgt, P2, g) {
-    var thr = U.railThr(s, m, g); if (thr == null) return;
-    // the spinal follows the AI's rule: the helm is told what the shot is worth so it holds steady for it,
-    // and a shot worth taking is ordered even mid-jink, since the engine holds it until the helm steadies
+  // what the gunnery computer would do with one rail at this target: { est, ammo ('canister' or undefined), n, thr,
+  // fire, what ('spinal', 'canister' or 'slug') }, or null when the group holds or there is no solution. The fire
+  // rule and the aim label on the plot both read it, so the label quotes the round that is really going out.
+  U.railPlan = function (w, s, m, tgt, g) {
+    var thr = U.railThr(s, m, g); if (thr == null || !tgt) return null;
+    // the spinal follows the AI's rule: a shot worth taking is ordered even mid-jink, since the engine holds it until the helm steadies
     if (m.def.spinal) {
-      var e1 = E.hitEstimate(w, s, m.id, tgt.id, { n: 1 });
-      if (e1 && e1.ok) { var M = w.ai && w.ai.side[st.P], mem = M && M.ship && M.ship[s.id]; if (mem) mem.spin = { t: w.t, p: e1.steadyChance != null ? e1.steadyChance : e1.chance }; }
-      if (e1 && e1.ok && (e1.chance >= thr || (e1.blocked && e1.steadyChance >= thr))) E.order(w, s.id, { fireNow: { weapon: m.id, target: tgt.id, n: 1 } });
-      return;
+      var e1 = E.hitEstimate(w, s, m.id, tgt.id, { n: 1 }); if (!e1 || !e1.ok) return null;
+      return { est: e1, n: 1, thr: thr, what: 'spinal', fire: e1.chance >= thr || !!(e1.blocked && e1.steadyChance >= thr) };
     }
     var n = U.railN(m, g);
-    if (g.ammo === 'canister') { var c = E.hitEstimate(w, s, m.id, tgt.id, { ammo: 'canister' }); if (c && c.ok && c.chance >= thr) E.order(w, s.id, { fireNow: { weapon: m.id, target: tgt.id, ammo: 'canister' } }); return; }
-    var es = E.hitEstimate(w, s, m.id, tgt.id, { n: n }); if (!es || !es.ok) return;
+    if (g.ammo === 'canister') { var c = E.hitEstimate(w, s, m.id, tgt.id, { ammo: 'canister' }); return c && c.ok ? { est: c, ammo: 'canister', n: 1, thr: thr, what: 'canister', fire: c.chance >= thr } : null; }
+    var es = E.hitEstimate(w, s, m.id, tgt.id, { n: n }); if (!es || !es.ok) return null;
     if (g.ammo === 'auto') {
       var ec = E.hitEstimate(w, s, m.id, tgt.id, { ammo: 'canister' });
       // as the AI chooses: one canister against one solid round, by expected damage, with canMinHits fragments on the hull
       var sv = es.expHits / n * es.slugPts, cv = ec && ec.ok ? ec.expHits * ec.fragPts : 0;
-      if (cv > sv && ec.expHits >= N.canMinHits) { E.order(w, s.id, { fireNow: { weapon: m.id, target: tgt.id, ammo: 'canister' } }); return; }
+      if (cv > sv && ec.expHits >= N.canMinHits) return { est: ec, ammo: 'canister', n: 1, thr: thr, what: 'canister', fire: true };
     }
-    if (es.chance >= thr) E.order(w, s.id, { fireNow: { weapon: m.id, target: tgt.id, n: n } });
+    return { est: es, n: n, thr: thr, what: 'slug', fire: es.chance >= thr };
+  };
+  function railShot(w, s, m, tgt, P2, g) {
+    var pl = U.railPlan(w, s, m, tgt, g); if (!pl) return;
+    // the helm is told what a spinal shot is worth so it holds steady for it
+    if (m.def.spinal) { var e1 = pl.est, M = w.ai && w.ai.side[st.P], mem = M && M.ship && M.ship[s.id]; if (mem) mem.spin = { t: w.t, p: e1.steadyChance != null ? e1.steadyChance : e1.chance }; }
+    if (pl.fire) E.order(w, s.id, { fireNow: pl.ammo ? { weapon: m.id, target: tgt.id, ammo: pl.ammo } : { weapon: m.id, target: tgt.id, n: pl.n } });
   }
+  // seconds until a round (or missile) at x, y moving vx, vy comes closest to a track; null once it is past
+  U.etaTo = function (x, y, vx, vy, tr) {
+    if (!tr) return null; var rx = tr.ex - x, ry = tr.ey - y, ux = (tr.vx || 0) - vx, uy = (tr.vy || 0) - vy, u2 = ux * ux + uy * uy;
+    var t = u2 > 1e-9 ? -(rx * ux + ry * uy) / u2 : null; return t != null && t > 0 ? t : null;
+  };
+  // an Approach or Hold whose drive points away from the target while still closing: the flip to brake
+  U.braking = function (s) {
+    var m = s.orders.man, tr = U.targetOf(s); if (!m || (m.type !== 'close' && m.type !== 'hold') || !tr || !E.active(s)) return false;
+    var dx = tr.ex - s.x, dy = tr.ey - s.y, d = hyp(dx, dy) || 1, a = hyp(s.ax || 0, s.ay || 0), cl = -(dx * (tr.vx - s.vx) + dy * (tr.vy - s.vy)) / d;
+    return a > 0.05 * G && cl > 0.2 && ((s.ax || 0) * dx + (s.ay || 0) * dy) / (a * d) < -0.5;
+  };
   function nearestOf(list, s) { var b = null, bd = 1e18; list.forEach(function (c) { var d = hyp(c.ex - s.x, c.ey - s.y); if (d < bd) { bd = d; b = c; } }); return b ? { c: b, d: bd } : null; }
   function laserPick(s, m, tgt, missiles, drones, P2, mode) {
     if (mode === 'hold') { m.target = null; return; }
@@ -417,6 +434,34 @@
   function shipPre(e) { return U.ownShips().length > 1 ? U.nameOf(e.ship) + ': ' : ''; }
   function hypS(tr) { var s = U.selShip() || U.ownShips()[0]; return s ? hyp(tr.ex - s.x, tr.ey - s.y) : 0; }
 
+  // ---------------------------------------------------------------- our own fire, said in the log
+  // Rounds are counted per ship and kind; a line goes out a few seconds after the first round (so a burst is one
+  // line), then at most every two minutes per ship and kind, covering what was fired since. Also: a rail running
+  // dry, and the flip to brake on Approach or Hold (the nose swings away from the enemy, which reads as a retreat).
+  var FIRE_GAP = 120, RNAME = { slug: ['railgun round', 'railgun rounds'], spinal: ['spinal round', 'spinal rounds'], canister: ['canister', 'canisters'] };
+  function tgtName(oid) { var tr = U.trackByOid(oid); return tr ? tr.id + (tr.name ? ' ' + tr.name : '') : U.nameOf(oid); }
+  function ownFire(w) {
+    var F = st.fire || (st.fire = {});
+    for (var i = 0; i < w.slugs.length; i++) {
+      var p = w.slugs[i]; if (p.side !== st.P || p.__ui || (p.kind !== 'slug' && p.kind !== 'can')) continue; p.__ui = 1;
+      var what = p.kind === 'can' ? 'canister' : p.wk === 'spinal' ? 'spinal' : 'slug', k = p.src + '|' + what;
+      var r = F[k] || (F[k] = { ship: p.src, what: what, n: 0, t0: 0, last: -1e9 });
+      if (!r.n) r.t0 = w.t; r.n++; r.p = p; r.tgt = p.tgt; r.est = p.sv && p.sv.est;
+    }
+    for (var key in F) {
+      var f = F[key]; if (!f.n || w.t - f.t0 < 5 || w.t - f.last < FIRE_GAP) continue;
+      var q = f.p, eta = U.etaTo(q.x, q.y, q.vx, q.vy, U.trackByOid(f.tgt));
+      U.addLog(U.nameOf(f.ship) + ' fires ' + (f.n > 1 ? f.n + ' ' + RNAME[f.what][1] : 'a ' + RNAME[f.what][0]) + ' at ' + tgtName(f.tgt) + (eta != null ? ', impact ' + U.fmtEta(eta) : '') + (f.est != null ? ', ' + U.pct(f.est) + ' to hit' : '') + '.', 'own');
+      f.n = 0; f.last = w.t;
+    }
+    U.ownShips().forEach(function (s) {
+      if (!E.active(s)) return;
+      s.mods.forEach(function (m) { if (m.kind === 'rail' && m.state < 2 && m.ammo <= 0 && !m.__dry) { m.__dry = 1; U.addLog(s.name + ': ' + (m.def.name.charAt(0).toLowerCase() + m.def.name.slice(1)) + ' dry, no rounds left.', 'bad'); } });
+      var b = U.braking(s); if (b && !s.__brk && gate('brk' + s.id, 600)) U.addLog(s.name + ' flips to brake: the drive faces ' + ((U.targetOf(s) || {}).id || 'the enemy') + '. ' + (s.mods.some(function (m) { return m.kind === 'rail' && !m.def.spinal || m.kind === 'laser'; }) ? 'Turrets still bear.' : 'The spinal swings round to fire.'), 'see');
+      s.__brk = b;
+    });
+  }
+
   // ---------------------------------------------------------------- per tick: events, ghosts, beams
   function afterTick() {
     var w = st.w, evs = E.events(w);
@@ -427,6 +472,7 @@
       tl.forEach(function (c) { seen[c.id] = 1; var g = st.ghosts[c.id] || (st.ghosts[c.id] = []); var l = g[g.length - 1]; if (!l || l.x !== c.x || l.y !== c.y) { g.push({ x: c.x, y: c.y, t: c.tObs }); if (g.length > 14) g.shift(); } });
       for (var k in st.ghosts) if (!seen[k]) delete st.ghosts[k];
     }
+    ownFire(w);
     var now = performance.now();
     w.beams.forEach(function (b) {
       if (b.__ui) return; b.__ui = 1;
@@ -466,6 +512,7 @@
     requestAnimationFrame(frame);
   }
   U.frame = frame; // for test harnesses that drive frames by hand
+  U.afterTick = function () { if (st) afterTick(); };   // and for node harnesses that step the world themselves
   U.withdraw = function () {
     if (!st || st.over) return;
     U.ownShips().forEach(function (s) { if (E.active(s)) E.order(st.w, s.id, { man: { type: 'break', target: (U.targetOf(s) || {}).id || null, vmax: 40 } }); });

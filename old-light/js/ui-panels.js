@@ -233,6 +233,8 @@
   }
   function manText(s) {
     var m = s.orders.man || { type: 'coast' }, tg = m.target ? ' ' + m.target : '';
+    // the flip to brake points the nose away from the enemy: say so, or it reads as a retreat
+    if (U.braking(s)) { var tr = U.targetOf(s), dx = tr.ex - s.x, dy = tr.ey - s.y, d = Math.hypot(dx, dy) || 1, cl = -(dx * (tr.vx - s.vx) + dy * (tr.vy - s.vy)) / d; return 'Braking to stop ' + U.fmtKm(m.range) + ' from' + (tg || ' the enemy') + ': closing ' + cl.toFixed(1) + ' km/s, drive toward the enemy'; }
     switch (m.type) {
       case 'close': return 'Approaching to within ' + U.fmtKm(m.range) + ' of' + (tg || ' the enemy');
       case 'hold': return 'Holding ' + U.fmtKm(m.range) + ' from' + (tg || ' the enemy');
@@ -298,9 +300,13 @@
       var dead = n - live.length, sub = dead ? dead + ' out' : '';
       if (G.kind === 'rail') {
         var g = U.grp(s, G.key), ammo = 0, m0 = live[0]; G.mods.forEach(function (m) { ammo += m.ammo || 0; });
-        var est = m0 && tr ? E.hitEstimate(st.w, s, m0.id, tr.id, { n: U.railN(m0, g), ammo: g.ammo === 'canister' ? 'canister' : undefined }) : null;
+        // the quote is for the round the gunnery computer would fire (Auto ammo may pick canister); a ready gun whose
+        // quote is under its threshold says it is holding
+        var pl = m0 && tr && m0.ammo > 0 ? U.railPlan(st.w, s, m0, tr, g) : null;
+        var est = pl ? pl.est : m0 && tr ? E.hitEstimate(st.w, s, m0.id, tr.id, { n: U.railN(m0, g), ammo: g.ammo === 'canister' ? 'canister' : undefined }) : null;
         var ch = est && est.ok ? est.chance : null, thr = m0 ? U.railThr(s, m0, g) : null;
-        var cdT = m0 ? (m0.burst ? 'firing' : m0.pending ? 'aiming' : m0.cd > 0 ? 'loading ' + Math.ceil(m0.cd) + 's' : 'ready') : 'out';
+        var cdT = !m0 ? 'out' : ammo <= 0 ? 'dry' : m0.burst ? 'firing' : m0.pending ? 'aiming' : m0.cd > 0 ? 'loading ' + Math.ceil(m0.cd) + 's' : thr == null ? 'holding' : pl && !pl.fire ? 'holding: under ' + Math.round(thr * 100) + '%' : 'ready';
+        if (pl && pl.what === 'canister' && g.ammo === 'auto') cdT += ' · canister';
         h += '<div class="wg"><div class="wg-h"><b>' + nm + '</b><span>' + ammo + ' rds · ' + cdT + (sub ? ' · ' + sub : '') + '</span><span class="hc' + (ch != null && thr != null && ch >= thr ? '' : ' lo') + '">' + (ch != null ? U.pct(ch) : '--') + '</span></div>';
         if (est && est.ok) h += '<p class="note" style="margin:0 0 4px">Impact in ' + U.fmtEta(est.tti) + ', spread ' + U.fmtKm(est.spread) + (est.rounds > 1 ? ', ' + est.rounds + ' rounds' : '') + '</p>';
         var autoT = Math.round(((G.def.spinal ? U.doc(s).spinal : U.doc(s).rail) || 0) * 100);
