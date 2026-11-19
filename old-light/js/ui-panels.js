@@ -34,6 +34,9 @@
     $('timeCtl').addEventListener('click', function (e) { var b = e.target.closest('[data-sp]'); if (!b) return; var v = b.getAttribute('data-sp'); U.setSpeed(v === 'auto' ? 'auto' : +v); U.sfx('click'); });
     $('bannerGo').onclick = function () { U.resume(); };
     $('bFit').onclick = function () { U.plot.fit(); };
+    // the log filter: every line, shot results only, or everything but shot results (kept in ol.settings.v1)
+    $('bLogF').onclick = function () { var i = LOGF.indexOf(U.set.logF || 'all'); U.set.logF = LOGF[(i + 1) % LOGF.length]; U.save(); logfBtn(); Pn.log(); U.sfx('click'); };
+    logfBtn();
     $('bFollow').onclick = function () { var c = U.plot.cam; U.plot.setFollow(!c.follow); $('bFollow').classList.toggle('on', c.follow); };
     $('bManual').onclick = function () { var st = U.st(); if (!st) return; if (st.sel === 'all') { U.addLog('Pick one ship for a manual burn.', ''); return; } st.manual = !st.manual; if (st.manual) U.addLog('Manual burn: drag from the ship toward where to thrust. Longer is harder.', ''); Pn.refresh(true); };
     $('bMenu').onclick = function () { togglePop('menu'); };
@@ -143,9 +146,12 @@
   };
 
   // ---------------------------------------------------------------- the log
+  var LOGF = ['all', 'shots', 'events'], LOGF_T = { all: ['Log: all', 'Showing every line. Tap for shot results only.'], shots: ['Log: shots', 'Showing shot results only. Tap to hide them instead.'], events: ['Log: events', 'Showing everything but shot results. Tap for every line.'] };
+  function logfBtn() { var f = LOGF_T[U.set.logF] || LOGF_T.all; $('bLogF').textContent = f[0]; $('bLogF').title = f[1]; $('bLogF').classList.toggle('on', (U.set.logF || 'all') !== 'all'); }
   Pn.log = function () {
     var st = U.st(); if (!st) return;
-    var h = ''; st.log.slice(-6).forEach(function (l) { h += '<div class="' + l.cls + '"><i>' + U.fmtT(l.t).slice(2) + '</i>' + esc(l.text) + '</div>'; });
+    var f = U.set.logF || 'all', L = f === 'all' ? st.log : st.log.filter(function (l) { return f === 'shots' ? l.shot : !l.shot; });
+    var h = ''; L.slice(-6).forEach(function (l) { h += '<div class="' + l.cls + '"><i>' + U.fmtT(l.t).slice(2) + '</i>' + esc(l.text) + '</div>'; });
     $('log').innerHTML = h;
   };
 
@@ -293,6 +299,10 @@
     s.mods.forEach(function (m) { if (m.kind !== 'rail' && m.kind !== 'laser' && m.kind !== 'pdl' && m.kind !== 'flak' && m.kind !== 'rack') return; if (!g[m.key]) { g[m.key] = { key: m.key, kind: m.kind, def: m.def, mods: [] }; order.push(g[m.key]); } g[m.key].mods.push(m); });
     return order;
   }
+  // the Guns tab's help text (OL_DATA.GUN_HELP): a button with its help as the tooltip, and the line under a row
+  function help(row, key, autoT) { var H = U.D.GUN_HELP, t = H[row] && H[row][key]; return t ? t.replace('{t}', autoT != null ? autoT : '') : ''; }
+  function hbtn(a, label, on, tip) { return btn(a, label, on).replace('<button ', '<button title="' + esc(tip) + '" '); }
+  function helpLine(text, html) { return text ? '<p class="ghelp">' + (html ? text : esc(text)) + '</p>' : ''; }
   function gunsTab(st, s) {
     var E = U.E, tr = U.targetOf(s), h = '<div class="sec">' + tgtLine(s) + '</div>';
     groupsOf(s).forEach(function (G) {
@@ -310,10 +320,17 @@
         h += '<div class="wg"><div class="wg-h"><b>' + nm + '</b><span>' + ammo + ' rds · ' + cdT + (sub ? ' · ' + sub : '') + '</span><span class="hc' + (ch != null && thr != null && ch >= thr ? '' : ' lo') + '">' + (ch != null ? U.pct(ch) : '--') + '</span></div>';
         if (est && est.ok) h += '<p class="note" style="margin:0 0 4px">Impact in ' + U.fmtEta(est.tti) + ', spread ' + U.fmtKm(est.spread) + (est.rounds > 1 ? ', ' + est.rounds + ' rounds' : '') + '</p>';
         var autoT = Math.round(((G.def.spinal ? U.doc(s).spinal : U.doc(s).rail) || 0) * 100);
-        h += '<div class="row"><span class="lbl">Fire at</span><div class="chips">' + btn('thr:' + G.key + ':auto', 'Auto ' + autoT + '%', g.thr === 'auto') + [0.1, 0.25, 0.5].map(function (v) { return btn('thr:' + G.key + ':' + v, Math.round(v * 100) + '%', g.thr === v); }).join('') + btn('thr:' + G.key + ':hold', 'Hold', g.thr === 'hold') + '</div></div>';
+        // each row: the chips (every button's help as its tooltip), then one small line explaining the selected choice
+        var thrK = g.thr === 'auto' || g.thr === 'hold' ? g.thr : String(g.thr), thrX = !G.def.spinal && g.ammo === 'auto' && thrK !== 'auto' && thrK !== 'hold' ? ' ' + U.D.GUN_HELP.canAny : '';
+        h += '<div class="row"><span class="lbl">Fire at</span><div class="chips">' + [['auto', 'Auto ' + autoT + '%']].concat([0.1, 0.25, 0.5].map(function (v) { return [String(v), Math.round(v * 100) + '%']; })).concat([['hold', 'Hold']]).map(function (a) { return hbtn('thr:' + G.key + ':' + a[0], a[1], thrK === a[0], help('thr', a[0], autoT)); }).join('') + '</div></div>';
+        h += helpLine(help('thr', thrK, autoT) + thrX);
         if (!G.def.spinal) {
-          h += '<div class="row"><span class="lbl">Ammo</span><div class="chips">' + [['auto', 'Auto'], ['slug', 'Slug'], ['canister', 'Canister']].map(function (a) { return btn('ammo:' + G.key + ':' + a[0], a[1], g.ammo === a[0]); }).join('') + '</div></div>';
-          h += '<div class="row"><span class="lbl">Salvo</span><div class="chips">' + btn('sn:' + G.key + ':auto', 'Auto', g.n === 'auto') + [1, 2, 4].map(function (v) { return btn('sn:' + G.key + ':' + v, v, g.n === v); }).join('') + '</div></div>';
+          h += '<div class="row"><span class="lbl">Ammo</span><div class="chips">' + [['auto', 'Auto'], ['slug', 'Slug'], ['canister', 'Canister']].map(function (a) { return hbtn('ammo:' + G.key + ':' + a[0], a[1], g.ammo === a[0], help('ammo', a[0])); }).join('') + '</div></div>';
+          var now = tr ? U.ammoNow(st.w, s, m0, tr, g) : '';
+          h += helpLine(esc(help('ammo', g.ammo)) + (now ? '<br>' + now : ''), true);
+          var snK = String(g.n);
+          h += '<div class="row"><span class="lbl">Salvo</span><div class="chips">' + [['auto', 'Auto'], ['1', 1], ['2', 2], ['4', 4]].map(function (a) { return hbtn('sn:' + G.key + ':' + a[0], a[1], snK === a[0], help('sn', a[0])); }).join('') + '</div></div>';
+          h += helpLine(help('sn', snK));
         } else h += '<p class="note">Spinal: the whole ship turns to aim it.</p>';
         h += '<div class="row">' + btn('fire:' + G.key, 'Fire now', false, 'fire') + '</div></div>';
       } else if (G.kind === 'laser') {
@@ -321,7 +338,8 @@
         var on = live.filter(function (m) { return m.target; }).map(function (m) { return m.target; });
         h += '<div class="wg"><div class="wg-h"><b>' + nm + '</b><span>' + (on.length ? 'on ' + esc(on[0]) : 'idle') + (sub ? ' · ' + sub : '') + '</span><span class="hc' + (le && le.ok && le.dmgFactor > 0 ? '' : ' lo') + '">' + (le && le.ok ? U.pct(le.chance) : '--') + '</span></div>';
         if (le && le.ok) h += '<p class="note" style="margin:0 0 4px">' + (le.dmgFactor > 0 ? 'Power at target ' + Math.round(le.dmgFactor * 100) + '%' : 'Out of reach: armour sheds it') + ' · ' + U.fmtKm(le.range) + '</p>';
-        h += '<div class="row"><span class="lbl">Mode</span><div class="chips">' + btn('lz:free', 'Free', mode === 'free') + btn('lz:pd', 'PD only', mode === 'pd') + btn('lz:hold', 'Hold', mode === 'hold') + '</div></div>';
+        h += '<div class="row"><span class="lbl">Mode</span><div class="chips">' + [['free', 'Free'], ['pd', 'PD only'], ['hold', 'Hold']].map(function (a) { return hbtn('lz:' + a[0], a[1], mode === a[0], help('laser', a[0])); }).join('') + '</div></div>';
+        h += helpLine(help('laser', mode));
         h += '<div class="row">' + btn('fire:' + G.key, 'Fire now', false, 'fire') + '</div></div>';
       } else if (G.kind === 'rack') {
         var pc = U.pc(s), load = U.rackLoad(s), dd = U.doc(s).launchAt;

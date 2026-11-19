@@ -337,15 +337,17 @@
         var pts = N.nukePts * Math.min(1, sqr(N.nukeR / Math.max(d, 0.01)));
         var rad = pts * N.nukeRad * (s.has.magscreen && s.has.magscreen.state < 2 ? N.magNuke : 1);
         if (!m.hitAny) { m.hitAny = true; stat(w, 'nuke').hits++; }
-        hitRecord(w, 'nuke', m.lr, damage(w, s, pts * (1 - N.nukeRad), 'nuke', facing(s, m.x - s.x, m.y - s.y), 'nuke') + (s.status !== 'destroyed' ? rad : 0), m.side);
+        var tk = damage(w, s, pts * (1 - N.nukeRad), 'nuke', facing(s, m.x - s.x, m.y - s.y), 'nuke') + (s.status !== 'destroyed' ? rad : 0);
+        m.pts = (m.pts || 0) + tk; hitRecord(w, 'nuke', m.lr, tk, m.side);
         if (s.status !== 'destroyed') { kill(w, s, rad * N.crewPerPt * s.crew0 * 2); updStatus(w, s); }
       });
-      w.drones.forEach(function (d) { if (d.side !== m.side && d.alive && hyp3(d.x - m.x, d.y - m.y, d.z - m.z) < 10) killSmall(w, d, 'nuke'); });
+      w.drones.forEach(function (d) { if (d.side !== m.side && d.alive && hyp3(d.x - m.x, d.y - m.y, d.z - m.z) < 10) killSmall(w, d, 'nuke', m.from); });
+      misLog(w, m, m.hitAny ? 'hit' : 'miss');
       return;
     }
     // kinetic bus: penetrators in a grid across the relative velocity (a disc, in 3D)
     var rvx = m.vx - T.vx, rvy = m.vy - T.vy, rvz = m.vz - T.vz, rl = hyp3(rvx, rvy, rvz) || 1, B = basis(rvx / rl, rvy / rl, rvz / rl);
-    var n = m.pen, nl = Math.ceil(Math.sqrt(n)), nu = Math.ceil(n / nl), t = Math.max(tgo, 0.2), k = 0;
+    var n = m.pen; m.penLeft = n; var nl = Math.ceil(Math.sqrt(n)), nu = Math.ceil(n / nl), t = Math.max(tgo, 0.2), k = 0;
     // the pattern is spaced to the target's size (1.6 radii), never wider than the fan
     var sp = Math.min(1.6 * (T.r || 0.05), 2 * m.fan / Math.max(nl - 1, 1));
     for (var i = 0; i < nl && k < n; i++) for (var j = 0; j < nu && k < n; j++, k++) {
@@ -530,12 +532,16 @@
   }
   function droneDied(w, d, by) {
     var L = w.stats.droneLost[d.side]; L[d.type] = (L[d.type] || 0) + 1;
-    emit(w, { type: 'droneKilled', side: d.side, id: d.id, drone: d.type, by: by });
+    emit(w, { type: 'droneKilled', side: d.side, id: d.id, drone: d.type, by: by, who: d.diedTo || null });
   }
 
   // ---------------------------------------------------------------- slugs (railgun rounds, fragments, penetrators)
   function addSlug(w, p) { p.id = 's' + (w.sid = (w.sid || 0) + 1); p.born = w.t; p.alive = true; if (p.z == null) p.z = 0; if (p.sv) p.sv.left++; w.slugs.push(p); return p; }
-  function slugGone(w, p) { var sv = p.sv; if (!sv) return; sv.left--; if (sv.left <= 0 && sv.closed) salvoDone(w, sv); }
+  // the UI's shot log: how each missile ended (hit, missed, or shot down and by what)
+  function misLog(w, m, out, by, who) {
+    if (w.shotLog) w.shotLog.push({ k: 'mis', t: w.t, side: m.side, src: m.from, tgt: m.seek ? m.seek.id : null, wk: m.wk, out: out, by: by || null, who: who || null, pts: m.pts || 0 });
+  }
+  function slugGone(w, p) { if (p.mis && --p.mis.penLeft === 0) misLog(w, p.mis, p.mis.hitAny ? 'hit' : 'miss'); var sv = p.sv; if (!sv) return; sv.left--; if (sv.left <= 0 && sv.closed) salvoDone(w, sv); }
   var TG = [];
   function slugsMove(w, h) {
     var L = w.slugs, cull = (w.nTick % 10 === 0), tg = TG; tg.length = 0;
@@ -575,6 +581,9 @@
   function salvoDone(w, sv) {
     if (sv.reported) return; sv.reported = true;
     calAdd(w, sv.wk, sv.side, sv.est, sv.hits > 0);
+    // the UI's shot log (only when it asked for one): what the salvo or canister really did
+    if (w.shotLog) w.shotLog.push({ k: 'rail', t: w.t, side: sv.side, src: sv.src, tgt: sv.tgt, wk: sv.wk, n: sv.n, r: sv.r || 1, hits: sv.hits, pts: sv.pts || 0,
+      up: sv.mN ? sv.mUp / sv.mN : 0, lat: sv.mN ? sv.mLat / sv.mN : 0, mN: sv.mN, mD: sv.mD });
     if (w.calTrace && sv.info) { var Ti = w.idx[sv.tgt]; sv.info.wk = sv.wk; sv.info.est = sv.est; sv.info.hit = sv.hits > 0; sv.info.n = sv.n; sv.info.miss = sv.mN ? sv.mD / sv.mN : null; sv.info.best = sv.best; sv.info.evEnd = Ti && Ti.ctl ? Ti.ctl.ev : null; w.calTrace.push(sv.info); }
     if (sv.hits || !sv.mN) return;
     var up = sv.mUp / sv.mN, side = sv.mLat / sv.mN, d = Math.sqrt(up * up + side * side), T = w.idx[sv.tgt];
@@ -607,8 +616,10 @@
     var pts = 0.5 * p.kg * v2 / 1000 * N.kinPts * (p.kind === 'frag' ? N.fragK : 1);
     if (p.kind === 'pen') { if (p.mis && !p.mis.hitAny) { p.mis.hitAny = true; stat(w, p.wk).hits++; } }
     else if (p.sv) { if (!p.sv.hits) stat(w, p.wk).hits++; p.sv.hits++; }
-    if (T.kind !== 'ship') { T.hp -= pts; if (T.hp <= 0) killSmall(w, T, p.wk); return; }
-    hitRecord(w, p.wk, p.lr, damage(w, T, pts, p.kind === 'frag' ? 'frag' : 'kin', facing(T, -rvx, -rvy), p.wk), p.side);
+    if (T.kind !== 'ship') { T.hp -= pts; if (T.hp <= 0) killSmall(w, T, p.wk, p.src); return; }
+    var took = damage(w, T, pts, p.kind === 'frag' ? 'frag' : 'kin', facing(T, -rvx, -rvy), p.wk);
+    if (p.sv) p.sv.pts = (p.sv.pts || 0) + took; else if (p.mis) p.mis.pts = (p.mis.pts || 0) + took;
+    hitRecord(w, p.wk, p.lr, took, p.side);
   }
   // calibration: every shot is filed under the hit chance its gunnery computer gave it when it fired
   var CALB = [0.05, 0.15, 0.3, 0.6];
@@ -628,12 +639,14 @@
     var cls = T.kind === 'drone' ? T.type : (T.wk || 'missile'), G2 = w.stats.gone[T.side], b = G2[cls] || (G2[cls] = {});
     b[cause] = (b[cause] || 0) + 1;
   }
-  function killSmall(w, T, by) {
+  // who: the ship or drone whose weapon did it, when there is one (for the UI's shot log)
+  function killSmall(w, T, by, who) {
     if (!T.alive) return;
     T.alive = false; goneStat(w, T, by);
-    T.diedBy = by;
+    T.diedBy = by; T.diedTo = who || null;
+    if (T.kind === 'missile') misLog(w, T, by === 'life' || by === 'planet' ? 'miss' : 'down', by, who);
     if (T.kind === 'drone') droneDied(w, T, by);
-    else emit(w, { type: 'missileKilled', side: T.side, id: T.id, by: by });
+    else emit(w, { type: 'missileKilled', side: T.side, id: T.id, by: by, who: who || null });
   }
   function blocked(w, x0, y0, x1, y1) {
     for (var i = 0; i < w.planets.length; i++) {
@@ -659,11 +672,11 @@
     if (w.planets.length && blocked(w, s.x, s.y, ax, ay)) return false;
     // the beam director re-points only as fast as light brings word back: whatever the target does that the
     // track did not foresee drags the spot across the hull for that long, and a smeared spot heats, not cuts
-    var fall = laserFall(ldef, range) * smearF(hyp3(obj.vx - sol.tvx, obj.vy - sol.tvy, obj.vz - sol.tvz), range);
+    var lf = laserFall(ldef, range), sf = smearF(hyp3(obj.vx - sol.tvx, obj.vy - sol.tvy, obj.vz - sol.tvz), range), fall = lf * sf;
     var att = w.clouds.length ? sandAtt(w, s.x, s.y, ax, ay) : 1;
     s.beamT = w.t; s.beamX = ax; s.beamY = ay;  // for the dev view: the last beam this shooter fired, and where
     var rr = (tr.r || 0.06) + range * N.laserDiv, est = laserChance(tr, sol, rr, spreadOf(w, s, tr, sol), spreadOf(w, s, tr, sol, 0, 0, false, true), readOf(s));
-    w.beams.push({ side: s.side, src: s.id, wk: wk, tArr: w.t + sol.t, ax: ax, ay: ay, az: az, pts: dps * N.tick * fall * att, obj: obj, range: range, spot: range * N.laserDiv, est: est });
+    w.beams.push({ side: s.side, src: s.id, wk: wk, tArr: w.t + sol.t, ax: ax, ay: ay, az: az, pts: dps * N.tick * fall * att, lf: lf, sf: sf, obj: obj, range: range, spot: range * N.laserDiv, est: est });
     stat(w, wk).fired++;
     return true;
   }
@@ -676,18 +689,22 @@
       var bh = hyp3(tx - b.ax, ty - b.ay, tz - b.az) <= T.r + b.spot;
       calAdd(w, b.wk, b.side, b.est, bh);
       if (w.calTrace && b.wk !== 'pdLaser') w.calTrace.push({ lz: 1, wk: b.wk, est: b.est, hit: bh, kind: T.kind, type: T.type, miss: hyp3(tx - b.ax, ty - b.ay, tz - b.az) / (T.r + b.spot) });
+      var lzRec = w.shotLog && T.kind === 'ship' ? { k: 'lz', t: w.t, side: b.side, src: b.src, tgt: T.id, wk: b.wk, hit: bh, pts: 0, shed: bh && !(b.lf > 0), smear: bh && b.lf > 0 && b.sf < 0.5 } : null;
+      if (lzRec) w.shotLog.push(lzRec);
       if (!bh) continue;
       stat(w, b.wk).hits++;
       if (T.kind !== 'ship') {
         T.hp -= b.pts * (T.kind === 'missile' ? N.laserMis : 1); if (T.kind === 'drone') T.lasered = w.t;   // a missile's skin is thin
-        if (T.hp <= 0) { killSmall(w, T, b.wk); if (T.kind === 'missile') w.stats.pdKills[b.side]++; }
+        if (T.hp <= 0) { killSmall(w, T, b.wk, b.src); if (T.kind === 'missile') w.stats.pdKills[b.side]++; }
         continue;
       }
       var S = w.idx[b.src];
       T.lasered = w.t; T.laseredBy = b.src;
       // a lancer's beam is too weak to cut armour; it picks at the gear outside it, and the hull takes only a little
-      if (b.wk === 'lancer') { var fl = facing(T, b.ax - T.x, b.ay - T.y); var mk = modRoll(w, T, 0, fl, 'lancer', b.pts * N.lancerModPerPt); hitRecord(w, 'lancer', b.range, damage(w, T, b.pts * N.lancerHull, 'laser', fl, 'lancer') + (mk ? N.modWorth : 0), b.side); continue; }
-      hitRecord(w, b.wk, b.range, damage(w, T, b.pts, 'laser', S ? facing(T, S.x - T.x, S.y - T.y) : 'flank', b.wk), b.side);
+      if (b.wk === 'lancer') { var fl = facing(T, b.ax - T.x, b.ay - T.y); var mk = modRoll(w, T, 0, fl, 'lancer', b.pts * N.lancerModPerPt); var lt = damage(w, T, b.pts * N.lancerHull, 'laser', fl, 'lancer'); if (lzRec) { lzRec.pts = lt; lzRec.mod = !!mk; } hitRecord(w, 'lancer', b.range, lt + (mk ? N.modWorth : 0), b.side); continue; }
+      var bt = damage(w, T, b.pts, 'laser', S ? facing(T, S.x - T.x, S.y - T.y) : 'flank', b.wk);
+      if (lzRec) lzRec.pts = bt;
+      hitRecord(w, b.wk, b.range, bt, b.side);
     }
   }
   function sandAtt(w, x0, y0, x1, y1) {
@@ -724,11 +741,11 @@
           T.hp -= m.def.dps * e * heatF * jk * laserFall(m.def, pick.d) * h * (s.sys.reactor.state === 1 ? 0.6 : 1);
           s.heat += m.def.heat * h; m.firing = 1;
           if (T.kind === 'drone') T.lasered = w.t;
-          if (T.hp <= 0 && T.alive) { if (T.kind === 'missile') w.stats.pdKills[s.side]++; killSmall(w, T, 'pdLaser'); }
+          if (T.hp <= 0 && T.alive) { if (T.kind === 'missile') w.stats.pdKills[s.side]++; killSmall(w, T, 'pdLaser', s.id); }
         } else {
           if (m.ammo <= 0) continue;
           m.ammo -= m.def.rate * h; m.firing = 1;
-          if (rnd(w) < flakP(m.def.rate, h, e, T)) { killSmall(w, T, 'flak'); if (T.kind === 'missile') w.stats.flakKills[s.side]++; }
+          if (rnd(w) < flakP(m.def.rate, h, e, T)) { killSmall(w, T, 'flak', s.id); if (T.kind === 'missile') w.stats.flakKills[s.side]++; }
         }
       }
     }
@@ -738,7 +755,7 @@
       var fl = d.def.flak, cd = pdCandidates(w, d.side, d.x, d.y, d.z, fl.range, false);
       if (!cd.length) continue;
       var Tm = cd[0].o; d.ammo -= fl.rate * h;
-      if (rnd(w) < flakP(fl.rate, h, 1, Tm)) { killSmall(w, Tm, 'interceptor'); w.stats.droneFlakKills[d.side]++; }
+      if (rnd(w) < flakP(fl.rate, h, 1, Tm)) { killSmall(w, Tm, 'interceptor', d.id); w.stats.droneFlakKills[d.side]++; }
     }
   }
   function flakP(rate, h, e, T) { return 1 - Math.exp(-rate * h * e * (T.kind === 'missile' && T.phase === 'term' ? 1 - N.mJink : 1) * N.flakK); }
@@ -811,7 +828,7 @@
       // a spinal is laid some seconds after it was ordered: its estimate is the one at the moment it fires
       var est = job.est;
       if (m.def.spinal) { var ef = hitEstimate(w, s, m.id, job.target, { n: 1, steady: true, ammo: job.ammo }); if (ef && ef.ok) { est = ef.chance; if (canister) { job.canR = ef.canR; job.canN = ef.canN; job.canLead = ef.canLead; } if (job.e) { job.e.parts = ef.parts; job.e.pm = ef.pm; job.e.s0 = ef.s0; job.e.T = ef.tT; job.e.offs = ef.offsets; } } }
-      job.sv = { side: s.side, src: s.id, tgt: job.tobj, wk: wk, n: 0, left: 0, hits: 0, closed: false, mUp: 0, mLat: 0, mN: 0, mD: 0, best: 1e9, est: est };
+      job.sv = { side: s.side, src: s.id, tgt: job.tobj, wk: wk, n: 0, left: 0, hits: 0, closed: false, mUp: 0, mLat: 0, mN: 0, mD: 0, best: 1e9, est: est, pts: 0, r: 0 };
       if (w.calTrace) { var Tg = w.idx[job.tobj]; job.sv.info = { t: w.t, range: sol.range, T: sol.t, cls: Tg && (Tg.hull || Tg.type || Tg.kind), src: s.hull, tg: Tg ? Tg.gNow : null, man: Tg && Tg.orders && Tg.orders.man ? Tg.orders.man.type : null, ev: Tg && Tg.ctl ? Tg.ctl.ev : null, sev: s.ctl.ev, e: job.e || null }; }
     }
     // the launch flash: the enemy learns of the round when the light reaches its nearest sensor
@@ -819,7 +836,7 @@
     for (var i = 0; i < w.ships.length; i++) { var o = w.ships[i]; if (o.side === E && o.status !== 'destroyed') best = Math.min(best, hyp(o.x - s.x, o.y - s.y)); }
     var p = addSlug(w, { kind: canister ? 'can' : 'slug', wk: wk, side: s.side, src: s.id, x: s.x, y: s.y, z: s.z, vx: s.vx + dx * u, vy: s.vy + dy * u, vz: s.vz + dz * u,
       kg: m.def.kg, tgt: job.tobj, lr: sol.range, sv: job.sv, known: w.t + best / C });
-    job.sv.n += canister ? (job.canN || N.canN) : 1;
+    job.sv.n += canister ? (job.canN || N.canN) : 1; job.sv.r++;
     if (canister) { p.canT = w.t + sol.t; p.burst = w.t + Math.max(Math.min(1, sol.t / 2), sol.t - (job.canLead || N.canLeadMin)); p.canR = job.canR || 1; p.canN = job.canN || N.canN; p.tvx = sol.tvx; p.tvy = sol.tvy; p.tvz = sol.tvz; }
     m.ammo--; m.cd = m.def.cycle;
     stat(w, wk).fired++;

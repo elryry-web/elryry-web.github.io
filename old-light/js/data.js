@@ -260,7 +260,7 @@
     { id: 'lost', highlight: 'card', title: 'Track lost',
       body: 'The enemy cut its drive, and a cold ship is hard to see from this far. The plot now guesses its position from its last course, and the dashed ring shows how far off that guess may be. Keep closing, and your sensors will find it again.' },
     { id: 'guns', highlight: 'guns', title: 'Guns',
-      body: 'The Guns tab and the aim label on the plot give each weapon\'s chance to hit and its time to impact. A solid slug does full damage but rarely hits a ship that is dodging. A canister bursts into a wide cloud of light fragments that is hard to dodge.' },
+      body: 'The Guns tab and the aim label on the plot give each weapon\'s chance to hit and its time to impact. Slugs hit hard but are easy to dodge, and canister fragments are weak but hard to dodge. The small line under each setting explains it and gives both rounds\' odds right now.' },
     { id: 'threats', highlight: 'threats', title: 'Incoming fire',
       body: 'Red lines are enemy rounds aimed at your ship. This strip gives each round\'s time to impact and its chance to hit if you do not dodge. Evasion on the Helm tab sets how hard your ship dodges.' },
     { id: 'damage', highlight: 'meters', title: 'Damage, heat and fuel',
@@ -268,6 +268,36 @@
     { id: 'end', highlight: null, title: 'The tutorial is over',
       body: 'The other skirmishes add missiles, drones, more ships and a convoy to guard. The ? button at the top explains the plot at any time.' }
   ];
+
+  // the Guns tab's help: one line per choice, shown under its row for the selected choice and as each button's
+  // tooltip. {t} is the doctrine's Auto threshold in percent. Every claim follows the code (HANDOFF "Fire rules").
+  var GUN_HELP = {
+    thr: {
+      auto: 'Auto: fires at {t}% or better, as an AI captain would.',
+      '0.1': '10%: waits for better odds. Fewer rounds are wasted on long shots.',
+      '0.25': '25%: fires on good odds only. Ammo is kept for closer range.',
+      '0.5': '50%: fires on near-sure shots only. A dodging ship may never offer one.',
+      hold: 'Hold: never fires by itself. Fire now still works.'
+    },
+    ammo: {
+      auto: 'Auto: fires whichever round should do more damage.',
+      slug: 'Slug: full damage on a hit, but easy to dodge. Best on short flights or a target holding steady.',
+      canister: 'Canister: bursts into ' + NUM.canN + ' fragments just before it arrives. Hard to dodge, but weak far out.'
+    },
+    sn: {
+      auto: 'Auto: same as 4. Canisters always fire one at a time.',
+      '1': '1: one slug per shot. It saves ammo, but a lone round rarely hits a dodging ship.',
+      '2': '2: two slugs spread around the aim point. Half the ammo of 4.',
+      '4': '4: four slugs spread to cover a dodge. Best odds, for four times the ammo.'
+    },
+    laser: {
+      free: 'Free: shoots missiles and drones first, then the target when the beam can hurt it.',
+      pd: 'PD only: shoots missiles and drones only. Saves heat for when they arrive.',
+      hold: 'Hold: the main lasers never fire, even at missiles. Point defence still works.'
+    },
+    // added to a 10/25/50% line while Ammo is Auto: the Auto pick fires a worthwhile canister whatever the threshold
+    canAny: 'Auto ammo fires a worthwhile canister at any setting.'
+  };
 
   // ---------------------------------------------------------------- crew
   var ORIGINS = {
@@ -321,5 +351,5 @@
   };
 
   return { NUM: NUM, HULLS: HULLS, MODS: MODS, TIERS: TIERS, ARMOUR: ARMOUR, DRONES: DRONES, LOADOUTS: LOADOUTS, SCENARIOS: SCENARIOS,
-    ORIGINS: ORIGINS, STATIONS: STATIONS, STATION_NAMES: STATION_NAMES, ABILITIES: ABILITIES, CAST: CAST, FACTIONS: FACTIONS, NAMES: NAMES, TUTORIAL: TUTORIAL };
+    ORIGINS: ORIGINS, STATIONS: STATIONS, STATION_NAMES: STATION_NAMES, ABILITIES: ABILITIES, CAST: CAST, FACTIONS: FACTIONS, NAMES: NAMES, TUTORIAL: TUTORIAL, GUN_HELP: GUN_HELP };
 });

@@ -104,7 +104,8 @@
     cmd[P] = false; cmd[O] = true; gun[P] = false; gun[O] = true;
     AI.attach(w, { commander: cmd, gunnery: gun });
     st = { w: w, P: P, O: O, scn: scnKey, seed: seed, sel: null, speed: 'auto', autoL: 1000, paused: true, why: 'Battle ready. Give your orders, then resume.', acc: 0, frac: 0,
-      pc: {}, ghosts: {}, fx: [], log: [], over: false, endShown: false, withdrew: false, thr: {}, lostLog: {}, minEta: Infinity, gate: {}, agg: {}, lastAgg: 0, manual: false, cardId: null };
+      pc: {}, ghosts: {}, fx: [], log: [], over: false, endShown: false, withdrew: false, thr: {}, lostLog: {}, minEta: Infinity, gate: {}, agg: {}, lastAgg: 0, manual: false, cardId: null, shots: {} };
+    w.shotLog = [];   // the engine files every shot's outcome here for the log (see shotRec)
     var think = w.control, first = true;
     w.control = function (w) {
       var snap = null;
@@ -204,6 +205,29 @@
       if (cv > sv && ec.expHits >= N.canMinHits) return { est: ec, ammo: 'canister', n: 1, thr: thr, what: 'canister', fire: true };
     }
     return { est: es, n: n, thr: thr, what: 'slug', fire: es.chance >= thr };
+  };
+  // the Guns tab's live line under Ammo: what a slug (at the salvo size) and a canister would do at this target now,
+  // e.g. "Now: 4 slugs 2% to hit. Canister 49%, about 3 fragments on the hull (25 do one slug's damage)." The round
+  // Auto would pick is bold. Estimates are cached 250 ms per rail and target, as the plot's aim label does.
+  var nowCache = {}, nowW = null;
+  U.ammoNow = function (w, s, m, tgt, g) {
+    if (!m || !tgt || m.def.spinal || m.ammo <= 0) return '';
+    if (nowW !== w) { nowCache = {}; nowW = w; }
+    var key = s.id + '/' + m.id + '/' + tgt.id + '/' + U.railN(m, g), t = performance.now(), c = nowCache[key];
+    if (!c || t - c.t > 250) {
+      var n = U.railN(m, g), es = E.hitEstimate(w, s, m.id, tgt.id, { n: n }), ec = E.hitEstimate(w, s, m.id, tgt.id, { ammo: 'canister' });
+      c = nowCache[key] = { t: t, n: n, es: es && es.ok ? es : null, ec: ec && ec.ok ? ec : null };
+    }
+    if (!c.es && !c.ec) return '';
+    // the Auto rule, as railPlan: one canister against one solid round by expected damage, canMinHits fragments on the hull
+    var sv = c.es ? c.es.expHits / c.n * c.es.slugPts : 0, cv = c.ec ? c.ec.expHits * c.ec.fragPts : 0;
+    var pick = g.ammo !== 'auto' ? null : c.ec && cv > sv && c.ec.expHits >= N.canMinHits ? 'canister' : 'slug';
+    var f = c.ec ? c.ec.expHits : 0, fr = f >= 1 ? String(Math.round(f)) : f >= 0.05 ? f.toFixed(1) : 'under 0.1';
+    var a = c.es ? c.n + (c.n > 1 ? ' slugs ' : ' slug ') + U.pct(c.es.chance) + ' to hit' : '';
+    var b = c.ec ? (a ? 'Canister ' : 'canister ') + U.pct(c.ec.chance) + ', ' + (f >= 0.05 ? 'about ' : '') + fr + ' fragment' + (fr === '1' ? '' : 's') + ' on the hull' : '';
+    if (pick === 'slug' && a) a = '<b>' + a + '</b>';
+    if (pick === 'canister' && b) b = '<b>' + b + '</b>';
+    return 'Now: ' + (a ? a + '.' : '') + (a && b ? ' ' : '') + (b ? b + ' (' + Math.round(N.canN / N.fragK) + ' do one slug\'s damage).' : '');
   };
   function railShot(w, s, m, tgt, P2, g) {
     var pl = U.railPlan(w, s, m, tgt, g); if (!pl) return;
@@ -342,13 +366,14 @@
   U.setSpeed = function (sp) { if (!st) return; st.speed = sp; if (st.paused) U.resume(); };
 
   // ---------------------------------------------------------------- the log
-  U.addLog = function (text, cls) {
+  U.addLog = function (text, cls, shot) {
     if (!st) return;
-    st.log.push({ t: st.w.t, text: text, cls: cls || '' }); if (st.log.length > 120) st.log.shift();
+    st.log.push({ t: st.w.t, text: text, cls: cls || '', shot: !!shot }); if (st.log.length > 200) st.log.shift();
     U.panels.log();
   };
   function gate(k, dt) { var t = st.w.t; if (st.gate[k] != null && t - st.gate[k] < dt) return false; st.gate[k] = t; return true; }
   function agg(k, n, pts) { var a = st.agg[k] || (st.agg[k] = { n: 0, pts: 0, t0: st.w.t }); a.n += n || 0; a.pts += pts || 0; }
+  var DK_BY = { life: 'out of fuel', planet: 'hit the planet', nuke: 'nuclear blast', docked: '' };
   function flushAgg(force) {
     var t = st.w.t; if (!force && t - st.lastAgg < 30) return; st.lastAgg = t;
     for (var k in st.agg) {
@@ -356,7 +381,7 @@
       if (parts[0] === 'lz') U.addLog((parts[1] === st.P ? U.nameOf(parts[2]) + ' under laser fire: ' : 'Our lasers on ' + U.nameOf(parts[2]) + ': ') + a.pts.toFixed(1) + ' pts', parts[1] === st.P ? 'bad' : 'good');
       else if (parts[0] === 'dc') U.addLog(a.n + ' new drone contact' + (a.n > 1 ? 's' : ''), 'see');
       else if (parts[0] === 'mk') U.addLog((parts[1] === st.P ? 'We lost ' : 'Shot down ') + a.n + ' missile' + (a.n > 1 ? 's' : '') + (parts[1] === st.P ? '' : ' (' + U.wkName(parts[2], true) + ')'), parts[1] === st.P ? 'bad' : 'good');
-      else if (parts[0] === 'dk') U.addLog((parts[1] === st.P ? 'Lost ' : 'Killed ') + a.n + ' ' + U.droneName(parts[2], a.n), parts[1] === st.P ? 'bad' : 'good');
+      else if (parts[0] === 'dk') U.addLog((parts[1] === st.P ? 'Lost ' : 'Killed ') + a.n + ' ' + U.droneName(parts[2], a.n) + (DK_BY[parts[3]] ? ' (' + DK_BY[parts[3]] + ')' : parts[3] && parts[3] !== 'undefined' ? ' (' + U.wkName(parts[3], true) + ')' : ''), parts[1] === st.P ? 'bad' : 'good');
       else if (parts[0] === 'sk') U.addLog(a.n + ' of our ' + U.droneName(parts[1], 2) + ' docked', '');
     }
     st.agg = {};
@@ -382,11 +407,12 @@
         return;
       case 'impact':
         var laser = e.by === 'laser' || e.by === 'lancer' || e.by === 'pdl';
-        if (laser) { agg('lz|' + e.side + '|' + e.ship, 0, e.pts); if (mine && gate('lzp' + e.ship, 1e9)) U.pause(U.nameOf(e.ship) + ' is under laser fire.', 'impact'); return; }
-        if (mine) { U.addLog(U.nameOf(e.ship) + ' hit by ' + U.wkName(e.by, true) + ' on ' + (FACE[e.face] || 'the hull') + ': ' + e.pts + ' pts', 'bad'); U.sfx('impact'); if (gate('imp', 10)) U.pause(U.nameOf(e.ship) + ' hit by ' + U.wkName(e.by, true) + '.', 'impact'); }
-        else U.addLog('Hit on ' + U.nameOf(e.ship) + ': ' + U.wkName(e.by, true) + ', ' + e.pts + ' pts', 'good');
+        // the log line for every hit comes from the shot log (one line per salvo, burst or missile group);
+        // an impact on us still sounds and pauses at once
+        if (laser) { if (mine && gate('lzp' + e.ship, 1e9)) U.pause(U.nameOf(e.ship) + ' is under laser fire.', 'impact'); return; }
+        if (mine) { U.sfx('impact'); if (gate('imp', 10)) U.pause(U.nameOf(e.ship) + ' hit by ' + U.wkName(e.by, true) + ' on ' + (FACE[e.face] || 'the hull') + '.', 'impact'); }
         return;
-      case 'miss': var mt = String(e.text || ''); U.addLog((e.side === P ? 'Our ' : 'Their ') + mt.charAt(0).toLowerCase() + mt.slice(1), e.side === P ? '' : 'see'); return;
+      case 'miss': return;   // said in the shot log
       case 'crippled': case 'disabled': case 'destroyed': case 'captured':
         var nm = U.nameOf(e.ship), word = { crippled: 'crippled: the drive is out', disabled: 'disabled', destroyed: 'destroyed', captured: 'captured' }[e.type];
         U.addLog(nm + ' ' + word + '.', mine ? 'bad' : 'good');
@@ -419,11 +445,11 @@
       case 'wardlineDown': if (mine) U.addLog(U.nameOf(e.ship) + ': wardline down.', 'bad'); return;
       // enemy sand is logged once every fifteen minutes at most; the cloud itself shows on the plot
       case 'sand': if (mine || gate('esand', 900)) U.addLog((mine ? U.nameOf(e.ship) : 'Enemy') + ' cast sand.', mine ? '' : 'see'); return;
-      case 'missileKilled': agg('mk|' + e.side + '|' + e.by, 1); return;
-      case 'droneKilled': agg('dk|' + e.side + '|' + e.drone, 1); return;
+      case 'missileKilled': return;   // said in the shot log, with the rest of that missile group
+      case 'droneKilled': agg('dk|' + e.side + '|' + e.drone + '|' + e.by, 1); return;
       case 'strikerRelease': if (mine) U.addLog('Striker released on ' + e.target + ' at ' + U.fmtKm(e.range) + '.', 'good'); return;
       case 'docked': if (mine) agg('sk|' + e.drone, 1); return;
-      case 'end': flushAgg(true); U.addLog('Cease fire. ' + U.endWhy(e.reason), e.winner === P ? 'good' : e.winner === st.O ? 'bad' : ''); return;
+      case 'end': flushAgg(true); shotFlush(true); U.addLog('Cease fire. ' + U.endWhy(e.reason), e.winner === P ? 'good' : e.winner === st.O ? 'bad' : ''); return;
     }
   }
   var RATING = { helm: 'A rating has the helm.', guns: 'A rating has the guns.', sensors: 'A rating has the sensors.', engineering: 'A rating runs engineering.', flight: 'A rating runs the flight deck.' };
@@ -451,7 +477,7 @@
     for (var key in F) {
       var f = F[key]; if (!f.n || w.t - f.t0 < 5 || w.t - f.last < FIRE_GAP) continue;
       var q = f.p, eta = U.etaTo(q.x, q.y, q.vx, q.vy, U.trackByOid(f.tgt));
-      U.addLog(U.nameOf(f.ship) + ' fires ' + (f.n > 1 ? f.n + ' ' + RNAME[f.what][1] : 'a ' + RNAME[f.what][0]) + ' at ' + tgtName(f.tgt) + (eta != null ? ', impact ' + U.fmtEta(eta) : '') + (f.est != null ? ', ' + U.pct(f.est) + ' to hit' : '') + '.', 'own');
+      U.addLog(U.nameOf(f.ship) + ' fires ' + (f.n > 1 ? f.n + ' ' + RNAME[f.what][1] : 'a ' + RNAME[f.what][0]) + ' at ' + tgtName(f.tgt) + (eta != null ? ', impact ' + U.fmtEta(eta) : '') + (f.est != null ? ', ' + U.pct(f.est) + ' to hit' : '') + '.', 'own', true);
       f.n = 0; f.last = w.t;
     }
     U.ownShips().forEach(function (s) {
@@ -462,11 +488,100 @@
     });
   }
 
+  // ---------------------------------------------------------------- every shot's outcome, said in the log
+  // The engine files one record per finished salvo or canister, per laser pulse on a ship, and per missile that
+  // ends (w.shotLog). They are grouped by side, shooter, weapon and target, and a group becomes one line when its
+  // window closes: 10 s of game time, stretched at high speed so a line lasts about 1.5 s on screen (at most
+  // 10 min). A laser line covers one burst: it closes after a 3 s gap in the pulses.
+  function shotWin() { var sp = st.speed === 'auto' ? st.autoL : +st.speed || 1; return Math.min(600, Math.max(10, 1.5 * sp)); }
+  function fmtPts(p) { return p >= 0.05 ? p.toFixed(1) + ' pts' : p > 0 ? 'under 0.1 pts' : '0 pts'; }
+  function objName(id) {
+    var o = st.w.idx[id]; if (!o) return id ? String(id) : 'the target';
+    if (o.kind === 'drone') return (o.side === st.P ? 'our ' : 'a ') + U.droneName(o.type, 1);
+    if (o.kind === 'missile') return 'a missile';
+    return o.side === st.P ? (o.name || id) : U.trackByOid(id) ? U.nameOf(id) : 'an unseen ship';
+  }
+  // who fired, for the front of the line: nothing for our only ship, a name otherwise
+  function shooterPre(side, src) {
+    var o = st.w.idx[src];
+    if (side === st.P) return o && o.kind === 'ship' && U.ownShips().length > 1 ? (o.name || src) + ' ' : '';
+    if (o && o.kind === 'drone') return 'Their ';
+    return U.trackByOid(src) ? U.nameOf(src) + ' ' : 'Enemy ';
+  }
+  // the ship and weapon that shot a missile down ('Insistence's flak'), or the drones that did
+  function killer(who, by, n) {
+    var o = who && st.w.idx[who];
+    if (o && o.kind === 'drone') return (o.side === st.P ? 'our ' : 'their ') + U.droneName(o.type, n);
+    return (o ? objName(who) + "'s " : '') + U.wkName(by, true);
+  }
+  function lead(side, src, wpn) { var p = shooterPre(side, src); return p ? p + wpn.charAt(0).toLowerCase() + wpn.slice(1) : wpn; }
+  function shotLine(text, side) { U.addLog(text, side === st.P ? 'own' : 'bad', true); }
+  var MISS_AT = function (up, lat) { return Math.abs(up) >= Math.abs(lat) ? (up > 0 ? 'above' : 'below') : (lat > 0 ? 'to port' : 'to starboard'); };
+  function shotRec(r) {
+    var G = st.shots || (st.shots = {}), key = r.k + '|' + r.side + '|' + r.src + '|' + r.wk + '|' + (r.k === 'mis' ? '' : r.tgt), g = G[key];
+    if (!g) g = G[key] = { k: r.k, side: r.side, src: r.src, wk: r.wk, tgt: r.tgt, t0: r.t, last: r.t, n: 0, r: 0, hits: 0, rHit: 0, pts: 0, up: 0, lat: 0, mN: 0, mD: 0, on: 0, shed: 0, smear: 0, mod: 0, out: { hit: 0, miss: 0, down: 0 }, by: {}, tg: {} };
+    g.last = r.t; g.pts += r.pts || 0;
+    if (r.k === 'rail') { g.n += r.n; g.r += r.r; g.hits += r.hits; if (r.hits) g.rHit += r.r; else if (r.mN) { g.up += r.up * r.mN; g.lat += r.lat * r.mN; g.mN += r.mN; g.mD += r.mD; } }
+    else if (r.k === 'lz') { g.n++; if (r.hit) { g.on++; if (r.shed) g.shed++; if (r.smear) g.smear++; } if (r.mod) g.mod++; }
+    else { g.n++; g.out[r.out]++; if (r.out === 'down') { var bk = (r.who || '') + '|' + r.by; g.by[bk] = (g.by[bk] || 0) + 1; } if (r.tgt) g.tg[r.tgt] = 1; }
+  }
+  function shotSay(g) {
+    var wpn, body;
+    if (g.k === 'rail') {
+      var can = g.wk === 'canister';
+      wpn = (g.wk === 'spinal' ? 'Spinal railgun' : 'Railgun') + ' on ' + objName(g.tgt);
+      var ship = st.w.idx[g.tgt] && st.w.idx[g.tgt].kind === 'ship';
+      var what = can ? g.r + (g.r > 1 ? ' canisters' : ' canister') : g.n + (g.n > 1 ? ' slugs' : ' slug');
+      if (g.hits) {
+        var hitN = can ? g.rHit : g.hits;
+        var of = can ? g.r : g.n;
+        body = what + ', ' + (of === 1 ? 'hit' : hitN === of ? 'all hit' : hitN + ' hit') + (can ? ' (' + g.hits + ' of ' + g.n + ' fragments)' : '') + (ship ? ', ' + fmtPts(g.pts) : '');
+      } else {
+        // how far off: the average miss of each round (or fragment) as it went by, and the side the pattern's
+        // centre went; a pattern centred on the target that still missed went by on all sides
+        var avg = g.mN ? g.mD / g.mN : null, cen = g.mN ? Math.sqrt(g.up * g.up + g.lat * g.lat) / g.mN : 0;
+        var how = avg == null ? '' : g.mN > 1 && cen < avg / 2 ? ' (' + (can ? 'fragments' : 'rounds') + ' passed on all sides, ' + U.fmtKm(avg) + ' off on average)'
+          : ' (passed ' + U.fmtKm(avg) + ' ' + MISS_AT(g.up, g.lat) + (g.mN > 1 ? ' on average' : '') + ')';
+        body = what + ', ' + (can ? 'no fragment hit' : g.n > 1 ? 'none hit' : 'missed') + how;
+      }
+    } else if (g.k === 'lz') {
+      wpn = U.wkName(g.wk) + ' on ' + objName(g.tgt);
+      var burst = g.n + ' s burst';
+      var onT = g.on < g.n ? ', ' + g.on + ' s on target' : '';
+      // shed: too far for the beam to beat the armour's threshold; smeared: the target's dodge dragged the spot
+      if (!g.on) body = burst + ', all off target';
+      else if (g.shed === g.on) body = burst + onT + ', all shed by armour (too far)';
+      else body = burst + onT + ', ' + fmtPts(g.pts) + (g.mod ? ', ' + g.mod + ' hit' + (g.mod > 1 ? 's' : '') + ' on outboard gear' : '') + (g.smear * 2 > g.on ? ', spot smeared by the dodge' : '');
+    } else {
+      var tk = Object.keys(g.tg), nm = U.wkName(g.wk);
+      wpn = nm + (/s$/.test(nm) ? '' : 's') + (tk.length === 1 ? ' at ' + objName(tk[0]) : '');
+      var parts = [], O = g.out;
+      if (O.hit) parts.push(O.hit + ' hit' + (g.pts > 0 ? ' for ' + fmtPts(g.pts) : ''));
+      if (O.down) {
+        var bys = Object.keys(g.by), one = bys.length === 1 ? bys[0].split('|') : null;
+        if (one) parts.push(O.down + ' shot down by ' + killer(one[0], one[1], O.down));
+        else parts.push(O.down + ' shot down (' + bys.map(function (b) { var q = b.split('|'); return g.by[b] + ' by ' + killer(q[0], q[1], g.by[b]); }).join(', ') + ')');
+      }
+      if (O.miss) parts.push(O.miss + ' missed');
+      body = parts.join(', ');
+    }
+    shotLine(lead(g.side, g.src, wpn) + ': ' + body + '.', g.side);
+  }
+  function shotFlush(force) {
+    var G = st.shots; if (!G) return;
+    var t = st.w.t, W = shotWin();
+    for (var k in G) {
+      var g = G[k], done = force || (g.k === 'lz' ? t - g.last > 3 || t - g.t0 >= Math.max(30, W) : t - g.t0 >= W);
+      if (done) { delete G[k]; shotSay(g); }
+    }
+  }
+
   // ---------------------------------------------------------------- per tick: events, ghosts, beams
   function afterTick() {
-    var w = st.w, evs = E.events(w);
-    for (var i = 0; i < evs.length; i++) onEvent(evs[i]);
-    flushAgg(false);
+    var w = st.w, evs = E.events(w), i;
+    if (w.shotLog) { for (i = 0; i < w.shotLog.length; i++) shotRec(w.shotLog[i]); w.shotLog.length = 0; }
+    for (i = 0; i < evs.length; i++) onEvent(evs[i]);
+    flushAgg(false); shotFlush(false);
     if (w.t % 20 === 0) {
       var tl = w.sides[st.P].tl, seen = {};
       tl.forEach(function (c) { seen[c.id] = 1; var g = st.ghosts[c.id] || (st.ghosts[c.id] = []); var l = g[g.length - 1]; if (!l || l.x !== c.x || l.y !== c.y) { g.push({ x: c.x, y: c.y, t: c.tObs }); if (g.length > 14) g.shift(); } });
