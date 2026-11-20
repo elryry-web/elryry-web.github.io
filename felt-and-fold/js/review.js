@@ -155,6 +155,7 @@
   }
   // Estimate, Chart and Nash grades stop at Mistake unless simple math settles the case (see settled());
   // an Estimate missed bluff stops at Inaccuracy. Solved and Library grades keep the full range.
+  var LIMP_SIZE_COST = 0.35;
   var SETTLE_GAP = 0.12, SETTLE_JAM_GAP = 0.06, SETTLE_PRE_OFF = 0.05, SETTLE_PRE_TOP = 0.85;
   function thresholds(d) {
     var p = Math.max(d.potBB, d.toCall || 0), pre = d.street === 'preflop';
@@ -189,6 +190,16 @@
     if (!isAgg(d.did.action) && isAgg(bestAct) && d.feat && d.feat.eq < 0.35) { loss = Math.min(loss, Math.max(0.3 * d.potBB, 1.2)); d.missedBluff = true; }
     var ref = isAgg(d.did.action) ? sizeRef(d.mix, d.did) : null;
     var sizeOff = !!(ref && d.did.to && (d.did.to / ref.to > 1.7 || d.did.to / ref.to < 0.55));
+    // a raise over limpers, compared with the target size at sizeOff's gap. When raising is right, a size that far off
+    // costs at least LIMP_SIZE_COST or 10% of the pot: the chip model prices a small raise as if the limpers folded to it.
+    d.limpSize = null;
+    if (d.limpTo > 0 && d.did.action === 'raise' && d.did.toBB > 0) {
+      var lr = d.did.toBB / d.limpTo;
+      if (lr < 0.55 || lr > 1.7) {
+        d.limpSize = { to: d.limpTo, small: lr < 1 };
+        if (hm.freq >= GOOD_FREQ) { sizeOff = true; loss = Math.max(loss, LIMP_SIZE_COST, 0.1 * (d.potBB || 0)); }
+      }
+    }
     d.sizeRef = sizeOff ? ref : null;
     var good = hm.freq >= GOOD_FREQ && !sizeOff;
     d.heroFreq = rd(hm.freq, 3); d.bestAction = bestAct; d.bestEV = rd(best, 2); d.heroEVUsed = heroEV == null ? null : rd(heroEV, 2);
@@ -255,6 +266,14 @@
       var w = new Float64Array(169); for (var q = 0; q < 169; q++) w[q] = first ? sp.raise[q] : sp.raise[q] + sp.call[q];
       d.chartShare = rd(C.classPercent(w), 3); d.chartFirst = first;
       if (res.cls != null) d.chartIn = rd(w[res.cls], 3);
+      if (sp.kind === 'bbVsLimp' || sp.kind === 'isolate') {
+        var lim = [], rz = false, hp = h.pos[seat];
+        h.log.slice(0, e.n).forEach(function (x) { if (x.ev !== 'act' || x.street !== 'preflop') return; if (x.type === 'raise' || x.type === 'bet') rz = true; else if (x.type === 'call' && !rz && x.seat !== seat) lim.push(h.pos[x.seat]); });
+        d.limpers = lim.length;
+        // in position: the hero acts after the limpers on later streets (the BB against a lone SB complete, at a full table)
+        d.limpIP = (hp !== 'SB' && hp !== 'BB') || (hp === 'BB' && lim.length === 1 && lim[0] === 'SB' && h.order.length > 2);
+        d.limpTo = sp.jam || !sp.raiseToBB ? 0 : sp.raiseToBB; // the raise size over the limpers, in bb (none when the raise would be all in)
+      }
     }
     d.boardStr = C.cardsStr(d.board);
     d.heroIn = rd((e.betBefore - e.toCall) / bb, 2); // the hero's chips already in on this street, in bb
@@ -390,7 +409,10 @@
     station: { term: 'calling station', phrases: ['calling station'], def: 'A player who calls far too often and rarely raises or bluffs. Bet your good hands bigger against one, and do not bluff.' },
     maniac: { term: 'maniac', phrases: ['maniac'], def: 'A player who bets, raises and bluffs far too often. Call down lighter and let the maniac bet into you.' },
     nit: { term: 'nit', phrases: ['nit'], def: 'A player who plays very few hands and rarely bluffs. When a nit bets big, believe it and fold the hands that only beat a bluff.' },
-    nash: { term: 'Nash push/fold', phrases: ['Nash push/fold'], def: 'At 15bb or less, play is close to shove or fold. The Nash ranges are the shoves and calls that no opponent can exploit.' }
+    nash: { term: 'Nash push/fold', phrases: ['Nash push/fold'], def: 'At 15bb or less, play is close to shove or fold. The Nash ranges are the shoves and calls that no opponent can exploit.' },
+    limp: { term: 'limper', phrases: ['limper'], def: 'A player who only calls the big blind before the flop instead of raising. Limpers often hold weak or speculative hands.' },
+    position: { term: 'position', phrases: ['out of position', 'in position'], def: 'In position means you act after your opponent on every street after the flop. Out of position means you act first, with less to go on.' },
+    dominated: { term: 'dominated', phrases: ['dominated'], def: 'Your hand is dominated when an opponent holds one of your cards with a better second card, such as AJ against J8. When you both hit, you win small pots and lose big ones.' }
   };
   function handDesc(name) {
     var r = 'AKQJT98765432', a = r.indexOf(name[0]), b = r.indexOf(name[1]), s = name[2] === 's';
@@ -400,6 +422,42 @@
     if (s && b - a <= 2) return b - a === 1 ? 'a suited connector' : 'a suited one-gapper';
     return s ? 'a suited hand' : 'an offsuit hand';
   }
+  // ---- against limpers: why the chart plays the hand its way, from the position, the number of limpers and the kind of hand
+  var RANK_WORD = { A: 'an ace', K: 'a king', Q: 'a queen', J: 'a jack', T: 'a ten', 9: 'a nine', 8: 'an eight', 7: 'a seven', 6: 'a six', 5: 'a five', 4: 'a four', 3: 'a three', 2: 'a two' };
+  function handCat(name) {
+    var a = 'AKQJT98765432'.indexOf(name[0]);
+    if (name.length === 2) return a <= 4 ? 'premium' : a <= 7 ? 'midPair' : 'smallPair';
+    if (/^A[KQ]/.test(name) || name === 'AJs' || name === 'KQs') return 'premium';
+    return name[2] === 's' ? 'suited' : 'offsuit';
+  }
+  function limpWhy(h, seat, d) {
+    var n = d.limpers || 1, ip = !!d.limpIP, act = d.mix[0] ? d.mix[0].action : 'check', hand = d.hand, cat = handCat(hand), pos = h.pos[seat];
+    var lw = n === 1 ? 'the limper' : n + ' limpers', pair = cat === 'smallPair' ? 'A small pair' : 'A middle pair';
+    var conn = /connector|gapper/.test(handDesc(hand)), out = [], K = [];
+    var dom = function () { K.push('dominated'); return hand + ' is often dominated: ' + (n === 1 ? 'the limper' : 'with ' + n + ' limpers, one') + ' may hold ' + RANK_WORD[hand[0]] + ' or ' + RANK_WORD[hand[1]] + ' with a better second card. When it hits, it wins small pots and loses big ones.'; };
+    var flush = 'a flush' + (conn ? ' or a straight' : '');
+    if (act === 'raise' || act === 'allin') {
+      if (cat === 'premium') out.push('A strong hand raises for value' + (ip ? '.' : ', even out of position.'), 'Limpers often hold weaker hands that will pay to see the flop.');
+      else out.push('Limpers often hold weak hands that fold to a raise.', ip ? 'When one calls, you play the flop in position.' : 'This hand is strong enough to raise even out of position.');
+    } else if (act === 'check') {
+      out.push('From the BB, checking gives you a free flop.');
+      if (cat === 'offsuit') out.push(dom());
+      else if (cat === 'suited') out.push('A suited hand can make ' + flush + ' and win a big pot.');
+      else if (cat !== 'premium') out.push(pair + ' can win a big pot when it makes three of a kind.');
+    } else if (act === 'call') {
+      if (cat === 'suited') out.push('A suited hand likes a cheap flop with several players.', 'It can make ' + flush + ' and win a big pot.');
+      else if (cat === 'smallPair' || cat === 'midPair') out.push(pair + ' likes a cheap flop with several players.', 'It can win a big pot when it makes three of a kind.');
+      else out.push('Calling keeps the pot cheap' + (ip ? ', and you act last after the flop.' : '.'));
+    } else if (act === 'fold') {
+      if (cat === 'offsuit') out.push(dom());
+      else if (!ip && pos === 'SB') out.push('From the SB you act first after the flop, and the BB can still raise.', 'Even a cheap call with ' + hand + ' does not pay here.');
+      else out.push(hand + ' is too weak to play against ' + lw + ' here.' + (n >= 2 ? ' A hand does worse the more players see the flop.' : ''));
+    }
+    var text = out.join(' ');
+    if (/out of position|in position/.test(text)) K.push('position');
+    if (/limper/.test(text)) K.push('limp');
+    return { text: text, concepts: K };
+  }
   function actWords(m) { return m.action === 'allin' ? 'moves all in' : verb3(m.action); }
   function reasonPre(h, seat, d) {
     var out = [], K = [], f = d.factors, po = F(f, 'potOdds'), icm = F(f, 'icm'), hand = d.hand, pos = h.pos[seat], good = d.grade === 'Good';
@@ -407,6 +465,7 @@
     function k(x) { if (K.indexOf(x) < 0) K.push(x); }
     if (good && d.heroFreq < 0.7 && d.mix[1] && d.mix[1].freq >= GOOD_FREQ) {
       out.push('This is a mixed spot. The chart plays ' + hand + ' both ways here, and the options are close.'); k('mixed');
+      if (d.limpers && hand) { var lm = limpWhy(h, seat, d); if (lm.text) out.push(lm.text); lm.concepts.forEach(k); }
       return { text: out.join(' '), concepts: K };
     }
     if (!kind || kind === 'walk') return { text: '', concepts: K };
@@ -419,7 +478,10 @@
     if (kind === 'push' || kind === 'reshove') {
       out.push('At about ' + d.depth + 'bb, the Nash push/fold range ' + (kind === 'push' ? 'from ' + pos + ' shoves' : 'against this raise re-shoves') + ' about ' + pc(share) + ' of hands. ' + desc); k('nash');
     } else if (kind === 'rfi') out.push('The chart opens about ' + pc(share) + ' of hands from ' + pos + '. ' + desc);
-    else if (kind === 'bbVsLimp' || kind === 'isolate') out.push('The chart raises about ' + pc(share) + ' of hands here. ' + desc);
+    else if (kind === 'bbVsLimp' || kind === 'isolate') {
+      out.push('The chart raises about ' + pc(share) + ' of hands here. ' + desc);
+      if (d.limpers && hand) { var lw = limpWhy(h, seat, d); if (lw.text) out.push(lw.text); lw.concepts.forEach(k); }
+    }
     else {
       out.push('The chart continues with about ' + pc(share) + ' of hands here. ' + desc);
       if (po && !good && (did === 'call' || d.bestAction === 'call')) { out.push('The pot odds ask for ' + pc(po.need) + ' equity. ' + hand + ' has about ' + pc(po.have) + ' against the raiser\'s range.'); k('potOdds'); }
@@ -665,10 +727,13 @@
     var mixed = d.mix.length > 1 && d.mix[1].freq >= GOOD_FREQ;
     var why = reasonFor(h, seat, d), K = d.concepts, has = function (x) { return K.indexOf(x) >= 0; }, who = d.source === 'Nash' ? 'The Nash range' : 'The chart';
     d.reason = why;
-    if (d.grade === 'Good') out.push('Good. ' + (has('mixed') ? why + ' The mix is ' + mt + '.'
+    var ls = d.limpSize, lsRight = !!(ls && d.grade !== 'Good' && d.sizeOff);
+    if (lsRight) out.push(d.grade + '. Raising was right. The size was too ' + (ls.small ? 'small' : 'big') + '. ' + limpSizeText(d, false) + (why ? ' ' + why : '') + approx);
+    else if (d.grade === 'Good') out.push('Good. ' + (has('mixed') ? why + ' The mix is ' + mt + '.'
       : why ? why + ' ' + who + ' ' + (mixed ? 'mixes it: ' + mt + '.' : chartVerb(d.mix[0]) + ' it here.')
       : mixed ? 'The chart mixes ' + hand + ' here: ' + mt + '.' : 'The chart ' + chartVerb(d.mix[0]) + ' ' + hand + ' here.') + approx);
     else out.push(d.grade + '. ' + (why ? why + ' ' : '') + 'You ' + verbPast(did) + ' ' + hand + '. ' + who + ' ' + (mixed ? 'mixes it: ' + mt : chartVerb(d.mix[0]) + ' it' + (d.mix[0].freq < 0.97 ? ' ' + pc(d.mix[0].freq) + ' of the time' : '')) + '.' + approx);
+    if (ls && !lsRight) out.push(limpSizeText(d, true));
     if (d.jamOversize) out.push('Moving all in risks ' + bbs(d.stack) + ' where the chart raises to ' + bbs(d.jamOversize.toBB) + '. Better hands call the jam and worse ones fold.');
     if (po && !isAgg(did) && (ch.chart === 'vsJam' || po.toCall >= 0.25 * d.stack || d.grade !== 'Good')) {
       out.push('The call was ' + bbs(po.toCall) + ' into ' + bbs(d.potBB + po.toCall) + '.' + (has('potOdds') ? '' : ' A call needed ' + pc(po.need) + ' equity.'));
@@ -678,7 +743,20 @@
     if (icm && icm.premium > 0.01 && !has('icm')) out.push('The payouts add an ICM premium of ' + pc(icm.premium) + '. ' + (isAgg(did) ? 'Losing the all in costs more than the chip count shows.' : 'A call needs that much more equity than the chips alone suggest.'));
     if (d.evLost > 0) out.push('The estimated cost is ' + bbs(d.evLost) + '.');
     if (trustNote(d)) out.push(trustNote(d));
-    return out.join(' ').replace(/about (over|under) /g, '$1 ');
+    var txt = out.join(' ').replace(/about (over|under) /g, '$1 ');
+    if (ls) { if (/out of position|in position/.test(txt) && !has('position')) K.push('position'); if (/limper/.test(txt) && !has('limp')) K.push('limp'); }
+    return txt;
+  }
+  // a raise over limpers far from the target size: the size it should be and why (also: the action was wrong too)
+  function limpSizeText(d, also) {
+    var ls = d.limpSize, n = d.limpers || 1, ip = d.limpIP, out = [];
+    out.push(also ? 'Your raise to ' + bbs(d.did.toBB) + ' was also too ' + (ls.small ? 'small' : 'big') + '.' : 'You raised to ' + bbs(d.did.toBB) + '.');
+    var solo = d.chartKind === 'bbVsLimp' && n === 1 && ip;
+    out.push('Over ' + (n === 1 ? 'one limper' : n + ' limpers') + (ip ? '' : ' out of position') + ', a raise should go to about ' + bbs(ls.to)
+      + (solo ? '.' : ': 4bb, plus 1bb per limper' + (ip ? '.' : ', plus 1bb for being out of position.')));
+    if (ls.small) out.push('A small raise offers the limpers a cheap call.', ip ? 'It plays like a limp that costs more, with a bigger pot against several players.' : 'It plays like a check that costs more, and it builds a bigger pot that you play out of position.');
+    else out.push('A raise this big risks a lot to win a small pot.', handCat(d.hand || 'xx') === 'premium' ? 'Worse hands fold, and your strong hand wins only what is in the middle.' : 'The hands that call it are mostly ones that beat you.');
+    return out.join(' ');
   }
   function rankLine(pct) {
     if (pct <= 0.5) return 'Your hand is in the top ' + pc(Math.max(0.01, pct)) + ' of your range.';

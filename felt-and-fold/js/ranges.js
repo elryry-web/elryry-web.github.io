@@ -230,6 +230,13 @@
   }
   function sig(x) { return 1 / (1 + Math.exp(-x)); }
 
+  // a raise over limpers: about 4bb plus 1bb per limper in position, 1bb more from the blinds (out of position).
+  // The BB against a lone SB complete plays heads-up in position and raises to 4bb. A raise of 40% of the stack or more
+  // becomes all in (SIZES.jamAt, in spot()).
+  function isoTo(hero, limps) {
+    if (hero === 'BB' && limps.length === 1 && limps[0].pos === 'SB') return 4;
+    return 4 + limps.length + (hero === 'SB' || hero === 'BB' ? 1 : 0);
+  }
   // desc: { hero, actions (voluntary preflop actions before hero, in order; folds may be left out), stackBB (effective), ante, nPlayers,
   //         potBB, toCallBB, heroLeftBB (hero's chips behind), heroInBB } -- the last four are optional and used for all-in pricing
   function spot(desc) {
@@ -273,11 +280,11 @@
         s = rfiAt(hero, depth); kind = 'rfi'; label = hero + ' first in'; rt = open(hero);
       } else if (hero === 'BB') {
         s = chart(BB_VS_LIMP); s = clone(s); for (var i = 0; i < 169; i++) { s.call[i] = 1 - s.raise[i]; s.fold[i] = 0; } // call = check
-        kind = 'bbVsLimp'; label = 'BB vs ' + (limps.length === 1 && limps[0].pos === 'SB' ? 'SB complete' : limps.length + ' limper' + (limps.length > 1 ? 's' : '')); rt = 3 + limps.length; approx = !(limps.length === 1 && limps[0].pos === 'SB');
+        kind = 'bbVsLimp'; label = 'BB vs ' + (limps.length === 1 && limps[0].pos === 'SB' ? 'SB complete' : limps.length + ' limper' + (limps.length > 1 ? 's' : '')); rt = isoTo(hero, limps); approx = !(limps.length === 1 && limps[0].pos === 'SB');
       } else { // isolate the limpers or over-limp: the hero's open range, raise the top part
         s = clone(rfiAt(hero, depth)); var vr = vsRandom();
         for (i = 0; i < 169; i++) { var r0 = s.raise[i]; s.raise[i] = vr[i] > 0.6 ? r0 : r0 * 0.3; s.call[i] = speculative(i) ? r0 * 0.5 : 0; }
-        refold(s); kind = 'isolate'; label = hero + ' vs ' + limps.length + ' limper' + (limps.length > 1 ? 's' : ''); rt = open(hero) + 1 + limps.length; approx = true;
+        refold(s); kind = 'isolate'; label = hero + ' vs ' + limps.length + ' limper' + (limps.length > 1 ? 's' : ''); rt = isoTo(hero, limps); approx = true;
       }
     } else if (raises.length === 1) {
       var key = hero + '>' + firstR.pos;
