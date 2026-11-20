@@ -169,6 +169,11 @@ table.results tr.me td { color: var(--gold2); font-weight: 700; }
 .actionbar { padding: 8px 12px calc(10px + env(safe-area-inset-bottom)); background: var(--panel); border-top: 1px solid var(--line); min-height: 64px; }
 .bar-wait { color: var(--muted); text-align: center; font-size: 14px; padding: 12px 0; }
 .actionbar.live { background: #172d22; }
+/* desktop: the bar always keeps room for its tallest state (sizer + buttons), so the felt above it does not resize between turns */
+@media (min-width: 641px) {
+  .actionbar { flex: none; min-height: 156px; display: flex; flex-direction: column; justify-content: center; }
+  .actionbar > * { width: 100%; }
+}
 .sizer { max-width: 640px; margin: 0 auto 8px; }
 .presets { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
 .preset { flex: 1 1 0; min-width: 48px; }
