@@ -29,6 +29,8 @@
   // ---------------------------------------------------------------- once a tick, after the UI has read the tick's events
   C.tick = function () {
     var st = U.st(); if (!st || !cs) return; var w = st.w;
+    // once the battle is over nothing more is asked or said: an open card closes without a log line
+    if (st.over || w.over) { C.end(); cs.pend = null; cs.restore = []; return; }
     restores(st, w);
     if (cs.cur) {
       if (!cs.cur.still() || (!st.paused && w.t - cs.cur.t0 > OPEN)) close(null, true);
@@ -62,7 +64,7 @@
     var tr = U.track(I.tgt), nm = tr ? (tr.name || tr.id) : I.tgt, left = I.dv - I.vr;
     var tc = I.Vc > 0.5 ? Math.max(0, I.d - I.R) / I.Vc : 0;
     var taken = I.deal != null && I.edge != null ? I.deal - I.edge : null, ratio = taken > 1e-9 ? I.deal / taken : null;
-    var why = I.why === 'edge' ? 'At ' + U.fmtKm(I.R) + ' we out-hit them ' + ratio.toFixed(1) + ' to 1.'
+    var why = I.why === 'edge' ? 'At ' + U.fmtKm(I.R) + (ratio != null ? ' we out-hit them ' + ratio.toFixed(1) + ' to 1.' : ' they can hardly hurt us.')
       : I.why === 'passes' ? 'It has passed ' + I.n + ' times already.'
       : I.why === 'fuel' ? 'The stop would leave under ' + kms(N.reserveDv + N.passMargin) + '.'
       : ratio != null && Math.abs(ratio - 1) < 0.15 ? 'At ' + U.fmtKm(I.R) + ' the trade is about even.'
@@ -230,7 +232,13 @@
     if (!passed && st.paused && !st.over && st.pauseKey === 'call') U.resume();
     if (U.panels && U.panels.refresh) U.panels.refresh(true);
   }
-  C.answer = function (k) { if (cs && cs.cur) close(k, false); };
+  C.answer = function (k) { var st = U.st(); if (st && (st.over || st.w.over)) { C.end(); return; } if (cs && cs.cur) close(k, false); };
+  // a range call for this ship is open, or is waiting to show: the helm's pass line waits for the answer
+  C.holds = function (s) {
+    var st = U.st(); if (!st || !cs || st.over || st.w.over) return false;
+    if (cs.cur) return cs.cur.kind === 'range' && cs.cur.s === s;
+    return !!(cs.pend && cs.pend.s === s && C.on() && rangeCall(st, st.w, cs.pend));
+  };
   C.current = function () { return cs && cs.cur; };
 
   function show(c) {

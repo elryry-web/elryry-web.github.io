@@ -488,11 +488,17 @@
     var row = function (a, b) { return '<div class="cr"><span>' + a + '</span><span>' + b + '</span></div>'; };
     c.innerHTML = '<div class="ct"><span>' + esc(tr.id) + ' · ' + esc(tr.kind === 'ship' ? (tr.name ? tr.name + ', ' : '') + (tr.cls || 'ship') : tr.kind) + '</span><button data-c="x" aria-label="Close">×</button></div>' +
       row(U.isLost(tr, age) ? 'last seen' : 'seen', U.fmtAge(age) + ' ago') + row('distance', U.fmtKm(d)) + row(cl >= 0 ? 'closing' : 'opening', Math.abs(cl).toFixed(2) + ' km/s') + row('could be off by', U.fmtKm(U.ringOf(tr, age))) +
-      (tr.firm ? '' : row('track', U.isLost(tr, age) ? 'lost' : 'tentative')) + (tr.disabled ? row('state', 'disabled') : tr.crippled ? row('state', 'crippled') : '') + (tr.burning ? row('drive', 'burning') : '') + cardCrew(st, tr) +
+      (tr.firm ? '' : row('track', U.isLost(tr, age) ? 'lost' : 'tentative')) + (tr.disabled ? row('state', 'disabled') : tr.crippled ? row('state', 'crippled') : '') + (tr.burning ? row('drive', 'burning') : '') + cardRounds(tr, row) + cardCrew(st, tr) +
       (tr.kind !== 'missile' ? '<div class="row">' + (isT ? '<span class="note">Targeted by ' + esc(st.sel === 'all' ? 'all ships' : s.name) + '</span>' : '<button data-c="tgt">Target</button>') + '</div>' : '');
     c.classList.add('on');
   }
 
+  // the captain's habit once it is plain, and the rounds our side has seen this ship fire
+  function cardRounds(tr, row) {
+    if (tr.kind !== 'ship' || !U.roundsLine) return '';
+    var hb = U.habitOf(tr.oid), rl = U.roundsLine(tr.oid, null);
+    return (hb ? row('captain', esc(hb)) : '') + (rl ? '<div class="cc-u">' + esc(rl) + '.</div>' : '');
+  }
   // an identified ship's officers: who holds each post and what they are good at
   function cardCrew(st, tr) {
     if (tr.kind !== 'ship') return '';

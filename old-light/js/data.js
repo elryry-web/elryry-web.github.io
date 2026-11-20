@@ -34,7 +34,7 @@
     couchG: 0.5,                                // couches or gel: + this to every officer's comfort and limit (the best one fitted counts)
     originVary: 0.5, identifyRange: 30000,      // officers vary this much (G) from their origin; an enemy ship is identified on a firm track inside this
     regainT: 6,                                 // s of fresh sight a lost track needs before it is firm again (at full sensors effectiveness)
-    guardKill: 30000, guardNear: 100000, guardMiss: 300, guardRisk: 0.3, combatR: 30000, bandGain: 0.015, bandLow: 0.002, bandCut: 0.7, bandHurt: 5, bandWell: 70, pushR: 45000, boldP: 0.2,  // combatR: km, an enemy ship this near makes it the combat phase (band stats); bandGain: least hit-weight a higher dodge band must save; bandLow/bandCut: a strain-only band is taken when it cuts at least 30% off a risk of bandLow or more; AI: when pushing an officer into injury is worth it (gGuard)
+    trigThr: 1e-9, trigHold: 300, trigNear: 30000, guardKill: 30000, guardNear: 100000, guardMiss: 300, guardRisk: 0.3, combatR: 30000, bandGain: 0.015, bandLow: 0.002, bandCut: 0.7, bandHurt: 5, bandWell: 70, pushR: 45000, boldP: 0.2,  // combatR: km, an enemy ship this near makes it the combat phase (band stats); bandGain: least hit-weight a higher dodge band must save; bandLow/bandCut: a strain-only band is taken when it cuts at least 30% off a risk of bandLow or more; AI: when pushing an officer into injury is worth it (gGuard)
     fateKilled: 0.4, fateDown: 0.4,  // a destroyed ship's non-story officers: killed / down (health 5-25) / fine via the pods; the story cast always come out down
     deathChance: 1 / 3, deathChanceMed: 1 / 6,  // campaign: a downed non-story officer dies with this chance (with a working medical bay)
     // sensors
@@ -187,6 +187,9 @@
     smuggler: { hull: 'frigate', name: 'Smuggler', mods: { turret: ['railgun'], pd: ['flak'], internal: ['couches', 'automation'] },
       armour: { type: 'composite', nose: 5, flank: 3, tail: 2 }, tanks: 4, radiators: 1, sensors: 1, helm: 1, gunnery: 1, cargo: 6000 },
     // a gun destroyer: a medium spinal, two railguns and a laser behind thick composite armour (the Plumb Line)
+    // the Arrears: a gun destroyer with no laser and deep rail magazines, so she is out of the fight once her rounds are gone
+    railDD: { hull: 'destroyer', name: 'Rail destroyer', mods: { spinal: ['spinalM'], turret: ['railgun', 'railgun', 'railgun'], pd: ['pdLaser', 'flak', 'flak'], internal: ['couches', 'medbay', 'automation', 'sandcaster'] },
+      armour: { type: 'composite', nose: 22, flank: 14, tail: 8 }, tanks: 8, radiators: 2, sensors: 2, helm: 2, gunnery: 3, ammo: { railgun: 640 } },
     gunDD: { hull: 'destroyer', name: 'Gun destroyer', mods: { spinal: ['spinalM'], turret: ['railgun', 'railgun', 'laser'], pd: ['pdLaser', 'flak', 'flak'], internal: ['couches', 'medbay', 'automation', 'sandcaster'] },
       armour: { type: 'composite', nose: 22, flank: 14, tail: 8 }, tanks: 8, radiators: 2, sensors: 2, helm: 2, gunnery: 3 },
     laserDD: { hull: 'destroyer', name: 'Laser destroyer', mods: { turret: ['laser', 'laser', 'laser'], pd: ['pdLaser', 'pdLaser', 'flak'], internal: ['sandcaster', 'couches', 'magscreen', 'medbay'] },
@@ -222,6 +225,16 @@
       ships: [
         { load: 'patience', side: 'A', name: 'Patience', x: 2000, y: 5000, vx: 0, vy: 0, h: 180, cast: true, orders: { man: { type: 'cold' } } },
         { load: 'gunDD', side: 'B', name: 'Plumb Line', x: -160000, y: 0, vx: 10, vy: 0, h: 0 }
+      ] },
+    // a stronger ship with a dumb captain: the Arrears's captain has the 'trigger' habit (ai.js trigOn). Beyond trigNear he
+    // fires at any solution and stops to shoot. Held far off and dodging, Patience watches him empty his magazines
+    odds: { name: 'Long Odds', text: 'A stronger Charter destroyer meets Patience in open space. Her captain is quick to shoot.', story: true, side: 'A',
+      brief: 'The Charter destroyer Arrears has come for Patience. She has bigger guns and thicker armour. The haulers say her captain, Corin Achterberg, has never passed up a shot.',
+      sides: { A: { doctrine: 'auto', faction: 'arbitration' }, B: { doctrine: 'auto', faction: 'charter', trait: 'trigger' } },
+      planets: [],
+      ships: [
+        { load: 'patience', side: 'A', name: 'Patience', x: -27500, y: 0, vx: 0, vy: 0, h: 0, cast: true },
+        { load: 'railDD', side: 'B', name: 'Arrears', x: 27500, y: 0, vx: 0, vy: 0, h: 180 }
       ] },
     duel: { name: 'Frigate duel', text: 'Two frigates of the same class meet across 200,000 km.',
       sides: { A: { doctrine: 'auto', faction: 'arbitration' }, B: { doctrine: 'auto', faction: 'arbitration' } },

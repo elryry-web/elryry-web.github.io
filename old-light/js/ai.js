@@ -114,6 +114,12 @@
       var dvx = g.vx + ux * vm - s.vx, dvy = g.vy + uy * vm - s.vy, dl = hyp(dvx, dvy);
       if (dl > N.deadband) { var a = Math.min(aL, dl / N.helmTau); ax = dvx / dl * a; ay = dvy / dl * a; }
     }
+    // the trigger-happy captain stops the ship to shoot: while his guns have fired at long range in the last trigHold s,
+    // an approach or a hold brakes to a stop instead of flying the course
+    if (trS && mem.trigT != null && w.t - mem.trigT < N.trigHold && trigOn(w, s, trS)) {
+      var sv = hyp(s.vx, s.vy); ax = ay = 0;
+      if (sv > N.deadband) { var ab = Math.min(aL, sv / N.helmTau); ax = -s.vx / sv * ab; ay = -s.vy / sv * ab; }
+    }
     var dvl = E.dvLeft(s);
     // a chase stops chaseDv above the reserve: a ship that cannot catch its prey keeps the fuel to dodge with
     if (dvl < N.reserveDv + (o.type === 'close' ? N.chaseDv : 0) && o.type !== 'break') ax = ay = 0;
@@ -438,10 +444,16 @@
   function coin(seed, key) { var h = (seed || 0) >>> 0; for (var i = 0; i < key.length; i++) h = Math.imul(h ^ key.charCodeAt(i), 16777619) >>> 0; h = Math.imul(h ^ (h >>> 15), 2246822507) >>> 0; h = Math.imul(h ^ (h >>> 13), 3266489909) >>> 0; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
   function M_spin(w, s, e) { var mem = AIM(w, s); if (mem) mem.spin = { t: w.t, p: e.steadyChance != null ? e.steadyChance : e.chance }; }
   function AIM(w, s) { var M = w.ai && w.ai.side[s.side]; return M && M.ship ? M.ship[s.id] : null; }
+  // a captain's habit, set per scenario side (sides.X.trait). 'trigger': beyond trigNear he fires every rail and spinal
+  // at any solution over trigThr and stops the ship to do it, so he empties his magazines where his rounds can be dodged.
+  // Inside trigNear he fights by the doctrine.
+  function traitOf(w, s) { var sd = w.scn && w.scn.sides && w.scn.sides[s.side]; return (sd && sd.trait) || null; }
+  function trigOn(w, s, tr) { return traitOf(w, s) === 'trigger' && !!tr && hyp(tr.ex - s.x, tr.ey - s.y) > N.trigNear; }
   function railShot(w, s, m, tgt, P) {
-    var vj = 0, thr = m.def.spinal ? P.spinal : P.rail, n = m.def.spinal ? 1 : Math.min(4, m.ammo);
+    var vj = 0, trig = trigOn(w, s, tgt), thr = trig ? N.trigThr : m.def.spinal ? P.spinal : P.rail, n = m.def.spinal ? 1 : Math.min(4, m.ammo);
     var es = E.hitEstimate(w, s, m.id, tgt.id, { n: n, vj: vj });
     if (!es || !es.ok) return;
+    var mem = AIM(w, s);
     if (m.def.spinal) M_spin(w, s, es);
     // solid or canister, per shot, by the damage each round is expected to do (a canister's fragments at their
     // share of the round's energy); canister only when at least canMinHits fragments are expected on the hull.
@@ -450,9 +462,9 @@
     var sc = es.blocked ? es.steadyChance : es.chance, ce = ec && ec.ok ? (ec.blocked ? ec.steadyChance : ec.chance) : 0;
     var hitsC = ec && ec.ok ? (ec.blocked ? -Math.log(Math.max(1e-9, 1 - ce)) : ec.expHits) : 0;
     var slugVal = (es.blocked ? sc : es.expHits / n) * es.slugPts, canVal = ec && ec.ok ? hitsC * ec.fragPts : 0;
-    var mem = AIM(w, s); if (mem && hitsC >= N.canMinHits) mem.canOk = w.t;
+    if (mem && hitsC >= N.canMinHits) mem.canOk = w.t;
     if (hitsC >= N.canMinHits && canVal > slugVal) { E.order(w, s.id, { fireNow: { weapon: m.id, target: tgt.id, n: 1, ammo: 'canister', vj: vj } }); return; }
-    if (sc >= thr) E.order(w, s.id, { fireNow: { weapon: m.id, target: tgt.id, n: n, vj: vj } });
+    if (sc >= thr) { E.order(w, s.id, { fireNow: { weapon: m.id, target: tgt.id, n: n, vj: vj } }); if (mem && trig) mem.trigT = w.t; }
   }
   function railTarget(w, s, m, v, tgt) {
     var list = enemyShips(v).filter(function (c) { return c.firm && !c.disabled; }), best = tgt, bv = -1;

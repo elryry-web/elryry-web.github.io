@@ -92,7 +92,7 @@
       slots[slot].forEach(function (key, i) {
         var d = MODS[key]; if (!d) throw new Error('unknown module ' + key);
         var m = { id: slot + i, key: key, def: d, kind: d.kind, slot: slot, name: d.name, state: 0, dc: 0, cd: 0, q: [], target: null, pending: null, burst: null, firing: 0, service: [] };
-        if (d.ammo) m.ammo = d.ammo;
+        if (d.ammo) m.ammo = m.mag = (L.ammo && L.ammo[key]) || d.ammo;   // a loadout may carry a deeper or shallower magazine (mag: as loaded)
         if (d.load) m.load = d.load;
         if (d.charges) m.charges = d.charges;
         dry += d.mass; s.mods.push(m);

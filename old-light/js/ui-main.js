@@ -277,8 +277,36 @@
   // E.threatPreview gives {id, kind, eta, hit:{off,cruise,combat,brace,crash}, n, src, wk} per salvo, round, missile or striker
   var STEPS = [1000, 500, 200, 100, 50, 20, 10, 5, 2, 1];
   U.riskOf = function (s, t) { var b = s.orders.evasion === 'off' ? 'off' : s.orders.gLimit; return t.hit ? (t.hit[b] != null ? t.hit[b] : t.hit.combat) : 0.5; };
+  // ---------------------------------------------------------------- enemy rounds our side has seen fired
+  // st.seenR.by[ship id] = {spinal, rail}: each enemy round (not fragment) counted once, the first time our side sees it.
+  // Against a captain with the trigger habit (scenario sides.X.trait), the log names the habit once it is plain
+  // and gives the count every 20 spinal rounds
+  function seeRounds(w, v) {
+    var sr = st.seenR || (st.seenR = { ids: {}, by: {}, said: {} }), sd = w.scn && w.scn.sides && w.scn.sides[st.O], trig = sd && sd.trait === 'trigger';
+    for (var i = 0; i < v.slugs.length; i++) {
+      var p = v.slugs[i]; if ((p.kind !== 'slug' && p.kind !== 'can') || sr.ids[p.id]) continue;
+      sr.ids[p.id] = 1; var b = sr.by[p.src] || (sr.by[p.src] = { spinal: 0, rail: 0 }); if (p.wk === 'spinal') b.spinal++; else b.rail++;
+      if (!trig) continue;
+      var tr = U.trackByOid(p.src), nm = tr ? (tr.name || tr.id) : 'The enemy';
+      if (!sr.said[p.src] && b.spinal >= 3 && tr) { sr.said[p.src] = 1; U.addLog(nm + "'s captain fires at long odds and stops the ship to shoot.", 'see'); }
+      if (p.wk === 'spinal' && b.spinal % 20 === 0) U.addLog(U.roundsLine(p.src, nm) + '.', 'see');
+    }
+  }
+  // what our side has seen one enemy ship fire, against what a ship of its class carries
+  U.roundsLine = function (oid, nm) {
+    var b = st.seenR && st.seenR.by[oid], S = st.w.idx[oid]; if (!b || !S) return null;
+    var mag = { spinal: 0, rail: 0 }, out = [];
+    S.mods.forEach(function (m) { if (m.kind === 'rail' && m.mag) mag[m.def.spinal ? 'spinal' : 'rail'] += m.mag; });
+    function about(n) { var e = Math.pow(10, Math.max(0, Math.floor(Math.log10(n)) - 2)); return (Math.round(n / e) * e).toLocaleString('en-US'); }
+    if (b.spinal) out.push((nm ? nm + "'s" : 'Its') + ' spinal has fired ' + b.spinal + (b.spinal === 1 ? ' time' : ' times') + '. A ship of its class carries about ' + about(mag.spinal));
+    if (b.rail && mag.rail) out.push((nm && !b.spinal ? nm + "'s" : 'Its') + ' rails have fired ' + b.rail.toLocaleString('en-US') + (b.rail === 1 ? ' round' : ' rounds') + '. A ship of its class carries about ' + about(mag.rail));
+    return out.length ? out.join('. ') : null;
+  };
+  U.habitOf = function (oid) { var sr = st.seenR; return sr && sr.said[oid] ? 'fires at long odds, stops to shoot' : null; };
+
   function computeThreats() {
     var w = st.w, v = st.view = E.view(w, st.P), out = {}, own = v.own.filter(E.active), byId = {}, sv = new Map();
+    seeRounds(w, v);
     for (var i = 0; i < w.slugs.length; i++) { var p = w.slugs[i]; if (p.side !== st.P) byId[p.id] = p; }
     // the next thing worth watching, in game seconds, and what it is
     // k is 'near' for a contact at or nearing weapon range, 'own' for our own shots, and empty for a threat to us
@@ -493,8 +521,10 @@
       var b = U.braking(s); if (b && !s.__brk && gate('brk' + s.id, 600)) U.addLog(s.name + ' flips to brake: the drive faces ' + ((U.targetOf(s) || {}).id || 'the enemy') + '. ' + (s.mods.some(function (m) { return m.kind === 'rail' && !m.def.spinal || m.kind === 'laser'; }) ? 'Turrets still bear.' : 'The spinal swings round to fire.'), 'see');
       s.__brk = b;
       var ps = U.passing(s);
-      if (ps && !s.__pass) { var hi = U.helm(s) || {}, tn = (U.targetOf(s) || {}).id || 'the enemy'; U.addLog(s.name + ' passes ' + tn + ' at ' + Math.round(hi.vr || 0) + ' km/s. ' + (hi.why === 'fuel' ? 'Stopping would leave too little Δv.' : hi.why === 'order' ? 'Its guns fire as it goes.' : 'Stopping would gain nothing.'), 'see'); }
-      s.__pass = ps;
+      // while a brake-or-pass call is open or about to show, the pass line waits: it is said after the answer
+      var held = ps && U.calls && U.calls.holds && U.calls.holds(s);
+      if (ps && !s.__pass && !held) { var hi = U.helm(s) || {}, tn = (U.targetOf(s) || {}).id || 'the enemy'; U.addLog(s.name + ' passes ' + tn + ' at ' + Math.round(hi.vr || 0) + ' km/s. ' + (hi.why === 'fuel' ? 'Stopping would leave too little Δv.' : hi.why === 'order' ? 'Its guns fire as it goes.' : 'Stopping would gain nothing.'), 'see'); }
+      s.__pass = ps && !held;
     });
   }
 
