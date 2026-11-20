@@ -805,6 +805,151 @@
     return 'other';
   }
 
+  // ---------------------------------------------------------------- recap text
+  // A share of all hands in words: friendly fractions for wide ranges, "about 1 hand in N" for narrow ones.
+  var SHARES = [[75, 'about three quarters of all hands'], [66.7, 'about two thirds of all hands'], [50, 'about half of all hands'], [40, 'about 2 hands in 5'],
+    [33.3, 'about a third of all hands'], [25, 'about a quarter of all hands'], [20, 'about 1 hand in 5']];
+  function shareWords(p) {
+    if (p >= 88) return 'almost every hand';
+    if (p >= 18) { var best = SHARES[0]; SHARES.forEach(function (x) { if (Math.abs(Math.log(p / x[0])) < Math.abs(Math.log(p / best[0]))) best = x; }); return best[1]; }
+    if (p <= 0.1) return 'fewer than 1 hand in 1000';
+    var n = 100 / p, step = n < 20 ? 1 : n < 100 ? 5 : n < 1000 ? 10 : 100;
+    return 'about 1 hand in ' + Math.round(n / step) * step;
+  }
+  function pronouns(name) {
+    var g = AI && AI.genderOf ? AI.genderOf(name) : 'x';
+    return g === 'f' ? { he: 'she', his: 'her' } : g === 'm' ? { he: 'he', his: 'his' } : { he: 'they', his: 'their' };
+  }
+  function cap(t) { return t ? t.charAt(0).toUpperCase() + t.slice(1) : t; }
+  var AGG = { fold: 0, check: 1, call: 1, bet: 2, raise: 2, allin: 3 };
+  var STREET_ON = { preflop: 'before the flop', flop: 'on the flop', turn: 'on the turn', river: 'on the river' };
+  var PAST = { fold: 'folded', check: 'checked', call: 'called', bet: 'bet', raise: 'raised', allin: 'moved all in' };
+  var BASE = { fold: 'fold', check: 'check', call: 'call', bet: 'bet', raise: 'raise', allin: 'move all in' };
+  // the evaluator's name ("Three of a Kind, Sevens") as a phrase ("a set of sevens")
+  function madeWords(name, hole) {
+    var m = /^([^,]+)(?:, (.*))?$/.exec(String(name || '')), cat = m ? m[1] : '', rest = m && m[2] ? m[2].toLowerCase() : '';
+    var pocket = hole && hole.length === 2 && (hole[0] >> 2) === (hole[1] >> 2);
+    switch (cat) {
+      case 'High Card': return rest + ' high';
+      case 'Pair': return 'a pair of ' + rest;
+      case 'Two Pair': return 'two pair, ' + rest;
+      case 'Three of a Kind': return pocket ? 'a set of ' + rest : 'three ' + rest;
+      case 'Straight': return art(rest.replace(' high', '-high')) + ' straight';
+      case 'Flush': return art(rest.replace(' high', '-high')) + ' flush';
+      case 'Full House': return 'a full house, ' + rest;
+      case 'Four of a Kind': return 'four ' + rest;
+      case 'Royal Flush': return 'a royal flush';
+      case 'Straight Flush': return art(rest.replace(' high', '-high')) + ' straight flush';
+      default: return lc(String(name || 'a hand'));
+    }
+  }
+  function art(w) { return (/^[aeiou]/.test(w) ? 'an ' : 'a ') + w; }
+  function madeCat(name) { return ['High Card', 'Pair', 'Two Pair', 'Three of a Kind', 'Straight', 'Flush', 'Full House', 'Four of a Kind', 'Straight Flush', 'Royal Flush'].indexOf(String(name || '').split(',')[0]); }
+  // the play that shaped the range on a street: the last bet or raise, else the last action
+  function streetPlay(acts) {
+    var agg = acts.filter(function (e) { return AGG[e.type] >= 2; }), last = acts[acts.length - 1];
+    if (!last) return null;
+    var main = agg.length ? agg[agg.length - 1] : last, noun = main.type === 'allin' ? 'all-in' : main.type;
+    if (main.type === 'raise' && acts[0].type === 'check') noun = 'check-raise';
+    if (main.type === 'call' && acts[0].type === 'check') noun = 'check-call';
+    return { type: main.type, noun: noun };
+  }
+  // what that play usually means, from the action and the share of the range it kept
+  function meaning(play, kept, street) {
+    if (AGG[play.type] >= 2) return kept < 0.12 ? 'a very strong hand' : kept >= 0.4 ? 'a wide range of hands' : street === 'river' ? 'a strong hand or a bluff' : 'a strong hand or a draw';
+    if (play.type === 'call') return street === 'river' ? (kept < 0.25 ? 'a strong hand' : kept < 0.6 ? 'a medium-strength hand' : 'a wide range, weak hands included')
+      : kept < 0.25 ? 'a strong hand or a good draw' : kept < 0.6 ? 'a medium hand or a draw' : 'a wide range, weak hands included';
+    return 'a medium or weak hand';
+  }
+  function isSlip(x) { return !!(x && (x.slip || /usual plan/.test(x.vague || ''))); }
+  var RANK_LC = C.RANK_NAME.map(function (r) { return r.toLowerCase(); });
+  // When the shown hand's made part is all on the board (a board pair, two pair, trips or quads with the same ranks,
+  // or a straight, flush or full house that is the board itself), the hole cards only add a kicker, or nothing.
+  // Gives { board: sentence about the board, kicker: rank of the hole card that played or -1 } or null.
+  function boardMade(show, board) {
+    if (!show || !board || board.length < 5 || show.score == null) return null;
+    var bs = C.evalCards(board), ps = show.score, cat = C.category(ps);
+    if (cat < 1 || cat !== C.category(bs)) return null;
+    var n0 = function (x) { return (x >> 16) & 15; }, n1 = function (x) { return (x >> 12) & 15; };
+    if (cat === 1 || cat === 3 || cat === 7) { if (n0(ps) !== n0(bs)) return null; }
+    else if (cat === 2) { if (n0(ps) !== n0(bs) || n1(ps) !== n1(bs)) return null; }
+    else if (ps !== bs) return null;
+    var pl = RANK_LC[n0(bs)] + (n0(bs) === 4 ? 'es' : 's'), sentence;
+    if (cat === 1) sentence = 'The pair of ' + pl + ' was on the board.';
+    else if (cat === 2) sentence = 'Both pairs, ' + pl + ' and ' + RANK_LC[n1(bs)] + (n1(bs) === 4 ? 'es' : 's') + ', were on the board.';
+    else if (cat === 3) sentence = 'The three ' + pl + ' were on the board.';
+    else if (cat === 7) sentence = 'The four ' + pl + ' were on the board.';
+    else sentence = 'The whole ' + ({ 4: 'straight', 5: 'flush', 6: 'full house' }[cat] || 'hand') + ' was on the board.';
+    var kick = ps > bs ? Math.max(show.cards[0] >> 2, show.cards[1] >> 2) : -1;
+    return { board: sentence, kicker: kick };
+  }
+  function kickerLine(bm, whose, theirs) {
+    return bm.kicker >= 0 ? cap(whose) + ' hand was really ' + RANK_LC[bm.kicker] + '-high.' : 'Neither of ' + theirs + ' cards played.';
+  }
+  // The recap for one opponent as a short paragraph: the cards (if shown), at most two range figures (the preflop
+  // width and the postflop bet or raise that narrowed the range most), then the bot's own note.
+  // A slip is told as the exception to the range sentence.
+  function recapText(h, s, heroSeat, v, notes, shows) {
+    var name = v.name.split(' ')[0], pr = pronouns(v.name), out = [], show = shows[s], hs = shows[heroSeat];
+    var slipNote = notes.filter(isSlip).pop(), plain = notes.filter(function (x) { return !isSlip(x); });
+    var key = plain.filter(function (x) { return x.type !== 'check' && x.type !== 'fold' && x.street !== 'preflop'; }).pop() || plain[plain.length - 1];
+    if (key && slipNote && key.n < slipNote.n) key = null; // a note from before the slip adds nothing
+    var vb = boardMade(show, h.board);
+    if (show) {
+      var hb = hs ? boardMade(hs, h.board) : null;
+      out.push(name + ' showed ' + v.cards + (vb ? '.' : ', ' + madeWords(show.name, show.cards) + '.'));
+      if (hs) out.push('You showed ' + C.cardsStr(hs.cards) + (hb ? '.' : ', ' + madeWords(hs.name, hs.cards) + '.'));
+      var bsent = (vb || hb || {}).board;
+      if (bsent) {
+        out.push(bsent);
+        if (vb) out.push(kickerLine(vb, pr.his, pr.his));
+        if (hb) out.push(kickerLine(hb, 'your', 'your'));
+        if (vb && hb) out.push(show.score === hs.score ? 'You both played the board and split the pot.' : 'The kicker decided it.');
+      }
+    } else out.push(name + ' never showed ' + pr.his + ' cards.');
+    // the range: the preflop width, then the one postflop bet or raise that narrowed it most
+    var acts = {}; h.log.forEach(function (e) { if (e.ev === 'act' && e.seat === s) (acts[e.street] = acts[e.street] || []).push(e); });
+    var prev = null, best = null, bestCall = null, figSt = 'preflop';
+    ['preflop', 'flop', 'turn', 'river'].forEach(function (st) {
+      var p = v.range[st]; if (p == null) return;
+      var play = streetPlay(acts[st] || []);
+      if (st === 'preflop') {
+        var pre = play && play.type === 'allin' ? 'moved all in with ' : play && play.type === 'raise' ? 'raised with ' : 'played ';
+        out.push('Before the flop ' + name + ' ' + pre + shareWords(p) + '.');
+      } else if (play && prev) {
+        var c = { st: st, p: p, play: play, kept: p / prev };
+        if (AGG[play.type] >= 2) { if (!best || c.kept < best.kept) best = c; }
+        else if (play.type === 'call' && (!bestCall || c.kept < bestCall.kept)) bestCall = c;
+      }
+      prev = p;
+    });
+    if (best) {
+      var mean = meaning(best.play, best.kept, best.st), w = shareWords(best.p), lead = cap(pr.his) + ' ' + best.st + ' ' + best.play.noun;
+      out.push(/^a wide/.test(mean) && best.p < 15 ? lead + ' can mean many kinds of hands. It left ' + w + '.' : lead + ' usually means ' + mean + ', ' + w + '.');
+      if (!slipNote && show && !vb && madeCat(show.name) >= 2 && best.kept < 0.4) out.push('That fits a ' + best.st + ' ' + best.play.noun + '.');
+      figSt = best.st;
+    } else if (bestCall) {
+      // a call gets its meaning, never a figure of its own
+      out.push(cap(pr.his) + ' ' + bestCall.st + ' ' + bestCall.play.noun + ' usually means ' + meaning(bestCall.play, bestCall.kept, bestCall.st) + '.');
+      figSt = bestCall.st;
+    }
+    if (slipNote) {
+      var did = slipNote.type, from = slipNote.planned, when = slipNote.street !== figSt ? ' ' + STREET_ON[slipNote.street] : '', how;
+      if (from && AGG[from] != null && AGG[did] !== AGG[from]) {
+        if (did === 'fold') how = ' and folded a hand that would usually play on.';
+        else if (AGG[did] > AGG[from]) how = ' and ' + PAST[did] + ' with something weaker.';
+        else how = ' and only ' + PAST[did] + ' with something stronger. That hand would usually ' + (BASE[from] || 'play on') + '.';
+      } else how = ' and played differently from ' + pr.his + ' usual pattern.';
+      out.push('This time ' + name + ' made a mistake' + when + how);
+      // the shown cards already name a preflop hand; a postflop slip's reason adds what the hand was
+      if (show && slipNote.street !== 'preflop') out.push(cap(pr.he) + ' ' + lc(String(slipNote.reason).trim()));
+      var tier = slipNote.tier;
+      out.push(tier === 'Beginner' || tier === 'Casual' ? 'Weaker players do this now and then.' : tier ? 'Even good players do this now and then.' : 'Players make mistakes like this now and then.');
+    }
+    if (key) out.push(cap(STREET_ON[key.street]) + ' ' + pr.he + ' ' + lc(String(show || !key.vague ? key.reason : key.vague).trim()));
+    return out.join(' ');
+  }
+
   // ---------------------------------------------------------------- recap
   function recap(h, seat, decisions, opts) {
     var tr = S.advance(S.tracker(h)), shows = {}, out = { showdown: false, villains: [], lines: [] };
@@ -818,19 +963,12 @@
       var p = h.players[s], snaps = tr.snaps[s] || {}, v = { seat: s, name: p.name, id: p.id, pos: h.pos[s], shown: !!shows[s], cards: shows[s] ? C.cardsStr(shows[s].cards) : null,
         made: shows[s] ? shows[s].name : null, range: {} };
       ['preflop', 'flop', 'turn', 'river'].forEach(function (st) { if (snaps[st] != null) v.range[st] = snaps[st]; });
-      var parts = [], stl = ['preflop', 'flop', 'turn', 'river'].filter(function (st) { return v.range[st] != null; });
-      stl.forEach(function (st) { parts.push(st + ' ' + rd(v.range[st], 1) + '%'); });
-      v.rangeText = parts.length ? p.name + '\'s range by street, as a share of all hands: ' + parts.join(', ') + '.' : '';
       var notes = (opts.notes || h.botNotes || []).filter(function (x) { return x.seat === s; });
-      if (notes.length) { var key = notes.filter(function (x) { return x.type !== 'check' && x.type !== 'fold' && x.street !== 'preflop'; }).pop() || notes[notes.length - 1]; v.thinking = 'What ' + p.name + ' was thinking: ' + String(v.shown || !key.vague ? key.reason : key.vague).trim(); }
-      if (v.shown) {
-        var hs = shows[seat];
-        v.showText = p.name + ' showed ' + v.cards + ' (' + v.made + ').' + (hs ? ' You showed ' + C.cardsStr(hs.cards) + ' (' + hs.name + ').' : '');
-      }
+      v.text = recapText(h, s, seat, v, notes, shows);
       out.villains.push(v);
     });
     out.lines = [];
-    out.villains.forEach(function (v) { if (v.showText) out.lines.push(v.showText); if (v.rangeText) out.lines.push(v.rangeText); if (v.thinking) out.lines.push(v.thinking); });
+    out.villains.forEach(function (v) { if (v.text) out.lines.push(v.name.split(' ')[0] + ' (' + v.pos + '): ' + v.text); });
     return out;
   }
   function lc(s) { return s ? s.charAt(0).toLowerCase() + s.slice(1) : s; }

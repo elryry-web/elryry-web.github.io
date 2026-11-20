@@ -336,7 +336,7 @@
       if (exploit) note = 'adapting';
     }
     mix = norm(mix.filter(function (m) { return m.freq > 0; }));
-    var chosen = pick(mix, r()), slip = false;
+    var chosen = pick(mix, r()), slip = false, planned = chosen;
     if (tier.mistake && r() < tier.mistake) { // a slip: a plausible wrong action
       var alt = mix.length > 1 ? mix.slice().sort(function (a, b) { return a.freq - b.freq; })[0] : null;
       if (alt && alt !== chosen) { chosen = alt; slip = true; }
@@ -348,7 +348,9 @@
     act.reason = reasonFor(ag, h, seat, L, act, res, street, slip);
     act.ai = { tier: ag.tier, style: ag.style, mixFreq: Math.round((chosen.freq || 0) * 1000) / 1000, slip: slip, note: note };
     var notes = h.botNotes || (h.botNotes = []);
-    notes.push({ n: h.log.length, seat: seat, id: ag.id, street: street, type: act.type, reason: act.reason, vague: vagueReason(act, res, street, L, slip) });
+    // slip and planned (the action the bot meant to take) let the recap say which way the mistake went
+    notes.push({ n: h.log.length, seat: seat, id: ag.id, tier: ag.tier, street: street, type: act.type, reason: act.reason, vague: vagueReason(act, res, street, L, slip),
+      slip: slip, planned: slip ? toEngine(planned, L).type : null });
     return act;
   }
 
@@ -378,8 +380,8 @@
   // the same reason without the cards, for hands the bot never showed
   function vagueReason(act, res, street, L, slip) {
     var t = act.type, verb = { fold: 'Folded', check: 'Checked', call: 'Called', bet: 'Bet', raise: 'Raised', allin: 'Moved all in' }[t] || 'Acted';
-    if (slip) return verb + ' against its usual plan.';
-    if (street === 'preflop') return t === 'fold' ? 'Folded a hand outside its range.' : verb + ' with a hand from its range for this spot.';
+    if (slip) return verb + ' with a hand outside the usual plan.';
+    if (street === 'preflop') return t === 'fold' ? 'Folded a hand outside the range for this spot.' : verb + ' with a hand from the range for this spot.';
     var f = res.feat, cls = f.eq > 0.7 ? 'a strong hand' : f.draw.outs >= 8 && f.eq < 0.5 ? 'a draw' : f.eq > 0.45 ? 'a medium hand' : 'a weak hand';
     if (t === 'fold') return 'Folded ' + cls + '. The price was too high for it.';
     if (t === 'check') return 'Checked with ' + cls + '.';
@@ -390,7 +392,7 @@
     var t = act.type;
     if (street === 'preflop') {
       var cls = C.CLASS_NAME[C.classOfCards(h.players[seat].hole[0], h.players[seat].hole[1])];
-      if (slip) return 'Played ' + cls + ' off its usual plan.';
+      if (slip) return 'Played ' + cls + ' outside the usual plan.';
       if (t === 'fold') return 'Folded ' + cls + '. It was outside the range for this spot.';
       if (t === 'check') return 'Checked ' + cls + ' in the big blind.';
       if (t === 'call') return L.toCall >= L.stack ? 'Called all in with ' + cls + '.' : 'Called with ' + cls + '.';

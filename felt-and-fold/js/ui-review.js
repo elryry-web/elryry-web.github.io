@@ -29,7 +29,7 @@
     const rv = e.rv, rc = rv.recap;
     return { n: e.n, at: e.at, label: e.meta.label || '', rv: { handId: rv.handId, heroPos: rv.heroPos, heroCards: rv.heroCards, board: rv.board,
       net: rv.net, worst: rv.worst, clean: rv.clean, evLost: rv.evLost, solved: rv.solved || 0,
-      recap: rc ? { villains: rc.villains.map(v => ({ name: v.name, pos: v.pos, cards: v.cards, made: v.made, rangeText: v.rangeText, thinking: v.thinking })) } : null,
+      recap: rc ? { villains: rc.villains.map(v => ({ name: v.name, pos: v.pos, cards: v.cards, made: v.made, text: v.text, rangeText: v.rangeText, thinking: v.thinking })) } : null,
       decisions: rv.decisions.map(packDecision) } };
   }
   function saveHistory() {
@@ -144,7 +144,9 @@
     const rc = rv.recap; if (!rc || !rc.villains.length) return '';
     return '<div class="recap"><h4>Recap</h4>' + rc.villains.map(v =>
       '<div class="villain"><div class="vhead"><b>' + UI.esc(String(v.name || '').split(' ')[0]) + '</b> <span class="pos">' + UI.esc(v.pos) + '</span>' +
-      (v.cards ? ' <span class="vcards">' + UI.cardsText(v.cards) + '</span> <span class="made">' + UI.esc(v.made || '') + '</span>' : ' <span class="muted">cards not shown</span>') + '</div>' +
+      (v.cards ? ' <span class="vcards">' + UI.cardsText(v.cards) + '</span> <span class="made">' + UI.esc(v.made || '') + '</span>' : v.text ? '' : ' <span class="muted">cards not shown</span>') + '</div>' +
+      // v.text is the plain-words paragraph (0.8.4 on); older saved hands keep their range and thinking lines
+      (v.text ? '<p>' + UI.esc(v.text) + '</p>' : '') +
       (v.rangeText ? '<p>' + UI.esc(v.rangeText) + '</p>' : '') +
       (v.thinking ? '<p class="thinking">' + UI.esc(v.thinking) + '</p>' : '') + '</div>').join('') + '</div>';
   }
