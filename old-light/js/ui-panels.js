@@ -25,7 +25,7 @@
     $('sStart').onclick = function () {
       U.set.lastScen = setupSel.scn; U.set.lastSide = setupSel.side; U.save();
       var sc = U.D.SCENARIOS[setupSel.scn];   // the tutorial fixes its side and seed
-      if (sc.tutorial) startBattle(setupSel.scn, sc.side || 'A', sc.seed || 1); else startBattle(setupSel.scn, setupSel.side, setupSel.seed);
+      if (sc.tutorial) startBattle(setupSel.scn, sc.side || 'A', sc.seed || 1); else startBattle(setupSel.scn, sc.story ? sc.side || 'A' : setupSel.side, setupSel.seed);
     };
     $('sScen').onclick = function (e) { var b = e.target.closest('[data-scn]'); if (!b) return; setupSel.scn = b.getAttribute('data-scn'); drawSetup(); };
     $('sSide').onclick = function (e) { var b = e.target.closest('[data-side]'); if (!b) return; setupSel.side = b.getAttribute('data-side'); drawSetup(); };
@@ -48,7 +48,7 @@
     };
     $('settings').onclick = function (e) {
       var b = e.target.closest('[data-s]'); if (!b) return; var k = b.getAttribute('data-s');
-      if (k === 'sound') U.setSound(!U.set.sound); else { U.set.pause[k] = !U.set.pause[k]; U.save(); }
+      if (k === 'sound') U.setSound(!U.set.sound); else if (k === 'calls') { U.set.calls = U.set.calls === false; U.save(); if (!U.set.calls && U.calls) U.calls.answer('auto'); } else { U.set.pause[k] = !U.set.pause[k]; U.save(); }
       drawSettings();
     };
     $('help').onclick = function (e) { if (e.target.id === 'help' || e.target.closest('[data-h]')) $('help').classList.remove('on'); };
@@ -101,7 +101,10 @@
       sh += '<button data-side="' + S + '"' + (setupSel.side === S ? ' class="on"' : '') + '><b>Side ' + S + '</b><span>' + esc(names.join(', ')) + '</span></button>';
     });
     $('sSide').innerHTML = sh;
-    ['sSideH', 'sSide', 'sSeedH', 'sSeedRow'].forEach(function (id) { $(id).style.display = sc.tutorial ? 'none' : ''; });
+    // a story scenario is played from side A, and its briefing shows under the list
+    ['sSideH', 'sSide'].forEach(function (id) { $(id).style.display = sc.tutorial || sc.story ? 'none' : ''; });
+    ['sSeedH', 'sSeedRow'].forEach(function (id) { $(id).style.display = sc.tutorial ? 'none' : ''; });
+    var bf = $('sBrief'); if (bf) { bf.textContent = sc.brief || ''; bf.style.display = sc.brief ? '' : 'none'; }
   }
   function startBattle(scn, side, seed) {
     show('battle'); closePops(); $('end').classList.remove('on');
@@ -121,7 +124,7 @@
   }
   function drawSettings() {
     var p = U.set.pause, it = function (k, l, on) { return '<button class="item' + (on ? ' on' : '') + '" data-s="' + k + '">' + l + '<em>' + (on ? 'on' : 'off') + '</em></button>'; };
-    $('settings').innerHTML = '<h4>Sound</h4>' + it('sound', 'Sound', U.set.sound) + '<h4>Pause when</h4>' + it('contact', 'New contact', p.contact) + it('launch', 'Launch detected', p.launch) + it('impact', 'Own ship hit', p.impact) + it('strain', 'Strain critical', p.strain) + it('crew', 'Officer down', p.crew) + it('disabled', 'Ship disabled or lost', p.disabled);
+    $('settings').innerHTML = '<h4>Sound</h4>' + it('sound', 'Sound', U.set.sound) + '<h4>Captain' + "'" + 's calls</h4>' + it('calls', 'Ask at key moments', U.set.calls !== false) + '<h4>Pause when</h4>' + it('contact', 'New contact', p.contact) + it('launch', 'Launch detected', p.launch) + it('impact', 'Own ship hit', p.impact) + it('strain', 'Strain critical', p.strain) + it('crew', 'Officer down', p.crew) + it('disabled', 'Ship disabled or lost', p.disabled);
   }
   function openHelp() {
     closePops();

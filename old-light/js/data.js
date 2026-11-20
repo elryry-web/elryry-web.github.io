@@ -38,7 +38,7 @@
     fateKilled: 0.4, fateDown: 0.4,  // a destroyed ship's non-story officers: killed / down (health 5-25) / fine via the pods; the story cast always come out down
     deathChance: 1 / 3, deathChanceMed: 1 / 6,  // campaign: a downed non-story officer dies with this chance (with a working medical bay)
     // sensors
-    burnDetect: 5e6, coldShip: 40000, coldMissile: 15000, coldDrone: 20000, radOutMul: 2, picketMul: 3,
+    burnDetect: 5e6, quietK: 0.15, coldShip: 40000, coldMissile: 15000, coldDrone: 20000, radOutMul: 2, picketMul: 3,
     sensorTier: [0, 1, 1.25, 1.5],              // cold detection multiplier by sensor tier
     angRes: [0, 2e-6, 1e-6, 5e-7],              // rad, position error per km of range by sensor tier
     picketRes: 1e-6, errCorr: 12, reacqGap: 10, // picket resolution; sensor error correlation time (s); a track unseen this long restarts its smoothing
@@ -86,7 +86,7 @@
     spinalTol: 0.006,                           // rad: spinal fires when the ship points this close
     pendingLife: 40,
     // missiles
-    mAcc: 80, mDv: 80, mBoostDv: 45, mTermT: 40, mSplitT: 1.5, mPen: 6, mPenKg: 2, mFan: 0.18, mHp: 1,
+    mAcc: 80, mDv: 80, mBoostDv: 45, mTermT: 40, mSplitT: 1.5, mPen: 6, mPenKg: 5, mFan: 0.18, mHp: 1,
     flakK: 0.05, mCorrMiss: 80, mCorrEvery: 60, mPN: 4, mJink: 0.35, mMass: 3, mMaxLife: 9000, mKeep: 0.2,   // mKeep: share of dv a missile saves for its last seconds
     mFanN: 6, mRing: 0.2,   // a salvo of mFanN aims one missile at the middle and the rest round a ring of mRing km (scaled to the target's drive)
     lbT: 7, lbOut: 0.6, lbDv: 1, mWt: 1, missHard: 40, laserMis: 5, chaseDv: 0, lbK: 3.2, mScat: 0.35,   // late break: the helm burns flat out across a missile's line inside lbT s of it; Late break aims lbOut of it out of the plane;
@@ -108,6 +108,10 @@
     zHome: 0.02,                                // 1/s: helm pulls z back toward the plane when not dodging
     evZ: 1,                                     // out-of-plane share of the jink (1 = as much as across)
     // damage
+    // toughness: a ship carries tough x its listed hull points (HULLS hp) and armour points; the per-point module,
+    // crew and laser rolls below are per listed point, so each divides by tough
+    tough: 4,
+    thruK: 0.25, thruF: 0.1,                    // overpenetration: a solid slug's energy past thruK x the hull's points mostly goes out the far side
     bleed: 0.15, modHitPerPt: 0.12, lancerModPerPt: 1.2, lancerHull: 0.3, modWorth: 2, modKillPts: 6, dcRate: 1 / 300,
     armourMul: {                                 // armour points spent per point soaked, by armour type and damage type
       ablative: { laser: 0.3, kin: 1.25, frag: 1.1, nuke: 0.9 },
@@ -140,10 +144,10 @@
   // ---------------------------------------------------------------- modules
   // kind: rail, laser, pdl (PD laser), flak, rack, bay, int (internal). slot: which slot it fits.
   var MODS = {
-    railgun:  { name: 'Railgun', slot: 'turret', kind: 'rail', mass: 70, muzzle: 45, kg: 12, cycle: 3, ammo: 160 },
-    spinalS:  { name: 'Small spinal railgun', slot: 'spinal', size: 'S', kind: 'rail', spinal: true, mass: 220, muzzle: 70, kg: 25, cycle: 20, ammo: 40 },
-    spinalM:  { name: 'Spinal railgun', slot: 'spinal', size: 'M', kind: 'rail', spinal: true, mass: 400, muzzle: 90, kg: 40, cycle: 25, ammo: 40 },
-    spinalL:  { name: 'Large spinal railgun', slot: 'spinal', size: 'L', kind: 'rail', spinal: true, mass: 700, muzzle: 120, kg: 60, cycle: 30, ammo: 40 },
+    railgun:  { name: 'Railgun', slot: 'turret', kind: 'rail', mass: 70, muzzle: 45, kg: 12, cycle: 3, ammo: 320 },
+    spinalS:  { name: 'Small spinal railgun', slot: 'spinal', size: 'S', kind: 'rail', spinal: true, mass: 220, muzzle: 70, kg: 25, cycle: 20, ammo: 80 },
+    spinalM:  { name: 'Spinal railgun', slot: 'spinal', size: 'M', kind: 'rail', spinal: true, mass: 400, muzzle: 90, kg: 40, cycle: 25, ammo: 80 },
+    spinalL:  { name: 'Large spinal railgun', slot: 'spinal', size: 'L', kind: 'rail', spinal: true, mass: 700, muzzle: 120, kg: 60, cycle: 30, ammo: 80 },
     laser:    { name: 'Laser turret', slot: 'turret', kind: 'laser', mass: 90, dps: 0.22, focus: 7000, heat: 5 },
     pdLaser:  { name: 'PD laser', slot: 'pd', kind: 'pdl', mass: 25, dps: 0.22, focus: 1000, range: 3000, heat: 0.5 },
     flak:     { name: 'Flak coilgun', slot: 'pd', kind: 'flak', mass: 20, range: 500, rate: 1.2, ammo: 600 },
@@ -178,9 +182,17 @@
       armour: { type: 'spaced', nose: 12, flank: 8, tail: 4 }, tanks: 4, radiators: 1, sensors: 1, helm: 2, gunnery: 2 },
     raider: { hull: 'cutter', name: 'Raider', mods: { turret: ['railgun'], pd: ['flak'], internal: ['couches', 'automation'] },
       armour: { type: 'spaced', nose: 5, flank: 3, tail: 2 }, tanks: 2, radiators: 1, sensors: 1, helm: 2, gunnery: 1 },
+    // the tutorial's enemy: a debt-runner's frigate with one railgun, thin armour and cheap sensors and fire control.
+    // A full hold (cargo, t) triples its mass, so it accelerates and dodges at a third of a frigate's rate
+    smuggler: { hull: 'frigate', name: 'Smuggler', mods: { turret: ['railgun'], pd: ['flak'], internal: ['couches', 'automation'] },
+      armour: { type: 'composite', nose: 5, flank: 3, tail: 2 }, tanks: 4, radiators: 1, sensors: 1, helm: 1, gunnery: 1, cargo: 6000 },
+    // a gun destroyer: a medium spinal, two railguns and a laser behind thick composite armour (the Plumb Line)
+    gunDD: { hull: 'destroyer', name: 'Gun destroyer', mods: { spinal: ['spinalM'], turret: ['railgun', 'railgun', 'laser'], pd: ['pdLaser', 'flak', 'flak'], internal: ['couches', 'medbay', 'automation', 'sandcaster'] },
+      armour: { type: 'composite', nose: 22, flank: 14, tail: 8 }, tanks: 8, radiators: 2, sensors: 2, helm: 2, gunnery: 3 },
     laserDD: { hull: 'destroyer', name: 'Laser destroyer', mods: { turret: ['laser', 'laser', 'laser'], pd: ['pdLaser', 'pdLaser', 'flak'], internal: ['sandcaster', 'couches', 'magscreen', 'medbay'] },
       armour: { type: 'ablative', nose: 20, flank: 12, tail: 6 }, tanks: 6, radiators: 4, sensors: 2, helm: 2, gunnery: 2 },
-    tender: { hull: 'tender', name: 'Missile tender', mods: { rack: ['rack', 'rack', 'rack', 'rack'], pd: ['pdLaser', 'flak'], internal: ['automation', 'couches', 'medbay'] },
+    // two racks (16 missiles): with four the Tender scenario was a near-certain win for the tender
+    tender: { hull: 'tender', name: 'Missile tender', mods: { rack: ['rack', 'rack'], pd: ['pdLaser', 'flak'], internal: ['automation', 'couches', 'medbay'] },
       armour: { type: 'composite', nose: 10, flank: 6, tail: 4 }, tanks: 6, radiators: 1, sensors: 3, helm: 2, gunnery: 2 },
     carrier: { hull: 'carrier', name: 'Carrier', mods: { bay: ['bay', 'bay'], turret: ['laser'], pd: ['pdLaser', 'pdLaser', 'flak'], internal: ['couches', 'medbay', 'automation', 'sandcaster'] },
       armour: { type: 'composite', nose: 14, flank: 10, tail: 6 }, tanks: 6, radiators: 2, sensors: 3, helm: 1, gunnery: 2,
@@ -197,9 +209,20 @@
   // ---------------------------------------------------------------- skirmish scenarios
   // ships: loadout, side, position (km), velocity (km/s), heading (deg). Sides A and B; doctrine is the default fleet AI.
   var SCENARIOS = {
-    // the tutorial is the frigate duel (ships and sides copied in below) with a fixed seed, side A, an enemy captain
-    // who is never bold (sides.B.bold false), and the pauses in TUTORIAL
-    tutorial: { name: 'Tutorial', text: 'The frigate duel, with pauses that explain each part of the screen.', tutorial: true, seed: 15, side: 'A' },
+    // the tutorial is the frigate duel's start (copied in below) against a weaker ship, the smuggler Ledger Moth, with a
+    // fixed seed, side A, an enemy captain who is never bold (sides.B.bold false), and the pauses in TUTORIAL
+    tutorial: { name: 'Tutorial', text: 'Patience runs down an armed smuggler. Pauses explain each part of the screen as the fight goes on.', tutorial: true, seed: 7, side: 'A' },
+    // a stronger ship and a trick: the Plumb Line passes Hush, whose dropouts (planet quiet) hide a cold ship until it
+    // is close (quietK). Patience starts cold inside that ring; the Plumb Line does not know she is there (intel)
+    hush: { name: 'Under Hush', text: 'Patience waits cold beside Hush as a stronger Deep Office destroyer comes past.', story: true, side: 'A',
+      brief: 'The Deep Office destroyer Plumb Line will pass close by Hush. She is a stronger ship with a good crew. Patience starts cold inside the dashed ring. Radio noise near Hush hides a cold ship there until the enemy is close.',
+      sides: { A: { doctrine: 'auto', faction: 'arbitration' }, B: { doctrine: 'auto', faction: 'deep' } },
+      intel: { B: { x: 160000, y: 0 } },
+      planets: [{ name: 'Hush', x: 0, y: 0, r: 600, quiet: 12000 }],
+      ships: [
+        { load: 'patience', side: 'A', name: 'Patience', x: 2000, y: 5000, vx: 0, vy: 0, h: 180, cast: true, orders: { man: { type: 'cold' } } },
+        { load: 'gunDD', side: 'B', name: 'Plumb Line', x: -160000, y: 0, vx: 10, vy: 0, h: 0 }
+      ] },
     duel: { name: 'Frigate duel', text: 'Two frigates of the same class meet across 200,000 km.',
       sides: { A: { doctrine: 'auto', faction: 'arbitration' }, B: { doctrine: 'auto', faction: 'arbitration' } },
       planets: [],
@@ -214,14 +237,16 @@
         { load: 'tender', side: 'A', name: 'Long Count', x: -250000, y: 0, vx: 0, vy: 0, h: 0 },
         { load: 'laserDD', side: 'B', name: 'Cinder', x: 250000, y: 20000, vx: -8, vy: 0, h: 180 }
       ] },
-    carrier: { name: 'Carrier group and cruiser', text: 'A carrier and two frigates against a heavy cruiser, with a moon between.',
+    carrier: { name: 'Carrier group and cruiser', text: 'A carrier and two frigates against a heavy cruiser and its frigate, with a moon between.',
       sides: { A: { doctrine: 'carrier', faction: 'arbitration' }, B: { doctrine: 'sniper', faction: 'charter' } },
       planets: [{ name: 'Pell', x: 0, y: 30000, r: 1700 }],
       ships: [
         { load: 'carrier', side: 'A', name: 'Hearthward', x: -130000, y: 0, vx: 2, vy: 0, h: 0, cast: true },
         { load: 'patience', side: 'A', name: 'Tact', x: -110000, y: 8000, vx: 4, vy: 0, h: 0 },
         { load: 'gunFrigate', side: 'A', name: 'Recourse', x: -110000, y: -8000, vx: 4, vy: 0, h: 0 },
-        { load: 'cruiser', side: 'B', name: 'Assessor', x: 110000, y: 0, vx: -4, vy: 0, h: 180 }
+        { load: 'cruiser', side: 'B', name: 'Assessor', x: 110000, y: 0, vx: -4, vy: 0, h: 180 },
+        // the escort: alone, the cruiser lost every battle to the carrier group
+        { load: 'gunFrigate', side: 'B', name: 'Lien', x: 100000, y: 8000, vx: -4, vy: 0, h: 180 }
       ] },
     convoy: { name: 'Convoy escort', text: 'Two ore barges and their escort must cross the line at x = 250,000 km. Three raiders wait ahead.',
       sides: { A: { doctrine: 'escort', faction: 'pell' }, B: { doctrine: 'sniper', faction: 'deep' } },
@@ -248,7 +273,8 @@
 
   (function () {
     var t = SCENARIOS.tutorial, d = JSON.parse(JSON.stringify(SCENARIOS.duel));
-    t.sides = d.sides; t.planets = d.planets; t.ships = d.ships; t.sides.B.bold = false;
+    t.sides = d.sides; t.planets = d.planets; t.ships = d.ships; t.sides.B.bold = false; t.sides.B.faction = 'assembly';
+    t.ships[1].load = 'smuggler'; t.ships[1].name = 'Ledger Moth';
   })();
 
   // the tutorial's cards, in the order they usually fire. ui-tutor.js decides when each one shows; highlight names the
@@ -273,7 +299,7 @@
     { id: 'damage', highlight: 'meters', title: 'Damage, heat and fuel',
       body: 'Hits wear down armour and systems, which the Ship tab lists. Heat climbs while your lasers fire, and extending the radiators sheds it faster. Δv is your fuel budget, and a ship that runs low leaves the fight.' },
     { id: 'end', highlight: null, title: 'The tutorial is over',
-      body: 'The other skirmishes add missiles, drones, more ships and a convoy to guard. The ? button at the top explains the plot at any time.' }
+      body: 'The other skirmishes add missiles, drones, more ships, a convoy to guard and captain\'s calls at key moments. The ? button at the top explains the plot.' }
   ];
 
   // the Guns tab's help: one line per choice, shown under its row for the selected choice and as each button's

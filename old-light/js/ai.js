@@ -274,6 +274,8 @@
         }
         if (pick === 'brake' && P.mode !== 'brake') st.brake[s.side]++;
         P.mode = pick; P.why = why;
+        // the UI's captain's call: told of Auto's choice as it is made (it never changes the world; sim.js sets no hook)
+        if (why !== 'order' && w.ai.ask) w.ai.ask('range', s, { pick: pick, why: why, tgt: tr.id, d: d, R: R, Vc: Vc, vr: vr, dv: E.dvLeft(s), n: P.n, edge: rf ? rf.edge : null, deal: rf ? rf.deal : null });
       }
       if (P.mode !== 'pass') return null;
     }
@@ -318,6 +320,35 @@
   // least bandGain of weighted hits, and either hurts nobody or the danger is worth it (as gGuard reads it).
   // Crash only when it hurts nobody, or the ship is badly hurt and the rounds are likelier than not to land.
   // When the dodge ends the doctrine band comes back.
+  // the band dodgeBand would pick over base against the risk r (slugRisk); harm from E.bandHarm
+  function pickBand(w, v, s, base, r, harm) {
+    var bi = BANDS.indexOf(base), th = v.threats[s.id] || {}, pick = base;
+    var danger = th.missEta < N.guardMiss || (r && r.off > N.guardRisk);
+    for (var b = bi + 1; b < BANDS.length && harm; b++) {
+      var B = BANDS[b], lo = r ? r.by[BANDS[b - 1]] : 0, gain = r ? lo - r.by[B] : (b <= 2 ? 1 : 0);
+      if (harm[B].g <= harm[BANDS[b - 1]].g + 0.2) break;   // the drive cannot pull more here
+      // mild: the G bruises an officer who is still well (bandHurt health a minute at most, health over bandWell);
+      // a dodge flies the cap only in bursts, so that is a few points over a dodge. Spent officers are not mild.
+      var hurts = harm[B].hurt.length > 0, mild = harm[B].hurt.every(function (h) { var o = offOf(s, h.officer); return h.cause === 'g' && h.perMin <= N.bandHurt && o && o.health > N.bandWell; });
+      // a band that only strains or mildly bruises is worth it for a real cut in what still gets through; one
+      // that hurts worse needs the full bandGain and real danger
+      if (gain < N.bandGain && (!mild || !r || lo < N.bandLow || r.by[B] > N.bandCut * lo)) break;
+      if (mild) hurts = false;
+      if (B === 'crash' && hurts && !(s.hp < 0.4 * s.hpMax && r && r.dodge > 0.5)) break;
+      if (hurts && !danger) break;
+      pick = B;
+    }
+    return { pick: pick, danger: danger };
+  }
+  // for the UI's captain's call: the band the AI captain would dodge at now, from the ship's own band. Read-only:
+  // the risk is worked out afresh, not from (or into) the helm's cache.
+  function bandPick(w, s) {
+    var base = s.orders.gLimit || 'combat'; if (BANDS.indexOf(base) < 0) return null;
+    var v = E.view(w, s.side), r = slugRisk(w, s, {}), harm = E.bandHarm(w, s.side, s.id);
+    return { base: base, pick: pickBand(w, v, s, base, r, harm).pick, risk: r };
+  }
+  // the player overrode the stop choice (Helm tab At range, or a captain's call): decide again on the next tick
+  function repass(w, s) { var M = w.ai && w.ai.side[s.side], mem = M && M.ship && M.ship[s.id]; if (mem && mem.ps) mem.ps.mode = null; }
   function dodgeBand(w, v, s, mem, lvl) {
     var cur = s.orders.gLimit || 'combat';
     if (lvl !== 'hard' || (mem.evWhy !== 'slug' && mem.evWhy !== 'missile')) {
@@ -327,22 +358,7 @@
     if (mem.dBand && cur !== mem.dBand) mem.dBase = cur;   // the commander re-issued its band this tick
     var base = mem.dBase || cur, bi = BANDS.indexOf(base); if (bi < 0) return;
     if (!mem.dPick || w.t - mem.dPick.t >= N.evThink) {
-      var th = v.threats[s.id] || {}, r = slugRisk(w, s, mem), harm = E.bandHarm(w, s.side, s.id), pick = base;
-      var danger = th.missEta < N.guardMiss || (r && r.off > N.guardRisk);
-      for (var b = bi + 1; b < BANDS.length && harm; b++) {
-        var B = BANDS[b], lo = r ? r.by[BANDS[b - 1]] : 0, gain = r ? lo - r.by[B] : (b <= 2 ? 1 : 0);
-        if (harm[B].g <= harm[BANDS[b - 1]].g + 0.2) break;   // the drive cannot pull more here
-        // mild: the G bruises an officer who is still well (bandHurt health a minute at most, health over bandWell);
-        // a dodge flies the cap only in bursts, so that is a few points over a dodge. Spent officers are not mild.
-        var hurts = harm[B].hurt.length > 0, mild = harm[B].hurt.every(function (h) { var o = offOf(s, h.officer); return h.cause === 'g' && h.perMin <= N.bandHurt && o && o.health > N.bandWell; });
-        // a band that only strains or mildly bruises is worth it for a real cut in what still gets through; one
-        // that hurts worse needs the full bandGain and real danger
-        if (gain < N.bandGain && (!mild || !r || lo < N.bandLow || r.by[B] > N.bandCut * lo)) break;
-        if (mild) hurts = false;
-        if (B === 'crash' && hurts && !(s.hp < 0.4 * s.hpMax && r && r.dodge > 0.5)) break;
-        if (hurts && !danger) break;
-        pick = B;
-      }
+      var r = slugRisk(w, s, mem), harm = E.bandHarm(w, s.side, s.id), pb = pickBand(w, v, s, base, r, harm), pick = pb.pick, danger = pb.danger;
       // the risk a dodge reads falls as its own jink works: hold the band picked for this dodge until it ends
       if (mem.dPick && mem.dBase && BANDS.indexOf(mem.dPick.band) > BANDS.indexOf(pick) && !(harm && harm[mem.dPick.band] && harm[mem.dPick.band].hurt.length && !danger)) pick = mem.dPick.band;
       mem.dPick = { t: w.t, band: pick };
@@ -490,12 +506,19 @@
       if (mem.bold == null) { var sd = w.scn && w.scn.sides && w.scn.sides[s.side]; mem.bold = !(sd && sd.bold === false) && coin(w.seed, 'bold|' + s.id) < N.boldP; }
       var kin = s.mods.some(function (m) { return m.kind === 'rail' && m.state < 2 && m.ammo > 0; });
       var canIn = mem.canOk != null && w.t - mem.canOk < N.canHold;
-      var boldPush = tgt && d < N.pushR && d > 2 * R && (mem.bold || tgt.hp / tgt.hpMax < s.hp / s.hpMax - 0.1);
+      var boldPush = tgt && d < N.pushR && d > 2 * R && (mem.bold || seenHealth(tgt) < s.hp / s.hpMax - 0.1);
       var push = boldPush || tgt && d < N.pushR && kin && !canIn && d > N.canPushMin;
       // a closing push for the guns is not worth a bruise: gGuard drops it to a band that hurts nobody
       mem.canPush = push && !boldPush;
       E.order(w, s.id, { man: { type: 'close', target: tgt ? tgt.id : null, range: R, vmax: P.vmax }, gLimit: push ? 'brace' : P.gLimit });
     }
+  }
+  // how hurt an enemy looks from here: a track carries no hull points, only the hits this side saw land on it (hitPts,
+  // the energy put on the hull, about half of which armour soaks) and whether it shows crippled. 0..1, 1 = untouched
+  function seenHealth(tr) {
+    var H = D.HULLS[tr.cls], hp = H ? H.hp * N.tough : 0;
+    var f = hp ? Math.max(0, 1 - (tr.hitPts || 0) / (2 * hp)) : 1;
+    return tr.crippled ? Math.min(f, 0.3) : f;
   }
   // injury-aware G: a captain will not burn an officer into injury for nothing. If the ordered band would hurt
   // someone (over their limit, or spent and still under load), it drops to the highest band that hurts nobody,
@@ -603,5 +626,5 @@
     E.order(w, s.id, { man: man, gLimit: 'cruise' });
   }
 
-  return { attach: attach, think: think, DOC: DOC, roleOf: roleOf, rangeFight: rangeFight, helmInfo: helmInfo };
+  return { attach: attach, think: think, DOC: DOC, roleOf: roleOf, rangeFight: rangeFight, helmInfo: helmInfo, bandPick: bandPick, repass: repass, seenHealth: seenHealth };
 });

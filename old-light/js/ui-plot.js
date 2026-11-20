@@ -122,6 +122,8 @@
       var g = ctx.createRadialGradient(x - r * 0.35, y - r * 0.35, r * 0.1, x, y, r); g.addColorStop(0, '#1b2a33'); g.addColorStop(1, '#0b1318');
       ctx.fillStyle = g; circ(x, y, r); ctx.fill(); ctx.strokeStyle = 'rgba(150,180,200,0.35)'; ctx.stroke();
       label(x, y - r, p.name, C.dim, 2, 6, -6);
+      // a quiet moon's ring: inside it a cold ship is hard to see (engine coldRange, planet quiet)
+      if (p.quiet) { ctx.strokeStyle = 'rgba(150,180,200,0.3)'; ctx.setLineDash([4, 6]); circ(x, y, p.quiet / cam.s); ctx.stroke(); ctx.setLineDash([]); }
     });
     w.clouds.forEach(function (c) {
       var x = sx(c.x), y = sy(c.y), r = Math.max(2, c.r / cam.s);

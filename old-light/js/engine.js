@@ -100,15 +100,17 @@
       });
     });
     var A = L.armour || { type: 'composite', nose: 0, flank: 0, tail: 0 };
-    s.ar = { type: A.type, nose: A.nose, flank: A.flank, tail: A.tail }; s.ar0 = { nose: A.nose, flank: A.flank, tail: A.tail };
+    var TF = N.tough;   // toughness: tough x the listed armour and hull points (the armour's mass is from the listed points)
+    s.ar = { type: A.type, nose: A.nose * TF, flank: A.flank * TF, tail: A.tail * TF }; s.ar0 = { nose: A.nose * TF, flank: A.flank * TF, tail: A.tail * TF };
     dry += (A.nose + A.flank + A.tail) * H.arMass;
     s.nRad = L.radiators || 1; s.nTanks = L.tanks || 1;
     dry += s.nRad * N.radMass + s.nTanks * N.tankMass;
     ['sensors', 'helm', 'gunnery'].forEach(function (k) { dry += D.TIERS[k][s.tiers[k]] || 0; });
+    dry += L.cargo || 0;   // a loaded hold (t): the ship accelerates, and so dodges, worse
     s.dryBase = dry;
     s.fuel = s.fuel0 = spec.fuel != null ? spec.fuel : s.nTanks * N.tankCap;
     s.sys = { drive: sysMod('drive', 'Drive'), reactor: sysMod('reactor', 'Reactor'), sensors: sysMod('sensors', 'Sensors'), radiators: sysMod('radiators', 'Radiators'), quarters: sysMod('quarters', 'Crew quarters'), tanks: sysMod('tanks', 'Fuel tanks') };
-    s.hp = s.hpMax = H.hp;
+    s.hp = s.hpMax = H.hp * TF;
     s.crew = s.crew0 = H.crew;
     s.need = H.crew * (s.has.automation ? N.autoNeed : 1);
     crewShip(w, s, spec);
@@ -146,7 +148,7 @@
     scn = clone(scn);
     var w = { t: 0, acc: 0, nTick: 0, seed: seed >>> 0, rng: (seed >>> 0) ^ 0x9E3779B9, arng: ((seed >>> 0) * 2654435761) | 0, nid: 1,
       scn: scn, ships: [], missiles: [], drones: [], slugs: [], beams: [], clouds: [], idx: {},
-      planets: (scn.planets || []).map(function (p) { return { name: p.name, x: p.x, y: p.y, r: p.r }; }),
+      planets: (scn.planets || []).map(function (p) { return { name: p.name, x: p.x, y: p.y, r: p.r, quiet: p.quiet || 0 }; }),
       sides: {}, ev: [], log: [], over: false, winner: null, endReason: null, control: null, sub: 1,
       stats: { by: {}, crewLost: { A: 0, B: 0 }, pdKills: { A: 0, B: 0 }, flakKills: { A: 0, B: 0 }, droneFlakKills: { A: 0, B: 0 }, launched: { A: 0, B: 0 },
         dronesLaunched: { A: 0, B: 0 }, droneLost: { A: {}, B: {} }, dronesDocked: { A: 0, B: 0 }, dmgBy: { A: {}, B: {} }, gone: { A: {}, B: {} },
@@ -162,6 +164,8 @@
     });
     w.intel = {};
     SIDES.forEach(function (S) { var x = 0, y = 0, n = 0; scn.ships.forEach(function (sp) { if (sp.side !== S) { x += sp.x; y += sp.y; n++; } }); w.intel[S] = n ? { x: x / n, y: y / n } : null; });
+    // a scenario can say where a side believes the other to be (scn.intel[side]: { x, y }): an ambush starts unknown
+    if (scn.intel) Object.keys(scn.intel).forEach(function (S) { w.intel[S] = scn.intel[S]; });
     reindex(w);
     w.ships.forEach(function (s) { pushHist(w, s); });
     sense(w, 0);
@@ -608,7 +612,7 @@
       // the fragments scatter at random across the cloud (one per cell of the grid), so the cloud has no safe gaps a target can know of
       var ol = (nl === 1 ? 0 : ((i + rnd(w)) / nl) * 2 - 1) * sp, ou = (nu === 1 ? 0 : ((j + rnd(w)) / nu) * 2 - 1) * sp;
       addSlug(w, { kind: 'frag', wk: 'canister', side: p.side, src: p.src, x: p.x, y: p.y, z: p.z, vx: p.vx + B.lx * ol + B.ux * ou, vy: p.vy + B.ly * ol + B.uy * ou, vz: p.vz + B.uz * ou,
-        kg: p.kg / n, tgt: p.tgt, lr: p.lr, sv: p.sv, known: p.known, die: die });
+        kg: p.kg / n, tgt: p.tgt, lr: p.lr, sv: p.sv, known: p.known, die: die, par: p.id });
     }
   }
   function slugHit(w, p, T) {
@@ -617,7 +621,9 @@
     if (p.kind === 'pen') { if (p.mis && !p.mis.hitAny) { p.mis.hitAny = true; stat(w, p.wk).hits++; } }
     else if (p.sv) { if (!p.sv.hits) stat(w, p.wk).hits++; p.sv.hits++; }
     if (T.kind !== 'ship') { T.hp -= pts; if (T.hp <= 0) killSmall(w, T, p.wk, p.src); return; }
+    if (w.hitLog) w.hitKey = p.kind === 'frag' ? 'c' + p.par : 'r' + p.id;
     var took = damage(w, T, pts, p.kind === 'frag' ? 'frag' : 'kin', facing(T, -rvx, -rvy), p.wk);
+    if (w.hitLog) w.hitKey = null;
     if (p.sv) p.sv.pts = (p.sv.pts || 0) + took; else if (p.mis) p.mis.pts = (p.mis.pts || 0) + took;
     hitRecord(w, p.wk, p.lr, took, p.side);
   }
@@ -701,7 +707,7 @@
       var S = w.idx[b.src];
       T.lasered = w.t; T.laseredBy = b.src;
       // a lancer's beam is too weak to cut armour; it picks at the gear outside it, and the hull takes only a little
-      if (b.wk === 'lancer') { var fl = facing(T, b.ax - T.x, b.ay - T.y); var mk = modRoll(w, T, 0, fl, 'lancer', b.pts * N.lancerModPerPt); var lt = damage(w, T, b.pts * N.lancerHull, 'laser', fl, 'lancer'); if (lzRec) { lzRec.pts = lt; lzRec.mod = !!mk; } hitRecord(w, 'lancer', b.range, lt + (mk ? N.modWorth : 0), b.side); continue; }
+      if (b.wk === 'lancer') { var fl = facing(T, b.ax - T.x, b.ay - T.y); var mk = modRoll(w, T, 0, fl, 'lancer', b.pts * N.lancerModPerPt / N.tough); var lt = damage(w, T, b.pts * N.lancerHull, 'laser', fl, 'lancer'); if (lzRec) { lzRec.pts = lt; lzRec.mod = !!mk; } hitRecord(w, 'lancer', b.range, lt + (mk ? N.modWorth : 0), b.side); continue; }
       var bt = damage(w, T, b.pts, 'laser', S ? facing(T, S.x - T.x, S.y - T.y) : 'flank', b.wk);
       if (lzRec) lzRec.pts = bt;
       hitRecord(w, b.wk, b.range, bt, b.side);
@@ -1137,21 +1143,29 @@
       if (s.ward <= 0) { s.ward = 0; s.wardDown = true; emit(w, { type: 'wardlineDown', side: s.side, ship: s.id }); }
     }
     if (type === 'frag' && s.has.magscreen && s.has.magscreen.state < 2) pts *= N.magFrag;
+    if (type === 'kin') pts = thruPts(s, pts);
     var A = s.ar[face], mul = N.armourMul[s.ar.type][type], soak = pts * (1 - N.bleed), cost = soak * mul, hullD;
     if (A >= cost) { s.ar[face] = A - cost; hullD = pts * N.bleed; }
     else { var f = cost > 0 ? A / cost : 1; s.ar[face] = 0; hullD = pts * N.bleed + soak * (1 - f); }
     var took = (Math.min(A, cost) / (mul || 1)) + Math.min(hullD, Math.max(0, s.hp));
+    if (w.hitLog) w.hitLog.push({ t: w.t, ship: s.id, by: by, key: w.hitKey, hull: Math.min(hullD, Math.max(0, s.hp)), took: took });   // sim.js only
     s.hp -= hullD; s.lastHit = w.t;
+    // the shooting side sees its own hits land: the energy it put on the hull, filed on its track (hitPts) for the AI's
+    // read of how hurt the target is. Not what got through the armour, which it cannot see.
+    var hT = w.sides[enemyOf(s.side)].tracks[s.id]; if (hT) hT.hitPts = (hT.hitPts || 0) + pts;
     emit(w, { type: 'impact', side: s.side, ship: s.id, by: by, pts: Math.round(pts * 10) / 10, face: face });
-    kill(w, s, hullD * N.crewPerPt * s.crew0 * (s.has.medbay && s.has.medbay.state < 2 ? N.medCasMul : 1));
-    if (type === 'laser') { s.lasAcc += hullD; while (s.lasAcc >= 1) { s.lasAcc -= 1; modRoll(w, s, 1, face, by); } }
+    kill(w, s, hullD * N.crewPerPt / N.tough * s.crew0 * (s.has.medbay && s.has.medbay.state < 2 ? N.medCasMul : 1));
+    if (type === 'laser') { s.lasAcc += hullD; while (s.lasAcc >= N.tough) { s.lasAcc -= N.tough; modRoll(w, s, N.tough, face, by); } }
     else modRoll(w, s, hullD, face, by);
     updStatus(w, s);
     return took;
   }
+  // a solid slug with more energy than the structure along its path can take goes through: past thruK of the
+  // ship's hull points, only thruF of the rest stays in the ship
+  function thruPts(s, pts) { var c = N.thruK * s.hpMax; return pts > c ? c + (pts - c) * N.thruF : pts; }
   // exp: a lancer's precise beam on the outboard gear (radiators, sensors, PD and turrets) rather than through the hull
   function modRoll(w, s, hullD, face, by, exp) {
-    if (rnd(w) > Math.min(0.95, exp ? exp : hullD * N.modHitPerPt)) return;
+    if (rnd(w) > Math.min(0.95, exp ? exp : hullD * N.modHitPerPt / N.tough)) return;
     var opts = [], tot = 0;
     function add(m, wt) { if (m.state < 2 && wt > 0) { opts.push([m, wt]); tot += wt; } }
     if (exp) {
@@ -1173,7 +1187,7 @@
     for (var i = 0; i < opts.length; i++) { r -= opts[i][1]; if (r <= 0) { pick = opts[i][0]; break; } }
     if (!pick) pick = opts.length ? opts[opts.length - 1][0] : null;
     if (!pick) return;
-    var dead = pick.state === 1 || hullD > N.modKillPts || rnd(w) < (exp ? 0.15 : 0.3);
+    var dead = pick.state === 1 || hullD > N.modKillPts * N.tough || rnd(w) < (exp ? 0.15 : 0.3);
     pick.state = dead ? 2 : 1; pick.dc = 0;
     if (by) { var sb = stat(w, by); sb.mods++; if (dead) sb.modsDead++; }
     if (pick === s.sys.quarters) kill(w, s, s.crew * (dead ? 0.25 : 0.1));
@@ -1282,9 +1296,11 @@
   function end(w, winner, why) { (w.calM || []).forEach(function (m) { calAdd(w, m.wk, m.side, m.est, m.hitAny); }); w.calM = []; w.over = true; w.winner = winner; w.endReason = why; emit(w, { type: 'end', winner: winner, reason: why }); }
 
   // ---------------------------------------------------------------- sensors and light lag
-  function coldRange(o, sen) {
+  function coldRange(o, sen, w) {
     var base = o.kind === 'ship' ? N.coldShip : o.kind === 'missile' ? N.coldMissile : N.coldDrone;
     if (o.radOut) base *= N.radOutMul;
+    // a quiet moon (planet quiet: km, Hush): a cold object inside that range of it is seen only quietK as far
+    if (w) for (var q = 0; q < w.planets.length; q++) { var pq = w.planets[q]; if (pq.quiet && hyp(o.x - pq.x, o.y - pq.y) < pq.quiet) { base *= N.quietK; break; } }
     if (sen.kind === 'drone') return base * (sen.type === 'picket' ? N.picketMul : 1);
     var st = sen.sys.sensors.state;
     return base * N.sensorTier[sen.tiers.sensors] * (st === 0 ? 1 : st === 1 ? 0.6 : 0.25) * stE(sen, 'sensors') * (sen.ab && sen.ab.longEars ? sen.ab.longEars.range : 1);
@@ -1318,7 +1334,7 @@
             if (d < minD) minD = d;
             if (sn.kind === 'ship' && d < minS) minS = d;
             var sig = resOf(sn) * d; if (sig >= bsig) continue;
-            if (d > (histAt(o, w.t - d / C).burn > 0 ? N.burnDetect : coldRange(o, sn))) continue;
+            if (d > (histAt(o, w.t - d / C).burn > 0 ? N.burnDetect : coldRange(o, sn, w))) continue;
             if (w.planets.length && blocked(w, sn.x, sn.y, o.x, o.y)) continue;
             // a drone's sighting reaches the fleet only after its report has crossed back: count that leg too
             var link = 0;
@@ -1690,7 +1706,7 @@
         var e = 0.5 * m.def.kg * u * u / 1000, can = cd.c.exp >= N.canMinHits ? cd.c.exp * e / cd.n * N.fragK / am.frag : 0;
         var vj = N.evVel.hard * aT * Math.SQRT1_2, ev = N.gunEvK * vj * Tf / Math.sqrt(1 + Tf / N.evSegEst) * (1 - 0.5 * readOf(s)), sw = hyp3(s0, hyp(ev, sb), cap);
         var pS = pInterval(-r, r, sw) * pInterval(-r * PI / 4, r * PI / 4, sw);   // a round in flight is dodged: the jink is always in the spread
-        var sol = pS >= 0.03 ? pS * e * N.kinPts / am.kin : 0;
+        var sol = pS >= 0.03 ? pS * thruPts(T, e * N.kinPts) / am.kin : 0;
         out += k * Math.max(can, sol) / m.def.cycle;
       } else if (m.kind === 'laser') {
         var vl = (rails ? N.evVel.hard : N.evVel.light) * aT, tl = 2 * R / C + N.beamLag;

@@ -8,7 +8,7 @@
   // ---------------------------------------------------------------- settings (ol.settings.v1 only)
   var KEY = 'ol.settings.v1';
   function loadSet() {
-    var d = { sound: true, pause: { contact: true, launch: true, impact: true, strain: true, crew: true, disabled: true }, lastScen: 'duel', lastSide: 'A' };
+    var d = { sound: true, pause: { contact: true, launch: true, impact: true, strain: true, crew: true, disabled: true }, calls: true, lastScen: 'duel', lastSide: 'A' };
     try { var s = JSON.parse(localStorage.getItem(KEY) || 'null'); if (s && typeof s === 'object') { for (var k in s) if (k !== 'pause') d[k] = s[k]; if (s.pause) for (k in s.pause) d.pause[k] = !!s.pause[k]; } } catch (e) {}
     return d;
   }
@@ -120,6 +120,7 @@
       else if (r === 'carrier') man = { type: 'hold', target: null, range: P2.hold, vmax: P2.holdV || P2.vmax };
       else if (r === 'missile') man = { type: 'hold', target: null, range: P2.hold, vmax: P2.vmax };
       else man = { type: 'close', target: null, range: P2.hold, vmax: P2.vmax, auto: true, pass: 'auto' };
+      if (s.orders.man && s.orders.man.type === 'cold') man = { type: 'cold' };   // a scenario that starts a ship cold (Under Hush) keeps it cold
       E.order(w, s.id, { man: man, gLimit: P2.gLimit, evasion: 'auto' });
       U.pc(s);
     });
@@ -127,12 +128,14 @@
     st.sel = first0 ? first0.id : 'all';
     autoTargets();
     U.addLog(D.SCENARIOS[scnKey].name + '. Seed ' + seed + '.', '');
+    if (D.SCENARIOS[scnKey].brief) U.addLog(D.SCENARIOS[scnKey].brief, '');
     U.panels.onStart(); U.plot.onStart();
     U.pause(st.why, null, true);
     computeThreats();
     if (U.tutor) U.tutor.start(scnKey);
+    if (U.calls) U.calls.start();
   };
-  U.quit = function () { if (U.tutor) U.tutor.stop(); st = null; };
+  U.quit = function () { if (U.tutor) U.tutor.stop(); if (U.calls) U.calls.stop(); st = null; };
 
   // ---------------------------------------------------------------- orders from the panel
   U.order = function (o, ships) {
@@ -360,7 +363,7 @@
   U.pause = function (why, key, quiet) {
     if (!st) return;
     if (key && !U.set.pause[key]) return;
-    st.paused = true; st.why = why || ''; st.acc = 0;
+    st.paused = true; st.why = why || ''; st.acc = 0; st.pauseKey = key || null; st.pauseAt = st.w.t;
     if (!quiet) U.sfx('pause');
     U.panels.banner(why);
   };
@@ -417,6 +420,7 @@
         return;
       case 'miss': return;   // said in the shot log
       case 'crippled': case 'disabled': case 'destroyed': case 'captured':
+        shotFlushShip(e.ship);   // the shots that did it come first, under the name we knew
         var nm = U.nameOf(e.ship), word = { crippled: 'crippled: the drive is out', disabled: 'disabled', destroyed: 'destroyed', captured: 'captured' }[e.type];
         U.addLog(nm + ' ' + word + '.', mine ? 'bad' : 'good');
         if (e.type === 'destroyed') U.sfx('kill');
@@ -505,14 +509,20 @@
     var o = st.w.idx[id]; if (!o) return id ? String(id) : 'the target';
     if (o.kind === 'drone') return (o.side === st.P ? 'our ' : 'a ') + U.droneName(o.type, 1);
     if (o.kind === 'missile') return 'a missile';
-    return o.side === st.P ? (o.name || id) : U.trackByOid(id) ? U.nameOf(id) : 'an unseen ship';
+    return o.side === st.P ? (o.name || id) : knownName(id) || 'an unseen ship';
+  }
+  // an enemy ship we have tracked keeps the name we knew it by after its track goes (it may be wreckage by then)
+  function knownName(id) {
+    var kn = st.known || (st.known = {});
+    if (U.trackByOid(id)) kn[id] = U.nameOf(id);
+    return kn[id] || null;
   }
   // who fired, for the front of the line: nothing for our only ship, a name otherwise
   function shooterPre(side, src) {
     var o = st.w.idx[src];
     if (side === st.P) return o && o.kind === 'ship' && U.ownShips().length > 1 ? (o.name || src) + ' ' : '';
     if (o && o.kind === 'drone') return 'Their ';
-    return U.trackByOid(src) ? U.nameOf(src) + ' ' : 'Enemy ';
+    var n = knownName(src); return n ? n + ' ' : 'Enemy ';
   }
   // the ship and weapon that shot a missile down ('Insistence's flak'), or the drones that did
   function killer(who, by, n) {
@@ -573,6 +583,11 @@
     }
     shotLine(lead(g.side, g.src, wpn) + ': ' + body + '.', g.side);
   }
+  // say every grouped line now that a ship fired or took, before that ship's crippled or destroyed line
+  function shotFlushShip(id) {
+    var G = st.shots; if (!G) return;
+    for (var k in G) { var g = G[k]; if (g.tgt === id || g.src === id || g.tg[id]) { delete G[k]; shotSay(g); } }
+  }
   function shotFlush(force) {
     var G = st.shots; if (!G) return;
     var t = st.w.t, W = shotWin();
@@ -617,13 +632,14 @@
           E.step(w, 1); st.acc -= 1; afterTick();
           if (w.t % 5 === 0 || L <= 10) computeThreats();
           if (U.tutor) U.tutor.tick();
+          if (U.calls) U.calls.tick();
           var L2 = st.speed === 'auto' ? st.autoL : L;
           if (L2 < L) { st.acc = Math.min(st.acc, 1); L = L2; }
           if (st.paused || w.over) { st.acc = 0; break; }
           if (performance.now() - t0 > 9) { st.acc = Math.min(st.acc, 1); break; }
         }
         st.frac = Math.max(0, Math.min(1, st.acc));
-        if (w.over && !st.over) { flushAgg(true); st.over = true; st.paused = true; setTimeout(function () { if (st && !st.endShown) { st.endShown = true; if (!(U.tutor && U.tutor.atEnd(U.panels.end))) U.panels.end(); } }, 900); }
+        if (w.over && !st.over) { flushAgg(true); if (U.calls) U.calls.end(); st.over = true; st.paused = true; setTimeout(function () { if (st && !st.endShown) { st.endShown = true; if (!(U.tutor && U.tutor.atEnd(U.panels.end))) U.panels.end(); } }, 900); }
       } else st.frac = 0;
       if (st.paused && ts - (st.thrTs || 0) > 250) { st.thrTs = ts; computeThreats(); }
       st.fx = st.fx.filter(function (f) { return f.until > ts; });
@@ -637,7 +653,7 @@
   U.withdraw = function () {
     if (!st || st.over) return;
     U.ownShips().forEach(function (s) { if (E.active(s)) E.order(st.w, s.id, { man: { type: 'break', target: (U.targetOf(s) || {}).id || null, vmax: 40 } }); });
-    st.withdrew = true; st.over = true; st.paused = true; flushAgg(true); st.endShown = true; U.panels.end();
+    if (U.calls) U.calls.end(); st.withdrew = true; st.over = true; st.paused = true; flushAgg(true); st.endShown = true; U.panels.end();
   };
 
   document.addEventListener('DOMContentLoaded', function () { U.panels.init(); U.plot.init(); requestAnimationFrame(frame); });
