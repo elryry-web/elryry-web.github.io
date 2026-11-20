@@ -12,7 +12,7 @@
     Nash: 'From the Nash push/fold ranges for 15bb and under.'
   };
   const ACT_CLS = { fold: 'm-fold', check: 'm-check', call: 'm-call', bet: 'm-bet', raise: 'm-raise', allin: 'm-allin' };
-  const ACT_NAME = { fold: 'Fold', check: 'Check', call: 'Call', bet: 'Bet', raise: 'Raise', allin: 'All in' };
+  const ACT_NAME = { fold: 'Fold', check: 'Check', call: 'Call', bet: 'Bet', raise: 'Raise', allin: 'All-in' };
   let resolveClose = null;
 
   // ---------------------------------------------------------------- saved history: the last 200 reviews, under one ff. key
@@ -87,13 +87,8 @@
       (r.m.sizeLabel && r.m.action !== 'allin' ? ' ' + UI.esc(r.m.sizeLabel) : '') + ' ' + r.pct + '%</span>').join('');
     return '<div class="mixbar">' + segs + '</div><div class="mixlegend">' + legend + '</div>';
   }
-  function didText(d) {
-    const a = d.did.action, agg = a === 'bet' || a === 'raise' || a === 'allin';
-    let s = ACT_NAME[a] || a;
-    if (agg && a !== 'allin') s += d.street === 'preflop' ? ' to ' + UI.trim(d.did.toBB, 1) + ' bb' : ' ' + UI.trim(d.did.addBB, 1) + ' bb';
-    if (a === 'call' && d.toCall) s += ' ' + UI.trim(d.toCall, 1) + ' bb';
-    return s;
-  }
+  // "Bet half pot (6.5 bb)", "Raise to 3x (19.5 bb)", "All-in (48 bb)"; preflop "Raise to 4.7 bb" (see FF.Review.didLabel)
+  function didText(d) { return FF.Review.didLabel(d, x => UI.trim(x, 1) + ' bb'); }
   function decisionHtml(d, entry) {
     const pending = entry.solving && d.source === 'Estimate' && d.street !== 'preflop';
     const board = d.boardStr ? '<span class="dboard">' + UI.cardsText(d.boardStr) + '</span>' : '';
@@ -148,7 +143,7 @@
   function recapHtml(rv) {
     const rc = rv.recap; if (!rc || !rc.villains.length) return '';
     return '<div class="recap"><h4>Recap</h4>' + rc.villains.map(v =>
-      '<div class="villain"><div class="vhead"><b>' + UI.esc(v.name) + '</b> <span class="pos">' + UI.esc(v.pos) + '</span>' +
+      '<div class="villain"><div class="vhead"><b>' + UI.esc(String(v.name || '').split(' ')[0]) + '</b> <span class="pos">' + UI.esc(v.pos) + '</span>' +
       (v.cards ? ' <span class="vcards">' + UI.cardsText(v.cards) + '</span> <span class="made">' + UI.esc(v.made || '') + '</span>' : ' <span class="muted">cards not shown</span>') + '</div>' +
       (v.rangeText ? '<p>' + UI.esc(v.rangeText) + '</p>' : '') +
       (v.thinking ? '<p class="thinking">' + UI.esc(v.thinking) + '</p>' : '') + '</div>').join('') + '</div>';

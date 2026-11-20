@@ -40,6 +40,14 @@
     'Cosima', 'Dex', 'Hester', 'Lorcan', 'Mirela', 'Abner', 'Zinnia', 'Teodor', 'Vashti', 'Ludo', 'Clemency', 'Osric', 'Pippa', 'Ansel', 'Delphine', 'Moss'];
   var LAST = ['Quarrie', 'Holloway', 'Venn', 'Ashgrove', 'Pellam', 'Dunmore', 'Carvell', 'Bramwell', 'Okonda', 'Strand', 'Wexley', 'Larkin', 'Fairweather', 'Tolley',
     'Marchetti', 'Brisco', 'Halvorsen', 'Kettering', 'Ambrose', 'Mulvane', 'Orsini', 'Pike', 'Ruddock', 'Sallow', 'Thistle', 'Underhay', 'Vos', 'Winslade', 'Yarrow', 'Zell'];
+  // f, m or either (x) for each first name; the table picks a portrait to match (see Art.FACES in ui-core.js)
+  var GENDER = { Odessa: 'f', Brannock: 'm', Tilly: 'f', Marek: 'm', Junie: 'f', Corwin: 'm', Pell: 'x', Rosamund: 'f', Ike: 'm', Saffi: 'f', Dorran: 'm',
+    Wren: 'x', Hollis: 'x', Ottoline: 'f', Rafe: 'm', Mabry: 'x', Linnet: 'f', Caspar: 'm', Effie: 'f', Thane: 'm', Bettina: 'f', Lowry: 'x', Nim: 'x',
+    Aurel: 'm', Greer: 'x', Fenwick: 'm', Philippa: 'f', Jory: 'm', Tamsin: 'f', Barnaby: 'm', Ines: 'f', Quill: 'x', Cosima: 'f', Dex: 'm', Hester: 'f',
+    Lorcan: 'm', Mirela: 'f', Abner: 'm', Zinnia: 'f', Teodor: 'm', Vashti: 'f', Ludo: 'm', Clemency: 'f', Osric: 'm', Pippa: 'f', Ansel: 'm', Delphine: 'f', Moss: 'x' };
+  // players show by first name only (long names were cut off on the seat plates); the full name stays in profile.fullName
+  function firstName(nm) { return String(nm || '').split(' ')[0]; }
+  function genderOf(nm) { return GENDER[firstName(nm)] || 'x'; }
   var COLORS = ['#c2553d', '#3d7fc2', '#5a9e4b', '#b08a2e', '#8a5cb8', '#2e9e94', '#c2477f', '#6b7a8f', '#a8642e', '#4a6fb5', '#7f9e2e', '#b54a4a'];
   var CHAT = {
     any: ['Nice hand.', 'Shuffle up.', 'Good luck all.', 'That river.', 'Close one.', 'Fair enough.'],
@@ -56,9 +64,9 @@
   function profile(opts) {
     opts = opts || {};
     var r = C.rng(opts.seed || 1), first = FIRST[Math.floor(r() * FIRST.length)], last = LAST[Math.floor(r() * LAST.length)];
-    var name = opts.name || first + ' ' + last;
-    var parts = name.split(' ');
-    return { id: opts.id || 'ai' + (opts.seed || 1), name: name, initials: (parts[0][0] + (parts[1] ? parts[1][0] : '')).toUpperCase(),
+    var full = opts.name || first + ' ' + last;
+    var parts = full.split(' ');
+    return { id: opts.id || 'ai' + (opts.seed || 1), name: firstName(full), fullName: full, initials: (parts[0][0] + (parts[1] ? parts[1][0] : '')).toUpperCase(),
       color: opts.color || COLORS[Math.floor(r() * COLORS.length)], tier: opts.tier || 'Regular', style: opts.style || 'TAG', seed: opts.seed || 1 };
   }
 
@@ -296,6 +304,7 @@
   }
   function create(opts) {
     var prof = opts && opts.tier && opts.name && opts.id ? opts : profile(opts);
+    if (prof.name.indexOf(' ') >= 0) { var cp = {}; for (var k in prof) cp[k] = prof[k]; cp.fullName = prof.fullName || prof.name; cp.name = firstName(prof.name); prof = cp; }
     var tier = TIERS[prof.tier] || TIERS.Regular, rng = C.rng(C.hashSeed(prof.seed || 1, 991));
     var ag = { profile: prof, tier: prof.tier, style: prof.style, id: prof.id, stats: {}, mood: { tilt: 0, tight: 0 }, rng: rng, lastStack: null };
     ag.decide = function (h, seat, L) { return decide(ag, h, seat, L); };
@@ -417,14 +426,14 @@
     Shark: { TAG: 0.5, LAG: 0.35, Trappy: 0.15 },
     Solver: { TAG: 1 }
   };
-  // names already in use: no first name or surname may repeat within a field or at a table
+  // names already in use: no first name may repeat within a field or at a table
   function takenNames(list) {
     var t = {};
     (list || []).forEach(function (x) { var nm = typeof x === 'string' ? x : x && x.name; if (nm) claimName(nm, t); });
     return t;
   }
-  function claimName(nm, t) { var q = nm.split(' '); t['f:' + q[0]] = 1; if (q[1]) t['l:' + q[1]] = 1; }
-  function nameClash(nm, t) { var q = nm.split(' '); return !!(t['f:' + q[0]] || (q[1] && t['l:' + q[1]])); }
+  function claimName(nm, t) { t['f:' + firstName(nm)] = 1; }
+  function nameClash(nm, t) { return !!t['f:' + firstName(nm)]; }
   // profile(opts) with a name that shares no part with `taken` (from takenNames); claims the name
   function uniqueProfile(opts, taken) {
     var o = {}, k, seed = opts.seed || 1, p, tries = 0;
@@ -453,6 +462,6 @@
   }
 
   return { TIERS: TIERS, STYLES: STYLES, TIER_NAMES: TIER_NAMES, STYLE_NAMES: STYLE_NAMES, CASH_STAKES: CASH, TOURNEY_FIELDS: TOURNEY,
-    profile: profile, uniqueProfile: uniqueProfile, takenNames: takenNames, create: create, field: field, exploitFor: exploitFor, observeHand: observeHand, emptyStats: emptyStats, postAdj: postAdj,
+    profile: profile, firstName: firstName, genderOf: genderOf, GENDER: GENDER, uniqueProfile: uniqueProfile, takenNames: takenNames, create: create, field: field, exploitFor: exploitFor, observeHand: observeHand, emptyStats: emptyStats, postAdj: postAdj,
     model: model, traits: traits, exploitable: exploitable, STYLE_BY_TIER: STYLE_BY_TIER };
 });

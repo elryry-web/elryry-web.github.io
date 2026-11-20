@@ -235,15 +235,25 @@
   Art.icon = function (name, cls) {
     return Art.ok.markers ? '<img class="' + (cls || 'ico') + '" src="art/markers/' + name + '.webp" alt=""' + Art.onerr + '>' : '';
   };
-  // 16 portraits. Each AI gets one from a hash of its name; a clash at the table moves to the next free face.
-  // The choice is kept per table (map[id]) so a face never changes mid-session.
+  // 24 portraits, each tagged f or m with a rough age. An AI gets a face of its name's gender (FF.AI.genderOf; 'x' takes any),
+  // picked from a hash of its name; a clash at the table moves to the next free face of that gender.
+  // The choice is kept per table (map[id]) so a face never changes mid-session. Ten f and fourteen m faces cover any 6-seat table.
   Art.PORTRAITS = 24;
+  Art.FACES = [['f', 25], ['m', 55], ['m', 75], ['f', 30], ['m', 40], ['f', 65], ['m', 20], ['f', 45], ['f', 70], ['m', 20], ['m', 60], ['f', 25],
+    ['m', 35], ['f', 45], ['m', 35], ['m', 45], ['f', 65], ['m', 18], ['m', 70], ['f', 40], ['m', 20], ['m', 55], ['m', 65], ['f', 30]];
   function hashName(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
   Art.portraitIx = function (map, id, name, seatedIds) {
-    if (map[id] != null && !seatedIds.some(o => o !== id && map[o] === map[id])) return map[id];
+    const g = FF.AI && FF.AI.genderOf ? FF.AI.genderOf(name) : 'x';
+    const fits = ix => g === 'x' || Art.FACES[ix][0] === g;
+    if (map[id] != null && fits(map[id]) && !seatedIds.some(o => o !== id && map[o] === map[id])) return map[id];
     const used = {};
     seatedIds.forEach(o => { if (o !== id && map[o] != null) used[map[o]] = 1; });
-    let ix = hashName(String(name || id)) % Art.PORTRAITS;
+    const pool = [];
+    for (let i = 0; i < Art.PORTRAITS; i++) if (fits(i)) pool.push(i);
+    const h = hashName(String(name || id));
+    for (let k = 0; k < pool.length; k++) { const ix = pool[(h + k) % pool.length]; if (!used[ix]) return (map[id] = ix); }
+    // every face of that gender is taken (cannot happen with five AIs): any free face
+    let ix = h % Art.PORTRAITS;
     for (let k = 0; k < Art.PORTRAITS && used[ix]; k++) ix = (ix + 1) % Art.PORTRAITS;
     return (map[id] = ix);
   };

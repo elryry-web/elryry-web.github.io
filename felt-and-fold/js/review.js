@@ -23,10 +23,49 @@
     return 'You had ' + l.replace('of its own', 'of your own') + '.';
   }
   function verbIng(a) { return { fold: 'folding', check: 'checking', call: 'calling', bet: 'betting', raise: 'raising', allin: 'moving all in' }[a] || a; }
-  function sizeWord(f) {
-    if (f >= 1.9) return 'an overbet of ' + rd(f, 1) + ' times the pot'; if (f > 1.15) return 'an overbet'; if (f >= 0.9) return 'pot';
-    if (f >= 0.7) return 'three-quarters pot'; if (f >= 0.6) return 'two-thirds pot'; if (f >= 0.42) return 'half pot'; if (f >= 0.28) return 'a third of the pot'; return 'a quarter of the pot';
+  // ---------------------------------------------------------------- sizes in words
+  // after the flop a bet is a share of the pot before it; a raise is a multiple of the bet it faces; preflop stays in bb.
+  // A friendly fraction stands when it is within 4% of the pot; otherwise a percentage.
+  // short form (legends, the You line): "half pot", "third pot", "2x pot", "58% pot"
+  // sentence form: "half the pot", "a third of the pot", "twice the pot", "58% of the pot"
+  var FRIENDLY = [[0.25, 'quarter pot', 'a quarter of the pot'], [1 / 3, 'third pot', 'a third of the pot'], [0.5, 'half pot', 'half the pot'],
+    [2 / 3, 'two-thirds pot', 'two-thirds of the pot'], [0.75, 'three-quarters pot', 'three-quarters of the pot'], [1, 'pot', 'the pot'],
+    [1.5, '1.5x pot', '1.5 times the pot'], [2, '2x pot', 'twice the pot']];
+  function potWords(f, long) {
+    var best = null, bd = Infinity;
+    FRIENDLY.forEach(function (x) { var g = Math.abs(f - x[0]); if (g <= 0.04 * Math.max(1, x[0]) + 1e-9 && g < bd) { bd = g; best = x; } });
+    if (best) return long ? best[2] : best[1];
+    var p = Math.round(100 * f); return p + (long ? '% of the pot' : '% pot');
   }
+  function sizeWord(f) { return potWords(f, true); }
+  function times(x) { var v = rd(x, 1); return (v === Math.round(v) ? String(Math.round(v)) : v.toFixed(1)) + 'x'; }
+  // a size in words from the street total `to` (bb). sz.pot: the pot before the action; sz.heroIn: the hero's chips in
+  // on the street; sz.facing: the bet faced (street total, bb). form 'short': "half pot" / "to 3x" / "all in";
+  // 'long': "half the pot (6.5bb)" / "to 3x (19.5bb)" / "all in (48bb)"; unit formats the chips.
+  function sizeText(sz, action, toBB, form, unit) {
+    unit = unit || bbs;
+    var add = toBB - (sz.heroIn || 0), long = form === 'long';
+    if (action === 'allin') return long ? 'all in (' + unit(toBB) + ')' : 'all in';
+    if (sz.preflop) return 'to ' + unit(toBB);
+    if (action === 'raise' && sz.facing > 0) return 'to ' + times(toBB / sz.facing) + (long ? ' (' + unit(toBB) + ')' : '');
+    if (!(sz.pot > 0)) return unit(add);
+    return potWords(add / sz.pot, long) + (long ? ' (' + unit(add) + ')' : '');
+  }
+  function szOf(d) { return { pot: d.pot, heroIn: d.heroIn, facing: d.facing, preflop: d.street === 'preflop' }; }
+  // the hero's action as a label: "Bet half pot (6.5 bb)", "Raise to 3x (19.5 bb)", "All-in (48 bb)", "Raise to 4.7 bb".
+  // Works on saved history too: it needs only street, pot, toCall and did {action, toBB, addBB}.
+  function didLabel(d, unit) {
+    unit = unit || function (x) { return trim1(x) + ' bb'; };
+    var a = d.did.action, toBB = d.did.toBB, heroIn = rd(toBB - (d.did.addBB || 0), 2);
+    if (a === 'allin') return 'All-in (' + unit(toBB) + ')';
+    if (a === 'call') return 'Call' + (d.toCall ? ' ' + unit(d.toCall) : '');
+    if (a !== 'bet' && a !== 'raise') return cap(a);
+    var sz = { pot: d.pot, heroIn: heroIn, facing: heroIn + (d.toCall || 0), preflop: d.street === 'preflop' };
+    if (sz.preflop) return cap(a) + ' to ' + unit(toBB);
+    var s = sizeText(sz, a, toBB, 'short', unit);
+    return cap(a) + ' ' + s + (a === 'raise' && sz.facing > 0 ? ' (' + unit(toBB) + ')' : / pot$/.test(s) || s === 'pot' ? ' (' + unit(d.did.addBB) + ')' : '');
+  }
+  function trim1(x) { var v = rd(x, 1); return v === Math.round(v) ? String(Math.round(v)) : v.toFixed(1); }
   // thresholds in bb, scaled by the pot before the action being faced
   // preflop pots are small, so a preflop Blunder starts at 2bb
   function gradeFor(loss, potBB, preflop) {
@@ -93,15 +132,20 @@
     if (eq < 0.35) return 'A bigger bluff gets more folds.';
     return wet && !river ? 'On a wet board a bigger bet makes the draws pay more.' : '';
   }
-  function pctPot(p) { return p.action === 'allin' ? 'all in' : p.action === 'check' ? 'a check' : p.action === 'call' ? 'a call' : Math.round(100 * p.size) + '% pot'; }
+  // a solved size (chips added / pot) in words: a share of the pot for a bet, a multiple of the bet faced for a raise
+  function pctPot(d, p) {
+    if (p.action === 'allin') return 'all in'; if (p.action === 'check') return 'a check'; if (p.action === 'call') return 'a call';
+    if (p.action === 'raise' && d.facing > 0) return 'a raise to ' + times(((d.heroIn || 0) + p.size * d.pot) / d.facing);
+    return 'a bet of ' + sizeWord(p.size);
+  }
   // the library or solver graded a size it was not solved for, or turned the bet into all in
   function mapNote(d) {
     if (d.forcedAllin) return 'The solver treats a bet of over two-thirds of your stack as all in. This bet was graded as all in.';
     var m = d.heroMap;
     if (!m || m.mode === 'near' || d.source === 'Estimate') return '';
-    var lib = d.source === 'Library' ? 'The library' : 'The solver', mine = Math.round(100 * m.hero) + '% pot ' + (d.did.action === 'raise' ? 'raise' : 'bet');
-    if (m.mode === 'blend' && m.lo && m.hi) return lib + ' has no ' + mine + ' here. This grade blends its results for ' + pctPot(m.lo) + ' and ' + pctPot(m.hi) + '.';
-    return lib + ' has no ' + mine + ' here. This grade starts from its ' + pctPot(m.near) + ' result and adds a rough cost for the size.';
+    var lib = d.source === 'Library' ? 'The library' : 'The solver', mine = d.did.action === 'raise' && d.facing > 0 ? 'raise to ' + times(((d.heroIn || 0) + m.hero * d.pot) / d.facing) : 'bet of ' + sizeWord(m.hero);
+    if (m.mode === 'blend' && m.lo && m.hi) return lib + ' has no ' + mine + ' here. This grade blends its results for ' + pctPot(d, m.lo) + ' and ' + pctPot(d, m.hi) + '.';
+    return lib + ' has no ' + mine + ' here. This grade starts from its result for ' + pctPot(d, m.near) + ' and adds a rough cost for the size.';
   }
   function evOf(ev, act) {
     if (ev[act] != null) return ev[act];
@@ -182,6 +226,11 @@
       return (isAgg(m.action) ? (m.action === 'allin' ? 'all in' : m.action + (m.sizeLabel ? ' ' + m.sizeLabel : '')) : m.action) + ' ' + r.pct + '%';
     }).join(', ');
   }
+  // each bet or raise in the mix gets its short size label (see sizeText)
+  function labelMix(d) {
+    var sz = szOf(d);
+    d.mix.forEach(function (m) { if (isAgg(m.action)) m.sizeLabel = m.to > 0 && d.bbChips ? sizeText(sz, m.action, m.to / d.bbChips, 'short') : ''; });
+  }
   function F(factors, kind) { return factors.filter(function (f) { return f.kind === kind; })[0]; }
 
   function buildDecision(h, seat, e, opts) {
@@ -191,7 +240,7 @@
     if (isAgg(did.action) && e.street !== 'preflop') did.size = rd(did.add / Math.max(1, e.potBefore), 2);
     var mix = res.mix.map(function (m) {
       var o = { action: m.action, size: m.size, to: m.to || 0, freq: m.freq };
-      if (isAgg(m.action)) { o.toBB = rd(o.to / bb, 1); o.sizeLabel = e.street === 'preflop' ? 'to ' + bbs(o.to / bb) : bbs((o.to - (e.betBefore - e.toCall)) / bb); }
+      if (isAgg(m.action)) o.toBB = rd(o.to / bb, 1);
       return o;
     });
     var d = { n: e.n, street: e.street, board: e.street === 'preflop' ? [] : S.advance(S.tracker(h), e.n).board.slice(), pot: rd(e.potBefore / bb, 1), potBB: rd(potBB, 1),
@@ -209,7 +258,9 @@
     }
     d.boardStr = C.cardsStr(d.board);
     d.heroIn = rd((e.betBefore - e.toCall) / bb, 2); // the hero's chips already in on this street, in bb
+    d.facing = rd(e.betBefore / bb, 2); // the bet the hero faces (street total), in bb
     d.bbChips = bb;
+    labelMix(d);
     if (res.info && res.info.hero && isAgg(did.action)) d.heroEV = res.info.hero.evBB;
     // preflop: an all-in where the chart raises small, with deep stacks
     if (e.street === 'preflop' && did.action === 'allin' && mix.some(function (m) { return m.action === 'raise'; }) && e.stackBefore / bb > 40) {
@@ -504,8 +555,10 @@
       [['station', 'calling station'], ['maniac', 'maniac'], ['nit', ' nit']].forEach(function (c) { if (xt.indexOf(c[1]) >= 0 && K.indexOf(c[0]) < 0) K.push(c[0]); });
     }
     if (d.sizeOff && !sf && d.did.size != null && !(d.exploit && d.exploit.gradedBy === 'exploit' && d.grade === 'Good')) {
-      var rf = d.sizeRef ? potFrac(d, d.sizeRef) : bs ? bs.size : null, sw = rf != null ? sizingWhy(d, rf, tex) : '';
-      out.push('Your ' + (did === 'raise' ? 'raise' : 'bet') + ' was ' + sizeWord(d.did.size) + '. The baseline uses ' + (rf != null ? sizeWord(rf) : 'a different size') + ' here.' + (sw ? ' ' + sw : ''));
+      var rf = d.sizeRef ? potFrac(d, d.sizeRef) : bs ? bs.size : null, sw = rf != null ? sizingWhy(d, rf, tex) : '', szr = szOf(d), rv = did === 'raise';
+      var refTo = d.sizeRef ? d.sizeRef.to / d.bbChips : bs ? (d.heroIn || 0) + bs.amount : null, refAct = d.sizeRef ? d.sizeRef.action : rv ? 'raise' : 'bet';
+      out.push('You ' + (rv ? 'raised ' : 'bet ') + sizeText(szr, did, d.did.toBB, 'long') + '. The baseline '
+        + (refTo != null ? (refAct === 'allin' ? 'moves all in' : verb3(rv ? 'raise' : 'bet') + ' ' + sizeText(szr, rv ? 'raise' : 'bet', refTo, 'long')) : 'uses a different size') + ' here.' + (sw ? ' ' + sw : ''));
     }
     if (mapNote(d)) out.push(mapNote(d));
     if (po) {
@@ -541,8 +594,8 @@
         else if (hero.eqVsCall != null) out.push('When called, the hand has about ' + pc(hero.eqVsCall) + ' against the calling range.');
       } else if (isAgg(best) && did === 'check' && info.bet) {
         if (why.indexOf(pc(info.bet.eqVsCall) + ' of the time') >= 0 || has('semiBluff') || has('protection')) { /* said in the reason */ }
-        else if (d.feat && d.feat.eq >= 0.6 && info.bet.eqVsCall >= 0.5) out.push('A bet of ' + bbs(bs ? bs.amount : 0) + ' gets called by worse hands. It wins about ' + pc(info.bet.eqVsCall) + ' when called.');
-        else if (d.feat && d.feat.eq >= 0.6) out.push('A bet of ' + bbs(bs ? bs.amount : 0) + ' makes the draws pay. It takes the pot at once about ' + pc(info.bet.fold) + ' of the time.');
+        else if (d.feat && d.feat.eq >= 0.6 && info.bet.eqVsCall >= 0.5) out.push('A bet of ' + betOf(d, bs) + ' gets called by worse hands. It wins about ' + pc(info.bet.eqVsCall) + ' when called.');
+        else if (d.feat && d.feat.eq >= 0.6) out.push('A bet of ' + betOf(d, bs) + ' makes the draws pay. It takes the pot at once about ' + pc(info.bet.fold) + ' of the time.');
         else if (dr && dr.outs >= 8) out.push('The ' + dr.label + ' gives ' + dr.outs + ' outs. Betting wins the pot now ' + pc(info.bet.fold) + ' of the time.');
         else out.push('A bet wins the pot at once about ' + pc(info.bet.fold) + ' of the time.' + (d.missedBluff && d.grade !== 'Good' && !d.capped && !d.evSplit ? ' This estimate depends on how often the opponent folds.' : ''));
       } else if (dr && dr.outs >= 8 && d.street !== 'river' && why.indexOf(' outs') < 0) out.push('The ' + dr.label + ' gives ' + dr.outs + ' outs.');
@@ -565,12 +618,12 @@
     var add = m.to / bb - (d.heroIn || 0), mine = d.did.addBB;
     if (!(m.to > 0) || !(d.pot > 0) || Math.abs(add - mine) < 0.1) return null;
     var noun = did === 'raise' || (did === 'allin' && d.toCall > 0) ? 'raise' : 'bet';
-    var sf = { action: m.action, noun: noun, add: rd(add, 1), toBB: rd(m.to / bb, 1), frac: add / d.pot, mine: mine, mineTo: d.did.toBB, bigger: add > mine, who: who };
+    var sf = { action: m.action, noun: noun, add: rd(add, 1), toBB: rd(m.to / bb, 1), frac: add / d.pot, mine: mine, mineTo: d.did.toBB, bigger: add > mine, who: who, sz: szOf(d) };
     if (who) {
       // does the baseline play the same size? its played size nearest the better one, within 15%
       var br = sizeRef(d.mix, { to: m.to }), bAdd = br ? br.to / bb - (d.heroIn || 0) : null;
       sf.baseSame = m.action === 'allin' ? !!(br && br.action === 'allin') : !!(br && br.action !== 'allin' && Math.abs(bAdd / add - 1) <= 0.15);
-      sf.base = br ? { action: br.action, noun: noun, add: rd(bAdd, 1), toBB: rd(br.to / bb, 1), frac: bAdd / d.pot } : null;
+      sf.base = br ? { action: br.action, noun: noun, add: rd(bAdd, 1), toBB: rd(br.to / bb, 1), frac: bAdd / d.pot, sz: sf.sz } : null;
       sf.baseFine = x.baseGrade === 'Good';
       // the player's tendency, when it is what makes the size better
       var t = x.traits || {};
@@ -580,19 +633,24 @@
   }
   // an exploit-graded size verdict: whether the baseline plays the same size, then what the player's real play adds
   function sizeVs(sf, read) {
-    var who = (read ? read + ' ' : '') + 'Against ' + sf.who + (sf.tend ? ', ' + sf.tend + ',' : '\'s real play,'), better = sf.action === 'allin' ? 'moving all in' : 'a ' + sf.noun + ' ' + sizeAmt(sf, 'noun');
+    var who = (read ? read + ' ' : '') + 'Against ' + sf.who + (sf.tend ? ', ' + sf.tend + ',' : '\'s real play,'), better = sf.action === 'allin' ? 'moving all in' : verbIng(sf.noun) + ' ' + sizeAmt(sf, 'verb');
     if (sf.baseSame) return 'The baseline also ' + (sf.action === 'allin' ? 'moves all in' : verb3(sf.noun) + ' ' + sizeAmt(sf, 'verb')) + ' here. ' + who + ' the ' + (sf.action === 'allin' ? 'all in' : (sf.bigger ? 'bigger ' : 'smaller ') + sf.noun) + ' gains even more.';
-    var bal = sf.baseFine ? 'Against a balanced player ' + sizeAmt(sf, 'mine').replace(/^to /, 'a raise to ') + ' is fine.'
+    var bal = sf.baseFine ? 'Against a balanced player, ' + verbIng(sf.noun) + ' ' + sizeAmt(sf, 'mine') + ' is fine.'
       : sf.base ? 'The baseline ' + (sf.base.action === 'allin' ? 'moves all in' : verb3(sf.noun) + ' ' + sizeAmt(sf.base, 'verb')) + ' here.' : '';
     return (bal ? bal + ' ' : '') + who + ' ' + better + ' gains more.';
   }
-  // the sizes in words. mode 'noun': "of about 6.9bb (75% pot)" / "to about 18bb"; 'verb': "about 6.9bb (75% pot)" / "to about 18bb";
-  // 'cost': "about 6.9bb" / "about 18bb"; 'mine': the hero's "4.6bb" / "to 12bb"
+  // the sizes in words. 'verb': "three-quarters of the pot (6.9bb)" / "to 3x (18bb)"; 'cost': the same without "to";
+  // 'mine': the hero's size, "a third of the pot (4.6bb)" / "to 2x (13bb)"
   function sizeAmt(sf, mode) {
-    var r = sf.noun === 'raise', pct = ' (' + Math.round(100 * sf.frac) + '% pot)';
-    if (mode === 'mine') return r ? 'to ' + bbs(sf.mineTo) : bbs(sf.mine);
-    if (mode === 'cost') return 'about ' + bbs(r ? sf.toBB : sf.add);
-    return r ? 'to about ' + bbs(sf.toBB) : (mode === 'noun' ? 'of ' : '') + 'about ' + bbs(sf.add) + pct;
+    var r = sf.noun === 'raise', act = r ? 'raise' : 'bet';
+    if (mode === 'mine') return sizeText(sf.sz, act, sf.mineTo, 'long');
+    var t = sizeText(sf.sz, act, sf.toBB, 'long');
+    return mode === 'cost' ? t.replace(/^to /, '') : t;
+  }
+  // the Estimate's own bet size in words, for "A bet of ..." lines
+  function betOf(d, bs) {
+    if (!bs) return 'this size';
+    return d.pot > 0 ? sizeWord(bs.amount / d.pot) + ' (' + bbs(bs.amount) + ')' : bbs(bs.amount);
   }
   // the cost sentence; when the EV sketch calls two plays close, the grade comes from the baseline's frequencies instead
   function costLine(d) {
@@ -742,7 +800,8 @@
         if (!r) return null;
         var bb = h.bb, e = h.log[d.n];
         var est = d.estimate = { mix: d.mix, ev: d.ev, grade: d.grade, evLost: d.evLost, text: d.text, heroEV: d.heroEV, info: d.info, factors: d.factors };
-        d.mix = r.mix.map(function (m) { var o = { action: m.action, size: m.size, to: m.to || 0, freq: m.freq }; if (isAgg(o.action)) o.sizeLabel = m.size != null ? sizeWord(m.size) : ''; return o; }).sort(function (a, b) { return b.freq - a.freq; });
+        d.mix = r.mix.map(function (m) { var o = { action: m.action, size: m.size, to: m.to || 0, freq: m.freq }; if (isAgg(o.action)) o.toBB = rd(o.to / bb, 1); return o; }).sort(function (a, b) { return b.freq - a.freq; });
+        labelMix(d);
         d.ev = r.ev || {}; d.source = r.source || 'Solved'; d.heroEV = r.heroEV != null ? r.heroEV : null;
         d.heroMap = r.heroMap || null; d.forcedAllin = r.forcedAllin || null;
         // a size too far from the solved ones: keep the Estimate's cost for the size on top of the nearest solved size
@@ -786,7 +845,7 @@
     var out = [];
     out.push('Hand ' + rv.handId + ' (' + rv.mode + '), you in ' + rv.heroPos + ' with ' + rv.heroCards + (rv.board ? ', board ' + rv.board : '') + '. Result ' + (rv.net >= 0 ? '+' : '') + bbs(rv.net) + '.' + (rv.clean ? ' Clean hand.' : ''));
     rv.decisions.forEach(function (d) {
-      var did = (d.did.action === 'allin' ? 'all in' : d.did.action) + (isAgg(d.did.action) ? ' ' + (d.street === 'preflop' ? 'to ' + bbs(d.did.toBB) : bbs(d.did.addBB)) : '');
+      var did = lc(didLabel(d, bbs));
       out.push('  [' + d.grade + (d.evLost ? ', -' + bbs(d.evLost) : '') + '] ' + d.spot + (d.boardStr ? ' on ' + d.boardStr : '') + '. Pot ' + bbs(d.pot) + (d.toCall ? ', ' + bbs(d.toCall) + ' to call' : '') + '. You: ' + did + '. (' + d.source + ')');
       out.push('    ' + d.text);
     });
@@ -794,5 +853,5 @@
     return out.join('\n');
   }
 
-  return { hand: hand, session: session, toText: toText, gradeFor: gradeFor, GRADES: GRADES, LEAKS: LEAKS, GOOD_FREQ: GOOD_FREQ, mixPct: mixPct, GLOSSARY: GLOSSARY, grade: gradeDecision };
+  return { hand: hand, session: session, toText: toText, gradeFor: gradeFor, GRADES: GRADES, LEAKS: LEAKS, GOOD_FREQ: GOOD_FREQ, mixPct: mixPct, didLabel: didLabel, sizeText: sizeText, GLOSSARY: GLOSSARY, grade: gradeDecision };
 });
