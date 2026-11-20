@@ -102,6 +102,16 @@ table.results tr.me td { color: var(--gold2); font-weight: 700; }
 .seat { display: flex; flex-direction: column; align-items: center; width: 132px; z-index: 3; }
 .slot-0.seat { left: 50%; top: 88%; } .slot-1.seat { left: 11%; top: 69%; } .slot-2.seat { left: 11%; top: 28%; }
 .slot-3.seat { left: 50%; top: 10%; } .slot-4.seat { left: 89%; top: 28%; } .slot-5.seat { left: 89%; top: 69%; }
+/* desktop: past 1100x640 the felt keeps that shape and grows to fill the space between the bars; seats, cards,
+   pot and bets scale with it (--s = felt height / 640, held between 1 and 1.5), so 1280x720 and smaller look as before */
+@media (min-width: 641px) {
+  .table-wrap { container-type: size; }
+  .felt { max-width: max(1100px, 100cqh * 1100 / 640); max-height: max(640px, 100cqw * 640 / 1100); }
+  @supports (width: calc(1px * tan(atan2(1cqh, 640px)))) {
+    .felt { --s: clamp(1, tan(atan2(min(100cqh, 100cqw * 640 / 1100), 640px)), 1.5); }
+    .seat, .bet, .dealer, .center { transform: translate(-50%, -50%) scale(var(--s)); }
+  }
+}
 .slot-0.bet { left: 50%; top: 66%; } .slot-1.bet { left: 27%; top: 61%; } .slot-2.bet { left: 27%; top: 38%; }
 .slot-3.bet { left: 50%; top: 30%; } .slot-4.bet { left: 73%; top: 38%; } .slot-5.bet { left: 73%; top: 61%; }
 .slot-0.dealer { left: 61%; top: 72%; } .slot-1.dealer { left: 21%; top: 54%; } .slot-2.dealer { left: 21%; top: 44%; }
