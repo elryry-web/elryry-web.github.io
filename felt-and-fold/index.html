@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f2a1e">
+<title>Felt &amp; Fold</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="four-color">
+<div id="app">
+
+  <section class="screen on" id="scr-title">
+    <div class="title-wrap">
+      <div class="logo"><span class="suit s">&#9824;</span><h1>Felt &amp; Fold</h1><span class="suit h">&#9829;</span></div>
+      <p class="tag">No-limit hold'em, with a coach who reviews every hand you play.</p>
+      <nav class="menu">
+        <button class="btn primary big" data-go="cash">Cash games</button>
+        <button class="btn big" data-go="tour">Tournaments</button>
+        <button class="btn big" data-go="custom">Custom table</button>
+        <div class="menu-row">
+          <button class="btn" data-go="settings">Settings</button>
+          <button class="btn" data-go="about">About the coach</button>
+        </div>
+      </nav>
+      <div id="title-session" class="title-session"></div>
+    </div>
+  </section>
+
+  <section class="screen" id="scr-cash">
+    <header class="lobby-head"><button class="btn sm back" data-go="title">&#8592; Menu</button><h2>Cash games</h2></header>
+    <div id="cash-body" class="lobby"></div>
+  </section>
+
+  <section class="screen" id="scr-tour">
+    <header class="lobby-head"><button class="btn sm back" data-go="title">&#8592; Menu</button><h2>Tournaments</h2></header>
+    <div id="tour-body" class="lobby"></div>
+  </section>
+
+  <section class="screen" id="scr-custom">
+    <header class="lobby-head"><button class="btn sm back" data-go="title">&#8592; Menu</button><h2>Custom table</h2></header>
+    <div id="custom-body" class="lobby"></div>
+  </section>
+
+  <section class="screen" id="scr-settings">
+    <header class="lobby-head"><button class="btn sm back" data-go="title">&#8592; Menu</button><h2>Settings</h2></header>
+    <div id="settings-body" class="lobby"></div>
+  </section>
+
+  <section class="screen" id="scr-about">
+    <header class="lobby-head"><button class="btn sm back" data-go="title">&#8592; Menu</button><h2>About the coach</h2></header>
+    <div class="lobby prose">
+      <p>After each hand you played, the coach looks at every decision you made. It compares your action with a baseline strategy. Each decision gets a grade and a number: the big blinds you gave up against that baseline.</p>
+      <h4>Where the baseline comes from</h4>
+      <p>Before the flop, the baseline is a set of opening, 3-bet and defence charts. Short stacks in tournaments use Nash push-or-fold tables.</p>
+      <p>After the flop, the baseline is usually an estimate. It weighs your equity against the range your opponent likely holds, the pot odds and the board. It is a good guide. It is not a solver.</p>
+      <p>Heads-up pots can get a real solver answer. Turn and river spots are solved live while you read the review. Some flops come from a library of solved spots. Pots with three or more players always use the estimate.</p>
+      <h4>The labels</h4>
+      <dl class="labels">
+        <dt><span class="src src-solved">Solved</span></dt><dd>Solved for this exact spot, from the start of the street, with ranges from the hand so far.</dd>
+        <dt><span class="src src-library">Library</span></dt><dd>Read from a solved flop with the same structure. Suits are mapped onto your board, and sizes are scaled to your pot.</dd>
+        <dt><span class="src src-estimate">Estimate</span></dt><dd>The heuristic baseline. Treat the grade as advice. An Estimate grade stops at Mistake unless the pot odds settle it.</dd>
+        <dt><span class="src src-chart">Chart</span></dt><dd>From the preflop chart for this position and stack depth.</dd>
+        <dt><span class="src src-nash">Nash</span></dt><dd>From the Nash push/fold ranges for 15bb and under.</dd>
+      </dl>
+      <h4>Grades</h4>
+      <p><span class="grade g-good">Good</span> <span class="grade g-inacc">Inaccuracy</span> <span class="grade g-mistake">Mistake</span> <span class="grade g-blunder">Blunder</span></p>
+      <p>A mixed strategy shows as a bar. If the baseline plays an action some of the time, choosing it is fine.</p>
+      <p>Each grade comes with a reason. Tap an underlined term in it to see what the term means.</p>
+      <h4>The players</h4>
+      <p>Opponents come in five tiers, from Beginner to Solver, and seven styles. Each one adapts a little to how you play. Their names are made up.</p>
+      <p class="muted small">Live solving is skipped on phones. Your settings, bankroll and records are saved in this browser only.</p>
+    </div>
+  </section>
+
+  <section class="screen" id="scr-table">
+    <header class="tbar">
+      <button class="btn sm" id="tb-menu" aria-label="Leave table">&#8592; Leave</button>
+      <div id="tinfo" class="tinfo"></div>
+      <div class="tbtns">
+        <span id="tctl"></span>
+        <button class="btn sm" id="tb-hist">History</button>
+        <button class="btn sm" id="tb-stats">Stats</button>
+        <button class="btn sm icon" id="tb-set" aria-label="Settings">&#9881;</button>
+      </div>
+    </header>
+    <div class="table-wrap"><div id="felt" class="felt"></div></div>
+    <div id="actionbar" class="actionbar"></div>
+  </section>
+
+  <section class="screen" id="scr-finish">
+    <div id="finish-body" class="lobby finish"></div>
+  </section>
+
+</div>
+<aside id="review" class="review" aria-label="Hand review"></aside>
+<aside id="drawer" class="review drawer" aria-label="Session"></aside>
+<div id="toasts" class="toasts" aria-live="polite"></div>
+
+<script src="js/cards.js"></script>
+<script src="js/equity169-data.js"></script>
+<script src="js/pushfold-data.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/tournament.js"></script>
+<script src="js/ranges.js"></script>
+<script src="js/strategy.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/review.js"></script>
+<script src="solver/js/flop-subsets-data.js"></script>
+<script src="solver/js/flop-map.js"></script>
+<script src="solver/js/library-reader.js"></script>
+<script src="solver/js/solver-client.js"></script>
+<script src="js/solver-provider.js"></script>
+<script src="js/ui-core.js"></script>
+<script src="js/ui-table.js"></script>
+<script src="js/ui-review.js"></script>
+<script src="js/ui-modes.js"></script>
+<script src="js/ui-app.js"></script>
+</body>
+</html>
