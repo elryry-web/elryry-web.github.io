@@ -290,7 +290,9 @@
       // the open's size: scale the defence by its MDF against the standard open's
       var oIn = firstR.pos === 'SB' ? 0.5 : firstR.pos === 'BB' ? 1 : 0, o0 = open(firstR.pos);
       sizeR = sizeScale(potD - firstR.toBB - callers * (firstR.toBB - o0), firstR.toBB - oIn, o0 - oIn);
-      s = resize(s, sizeR, rfiAt(VS_OPEN[key] ? key.split('>')[1] : firstR.pos, depth).raise, key + depth + kind + callers + limps.length);
+      var basePos = VS_OPEN[key] ? key.split('>')[1] : firstR.pos;
+      if (!RFI[basePos]) basePos = 'SB'; // the BB raising a limp has no open chart; the SB's wide open stands in
+      s = resize(s, sizeR, rfiAt(basePos, depth).raise, key + depth + kind + callers + limps.length);
       if (depth === 25) rt = bb;
     } else if (raises.length === 2) {
       if (firstR.pos === hero) {

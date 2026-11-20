@@ -1,0 +1,57 @@
+/* Card faces: aged ivory stock, a corner index (rank over a small pip) and a big pip bottom-right.
+   Markup from UI.cardHtml (js/ui-core.js). Width/height per size stay in style.css; here every face measurement is
+   in em of a base font-size set per size (base = card width / 5), so one layout serves every card size. Backs untouched. */
+.card:not(.back) {
+  --ink-red: #a61d1a; --ink-black: #17130f; --ink-green: #1a6431; --ink-blue: #1b4c9a;
+  font-size: 10px; padding: 0; display: block; overflow: hidden; border-radius: .62em;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .25 0 0 0 0 .12 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='.22'/%3E%3C/svg%3E"),
+    radial-gradient(120% 90% at 30% 18%, rgba(255,253,244,.9) 0%, rgba(255,253,244,0) 60%),
+    linear-gradient(165deg, #fbf5e4 0%, #f3e9cf 58%, #e8dbbb 100%);
+  background-color: #f4ead2;
+  box-shadow: 0 0 0 1px rgba(70,45,20,.35), 0 1px 1px rgba(0,0,0,.35), 0 3px 8px rgba(0,0,0,.5);
+}
+/* thin printed frame line just inside the edge */
+.card:not(.back)::after { content: ""; position: absolute; inset: .2em; border: 1px solid rgba(120,84,40,.32); border-radius: .45em; pointer-events: none; }
+/* court cards without art (the image failed): a double gold-brown frame, the only court touch */
+.card.court:not(.art)::after { border: 3px double rgba(150,108,42,.6); inset: .18em; }
+
+.card .ci { position: absolute; left: .34em; top: .3em; width: 2em; display: flex; flex-direction: column; align-items: center; line-height: 1; }
+.card .ck { font: 700 2.25em/0.92 Georgia, "Noto Serif", "Droid Serif", "Times New Roman", serif; letter-spacing: -.02em;
+  display: inline-block; transform: scaleX(.88); white-space: nowrap; }
+.card.ten .ck { letter-spacing: -.09em; transform: scaleX(.74); margin-left: -.06em; }
+.card .cq { width: 1.15em; height: 1.15em; margin-top: .14em; display: block; }
+.card .cb { position: absolute; right: .36em; bottom: .38em; width: 2.75em; height: 2.75em; display: block;
+  filter: drop-shadow(0 .05em 0 rgba(255,255,255,.55)); }
+.card.ace .cb { width: 3.15em; height: 3.15em; right: .3em; bottom: .32em; }
+.card svg path { fill: currentColor; }
+
+/* inks: deep warm red and near-black; the four-colour deck keeps its green clubs and blue diamonds, deepened */
+.card.s-h { color: var(--ink-red); } .card.s-s { color: var(--ink-black); }
+body:not(.four-color) .card.s-d { color: var(--ink-red); } body:not(.four-color) .card.s-c { color: var(--ink-black); }
+body.four-color .card.s-d { color: var(--ink-blue); } body.four-color .card.s-c { color: var(--ink-green); }
+
+/* sizes (base = width / 5) */
+.card.sm:not(.back) { font-size: 7.2px; }
+.seat.hero .card.sm:not(.back) { font-size: 9.2px; }
+.card.sm:not(.back)::after { inset: .25em; }
+@media (max-width: 640px) {
+  .card:not(.back) { font-size: 8px; }
+  .card.sm:not(.back) { font-size: 6px; }
+  .seat.hero .card.sm:not(.back) { font-size: 8.8px; }
+}
+/* seat cards tuck their bottom ~1.4em under the name plate (.hole margin-bottom), so lift the big pip clear of it */
+.hole .card .cb { width: 2.45em; height: 2.45em; right: .32em; bottom: 1.45em; }
+.hole .card.ace .cb { width: 2.7em; height: 2.7em; right: .26em; bottom: 1.4em; }
+
+/* painted courts (art/courts/, a 0.64 panel with its own gold frame): the panel fills the face inside a slim ivory
+   margin, and the corner index sits on an ivory plate over it. Faces are in the top half of every panel, clear of the
+   name plate that covers the bottom 1.4em of seat cards. No big pip and no printed frame line. */
+.card.art .cp { position: absolute; left: .38em; right: .38em; top: .26em; bottom: .26em; width: calc(100% - .76em); height: calc(100% - .52em);
+  object-fit: cover; object-position: 50% 0; border-radius: .3em; display: block; pointer-events: none; }
+.card.art .cb, .card.art::after { display: none; }
+.card.art .ci { left: .14em; top: .12em; width: 1.82em; padding: .1em 0 .14em; border-radius: .38em .2em .5em .2em;
+  background: linear-gradient(165deg, #fdf8ea 0%, #f1e6c9 100%);
+  box-shadow: 0 0 0 1px rgba(150,108,42,.75), .06em .1em .25em rgba(0,0,0,.45); }
+.card.art .ck { transform: scaleX(.82); }
+.card.art .cq { width: 1em; height: 1em; margin-top: .1em; }

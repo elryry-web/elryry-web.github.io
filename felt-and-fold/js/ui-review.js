@@ -22,7 +22,8 @@
     return { street: d.street, boardStr: d.boardStr, grade: d.grade, evLost: d.evLost, source: d.source, spot: d.spot, pot: d.pot, toCall: d.toCall,
       did: { action: d.did.action, toBB: d.did.toBB, addBB: d.did.addBB }, hand: d.hand, leak: d.leak, text: d.text, concepts: d.concepts || [],
       mix: d.mix.filter(m => m.freq >= 0.005).map(m => ({ action: m.action, sizeLabel: m.sizeLabel, freq: r2(m.freq) })),
-      exploit: d.exploit ? { gradedBy: d.exploit.gradedBy, name: d.exploit.name, best: d.exploit.best, baseGrade: d.exploit.baseGrade } : null };
+      exploit: d.exploit ? { gradedBy: d.exploit.gradedBy, name: d.exploit.name, best: d.exploit.best, baseGrade: d.exploit.baseGrade, state: d.exploit.state } : null,
+      later: d.later || '' };
   }
   function pack(e) {
     const rv = e.rv, rc = rv.recap;
@@ -47,7 +48,8 @@
   // ---------------------------------------------------------------- review an engine hand
   R.add = function (h, heroSeat, meta) {
     if (FF.SolverProvider) FF.SolverProvider.remember(h);
-    const rv = FF.Review.hand(h, heroSeat);
+    const m = meta || {};
+    const rv = FF.Review.hand(h, heroSeat, { reads: m.reads || null, profiles: m.profiles || null });
     const last = R.entries[R.entries.length - 1];
     const entry = { n: last ? last.n + 1 : 1, rv: rv, h: h, meta: meta || {}, solving: false, at: Date.now() };
     R.entries.push(entry);
@@ -104,7 +106,8 @@
       '<div class="dspot">' + UI.esc(d.spot) + '. Pot ' + UI.trim(d.pot, 1) + ' bb' + (d.toCall ? ', ' + UI.trim(d.toCall, 1) + ' bb to call' : '') + '.</div>' +
       '<div class="ddid">You: <b>' + UI.esc(didText(d)) + '</b>' + (d.hand ? ' with ' + UI.esc(d.hand) : '') + '</div>' +
       mixBar(d.mix) +
-      '<p class="dtext">' + termsHtml(UI.esc(d.text), d.concepts) + '</p></div>';
+      '<p class="dtext">' + termsHtml(UI.esc(d.text), d.concepts) + '</p>' +
+      (d.later ? '<p class="dlater">' + UI.esc(d.later) + '</p>' : '') + '</div>';
   }
   // the first mention of each concept the reason names becomes a button that opens its definition in place
   function termsHtml(html, keys) {
@@ -208,7 +211,7 @@
       '<div><b>' + s.clean + '</b><span>clean hands</span></div></div>' +
       '<div class="gradecount">' + ['Good', 'Inaccuracy', 'Mistake', 'Blunder'].map(g => '<span class="grade ' + GRADE_CLS[g] + '">' + g + ' ' + s.grades[g] + '</span>').join('') + '</div>';
     html += '<h4>Top leaks</h4>' + (s.leaks.length ? '<ol class="leaks">' + s.leaks.slice(0, 5).map(x => '<li>' + UI.esc(x.text) + '</li>').join('') + '</ol>' : '<p class="muted">No leaks found yet.</p>');
-    if (s.exploitLeaks.length) html += '<h4>Against these players</h4><ol class="leaks">' + s.exploitLeaks.slice(0, 3).map(x => '<li>' + UI.esc(x.text) + '</li>').join('') + '</ol>';
+    if (s.exploitLeaks.length) html += '<h4>Against this table&rsquo;s players</h4><ol class="leaks">' + s.exploitLeaks.slice(0, 3).map(x => '<li>' + UI.esc(x.text) + '</li>').join('') + '</ol>';
     openDrawer('stats', 'Session stats', html);
   };
   R.reset = function () { R.entries.forEach(e => { e.saved = true; }); }; // starts a fresh session; the saved history stays

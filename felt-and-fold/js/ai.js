@@ -454,5 +454,5 @@
 
   return { TIERS: TIERS, STYLES: STYLES, TIER_NAMES: TIER_NAMES, STYLE_NAMES: STYLE_NAMES, CASH_STAKES: CASH, TOURNEY_FIELDS: TOURNEY,
     profile: profile, uniqueProfile: uniqueProfile, takenNames: takenNames, create: create, field: field, exploitFor: exploitFor, observeHand: observeHand, emptyStats: emptyStats, postAdj: postAdj,
-    model: model, traits: traits, exploitable: exploitable };
+    model: model, traits: traits, exploitable: exploitable, STYLE_BY_TIER: STYLE_BY_TIER };
 });

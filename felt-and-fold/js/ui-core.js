@@ -11,7 +11,7 @@
   UI.save = function (key, val) { try { localStorage.setItem('ff.' + key, JSON.stringify(val)); } catch (e) { /* private mode */ } };
   UI.remove = function (key) { try { localStorage.removeItem('ff.' + key); } catch (e) { /* ignore */ } };
 
-  const DEFAULTS = { speed: 'normal', chat: true, hud: false, sound: false, units: 'bb', fourColor: true, autoSkip: true, cardBack: 'oxblood' };
+  const DEFAULTS = { speed: 'normal', chat: true, hud: false, sound: false, units: 'bb', fourColor: true, autoSkip: true, cardBack: 'oxblood', reads: true };
   UI.settings = Object.assign({}, DEFAULTS, UI.load('settings', {}));
   UI.saveSettings = function () { UI.save('settings', UI.settings); UI.applySettings(); };
   UI.applySettings = function () {
@@ -71,9 +71,26 @@
   UI.rankTxt = r => r === 8 ? '10' : RANK_TXT[r];
   UI.cardHtml = function (c, cls) {
     if (c == null || c < 0) return '<div class="card back ' + (cls || '') + '"></div>';
-    const r = c >> 2, s = c & 3;
-    return '<div class="card s-' + SUIT_CLS[s] + ' ' + (cls || '') + '"><span class="cr">' + UI.rankTxt(r) + '</span><span class="cs">' + SUIT_SYM[s] + '</span></div>';
+    const r = c >> 2, s = c & 3, pip = UI.suitSvg(s);
+    // face: corner index (rank over a small pip) and a big pip bottom-right; styled in css/cards.css.
+    // J, Q, K add a painted panel (art/courts/); if it fails to load, onerror drops .art and the plain court look returns.
+    const court = r >= 9 && r <= 11;
+    const art = court ? '<img class="cp" src="art/courts/' + 'jqk'[r - 9] + SUIT_CLS[s] + '.webp" alt="" draggable="false" onerror="this.parentNode.classList.remove(\'art\');this.remove()">' : '';
+    return '<div class="card s-' + SUIT_CLS[s] + (court ? ' court art' : r === 12 ? ' ace' : r === 8 ? ' ten' : '') + ' ' + (cls || '') + '" aria-label="' + UI.rankTxt(r) + SUIT_CLS[s] + '">' + art +
+      '<span class="ci"><span class="ck">' + UI.rankTxt(r) + '</span>' + pip.replace('<svg', '<svg class="cq"') + '</span>' + pip.replace('<svg', '<svg class="cb"') + '</div>';
   };
+  // suit shapes as inline SVG (viewBox 0 0 100 100) so every browser draws the same pip, never an emoji
+  const SUIT_PATH = [
+    // club: three lobes, a filled centre, a flared stem
+    'M29 27a21 21 0 1 0 42 0a21 21 0 1 0-42 0ZM6 60a21 21 0 1 0 42 0a21 21 0 1 0-42 0ZM52 60a21 21 0 1 0 42 0a21 21 0 1 0-42 0ZM39 38L32 62H68L61 38ZM46 62C46 80 41 89 31 97h38C59 89 54 80 54 62Z',
+    // diamond: slightly pinched sides
+    'M50 2Q66 30 88 50Q66 70 50 98Q34 70 12 50Q34 30 50 2Z',
+    // heart
+    'M50 92C22 70 4 52 4 31C4 15 16 5 29 5C39 5 46 11 50 20C54 11 61 5 71 5C84 5 96 15 96 31C96 52 78 70 50 92Z',
+    // spade: inverted heart with a flared stem
+    'M50 3C63 23 95 40 95 62C95 76 84 84 73 84C64 84 57 80 54 73C54 84 58 91 67 97H33C42 91 46 84 46 73C43 80 36 84 27 84C16 84 5 76 5 62C5 40 37 23 50 3Z'
+  ];
+  UI.suitSvg = s => '<svg viewBox="0 0 100 100" aria-hidden="true"><path d="' + SUIT_PATH[s] + '"/></svg>';
   UI.cardsHtml = function (arr, cls) { return (arr || []).map(c => UI.cardHtml(c, cls)).join(''); };
   // inline text cards: "Kh Js" -> coloured spans
   UI.cardsText = function (str) {
@@ -277,5 +294,21 @@
     const p = (a, b) => b ? Math.round(100 * a / b) : 0;
     const af = x.calls ? UI.trim(x.agg / x.calls, 1) : (x.agg ? x.agg + '' : '0');
     return p(x.vpip, x.hands) + '/' + p(x.pfr, x.hands) + '/' + p(x.tb, x.tbOpp) + ' AF ' + af + ' (' + x.hands + ')';
+  };
+  // ---------------------------------------------------------------- player reads (FF.Reads): only what the hero saw, kept under ff.reads
+  // ctx: {kind:'cash', stake} or {kind:'tourney', buyIn}; null on a custom table, where the hero chose the profiles
+  UI.Reads = {
+    book: (function () { const b = UI.load('reads', {}); return b && typeof b === 'object' && !Array.isArray(b) ? b : {}; })(),
+    ctx: null,
+    start(ctx) { this.ctx = ctx || null; },
+    // reads for every opponent in h, as of before h
+    before(h) { return this.ctx ? FF.Reads.forReview(this.book, h, 'hero', this.ctx) : null; },
+    observe(h) { FF.Reads.observe(this.book, h, 'hero'); FF.Reads.prune(this.book); UI.save('reads', this.book); },
+    // the read for a seat tag: null before enough sample, on a custom table, or with the setting off
+    tag(p) {
+      if (!this.ctx || !UI.settings.reads || !p) return null;
+      const r = FF.Reads.read(this.book[p.id], FF.Reads.prior(this.ctx), p.name);
+      return r.state === 'read' ? r : null;
+    }
   };
 })();

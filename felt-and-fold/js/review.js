@@ -232,13 +232,13 @@
   // Regular, Shark and Solver the baseline grades and the second view only adds a sentence when the two disagree.
   var STYLE_WORD = { Nit: 'a nit', Rock: 'a rock', TAG: 'a tight-aggressive player', LAG: 'a loose-aggressive player', 'Calling Station': 'a calling station',
     Maniac: 'a maniac', Trappy: 'a trappy player' };
+  // the profile the review may use: the read as of this hand (opts.reads, from FF.Reads), or a profile the hero
+  // chose (opts.profiles, custom tables and tests). The hidden profile at the seat is never used.
   function profileOf(h, s, opts) {
-    var p = h.players[s], pr = opts.profiles && p && opts.profiles[p.id];
-    if (pr && pr.tier) return pr;
-    if (p && p.tier && p.style) return p;
-    var seats = h.table && h.table.seats;
-    if (seats) for (var k = 0; k < seats.length; k++) if (seats[k] && p && seats[k].id === p.id && seats[k].tier) return seats[k];
-    return null;
+    var p = h.players[s], rr = opts.reads && p && opts.reads[p.id];
+    if (rr && rr.profile && rr.profile.tier) return { tier: rr.profile.tier, style: rr.profile.style, name: p.name, read: rr };
+    var pr = opts.profiles && p && opts.profiles[p.id];
+    return pr && pr.tier ? pr : null;
   }
   function modelsFor(h, seat, opts) {
     if (!AI || !AI.model) return null;
@@ -246,7 +246,9 @@
     h.order.forEach(function (s) {
       if (s === seat) return;
       var pr = profileOf(h, s, opts); if (!pr || !AI.TIERS[pr.tier]) return;
-      m[s] = AI.model(pr); m[s].name = (pr.name || h.players[s].name || 'This player').split(' ')[0]; sig.push(s + pr.tier + pr.style); any = true;
+      m[s] = AI.model(pr); m[s].person = (pr.name || h.players[s].name || 'This player').split(' ')[0]; m[s].read = pr.read || null;
+      m[s].name = pr.read && pr.read.state === 'prior' ? pr.read.label : m[s].person;
+      sig.push(s + pr.tier + pr.style); any = true;
     });
     return any ? { models: m, sig: sig.join('|') } : null;
   }
@@ -264,8 +266,9 @@
     var bb = d.bestAction ? evOf(ev, d.bestAction) : null;
     var differ = Math.abs(loss - lossB) > thr || (actKind(best) !== actKind(d.bestAction || did) && bb != null && bestV - bb > thr);
     d.exploit = { ev: ev, best: best, bestEV: rd(bestV, 2), heroEV: rd(heroEV, 2), loss: rd(loss, 2), gradedBy: AI.exploitable(mdl.profile) ? 'exploit' : 'baseline',
-      differ: differ, name: mdl.name, id: h.players[x.villain].id, tier: mdl.tier, style: mdl.style, traits: mdl.traits, eq: rd(x.eq, 3), eqBase: rd(x.eqBase, 3),
+      differ: differ, name: mdl.name, person: mdl.person, state: mdl.read ? mdl.read.state : 'known', id: h.players[x.villain].id, tier: mdl.tier, style: mdl.style, traits: mdl.traits, eq: rd(x.eq, 3), eqBase: rd(x.eqBase, 3),
       info: { hero: x.info.hero || null, bet: x.info.bet || x.info.raise || null }, rangePct: x.rangePct, basePct: x.basePct };
+    d.exploit.who = mdl.read ? mdl.read.line : whoLine(d.exploit);
   }
   // the exploit view grades: same thresholds, no frequency floor, Blunder only when the numbers settle it
   function applyExploit(d) {
@@ -293,24 +296,25 @@
     return x.name + ' is ' + (tw ? tw + (x.style === 'TAG' ? '' : ' and ' + st) : st) + '.';
   }
   // the sentences the exploit view adds to the review text
-  function exploitText(d) {
+  // said: the head already opened with the read sentence
+  function exploitText(d, said) {
     var x = d.exploit; if (!x) return '';
     var did = d.did.action, rl = readLine(d), out = [];
     if (x.gradedBy === 'exploit') {
       if (!x.differ && !rl) return '';
-      out.push(whoLine(x)); if (rl && !(d.sizeFix && d.sizeFix.tend)) out.push(rl);
+      if (!said) out.push(x.who); if (rl && !(d.sizeFix && d.sizeFix.tend)) out.push(rl);
       var xb = x.info.bet, xh = x.info.hero;
       if (d.sizeFix) { /* the verdict already names the better size */ }
       else if (x.best === did && x.loss > 0.05 && xb && xh) out.push('Against ' + x.name + ', a ' + (xb.to > xh.to ? 'bigger' : 'smaller') + ' ' + (did === 'raise' ? 'raise' : 'bet') + ' scores more: about ' + bbs(x.bestEV) + ', against ' + bbs(x.heroEV) + ' for yours.');
       else if (x.best !== did && x.loss > 0.05) out.push('Against ' + x.name + ', ' + verbIng(x.best) + ' is worth about ' + bbs(x.bestEV) + ' and ' + verbIng(did) + ' about ' + bbs(x.heroEV) + '.');
       else out.push('Against ' + x.name + ', ' + verbIng(did) + ' is the best play here, worth about ' + bbs(x.heroEV) + '.');
-      if (x.baseGrade !== d.grade && !d.sizeFix) out.push('Against a balanced opponent this would be ' + (x.baseGrade === 'Good' ? 'fine' : (x.baseGrade === 'Inaccuracy' ? 'an ' : 'a ') + x.baseGrade.toLowerCase()) + '. The grade follows ' + x.name + '\'s real play.');
+      if (x.baseGrade !== d.grade && !d.sizeFix) out.push('Against a balanced opponent this would be ' + (x.baseGrade === 'Good' ? 'fine' : (x.baseGrade === 'Inaccuracy' ? 'an ' : 'a ') + x.baseGrade.toLowerCase()) + '. The grade follows ' + (x.state === 'prior' ? 'how ' + x.name + ' plays' : x.name + '\'s real play') + '.');
       return out.join(' ');
     }
     if (!x.differ) return '';
-    out.push(whoLine(x));
-    out.push('Against ' + x.name + '\'s real play, ' + (x.best === did ? verbIng(did) + ' scores best, worth about ' + bbs(x.heroEV) + '.' : x.bestEV - x.heroEV < 0.3 ? verbIng(x.best) + ' and ' + verbIng(did) + ' score about the same.' : verbIng(x.best) + ' scores about ' + bbs(x.bestEV - x.heroEV) + ' more than ' + verbIng(did) + '.'));
-    out.push('The grade still follows the baseline, because a ' + x.tier + ' player adjusts.');
+    out.push(x.who);
+    out.push('Against ' + x.name + (x.state === 'prior' ? '\'s usual play, ' : '\'s real play, ') +(x.best === did ? verbIng(did) + ' scores best, worth about ' + bbs(x.heroEV) + '.' : x.bestEV - x.heroEV < 0.3 ? verbIng(x.best) + ' and ' + verbIng(did) + ' score about the same.' : verbIng(x.best) + ' scores about ' + bbs(x.bestEV - x.heroEV) + ' more than ' + verbIng(did) + '.'));
+    out.push('The grade still follows the baseline, because ' + (x.tier === 'Regular' ? 'a regular' : 'a strong player') + ' adjusts.');
     return out.join(' ');
   }
 
@@ -483,7 +487,7 @@
     var dup = why && why.indexOf('The baseline ' + verb3(top) + ' ') >= 0;
     var sf = d.sizeFix = sizeFix(d), sfw = sf ? sizingWhy(d, sf.frac, tex) : '';
     var head = sf ? d.grade + '. ' + cap(verbIng(sf.noun)) + ' was right. The size was too ' + (sf.bigger ? 'small' : 'big') + '. '
-        + (sf.who ? sizeVs(sf)
+        + (sf.who ? sizeVs(sf, d.exploit.who)
           : 'The baseline ' + (sf.action === 'allin' ? 'moves all in' : verb3(sf.noun) + ' ' + sizeAmt(sf, 'verb')) + ' here.')
         + (d.feat ? ' ' + handLine(d.feat) : '') + (sfw ? ' ' + sfw : '') + (why ? ' ' + why : '')
       : d.evSplit ? d.grade + '. The baseline ' + verb3(top) + ' here ' + (d.mix[0].freq < 0.97 ? pc(d.mix[0].freq) + ' of the time' : 'almost always') + ', but its EV estimate rates ' + verbIng(did) + ' ' + (d.evSplit < 1 ? 'slightly' : 'about ' + bbs(d.evSplit)) + ' higher. This spot is unsettled.' + (why ? ' The case for ' + verbIng(top) + ': ' + why.charAt(0).toLowerCase() + why.slice(1) : '')
@@ -494,7 +498,7 @@
       : d.exploit && d.exploit.gradedBy === 'exploit' && d.exploit.baseGrade !== 'Good' ? 'Good. ' + pref
       : 'Good. ' + pref + ' ' + cap(verbIng(did)) + ((d.cost || 0) < 0.1 ? ' scores about the same in EV.' : ' costs about ' + bbs(d.cost) + '. That is too small to count as an error.');
     out.push(head);
-    var xt = exploitText(d);
+    var xt = exploitText(d, !!(sf && sf.who));
     if (xt) {
       out.push(xt);
       [['station', 'calling station'], ['maniac', 'maniac'], ['nit', ' nit']].forEach(function (c) { if (xt.indexOf(c[1]) >= 0 && K.indexOf(c[0]) < 0) K.push(c[0]); });
@@ -528,7 +532,7 @@
       }
       var xg = d.exploit && d.exploit.gradedBy === 'exploit' ? d.exploit.info.hero || d.exploit.info.bet : null;
       if (xg && isAgg(did)) {
-        if (d.feat && d.feat.eq < 0.35) out.push(d.exploit.name + ' folds to this bet about ' + pc(xg.fold) + ' of the time.');
+        if (d.feat && d.feat.eq < 0.35) out.push(cap(d.exploit.name) + ' folds to this bet about ' + pc(xg.fold) + ' of the time.');
         else if (xg.eqVsCall != null && why.indexOf('When ' + d.exploit.name + ' calls') < 0) out.push('When ' + d.exploit.name + ' calls, the hand wins about ' + pc(xg.eqVsCall) + '.');
       } else if (isAgg(did) && hero && hero.fold != null) {
         var bet = d.did.add / h.bb, be = bet / (d.potBB + bet);
@@ -575,8 +579,8 @@
     return sf;
   }
   // an exploit-graded size verdict: whether the baseline plays the same size, then what the player's real play adds
-  function sizeVs(sf) {
-    var who = 'Against ' + sf.who + (sf.tend ? ', ' + sf.tend + ',' : '\'s real play,'), better = sf.action === 'allin' ? 'moving all in' : 'a ' + sf.noun + ' ' + sizeAmt(sf, 'noun');
+  function sizeVs(sf, read) {
+    var who = (read ? read + ' ' : '') + 'Against ' + sf.who + (sf.tend ? ', ' + sf.tend + ',' : '\'s real play,'), better = sf.action === 'allin' ? 'moving all in' : 'a ' + sf.noun + ' ' + sizeAmt(sf, 'noun');
     if (sf.baseSame) return 'The baseline also ' + (sf.action === 'allin' ? 'moves all in' : verb3(sf.noun) + ' ' + sizeAmt(sf, 'verb')) + ' here. ' + who + ' the ' + (sf.action === 'allin' ? 'all in' : (sf.bigger ? 'bigger ' : 'smaller ') + sf.noun) + ' gains even more.';
     var bal = sf.baseFine ? 'Against a balanced player ' + sizeAmt(sf, 'mine').replace(/^to /, 'a raise to ') + ' is fine.'
       : sf.base ? 'The baseline ' + (sf.base.action === 'allin' ? 'moves all in' : verb3(sf.noun) + ' ' + sizeAmt(sf.base, 'verb')) + ' here.' : '';

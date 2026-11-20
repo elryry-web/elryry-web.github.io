@@ -42,12 +42,34 @@
     UI.hudObserve(h);
     const hs = h.order.find(s => h.players[s].id === HERO.id);
     g.hands++;
+    // reads as of before this hand grade it; this hand then joins the book
+    let reads = null;
+    if (UI.Reads.ctx) {
+      try { reads = UI.Reads.before(h); UI.Reads.observe(h); laterNotes(h); } catch (e) { console.error('reads failed', e); }
+    }
     if (hs == null || !heroActed(h, hs) || g.leave) return;
     await UI.sleep(20);
     let entry;
-    try { entry = UI.Review.add(h, hs, { label: label }); } catch (e) { console.error('review failed', e); return; }
+    try { entry = UI.Review.add(h, hs, { label: label, reads: reads, profiles: g.practice ? g.profiles : null }); } catch (e) { console.error('review failed', e); return; }
     if (entry.rv.clean && UI.settings.autoSkip) { setBarMsg('Hand ' + entry.n + ' was clean.'); return; }
     await UI.Review.open(entry, 'Next hand');
+  }
+  // once a newer read shows a different player, earlier decisions this session get one gentle note (never a grade)
+  function laterNotes(h) {
+    const pri = FF.Reads.prior(UI.Reads.ctx);
+    h.order.forEach(s => {
+      const p = h.players[s]; if (p.id === HERO.id) return;
+      const now = FF.Reads.read(UI.Reads.book[p.id], pri, p.name);
+      if (now.state !== 'read') return;
+      UI.Review.entries.forEach(e => {
+        if (e.saved || !e.rv) return;
+        e.rv.decisions.forEach(d => {
+          if (d.later || !d.exploit || d.exploit.id !== p.id || d.exploit.state === 'known' || e.h === h) return;
+          const note = FF.Reads.laterNote(d.exploit.traits, now);
+          if (note) d.later = note;
+        });
+      });
+    });
   }
   function setBarMsg(m) { const t = UI.Table.current(); if (t) t.barMsg = m; const b = UI.$('#actionbar .bar-wait'); if (b) b.textContent = m; }
   function playSync(g, h) {
@@ -115,6 +137,7 @@
     if (!practice) { c.bank -= opts.buyIn; c.seat = { stake: opts.stake.id, stack: opts.buyIn }; saveBank(c); }
     const t = E.createTable({ seats: 6, sb: sb, bb: bb, mode: 'cash', seed: uid(), id: 'C' + uid().toString(36) });
     const g = game = { mode: 'cash', t: t, agents: {}, profiles: {}, leave: false, hands: 0, practice: practice, stake: opts.stake, sitOut: false, depth: opts.depth || 100 };
+    UI.Reads.start(practice ? null : { kind: 'cash', stake: opts.stake.id });
     E.sit(t, 0, Object.assign({}, HERO, { stack: practice ? opts.depth * bb : opts.buyIn }));
     if (practice) opts.lineup.forEach((prof, i) => { if (prof) seatAI(g, t, i + 1, prof, opts.depth * bb); });
     else {
@@ -221,6 +244,7 @@
     const practice = !!opts.practice, n = opts.kind === 'double' ? 12 : 6;
     const field = practice ? opts.lineup.slice() : AI.field({ kind: 'tourney', buyIn: opts.buyIn, seats: n - 1, seed: uid() });
     const g = game = { mode: 'tourney', agents: {}, profiles: {}, leave: false, hands: 0, practice: practice };
+    UI.Reads.start(practice ? null : { kind: 'tourney', buyIn: opts.buyIn });
     field.forEach(p => makeAgent(g, p));
     const t = g.tour = T.create({ kind: opts.kind, speed: opts.speed, seed: uid(), buyIn: practice ? 10 : opts.buyIn, anteType: 'each', heroId: HERO.id,
       entrants: [Object.assign({}, HERO)].concat(field.map(p => ({ id: p.id, name: p.name, initials: p.initials, color: p.color, tier: p.tier, style: p.style }))) });

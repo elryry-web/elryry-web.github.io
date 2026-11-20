@@ -32,6 +32,7 @@
     { k: 'units', label: 'Show amounts in', type: 'select', opts: [['bb', 'Big blinds'], ['chips', 'Chips or dollars']] },
     { k: 'chat', label: 'Table chat', type: 'check' },
     { k: 'hud', label: 'HUD stats (VPIP / PFR / 3-bet, AF)', type: 'check' },
+    { k: 'reads', label: 'Show player reads', type: 'check' },
     { k: 'fourColor', label: 'Four-colour deck', type: 'check' },
     { k: 'cardBack', label: 'Card backs', type: 'select', opts: [['oxblood', 'Oxblood lattice'], ['vines', 'Green vines'], ['rosette', 'Navy rosette'], ['deco', 'Charcoal deco']] },
     { k: 'autoSkip', label: 'Skip the review of clean hands', type: 'check' },

@@ -9,7 +9,30 @@
   let cur = null, felt = null, bar = null, heroWait = null;
 
   const Table = UI.Table = {};
-  Table.mount = function () { felt = UI.$('#felt'); bar = UI.$('#actionbar'); };
+  Table.mount = function () {
+    felt = UI.$('#felt'); bar = UI.$('#actionbar');
+    // the read tag on a seat opens its details on tap; a second tap, or a tap elsewhere on the felt, closes them
+    felt.addEventListener('click', ev => {
+      const b = ev.target.closest ? ev.target.closest('.readtag') : null;
+      const id = b ? b.dataset.id : null;
+      if (!b && !openRead) return;
+      openRead = id && openRead !== id ? id : null;
+      UI.$$('#felt .seat').forEach(el => {
+        const tg = el.querySelector('.readtag'), on = !!(tg && openRead && tg.dataset.id === openRead);
+        el.classList.toggle('readopen', on); if (tg) tg.setAttribute('aria-expanded', on ? 'true' : 'false');
+      });
+    });
+  };
+  // the seat tag for an opponent with an established read ("calls a lot · 32 hands"), behind "Show player reads"
+  let openRead = null;
+  function readTagHtml(p) {
+    const r = UI.Reads && UI.Reads.tag(p);
+    if (!r) return '';
+    const dt = FF.Reads.detailText(r.detail), word = r.tag.split(' · ')[0];
+    return '<button type="button" class="readtag" data-id="' + UI.esc(p.id) + '" title="' + UI.esc(dt) + '" aria-expanded="' + (openRead === p.id) + '">' +
+      UI.esc(word) + ' <span class="rn">· ' + r.hands + '<span class="rh"> hands</span></span></button>' +
+      '<div class="readpop"><b>' + UI.esc(r.name) + ' ' + UI.esc(word) + '.</b> ' + UI.esc(dt) + '</div>';
+  }
   Table.current = () => cur;
 
   // ---------------------------------------------------------------- render
@@ -53,7 +76,7 @@
       }
       const state = !inHand && v.sp ? (v.sp.state === 'sitout' ? 'Sitting out' : v.sp.state === 'waiting' || v.sp.state === 'post' ? 'Waiting' : '') : '';
       const won = cur.final && h && h.result && h.result.won && h.result.won[s];
-      const cls = ['seat', 'slot-' + slot, isHero ? 'hero' : '', folded ? 'folded' : '', cur.thinking === s ? 'acting' : '', h && !h.done && h.toAct === s && cur.thinking !== s ? 'to-act' : '',
+      const cls = ['seat', 'slot-' + slot, isHero ? 'hero' : '', !isHero && openRead === p.id ? 'readopen' : '', folded ? 'folded' : '', cur.thinking === s ? 'acting' : '', h && !h.done && h.toAct === s && cur.thinking !== s ? 'to-act' : '',
         won ? 'winner' : '', !inHand ? 'idle' : ''].join(' ');
       let label = cur.labels[s] || state;
       if (won) label = '+' + UI.amt(won, bb, mode) + (cur.winName[s] ? ' · ' + cur.winName[s] : '');
@@ -62,10 +85,11 @@
         '<div class="hole">' + cards + '</div>' +
         '<div class="plate"><div class="av" style="background:' + (isHero ? HERO_COLOR : prof.color || '#666') + '">' + UI.esc(isHero ? 'YOU' : prof.initials || '?') +
         (isHero ? '' : Art.portraitHtml(Art.portraitIx(pmap, p.id, p.name, seatedIds))) + '</div>' +
-        '<div class="pinfo"><div class="pname">' + UI.esc(isHero ? 'You' : p.name) + (inHand && h.pos[s] ? ' <span class="pos">' + h.pos[s] + '</span>' : '') + '</div>' +
+        '<div class="pinfo"><div class="pname"><span class="pn">' + UI.esc(isHero ? 'You' : p.name) + '</span>' + (inHand && h.pos[s] ? '<span class="pos">' + h.pos[s] + '</span>' : '') + '</div>' +
         '<div class="pstack">' + (stack > 0 || inHand ? UI.amt(stack, bb, mode) : 'Busted') + '</div></div>' + Art.stackHtml(stack, bb, mode) + '</div>' +
         (label ? '<div class="plabel">' + UI.esc(label) + '</div>' : '') +
         (!isHero && UI.settings.hud ? '<div class="hudline">' + UI.esc(UI.hudText(p.id)) + '</div>' : '') +
+        (!isHero ? readTagHtml(p) : '') +
         (cur.chat[s] ? '<div class="bubble">' + UI.esc(cur.chat[s]) + '</div>' : '') + '</div>';
       if (inHand && v.hp.committed > 0 && !h.done) html += '<div class="bet slot-' + slot + '">' + Art.chipsHtml(v.hp.committed, bb) + UI.amt(v.hp.committed, bb, mode) + '</div>';
     });
