@@ -248,7 +248,7 @@
         if (o.ip && top === 'call' && !isValue(c)) k('position');
       }
     } else if (kind === 'vs4bet') {
-      if (did === 'raise' && top === 'call') out.push('Moving all in folds the hands you beat. A call keeps them in the pot.');
+      if (did === 'raise' && top === 'call') out.push(o.committed ? 'The 4-bettor is committed. A call gets the chips in as well.' : 'Moving all in folds the hands you beat. A call keeps them in the pot.');
       else if (did === 'raise' && top === 'fold') out.push('Against an all in, the 4-bettor calls only with hands that beat ' + n + '.');
       else if (did === 'call' && top === 'raise') out.push(n + ' is strong enough to get all in. A call gives the 4-bettor a cheap look at the flop.');
       else if (did === 'call' && top === 'fold') out.push('A 4-bet range is strong. ' + n + ' is behind most of it, and the call costs a big part of your stack.');

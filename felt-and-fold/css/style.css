@@ -212,9 +212,16 @@ table.results tr.me td { color: var(--gold2); font-weight: 700; }
 .rv-sum .net { margin-left: auto; font-weight: 700; }
 .pos-net { color: #6fd39a; } .neg-net { color: #ec7b6e; }
 .rv-grade { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 6px 14px 10px; border-bottom: 1px solid var(--line); }
-.rv-body { flex: 1; overflow-y: auto; padding: 10px 14px 20px; -webkit-overflow-scrolling: touch; }
-.rv-foot { padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); }
+.rv-body { flex: 1 1 0; min-height: 0; overflow-y: auto; padding: 10px 14px 20px; -webkit-overflow-scrolling: touch; }
+/* Firefox Android: at the very bottom of the review the swipe used to chain out of .rv-body to the page. That moved the
+   dynamic toolbar and resized the viewport under the fixed sheet, and the footer button lost its label. The scroll now
+   stops at the sheet's edge, the head and footer never shrink, and the footer paints on its own opaque layer. */
+.rv-body { overscroll-behavior: contain; }
+.rv-head, .rv-sum, .rv-grade, .rv-foot { flex: none; }
+.rv-foot { position: relative; z-index: 1; background: #10201a; padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); }
 .rv-foot .btn { width: 100%; min-height: 50px; font-size: 17px; }
+/* pinned footer buttons centre their label with flex and keep a fixed line box, so a viewport resize cannot push it out */
+.rv-foot .btn, .dnext .btn { display: flex; align-items: center; justify-content: center; line-height: 1.2; white-space: nowrap; }
 .pos { color: var(--gold); font-weight: 700; font-size: 13px; }
 .grade { display: inline-block; padding: 1px 9px; border-radius: 10px; font-size: 12px; font-weight: 700; color: #111; }
 .g-good { background: var(--g-good); } .g-inacc { background: var(--g-inacc); } .g-mistake { background: var(--g-mistake); } .g-blunder { background: var(--g-blunder); color: #fff; }
@@ -540,7 +547,7 @@ body.art-markers .dealer { width: 32px; height: 32px; color: #3b2a12; font-famil
 .dcell.me { outline: 2px solid #fff; outline-offset: -2px; box-shadow: inset 0 0 0 3px #000; position: relative; z-index: 1; opacity: 1; }
 .dresult .mixlegend { justify-content: center; }
 .dnext { position: sticky; bottom: 0; padding: 10px 0 calc(8px + env(safe-area-inset-bottom)); background: linear-gradient(to bottom, transparent, var(--bg) 30%); z-index: 3; }
-.dnext .btn { width: 100%; }
+.dnext .btn { width: 100%; min-height: 50px; }
 .dempty { background: var(--panel); border: 1px dashed var(--line); border-radius: 14px; padding: 16px; text-align: center; }
 .dscore { margin-top: 16px !important; }
 .dtable { width: 100%; border-collapse: collapse; font-size: 13px; margin: 4px 0 8px; }

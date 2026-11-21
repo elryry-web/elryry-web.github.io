@@ -137,10 +137,18 @@
     for (var k in post) if (post[k] > bw) { bw = post[k]; best = k; }
     var q = best.split('/'), prof = { tier: q[0], style: q[1] }, tr = AI.traits(prof), F = facedAll(st);
     // a tier the hero cannot tell apart at this sample reads as the style only
-    var ev = evidence(st, first, prof, tr, F), who = whoWord(prof, tr);
-    return { state: 'read', profile: prof, conf: Math.round(bw * 100) / 100, name: first, label: first, traits: tr, hands: st.hands,
-      line: ev + ' ' + first + ' plays like ' + who + '.', evidence: ev, who: who, tag: tagWord(prof, tr, st) + ' · ' + st.hands + ' hands', detail: detail(st, F) };
+    // says: the traits the review and coach may put into words. A loose-calling tier never reads as calling too
+    // much once the player has folded to most bets seen; the grading model keeps traits as they are
+    var says = Object.assign({}, tr); if (tr.calls === 'loose' && shownFolds(F)) says.calls = 'normal';
+    var ev = evidence(st, first, prof, says, F, tr), who = whoWord(prof, tr);
+    // a tight style the tier makes call loose after the flop: say both halves
+    var habit = (prof.style === 'Nit' || prof.style === 'Rock') && says.calls === 'loose' ? first + ' plays few hands but calls too much after the flop.' : first + ' plays like ' + who + '.';
+    return { state: 'read', profile: prof, conf: Math.round(bw * 100) / 100, name: first, label: first, traits: tr, says: says, hands: st.hands,
+      line: ev + ' ' + habit, evidence: ev, who: who, tag: tagWord(prof, says, st) + ' · ' + st.hands + ' hands', detail: detail(st, F) };
   }
+  // what the postflop counts show: calls on at least half the bets faced, or folds to at least half of 8 or more
+  function shownCalls(F) { return F[0] >= 3 && F[1] >= 0.5 * F[0]; }
+  function shownFolds(F) { return F[0] >= 8 && F[2] >= 0.5 * F[0]; }
   function whoWord(prof, tr) {
     if (prof.style === 'TAG') return prof.tier === 'Beginner' ? 'a beginner' : prof.tier === 'Casual' ? 'a casual player' : 'a solid regular';
     return STYLE_WORD[prof.style];
@@ -154,15 +162,20 @@
     if (prof.style === 'Trappy') return 'slow-plays';
     return prof.tier === 'Beginner' || prof.tier === 'Casual' ? 'plays loose' : 'solid';
   }
-  // one sentence of hard evidence for the read
-  function evidence(st, first, prof, tr, F) {
+  // one sentence of hard evidence for the read. tr: the traits the read says out loud; model: the traits it grades
+  // with. The call count is quoted only when it shows loose calling.
+  function evidence(st, first, prof, tr, F, model) {
     var cd = st.shows.filter(function (s) { return s.callDown; }).pop(), bl = st.shows.filter(function (s) { return s.bluff; }).pop();
-    if (tr.calls === 'loose' && prof.style !== 'Maniac') {
-      return 'By now ' + first + ' has called ' + F[1] + ' of ' + F[0] + ' bets after the flop.' + (cd ? ' ' + first + ' called the river with ' + cd.cards + ' (' + cd.made.toLowerCase() + ').' : '');
+    var tight = prof.style === 'Nit' || prof.style === 'Rock', played = 'By now ' + first + ' has played ' + st.vpip + ' of ' + st.hands + ' hands';
+    var cdLine = cd ? first + ' called the river with ' + cd.cards + ' (' + cd.made.toLowerCase() + ').' : '';
+    if (tr.calls === 'loose' && prof.style !== 'Maniac' && (shownCalls(F) || cd)) {
+      var calls = shownCalls(F) ? F[1] + ' of ' + F[0] + ' bets after the flop' : '';
+      if (tight) return played + (calls ? ' and called ' + calls : '') + '.' + (cdLine ? ' ' + cdLine : '');
+      return calls ? 'By now ' + first + ' has called ' + calls + '.' + (cdLine ? ' ' + cdLine : '') : cdLine;
     }
     if (prof.style === 'Maniac' || tr.bluffs === 'high') return 'By now ' + first + ' has bet or raised ' + (st.bets + F[3]) + ' times after the flop and called ' + F[1] + '.' + (bl ? ' ' + first + ' bet the river with ' + bl.cards + '.' : '');
-    if (prof.style === 'Nit' || prof.style === 'Rock') return 'By now ' + first + ' has played ' + st.vpip + ' of ' + st.hands + ' hands.';
-    if (tr.calls === 'tight') return 'By now ' + first + ' has folded to ' + F[2] + ' of ' + F[0] + ' bets after the flop.';
+    if (tight) return played + '.';
+    if (tr.calls === 'tight' || (model && model.calls === 'loose' && tr.calls !== 'loose')) return 'By now ' + first + ' has folded to ' + F[2] + ' of ' + F[0] + ' bets after the flop.';
     return 'By now ' + first + ' has played ' + st.vpip + ' of ' + st.hands + ' hands and raised ' + st.pfr + ' before the flop.';
   }
   function detail(st, F) {
@@ -186,16 +199,16 @@
   function sizeTell(h, seat, upto, tier, st) {
     if (tier !== 'Beginner' || !AI.openSize) return null;
     var o = AI.openSize(h, seat, upto); if (!o || !o.kind) return null;
-    var ob = st && st.opens, big = o.kind === 'big', seen = ob ? ob[o.kind] : 0, line = big ? 'Big open: usually a strong hand.' : 'Small open: usually not a top hand.';
+    var ob = st && st.opens, big = o.kind === 'big', seen = ob ? ob[o.kind] : 0, tw = AI.tellWords(o), line = tw.tag + '.';
     if (big && ob && ob.bigShown) line += ' ' + ob.bigStrong + ' of ' + ob.bigShown + ' big opens shown so far were strong.';
     else if (seen) line += ' Seen ' + seen + (seen === 1 ? ' time' : ' times') + ' before.';
-    return { kind: o.kind, toBB: o.toBB, std: o.std, to: o.to, tag: big ? 'Big open: usually a strong hand' : 'Small open: usually not a top hand', line: line, seen: seen };
+    return { kind: o.kind, toBB: o.toBB, std: o.std, to: o.to, limpers: o.limpers || 0, tag: tw.tag, line: line, seen: seen };
   }
   function laterNote(usedTraits, now) {
     if (!usedTraits || !now || now.state !== 'read') return '';
-    var t = now.traits, n = now.name, what = '';
+    var t = now.traits, says = now.says || t, n = now.name, what = '';
     if (usedTraits.calls !== 'tight' && t.calls === 'tight') what = 'folds more than most players here';
-    else if (usedTraits.calls !== 'loose' && t.calls === 'loose') what = 'calls more than most players here';
+    else if (usedTraits.calls !== 'loose' && says.calls === 'loose') what = 'calls more than most players here';
     else if (usedTraits.calls === 'loose' && t.calls !== 'loose') what = 'is tighter than most players here';
     else if (usedTraits.bluffs !== 'high' && t.bluffs === 'high') what = 'bluffs more than most players here';
     else if (usedTraits.bluffs !== 'low' && t.bluffs === 'low') what = 'bluffs less than most players here';
@@ -203,6 +216,6 @@
   }
 
   return { blank: blank, observe: observe, prune: prune, prior: prior, posterior: posterior, established: established, read: read, forReview: forReview,
-    laterNote: laterNote, sizeTell: sizeTell, knownTier: knownTier, detailText: detailText, facedAll: facedAll, weakHand: weakHand, EXPECT: EXPECT,
+    laterNote: laterNote, sizeTell: sizeTell, knownTier: knownTier, detailText: detailText, facedAll: facedAll, shownCalls: shownCalls, shownFolds: shownFolds, weakHand: weakHand, EXPECT: EXPECT,
     READ_HANDS: READ_HANDS, READ_FACED: READ_FACED, SD_HANDS: SD_HANDS, SD_STRONG: SD_STRONG };
 });

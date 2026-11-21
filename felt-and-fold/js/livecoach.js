@@ -137,7 +137,7 @@
         if ((weakPair || weakDraw) && oop) why += ' Out of position, they win even less.';
         o.tm += ' ' + why + ' In practice this hand gets closer to ' + M.tok(pc(re), { title: 'Realized equity', words: 'raw equity × share you keep',
           formula: pc(e) + ' × ' + rd(Rk, 2) + ' = ' + pc(re),
-          note: 'Raw equity is how often the hand wins if all the cards come out. A hand rarely keeps all of it, and out of position it keeps less. Weak hands keep less again.',
+          note: 'Raw equity is how often the hand wins if all the cards come out. A hand rarely keeps all of it. ' + (S.realiseText && S.realiseKey ? S.realiseText(S.realiseKey(ctx, i)).replace(/ Implied odds [^.]*\.$/, '') : 'Out of position it keeps less. Weak hands keep less again.'),
           source: 'The same share the review uses for this spot.', meaning: 'The part of its raw equity the hand wins once more bets come.' }) + '.';
         o.realized = re;
       }
@@ -165,8 +165,8 @@
     if (opts.readsOff) return { text: 'Reads are off in Settings.', traits: null, name: nm };
     var r = opts.reads && opts.reads[p.id];
     if (r && r.state === 'read') {
-      var tag = String(r.tag || '').split(' · ')[0], tt = traitText(r.traits || {}, /calls a lot|folds a lot/.test(tag));
-      return { text: nm + ' ' + (tag || 'plays solid') + ' (' + r.hands + ' hands seen).' + (tt ? ' ' + tt : ''), traits: r.traits || null, name: nm };
+      var tag = String(r.tag || '').split(' · ')[0], tt = traitText(r.says || r.traits || {}, /calls a lot|folds a lot/.test(tag));
+      return { text: nm + ' ' + (tag || 'plays solid') + ' (' + r.hands + ' hands seen).' + (tt ? ' ' + tt : ''), traits: r.says || r.traits || null, name: nm };
     }
     if (r && r.state === 'prior') return { text: 'No read on ' + nm + ' yet. ' + r.line, traits: null, name: nm };
     return { text: 'No read on ' + nm + '.', traits: null, name: nm };
@@ -201,8 +201,8 @@
     var L = E.legal(h, seat), opp = opponents(h, seat), v = villainOf(h, seat, L), M = Mx();
     var tell = sizeTellFor(h, seat, v, opts);
     var pr = price(h, L, M), hi = handInfo(h, seat, L, opp, v, M, tell), rdI = readInfo(h, seat, v, opts);
-    if (tell) rdI.text += ' ' + (rdI.name || 'They') + ' opened to ' + bbs(tell.toBB) + '. A normal open here is ' + bbs(tell.std) + '. '
-      + (tell.kind === 'big' ? 'Beginners usually open bigger with strong hands.' : 'Beginners usually open smaller with weaker hands.');
+    var tw = tell && AI.tellWords(tell);
+    if (tell) rdI.text += ' ' + (rdI.name || 'They') + ' ' + tw.did + ' to ' + bbs(tell.toBB) + '. ' + tw.normal + bbs(tell.std) + '. ' + tw.why;
     var lines = [{ k: 'sit', label: 'Situation', tm: situation(h, seat, L, opp, v) }];
     if (pr) lines.push({ k: 'price', label: 'Price', tm: pr.tm });
     lines.push({ k: 'hand', label: 'Hand', tm: hi.tm });

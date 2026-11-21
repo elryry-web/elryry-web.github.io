@@ -129,7 +129,8 @@
     // a bet of pot matched to the 3/4-pot bucket names both: "You: Bet pot (closest baseline size: three-quarters pot, 3%)"
     const youText = r => mine && isAgg(r.m.action) && r.m.sizeLabel && mine !== name(r) && Math.abs(d.did.toBB - r.m.toBB) > 0.02 * r.m.toBB
       ? 'You: ' + mine + ' (closest baseline size: ' + UI.esc(u.text(r.m.sizeLabel)) + ', ' + r.pct + '%)'
-      : 'You: ' + name(r) + ' ' + r.pct + '%';
+      : FF.Review.youLegend(name(r), r.pct, mine, ACT_NAME[r.m.action]);
+    // the chart's own size stays in view, then the hero's: "Raise to 20.4bb 100% (you: 20bb)", or "(you)" when they match
     let legend = rows.map((r, i) => '<span' + (i === you ? ' class="you"' : '') + '><b class="dot ' + (ACT_CLS[r.m.action] || '') + '"' + style(i) + '></b>' +
       (i === you ? youText(r) : name(r) + ' ' + r.pct + '%') + '</span>').join('');
     if (you < 0 && d.did) legend += '<span class="you"><b class="dot dot-you"></b>You: ' + mine + ' (0%)</span>';

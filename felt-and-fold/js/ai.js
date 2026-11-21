@@ -155,11 +155,22 @@
       if (e.ev !== 'act' || e.street !== 'preflop') continue;
       if (e.type === 'raise' || e.type === 'bet') {
         if (e.seat !== seat) return null;
-        var sp = R.forHand(h, seat, i);
-        return { seat: seat, to: e.to, toBB: e.to / h.bb, std: sp.raiseToBB, kind: sizeKind(sp, e, h.bb), at: i };
+        var sp = R.forHand(h, seat, i), limpers = 0;
+        for (var j = 0; j < i; j++) if (log[j].ev === 'act' && log[j].street === 'preflop' && log[j].type === 'call') limpers++;
+        return { seat: seat, to: e.to, toBB: e.to / h.bb, std: sp.raiseToBB, kind: sizeKind(sp, e, h.bb), at: i, limpers: limpers };
       }
     }
     return null;
+  }
+  // the words for a size tell. With limpers in, the raise is "a raise over limpers", never "an open", and its normal
+  // size (about 6bb over two limpers) is said, since it is far from a normal open: { did, noun, normal, why }
+  var LIMP_N = ['', 'one limper', 'two limpers', 'three limpers', 'four limpers'];
+  function tellWords(o) {
+    var lim = o && o.limpers || 0, big = o && o.kind === 'big', verb = lim ? 'raise' : 'open';
+    return { did: lim ? 'raised' : 'opened', noun: lim ? 'raise over limpers' : 'open',
+      normal: lim ? 'A normal raise over ' + (LIMP_N[lim] || lim + ' limpers') + ' here is about ' : 'A normal open here is ',
+      why: 'Beginners usually ' + verb + (big ? ' bigger with strong hands.' : ' smaller with weaker hands.'),
+      tag: (big ? 'Big ' : 'Small ') + verb + (big ? ': usually a strong hand' : ': usually not a top hand') };
   }
   // a deterministic narrowing of a 169-class range for a beginner's sized raise
   function sizeRange(f, kind) {
@@ -203,16 +214,23 @@
     return adj;
   }
   // a simple rule from what the hand makes, for low tiers
+  // the made-hand classes the naive rule plays by: strong (two pair or better), pair (top pair or an overpair), or neither
+  function naiveClass(f) {
+    var kind = f.hand.kind;
+    return f.hand.cat >= 3 || kind === 'twopair' || kind === 'set' || kind === 'monster' ? 'strong' : kind === 'toppair' || kind === 'overpair' ? 'pair' : 'weak';
+  }
+  // the bet size, as a share of the pot, of a player who sizes by strength
+  var STRENGTH_FRAC = { strong: 1, pair: 0.6, weak: 0.33 };
   function naiveMix(ag, h, seat, L, res) {
-    var f = res.feat, kind = f.hand.kind, strong = f.hand.cat >= 3 || kind === 'twopair' || kind === 'set' || kind === 'monster';
-    var pair = kind === 'toppair' || kind === 'overpair', weakPair = kind === 'midpair' || kind === 'lowpair' || kind === 'underpair';
+    var f = res.feat, kind = f.hand.kind, nc = naiveClass(f), strong = nc === 'strong';
+    var pair = nc === 'pair', weakPair = kind === 'midpair' || kind === 'lowpair' || kind === 'underpair';
     var drawy = f.draw.outs >= 8, st = STYLES[ag.style], loose = st.width > 1.2;
     var potNow = L.pot, mix = [];
     if (L.toCall === 0) {
       var b = strong ? 0.85 : pair ? 0.55 : drawy ? 0.3 : weakPair ? 0.2 : (ag.style === 'Maniac' ? 0.45 : 0.08);
       if (ag.style === 'Trappy' && strong) b = 0.3;
       if (L.canRaise && b > 0) {
-        var frac = TIERS[ag.tier].sizeByStrength ? (strong ? 1 : pair ? 0.6 : 0.33) : 0.6, to = L.committed + Math.round(potNow * frac);
+        var frac = TIERS[ag.tier].sizeByStrength ? STRENGTH_FRAC[nc] : 0.6, to = L.committed + Math.round(potNow * frac);
         to = clamp(to, L.minTo, L.maxTo);
         mix.push({ action: to >= L.maxTo ? 'allin' : 'bet', to: to, freq: b });
       }
@@ -248,7 +266,20 @@
       var tp = st.trap * Math.min(1, tier.styleW + 0.3);
       if (L.toCall === 0) base = blend(base, 1 - tp, [{ action: 'check', to: 0, freq: 1 }], tp);
     }
-    return tier.skill >= 0.999 ? base : blend(base, tier.skill, naiveMix(ag, { board: ctx.board }, ctx.spec.seat, L, { feat: feat }), 1 - tier.skill);
+    var mix = tier.skill >= 0.999 ? base : blend(base, tier.skill, naiveMix(ag, { board: ctx.board }, ctx.spec.seat, L, { feat: feat }), 1 - tier.skill);
+    return tier.sizeByStrength ? strengthSized(mix, L, feat) : mix;
+  }
+  // a player who sizes by strength bets every hand at its class size, whatever share of the bet came from the baseline:
+  // pot with two pair or better, about 0.6 pot with top pair or an overpair, about a third with anything weaker
+  function strengthSized(mix, L, feat) {
+    if (L.toCall || !L.canRaise) return mix;
+    var to = clamp(L.committed + Math.round(L.pot * STRENGTH_FRAC[naiveClass(feat)]), L.minTo, L.maxTo), bet = null, out = [];
+    mix.forEach(function (x) {
+      if (x.action !== 'bet' && x.action !== 'allin') { out.push(x); return; }
+      if (!bet) { bet = { action: to >= L.maxTo ? 'allin' : 'bet', to: to, freq: 0 }; out.push(bet); }
+      bet.freq += x.freq;
+    });
+    return out;
   }
   // the same mix with the expected slips folded in (decide() moves a slip to the least common action, or to a call)
   function withSlips(mix, m, L) {
@@ -274,7 +305,7 @@
     return !!prof && (prof.tier === 'Beginner' || prof.tier === 'Casual' || prof.style === 'Calling Station' || prof.style === 'Maniac' || prof.style === 'Nit');
   }
   // a model the strategy module can call without loading this one: pre() gives the chance of a preflop action for a class,
-  // post() the mix (fold, call, agg shares and the raise size) for combo i at a postflop node, with slips
+  // post() the mix (fold, call, agg shares, the raise size and the bet share per size) for combo i at a postflop node, with slips
   function model(prof) {
     var ag = { tier: TIERS[prof.tier] ? prof.tier : 'Regular', style: STYLES[prof.style] ? prof.style : 'TAG' }, tier = TIERS[ag.tier], mood = { tilt: 0, tight: 0 };
     var adj = postAdj(ag, mood);
@@ -291,11 +322,17 @@
         var k = sizeKind(sp, e, bb); return !k ? 1 : k === 'big' ? (bigOpenClass(cls) ? 1 : 0.05) : (bigOpenClass(cls) ? 0.15 : 1);
       } : null,
       post: function (ctx, i, L, feat) {
-        var mix = withSlips(postMix(ag, ctx, i, L, feat, adj), tier.mistake, L), out = { fold: 0, call: 0, agg: 0, to: 0 };
+        // sizes: the bet share per size, keyed by the bet as a share of the pot (two decimals). Only a tier that sizes by
+        // strength bets more than one size across its range; a raise always counts as one size
+        var mix = withSlips(postMix(ag, ctx, i, L, feat, adj), tier.mistake, L), out = { fold: 0, call: 0, agg: 0, to: 0, sizes: {} };
         mix.forEach(function (x) {
           if (x.action === 'fold') { if (L.toCall) out.fold += x.freq; else out.call += x.freq; }
           else if (x.action === 'check' || x.action === 'call' || !L.canRaise) out.call += x.freq;
-          else { out.to = out.agg > x.freq ? out.to : x.to; out.agg += x.freq; }
+          else {
+            out.to = out.agg > x.freq ? out.to : x.to; out.agg += x.freq;
+            var k = L.toCall || !tier.sizeByStrength ? 'one' : String(Math.round((x.to - L.committed) / Math.max(1, L.pot) * 100) / 100);
+            out.sizes[k] = (out.sizes[k] || 0) + x.freq;
+          }
         });
         return out;
       }
@@ -526,6 +563,6 @@
   }
 
   return { TIERS: TIERS, STYLES: STYLES, TIER_NAMES: TIER_NAMES, STYLE_NAMES: STYLE_NAMES, CASH_STAKES: CASH, TOURNEY_FIELDS: TOURNEY,
-    profile: profile, firstName: firstName, genderOf: genderOf, GENDER: GENDER, uniqueProfile: uniqueProfile, takenNames: takenNames, create: create, field: field, exploitFor: exploitFor, jamFloor: jamFloor, jammerWidth: jammerWidth, bigOpenClass: bigOpenClass, sizeKind: sizeKind, openSize: openSize, sizeRange: sizeRange, observeHand: observeHand, emptyStats: emptyStats, postAdj: postAdj,
+    profile: profile, firstName: firstName, genderOf: genderOf, GENDER: GENDER, uniqueProfile: uniqueProfile, takenNames: takenNames, create: create, field: field, exploitFor: exploitFor, jamFloor: jamFloor, jammerWidth: jammerWidth, bigOpenClass: bigOpenClass, sizeKind: sizeKind, openSize: openSize, tellWords: tellWords, sizeRange: sizeRange, observeHand: observeHand, emptyStats: emptyStats, postAdj: postAdj,
     model: model, traits: traits, exploitable: exploitable, STYLE_BY_TIER: STYLE_BY_TIER };
 });

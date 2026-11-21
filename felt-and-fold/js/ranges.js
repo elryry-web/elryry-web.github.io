@@ -91,7 +91,7 @@
     return VS_4BET[(wide ? 'wide' : '') + (ip ? (wide ? 'Ip' : 'ip') : (wide ? 'Oop' : 'oop'))];
   }
   var BB_VS_LIMP = { r: '88+, 77:0.5, A9s+, A5s-A2s:0.5, KTs+, K9s:0.4, QJs, Q9s:0.3, J9s:0.3, T8s:0.3, 97s:0.3, 86s:0.3, 75s:0.3, 64s:0.3, 54s:0.3, ATo+, KJo+, K8o:0.3, Q9o:0.3' };
-  var COLD_4BET = { r: 'KK+, QQ:0.4, AKs:0.4, AKo:0.3, A5s:0.15', c: 'QQ:0.5, JJ:0.3, AKs:0.4, AKo:0.2' };
+  var COLD_4BET = { r: 'KK+, QQ:0.4, AKs:0.4, AKo:0.3, A5s:0.15', c: 'QQ:0.5, JJ:0.6, TT:0.4, 99:0.15, AKs:0.4, AKo:0.2, AQs:0.4, KQs:0.2' };
 
   // ---------------------------------------------------------------- helpers
   function chart(def) {

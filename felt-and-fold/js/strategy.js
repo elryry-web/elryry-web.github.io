@@ -196,6 +196,28 @@
     if (ctx.nOpp > 1) r -= 0.05;
     return r;
   }
+  // why realise() and implied() give what they give, as a small code for the math popups (the numbers stay theirs):
+  // ip, a (+1 strong over 75%, -1 weak under 35% without an 8-out draw), mw, rv (river), im (0 none, 1 four outs, 2 eight outs, 3 SPR under 1.5)
+  function realiseKey(ctx, i) {
+    var sp = ctx.spec, rv = ctx.street === 'river', e = ctx.eqN[i], d = drawOf(ctx, i);
+    var a = rv ? 0 : e > 0.75 ? 1 : e < 0.35 && !(d.outs >= 8) ? -1 : 0;
+    var im = rv ? 0 : ctx.spr < 1.5 ? 3 : d.outs >= 8 ? 2 : d.outs >= 4 ? 1 : 0;
+    return { ip: sp.ip ? 1 : 0, a: a, mw: !rv && ctx.nOpp > 1 ? 1 : 0, rv: rv ? 1 : 0, im: im };
+  }
+  // the steps behind the share kept and the implied odds, in plain sentences
+  function realiseText(k) {
+    if (!k) return '';
+    if (k.rv) return 'On the river no cards are left to come. The hand keeps all its equity, with no implied odds.';
+    var base = k.ip ? 0.97 : 0.87, r = base, out = [];
+    out.push('The share kept starts at ' + base + (k.ip ? ' in position (0.87 out of position).' : ' out of position (0.97 in position).'));
+    if (k.a > 0) { out.push('A strong hand over 75% keeps 0.05 more.'); r += 0.05; }
+    if (k.a < 0) { out.push('A weak hand under 35% without an 8-out draw keeps 0.12 less.'); r -= 0.12; }
+    if (k.mw) { out.push('A multiway pot takes 0.05 off.'); r -= 0.05; }
+    out.push(k.a || k.mw ? 'That gives ' + rd(r, 2) + '.' : 'No adjustment applies.');
+    out.push(['Implied odds add nothing: the hand has under 4 outs.', 'Implied odds add 1.5% for a draw with 4 or more outs.',
+      'Implied odds add 3.5% for a draw with 8 or more outs.', 'Implied odds add nothing: the stacks are short (SPR under 1.5).'][k.im]);
+    return out.join(' ');
+  }
   function implied(ctx, i) {
     if (ctx.street === 'river' || ctx.spr < 1.5) return 0;
     var d = drawOf(ctx, i); return d.outs >= 8 ? 0.035 : d.outs >= 4 ? 0.015 : 0;
@@ -298,7 +320,7 @@
     var shift = A(adj, 'callShift') + (street === 'river' && s >= 0.7 ? A(adj, 'riverBigFold') : 0);
     var rp = sp.icmRP ? sp.icmRP * Math.min(1, callAmt / Math.max(1, sp.stack) * 2) : 0;
     var needAdj = need + shift + rp, eqR = new Float64Array(NC), c = new Float64Array(NC), D = 0, D0 = 0, base = need + rp;
-    for (var k = 0; k < ctx.list.length; k++) { var i = ctx.list[k]; eqR[i] = ctx.eq[i] * realise(ctx, i) + implied(ctx, i); D0 += W[i] * sig((eqR[i] - base) / 0.02); }
+    for (var k = 0; k < ctx.list.length; k++) { var i = ctx.list[k]; eqR[i] = ctx.eqN[i] * realise(ctx, i) + implied(ctx, i); D0 += W[i] * sig((eqR[i] - base) / 0.02); }
     D0 = ctx.tw ? D0 / ctx.tw : 0;
     // threshold that keeps the top `share` of the range
     function thrAt(share) { var acc = 0; for (var q = ctx.list.length - 1; q >= 0; q--) { var j = ctx.list[q]; acc += W[j]; if (acc / ctx.tw >= share) return eqR[j]; } return 0; }
@@ -313,8 +335,9 @@
     var thr = thr0 + shift;
     for (k = 0; k < ctx.list.length; k++) { i = ctx.list[k]; c[i] = sig((eqR[i] - thr) / 0.02); D += W[i] * c[i]; }
     D = ctx.tw ? D / ctx.tw : 0;
-    if (pull > 0 && ctx.nOpp === 1 && D < mdf - 0.05 && !sp.icmRP) { // a tight style still gets pulled part way back up
-      thr = Math.min(thr, thrAt(D + pull * (mdf - D)));
+    // multiway the pull is split across the players left to defend, at a reduced target
+    if (pull > 0 && D < mdf - 0.05 && !sp.icmRP) { // a tight style still gets pulled part way back up
+      thr = Math.min(thr, thrAt(D + pull / ctx.nOpp * (mdf - D)));
       D = 0; for (k = 0; k < ctx.list.length; k++) { i = ctx.list[k]; c[i] = sig((eqR[i] - thr) / 0.02); D += W[i] * c[i]; }
       D = ctx.tw ? D / ctx.tw : 0;
     }
@@ -384,7 +407,7 @@
     var sp = ctx.spec, p = policy(ctx), a = C1[i], b = C2[i];
     var f = { eq: ctx.eq[i], eqN: ctx.eqN[i], pct: pctOf(ctx, i), R: realise(ctx, i), draw: drawOf(ctx, i), hand: describe(a, b, ctx.board),
       blocker: ctx.street === 'river' ? blockerScores(ctx)[i] : 0 };
-    if (p.kind === 'facing') { f.need = p.need; f.needAdj = p.needAdj; f.eqR = ctx.eq[i] * f.R + implied(ctx, i); }
+    if (p.kind === 'facing') { f.need = p.need; f.needAdj = p.needAdj; f.eqR = ctx.eqN[i] * f.R + implied(ctx, i); }
     return f;
   }
   function factorsFor(ctx, i) {
@@ -398,7 +421,7 @@
     if (f.draw.outs || f.draw.backdoor) out.push({ kind: 'draw', label: f.draw.label, outs: f.draw.outs });
     if (ctx.street === 'river' && f.blocker > 0.25) out.push({ kind: 'blocker', score: rd(f.blocker, 2) });
     if (p.kind === 'facing') {
-      out.push({ kind: 'potOdds', need: rd(p.need, 3), have: rd(f.eqR, 3), toCall: rd(p.callAmt / bbv, 1), pot: rd(sp.pot / bbv, 1), raw: rd(f.eq, 3), R: rd(f.R, 3), imp: rd(implied(ctx, i), 3) });
+      out.push({ kind: 'potOdds', need: rd(p.need, 3), have: rd(f.eqR, 3), toCall: rd(p.callAmt / bbv, 1), pot: rd(sp.pot / bbv, 1), raw: rd(f.eq, 3), R: rd(f.R, 3), imp: rd(implied(ctx, i), 3), rk: realiseKey(ctx, i) });
       out.push({ kind: 'mdf', mdf: rd(p.mdf, 3), defend: rd(p.defend, 3), size: rd(p.s, 2) });
     } else {
       out.push({ kind: 'betSize', size: p.size, amount: rd(p.amount / bbv, 1), jam: p.jam });
@@ -448,7 +471,8 @@
     var win = potAfter + callIn * ctx.nOpp;
     var ev = resp.fold * pot + (1 - resp.fold) * (eqc * win * Rr - add);
     // parts (chips) let the review show the sum: fold x pot + call share x (win share x final pot x realized share - chips added)
-    return { ev: ev, fold: resp.fold, eqVsCall: eqc, parts: { pot: pot, add: add, win: win, R: Rr } };
+    // eqVsCallN: the same per calling range, as ctx.eqN is to ctx.eq. The review quotes it, the EV uses the product
+    return { ev: ev, fold: resp.fold, eqVsCall: eqc, eqVsCallN: resp.calls.length > 1 ? Math.pow(eqc, 1 / resp.calls.length) : eqc, parts: { pot: pot, add: add, win: win, R: Rr } };
   }
   function evs(ctx, i, extraTo) {
     var sp = ctx.spec, p = policy(ctx), out = {}, info = {}, bb = sp.bb, R0 = realise(ctx, i), W = sp.W;
@@ -519,13 +543,27 @@
   function legalAt(sp) {
     return { toCall: sp.toCall, pot: sp.pot, call: Math.min(sp.toCall, sp.stack), canRaise: sp.canRaise, committed: sp.committed, minTo: sp.minTo, maxTo: sp.maxTo, currentBet: sp.currentBet, isBet: sp.toCall === 0 };
   }
-  // narrow a modelled range by the chance the model takes the logged action
+  // narrow a modelled range by the chance the model takes the logged action. A bet keeps the share of the size nearest
+  // the one logged: a player who sizes by strength bets pot with strong hands and a third with weak ones, so the size is
+  // a read. A model with one size per node narrows by the total bet share, as before.
   function narrowX(ctx, WX, e, model) {
     var L = legalAt(ctx.spec), nw = new Float64Array(NC), agg = e.type === 'bet' || e.type === 'raise' || (e.type === 'allin' && e.to > e.betBefore);
-    for (var i = 0; i < NC; i++) if (WX[i] > 0) {
-      if (!(ctx.eqN[i] === ctx.eqN[i])) { nw[i] = WX[i]; continue; }
-      var m = model.post(ctx, i, L, lightFeat(ctx, i)), ap = e.type === 'fold' ? m.fold : agg ? m.agg : m.call;
-      nw[i] = WX[i] * (0.02 + 0.98 * ap);
+    var ms = new Array(NC), seen = {};
+    for (var i = 0; i < NC; i++) if (WX[i] > 0 && ctx.eqN[i] === ctx.eqN[i]) {
+      var m = ms[i] = model.post(ctx, i, L, lightFeat(ctx, i));
+      if (agg && m.sizes) for (var k in m.sizes) seen[k] = true;
+    }
+    var key = null;
+    if (agg && !seen.one && e.to > 0) {
+      var f = Math.max(0.01, (e.to - L.committed) / Math.max(1, L.pot)), bd = Infinity;
+      for (k in seen) { var dk = Math.abs(Math.log(f / Math.max(0.01, +k))); if (dk < bd) { bd = dk; key = k; } }
+    }
+    // the share an off-model combo keeps: 2%, or less for a bet off its strength size, which such a player never makes
+    var fl = key != null ? 0.005 : 0.02;
+    for (i = 0; i < NC; i++) if (WX[i] > 0) {
+      m = ms[i]; if (!m) { nw[i] = WX[i]; continue; }
+      var ap = e.type === 'fold' ? m.fold : agg ? (key != null ? m.sizes[key] || 0 : m.agg) : m.call;
+      nw[i] = WX[i] * (fl + (1 - fl) * ap);
     }
     return total(nw) < 1e-4 ? WX : nw;
   }
@@ -556,6 +594,9 @@
     tr.raises = 0; tr.snaps = {}; tr.acts = {}; tr.streetBet = false; tr.checks = 0; tr.prevAggr = null; tr.ended = false;
     h.order.forEach(function (s) { tr.active[s] = true; tr.stack[s] = h.players[s].stackStart; tr.comm[s] = 0; tr.snaps[s] = {}; });
   }
+  // the share of an off-policy combo an action keeps. A multiway check or call keeps more: those ranges stay wide
+  // (traps, pot control, hands that beat one player but not all). Heads-up keeps the old 2%.
+  var FLOOR_PASSIVE = 0.05;
   function advance(tr, upto) {
     var h = tr.h; upto = upto == null ? h.log.length : Math.min(upto, h.log.length);
     if (upto < tr.i) rewind(tr);
@@ -574,12 +615,12 @@
           // strong hands sometimes check or just call (traps), so a passive action never rules them out.
           // Medium made hands check for pot control far more than the baseline's bet-or-check split says:
           // without this floor a river check strips top pair out of the range and the hero's equity reads near 100%.
-          var passive = e.type === 'check' || e.type === 'call';
+          var passive = e.type === 'check' || e.type === 'call', floor = passive && ctx.nOpp > 1 ? FLOOR_PASSIVE : 0.02;
           for (var i = 0; i < NC; i++) if (W[i] > 0) {
             var ap = actionProb(ctx, i, e.type, e.to);
-            if (passive && ctx.eq[i] > 0.72) ap = Math.max(ap, 0.2 * Math.min(1, (ctx.eq[i] - 0.72) / 0.13));
-            if (e.type === 'check' && ctx.eq[i] > 0.45) ap = Math.max(ap, 0.3 * Math.min(1, (ctx.eq[i] - 0.45) / 0.1));
-            nw[i] = W[i] * (0.02 + 0.98 * ap);
+            if (passive && ctx.eqN[i] > 0.72) ap = Math.max(ap, 0.2 * Math.min(1, (ctx.eqN[i] - 0.72) / 0.13));
+            if (e.type === 'check' && ctx.eqN[i] > 0.45) ap = Math.max(ap, 0.3 * Math.min(1, (ctx.eqN[i] - 0.45) / 0.1));
+            nw[i] = W[i] * (floor + (1 - floor) * ap);
           }
           if (total(nw) < 1e-4) nw = W;
           tr.W[e.seat] = nw;
@@ -693,7 +734,7 @@
     }
     for (var a in out) out[a] = rd(out[a] / bb, 2);
     if (info.hero) info.hero.evBB = rd(info.hero.ev / bb, 2);
-    info.parts = { eq: eqX, R: R0, imp: imp, pot: sp.pot, call: pol.kind === 'open' ? 0 : pol.callAmt, bb: bb };
+    info.parts = { eq: eqX, R: R0, imp: imp, rk: realiseKey(ctx, i), pot: sp.pot, call: pol.kind === 'open' ? 0 : pol.callAmt, bb: bb };
     return { ev: out, info: info, eq: eqX, eqBase: ctx.eq[i], villain: v, rangePct: rd(effPct(WX) * 100, 1), basePct: rd(effPct(tr.W[v]) * 100, 1) };
   }
   function rangeOf(h, seat, upto) { var tr = advance(tracker(h), upto); return tr.W[seat] || C.classToCombos(preflopRange(h, seat)); }
@@ -765,7 +806,7 @@
     if (d.toCall > 0) {
       var callAmt = Math.min(d.toCall, d.stack), fr = lastR != null ? preflopRange(h, lastR, n) : new Float64Array(169).fill(1), ec = stat(fr).eq;
       var allInC = callAmt >= d.stack || (lastR != null && allin[lastR]);
-      out.call = ec * real(ec, lastR != null ? later(lastR) : false, allInC) * (pot + callAmt / bb) - callAmt / bb + implied(ec, (d.stack - callAmt) / bb, allInC);
+      out.call = ec * real(ec, lastR != null ? later(lastR) : false, allInC) * (pot + callAmt / bb) - callAmt / bb + implied(ec, (lastR != null ? Math.min(d.stack - callAmt, total(lastR) - (inn[lastR] || 0)) : d.stack - callAmt) / bb, allInC);
       out.callEq = ec;
     } else {
       var ek = 1; opps.forEach(function (j) { ek *= stat(preflopRange(h, j, n)).eq; });
@@ -811,6 +852,7 @@
     return out;
   }
   // the chart's mix for the hero's class, with EVs relative to the chart's favourite action
+  var COMMIT_SPR = 1.25; // behind / pot after a call, at or under which a raise and a call end the same way
   function preflopEval(h, seat, n, d, opts) {
     opts = opts || {};
     var p = h.players[seat], cls = C.classOfCards(p.hole[0], p.hole[1]), sp = preflopSpot(h, seat, n), bb = h.bb;
@@ -843,9 +885,22 @@
       if (rp > 0.004) { var c2 = clamp((eqx - need - rp) / 0.03 + 0.5, 0, 1); mix = [{ action: 'call', size: 0, to: 0, freq: rd(c2, 3) }, { action: 'fold', size: 0, to: 0, freq: rd(1 - c2, 3) }].filter(function (m) { return m.freq > 0.004; }).sort(function (x, y) { return y.freq - x.freq; }); }
       return { mix: mix, ev: ev, factors: factors, source: 'Estimate', spot: sp, cls: cls, evBasis: 'chips' };
     }
+    // the effective stack: a raise past the biggest stack that can still call puts in chips that come back
+    var gone = {}, lastR = null;
+    h.log.slice(0, n).forEach(function (e) { if (e.ev !== 'act' || e.street !== 'preflop') return; if (e.type === 'fold') gone[e.seat] = 1; if (e.type === 'raise' || e.type === 'bet') lastR = e.seat; });
+    var totOf = function (s) { return h.players[s].stackStart - h.players[s].anteP; }, oppMax = 0;
+    h.order.forEach(function (s) { if (s !== seat && !gone[s]) oppMax = Math.max(oppMax, totOf(s)); });
+    var effTo = Math.min(d.maxTo || raiseTo, oppMax || raiseTo);
     // relative EVs: the chart's favourite action is 0; a clear deviation costs about what it risks
-    var risk = Math.max(callBB, (raiseTo - d.committed) / bb, 1), vr = R.vsRandom()[cls];
-    var lastR = null; h.log.slice(0, n).forEach(function (e) { if (e.ev === 'act' && e.street === 'preflop' && (e.type === 'raise' || e.type === 'bet')) lastR = e.seat; });
+    var risk = Math.max(callBB, (Math.min(raiseTo, effTo) - d.committed) / bb, 1), vr = R.vsRandom()[cls];
+    // a raise against a player who is already pot-committed: after a call, what the raiser has behind (the effective
+    // stack) is no more than COMMIT_SPR times the pot. The call and the raise both end all in.
+    var commit = null;
+    if (lastR != null && lastR !== seat && toCall > 0 && d.canRaise) {
+      var vTo = d.committed + toCall, behind = (Math.min(totOf(seat), totOf(lastR)) - vTo) / bb, pot2 = potBB + callBB;
+      var hTo = opts.heroTo ? Math.min(opts.heroTo, d.maxTo || opts.heroTo) : raiseTo;
+      if (behind <= COMMIT_SPR * pot2) commit = { behind: rd(Math.max(0, behind), 1), pot: rd(pot2, 1), eff: rd(Math.min(totOf(seat), totOf(lastR)) / bb, 1), vTo: rd(vTo / bb, 1), call: rd(callBB, 1), canCall: rd(Math.max(0, Math.min(hTo, totOf(lastR)) - vTo) / bb, 1) };
+    }
     if (lastR != null && lastR !== seat) { eqx = eqVsSeatRange(h, seat, lastR, cls, n); factors.push({ kind: 'potOdds', need: rd(need, 3), have: rd(eqx, 3), toCall: rd(callBB, 1), pot: rd(potBB, 1) }); }
     var gap = eqx != null ? Math.abs(eqx - need) : Math.abs(vr - 0.5);
     var vOf = function (rk) { var v = rk * (0.2 + gap) + (sp.kind === 'push' || sp.kind === 'reshove' ? 0 : potBB * 0.1); return sp.kind === 'push' || sp.kind === 'reshove' ? Math.min(v, rk * 0.35) : v; };
@@ -894,6 +949,17 @@
       factors.push({ kind: 'preflopModel', fold: 0, call: M.call != null ? rd(M.call, 2) : null, check: M.check != null ? rd(M.check, 2) : null, raise: M.raise != null ? rd(M.raise, 2) : null,
         foldEq: M.foldEq != null ? rd(M.foldEq, 3) : null, heroRaise: info ? info.hero.modelEV : null, heroFoldEq: info ? info.hero.foldEq : null });
     }
+    // pot-committed: the raise and the call end the same way. The raise costs only what the chip model rates it below the call.
+    if (commit && ev.call != null && mix[0].action === 'call') {
+      var aggK = jam ? 'allin' : 'raise', Mr = factors.filter(function (f) { return f.kind === 'preflopModel'; })[0];
+      var gapR = function (rv) { return Mr && Mr.call != null && rv != null ? -rd(Math.max(0, Mr.call - rv), 2) : 0; };
+      ev[aggK] = gapR(Mr && Mr.raise); if (ev.allin != null && aggK !== 'allin') ev.allin = gapR(Mr && Mr.raise);
+      if (info) info.hero.evBB = gapR(info.hero.modelEV);
+      factors.push({ kind: 'committed', behind: commit.behind, pot: commit.pot, eff: commit.eff, vTo: commit.vTo, call: commit.call, canCall: commit.canCall });
+    }
+    // a call loses at most what it puts in against a fold: the hero can check-fold any flop. The chip model's implied
+    // term grows with the stacks behind and can price a cheap call far past its price; it stops at the call here.
+    if (ev.call != null && ev.fold != null && callBB > 0) ev.call = rd(Math.max(ev.call, ev.fold - callBB), 2);
     if (rp > 0.004) factors.push({ kind: 'icm', premium: rd(rp, 3) });
     factors.push({ kind: 'preflopStrength', vsRandom: rd(vr, 3), risk: rd(risk, 1) });
     return { mix: mix, ev: ev, factors: factors, source: 'Estimate', spot: sp, cls: cls, evBasis: 'relative', info: info };
@@ -941,7 +1007,7 @@
     catch (err) { return Promise.resolve(null); }
   }
 
-  return { realise: realise, setQuality: setQuality, quality: function () { return Q.name; }, qualityInfo: function () { return { flop: Q.flop, turn: Q.turn, name: Q.name }; }, texture: texture, draws: draws, describe: describe, eqVs: eqVs, node: node, policy: policy,
+  return { realise: realise, realiseKey: realiseKey, realiseText: realiseText, setQuality: setQuality, quality: function () { return Q.name; }, qualityInfo: function () { return { flop: Q.flop, turn: Q.turn, name: Q.name }; }, texture: texture, draws: draws, describe: describe, eqVs: eqVs, node: node, policy: policy,
     comboMix: comboMix, features: features, factorsFor: factorsFor, evs: evs, actionProb: actionProb, BASE: BASE,
     tracker: tracker, advance: advance, rangeOf: rangeOf, preflopRange: preflopRange, specFor: specFor, nodeAt: nodeAt,
     decisionFromEntry: decisionFromEntry, decisionFromLegal: decisionFromLegal, activeSeats: activeSeats,
