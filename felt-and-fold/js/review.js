@@ -163,6 +163,27 @@
     if (m.mode === 'blend' && m.lo && m.hi) return lib + ' has no ' + mine + ' here. This grade blends its results for ' + pctPot(d, m.lo) + ' and ' + pctPot(d, m.hi) + '.';
     return lib + ' has no ' + mine + ' here. This grade starts from its result for ' + pctPot(d, m.near) + ' and adds a rough cost for the size.';
   }
+  // a postflop bet or raise the baseline did not try, matched to its nearest size (the legend's rule: same action, within
+  // 0.55-1.7x) when that size is at least one named step away: "The baseline did not try a pot-size bet. Your bet is
+  // graded as its closest size, three-quarters pot." Silent when mapNote or the size-off line already speaks to the size.
+  function step(f) { var b = 0; FRIENDLY.forEach(function (x, i) { if (Math.abs(f - x[0]) < Math.abs(f - FRIENDLY[b][0])) b = i; }); return b; }
+  function closestNote(d) {
+    var a = d.did && d.did.action;
+    if ((d.source !== 'Library' && d.source !== 'Solved') || d.street === 'preflop' || (a !== 'bet' && a !== 'raise') || !(d.did.toBB > 0) || !(d.bbChips > 0) || d.sizeOff || d.forcedAllin || (d.exploit && d.exploit.gradedBy === 'exploit') || mapNote(d)) return '';
+    var best = null, bd = Infinity;
+    (d.mix || []).forEach(function (m) {
+      if (m.action !== a || !(m.to > 0)) return;
+      var x = Math.abs(Math.log(d.did.toBB / (m.to / d.bbChips))); if (x < bd) { bd = x; best = m; }
+    });
+    if (!best || bd > Math.log(1.7)) return '';
+    var sz = szOf(d), refBB = best.to / d.bbChips, mine = sizeText(sz, a, d.did.toBB, 'short'), ref = sizeText(sz, a, refBB, 'short');
+    if (mine === ref) return '';
+    if (a === 'bet' || !(sz.facing > 0)) {
+      if (!(sz.pot > 0) || step((d.did.toBB - (sz.heroIn || 0)) / sz.pot) === step((refBB - (sz.heroIn || 0)) / sz.pot)) return '';
+    } else if (Math.round(2 * d.did.toBB / sz.facing) === Math.round(2 * refBB / sz.facing)) return '';
+    var noun = a === 'raise' && sz.facing > 0 ? 'raise' : 'bet';
+    return 'The baseline did not try a ' + (noun === 'raise' ? 'raise ' + mine : (mine === 'pot' ? 'pot-size' : mine) + ' bet') + '. Your ' + noun + ' is graded as its closest size, ' + ref + '.';
+  }
   function evOf(ev, act) {
     if (ev[act] != null) return ev[act];
     if (isAgg(act)) { var b = null; ['bet', 'raise', 'allin'].forEach(function (k) { if (ev[k] != null && (b == null || ev[k] > b)) b = ev[k]; }); return b; }
@@ -449,6 +470,57 @@
     return out.join(' ');
   }
 
+  // a play the balanced baseline likes, marked down because of how this table plays. Three parts, in this order:
+  // the verdict against the table with its numbers, why the baseline still likes the play, then what to do here
+  function exploitFirst(d, dr) {
+    var x = d.exploit, did = d.did.action, best = x.best, eq = d.feat ? d.feat.eq : 0.5, river = d.street === 'river';
+    var xb = x.info.bet, xg = x.info.hero || xb, Name = cap(x.name), out = [];
+    var base = function (a) { return { allin: 'move all in' }[a] || a; };
+    var bluffing = isAgg(did) && eq < 0.45, outs = dr && dr.outs >= 4 && !river;
+    // 1. the verdict against the table type, with the numbers
+    out.push(d.grade + ' against ' + x.name + '.');
+    var them = d.multiway ? 'the other ranges' : x.state === 'prior' ? 'their range' : 'the opponent\'s range';
+    if (d.feat && d.feat.hand.kind !== 'board') out.push(handLine(d.feat).replace(/\.$/, '') + ', about ' + pc(eq) + ' equity against ' + them + '.');
+    else if (d.feat) out.push(handLine(d.feat) + ' The hand has about ' + pc(eq) + ' equity against ' + them + '.');
+    if (isAgg(did) && xg && xg.fold != null && bluffing) out.push(Name + ' folds to this bet only about ' + pc(xg.fold) + ' of the time.');
+    else if (isAgg(did) && xg && xg.eqVsCall != null) out.push('When ' + x.name + ' calls, the hand wins about ' + pc(xg.eqVsCall) + '.');
+    else if (isAgg(best) && xb && xb.fold != null && eq < 0.45) {
+      var risk = xb.to / (d.bbChips || 1) - (d.heroIn || 0), need = risk > 0 ? risk / (d.potBB + risk) : 0;
+      out.push('Against ' + x.name + ', a bet of ' + bbs(risk) + ' gets folds about ' + pc(xb.fold) + ' of the time.' + (need > 0 ? ' A bluff this size needs about ' + pc(need) + '.' : ''));
+    } else if (isAgg(best) && xb && xb.eqVsCall != null) out.push('When ' + x.name + ' calls a bet, the hand wins about ' + pc(xb.eqVsCall) + '.');
+    var cost = d.evLost > 0 ? cap(verbIng(did)) + ' cost about ' + bbs(d.evLost) + '.' : '';
+    if (x.loss > 0.05) out.push(cap(verbIng(best)) + ' is worth about ' + bbs(x.bestEV) + ', ' + verbIng(did) + ' about ' + bbs(x.heroEV) + (cost ? ': ' + cost.charAt(0).toLowerCase() + cost.slice(1) : '.'));
+    else if (cost) out.push(cost);
+    // 2. the balanced view, and why the baseline plays it
+    var f = d.heroFreq, freq = f >= 0.97 ? 'almost always' : pc(f) + ' of the time';
+    var size = isAgg(did) && did !== 'allin' && d.did.toBB > 0 ? ' ' + sizeText(szOf(d), did, d.did.toBB, 'short') : '';
+    var noun = { bet: 'the bet', raise: 'the raise', allin: 'the all in', check: 'checking', call: 'the call', fold: 'the fold' }[did] || verbIng(did);
+    if (x.baseGrade === 'Good') {
+      var because = isAgg(did) ? (bluffing ? (river ? ', because a balanced opponent folds often enough to pay for it'
+          : ', because the folds it gets plus ' + (outs ? 'your outs' : 'the hand\'s equity') + ' pay for it')
+          : ', because worse hands and draws pay to continue')
+        : isAgg(best) && eq < 0.45 ? ', because a balanced opponent folds too rarely to pay for a bluff' : '';
+      out.push('Against a balanced opponent ' + noun + ' is fine: the baseline ' + verb3(did) + size + ' ' + freq + because + '.');
+    } else out.push('Against a balanced opponent this would be ' + (x.baseGrade === 'Inaccuracy' ? 'an ' : 'a ') + x.baseGrade.toLowerCase() + '.');
+    // 3. what to do at this table: the table read joined to its habit, then the plan
+    var who = x.who, lead = cap(x.name) + ' ';
+    var k = who.indexOf('. ' + lead);
+    if (x.state === 'prior' && k > 0) {
+      var rest = who.slice(k + 2 + lead.length), stop = rest.indexOf('.'), habit = rest.slice(0, stop), tail = rest.slice(stop + 1).trim();
+      habit = habit.replace(/^((?:rarely|often|seldom) )?(\w+?)s\b/, '$1$2');
+      // the bluff it wants: a loose caller who still folds the hands that missed
+      if (!isAgg(did) && isAgg(best) && eq < 0.45 && habit === 'call too often') { habit = 'rarely fold a pair'; tail = ('A hand that missed the board often folds. ' + tail).trim(); }
+      who = who.slice(0, k) + ', who ' + habit + '.' + (tail ? ' ' + tail : '');
+    }
+    out.push(who);
+    var rl = readLine(d), plan;
+    if (isAgg(did) && !isAgg(best) && eq < 0.45) plan = (outs ? 'With nothing but outs, ' : 'With a weak hand, ') + base(best) + ' rather than bluff.';
+    else if (rl) plan = cap(rl.replace(/^Against a player who [^,]*, /, ''));
+    else plan = cap(base(best)) + ' rather than ' + base(did) + ' here.';
+    out.push(plan);
+    return out.join(' ');
+  }
+
   // ---------------------------------------------------------------- reasons and the glossary
   // every concept a reason can name, with the phrases that mark it in the text (the review panel makes them tappable)
   var GLOSSARY = {
@@ -474,8 +546,86 @@
     limp: { term: 'limper', phrases: ['limper'], def: 'A player who only calls the big blind before the flop instead of raising. Limpers often hold weak or speculative hands.' },
     realized: { term: 'realized equity', phrases: ['realized equity'], def: 'The share of the pot a hand really wins once later streets bring more bets. Hands out of position, against several players, or with few ways to improve keep less than their raw equity.' },
     position: { term: 'position', phrases: ['out of position', 'in position'], def: 'In position means you act after your opponent on every street after the flop. Out of position means you act first, with less to go on.' },
-    dominated: { term: 'dominated', phrases: ['dominated'], def: 'Your hand is dominated when an opponent holds one of your cards with a better second card, such as AJ against J8. When you both hit, you win small pots and lose big ones.' }
+    dominated: { term: 'dominated', phrases: ['dominated'], def: 'Your hand is dominated when an opponent holds one of your cards with a better second card, such as AJ against J8. When you both hit, you win small pots and lose big ones.' },
+    // the words any review line can use: hands, draws, boards, betting lines, seats and numbers
+    equity: { term: 'equity', phrases: ['equity'], def: 'Your share of the pot if all the cards were dealt out with no more betting. A hand with 40% equity wins about 4 times in 10.' },
+    range: { term: 'range', phrases: ['range'], def: 'All the hands a player could hold after acting the way they did. Good players think about the whole range, not one guessed hand.' },
+    ev: { term: 'EV', phrases: ['EV'], def: 'Expected value: what a play wins or loses on average over many tries. The review measures it in big blinds.' },
+    broadway: { term: 'Broadway', phrases: ['broadway'], def: 'The cards ten through ace (T, J, Q, K, A). A Broadway hand is two of them, like KQ or AJ.' },
+    suited: { term: 'suited', phrases: ['suited'], def: 'Both of your cards share a suit, like K♥ 7♥. Suited hands can make flushes.' },
+    offsuit: { term: 'offsuit', phrases: ['offsuit'], def: 'Your two cards are of different suits, like K♣ 7♥. Offsuit hands rarely make flushes.' },
+    connector: { term: 'suited connector', phrases: ['suited connector', 'suited one-gapper', 'one-gapper', 'connector'], def: 'Two suited cards next to each other in rank, like 8♠ 7♠. A one-gapper skips a rank, like 8♠ 6♠.' },
+    pocketPair: { term: 'pocket pair', phrases: ['pocket pair'], def: 'Two cards of the same rank in your hand, like 7♣ 7♦. It makes a set on about 1 flop in 8.' },
+    overcards: { term: 'overcards', phrases: ['overcard'], def: 'Cards higher than every card on the board. Two overcards have no pair yet but can pair up to the best one.' },
+    topPair: { term: 'top pair', phrases: ['top pair', 'second pair', 'middle pair', 'bottom pair', 'weak pair'], def: 'A pair made with the highest card on the board. Second pair uses the next card down, and a weak pair a lower one.' },
+    overpair: { term: 'overpair', phrases: ['overpair'], def: 'A pocket pair higher than every card on the board, like QQ on J-7-2. It beats any one pair made with a board card.' },
+    underpair: { term: 'underpair', phrases: ['underpair', 'pocket pair below the top card'], def: 'A pocket pair lower than the top card on the board, like 66 on K-9-2. Anyone holding a king beats it.' },
+    kicker: { term: 'kicker', phrases: ['kicker'], def: 'Your other card when you have a pair. When two players hold the same pair, the higher kicker wins.' },
+    set: { term: 'set', phrases: ['set of'], def: 'Three of a kind made with a pocket pair and one matching card on the board. Sets are strong and hard to see coming.' },
+    trips: { term: 'trips', phrases: ['trips', 'trip'], def: 'Three of a kind made with one card in your hand and a pair on the board. Another player can hold the same card, which makes the kicker matter.' },
+    nuts: { term: 'the nuts', phrases: ['nuts', 'nut flush', 'nut straight'], def: 'The best possible hand on this board. A nut flush is the highest flush the board allows.' },
+    draw: { term: 'draw', phrases: ['draw', 'drawing'], def: 'A hand that is not made yet but can improve to a strong one, like four cards to a flush. It needs the right card to come.' },
+    flushDraw: { term: 'flush draw', phrases: ['nut flush draw', 'flush draw'], def: 'Four cards of one suit, needing a fifth. Nine cards complete it.' },
+    straightDraw: { term: 'straight draw', phrases: ['open-ended straight draw', 'open-ended', 'straight draw'], def: 'Four cards toward a straight. An open-ended draw like 9-8-7-6 completes with a card at either end: eight outs.' },
+    gutshot: { term: 'gutshot', phrases: ['gutshot'], def: 'A straight draw missing a card in the middle, like 9-8-6-5 needing a 7. Only four cards complete it.' },
+    backdoor: { term: 'backdoor draw', phrases: ['backdoor'], def: 'A draw that needs help on both the turn and the river, like three cards of one suit on the flop. It adds a little equity.' },
+    outs: { term: 'outs', phrases: ['outs'], def: 'The cards left in the deck that improve your hand to a likely winner. Nine outs on the flop hit by the river about 35% of the time.' },
+    showdown: { term: 'showdown', phrases: ['showdown'], def: 'The end of the hand, when the players still in show their cards. The best hand wins the pot.' },
+    bluffCatcher: { term: 'bluff-catcher', phrases: ['bluff-catcher', 'bluff-catch'], def: 'A hand that beats only bluffs. It loses to a value bet and wins against a bluff.' },
+    open: { term: 'open', phrases: ['open', 'opener', 'first in'], def: 'The first raise before the flop, after everyone before you folded. The opener is the player who made it.' },
+    limpIn: { term: 'limp', phrases: ['limp', 'limped pot'], def: 'Calling the big blind before the flop instead of raising. A limped pot is one where nobody raised.' },
+    iso: { term: 'iso-raise', phrases: ['iso-raise', 'isolation raise', 'isolate'], def: 'A raise over one or more limpers. It aims to play the pot against the limper alone, often in position.' },
+    threeBet: { term: '3-bet', phrases: ['3-bet', '3-bettor', 're-raise'], def: 'The first re-raise before the flop. The big blind counts as the first bet and the open as the second.' },
+    fourBet: { term: '4-bet', phrases: ['4-bet', '5-bet'], def: 'A raise over a 3-bet. A 5-bet raises again over that, often all in.' },
+    squeeze: { term: 'squeeze', phrases: ['squeeze', 'squeezing'], def: 'A 3-bet after an open and at least one call. The callers rarely hold strong hands, which makes it fold often.' },
+    coldCall: { term: 'cold call', phrases: ['cold call'], def: 'Calling a raise with no money in the pot yet on this street.' },
+    shove: { term: 'shove', phrases: ['shove', 'shoving', 'reshove', 're-shove', 'jam', 'jamming', 'all in'], def: 'Betting or raising all your chips. A jam means the same.' },
+    singleRaised: { term: 'single-raised pot', phrases: ['single-raised pot'], def: 'A pot where one player raised before the flop and the others only called.' },
+    multiway: { term: 'multiway', phrases: ['multiway'], def: 'A pot with three or more players. Each hand wins less often, and a bluff has more players to get past.' },
+    headsUp: { term: 'heads-up', phrases: ['heads-up'], def: 'Only two players are in the hand.' },
+    cbet: { term: 'c-bet', phrases: ['c-bet', 'c-betting'], def: 'A continuation bet: the last raiser before the flop bets again on the flop.' },
+    barrel: { term: 'barrel', phrases: ['barrel'], def: 'Betting again on the turn or river after betting the street before. A second bet in a row is a second barrel.' },
+    donk: { term: 'lead (donk bet)', phrases: ['donk bet', 'donk', 'lead decision'], def: 'Betting first into the player who raised last on the street before. Players also call it a donk bet.' },
+    overbet: { term: 'overbet', phrases: ['overbet', 'overbetting'], def: 'A bet larger than the pot. It suits very strong hands and bluffs, not medium ones.' },
+    polar: { term: 'polarised', phrases: ['polarised', 'polarized'], def: 'A range made of very strong hands and bluffs, with few medium hands. Big bets usually come from a polarised range.' },
+    capped: { term: 'capped', phrases: ['capped'], def: 'A range with few very strong hands, because the player would have raised those earlier. A capped range struggles against big bets.' },
+    texture: { term: 'dry or wet board', phrases: ['dry', 'wet'], def: 'A dry board offers few draws, like K-7-2 in three suits. A wet board offers many, like J-T-8 with two hearts.' },
+    suits: { term: 'rainbow board', phrases: ['rainbow', 'two-tone', 'monotone'], def: 'Rainbow means every board card has a different suit. Two-tone has two cards of one suit, and monotone three.' },
+    btn: { term: 'BTN', phrases: ['BTN', 'button'], def: 'The button (dealer) seat. It acts last after the flop, which makes it the best seat at the table.' },
+    sb: { term: 'SB', phrases: ['SB', 'small blind'], def: 'The small blind posts half a big blind before the cards are dealt. After the flop it acts first.' },
+    bb: { term: 'BB', phrases: ['BB', 'big blind'], def: 'The big blind posts one big blind before the cards are dealt. Amounts in bb count big blinds.' },
+    utg: { term: 'UTG', phrases: ['UTG', 'UTG1', 'UTG2', 'under the gun'], def: 'Under the gun: the first seat to act before the flop. With the whole table still to act, it plays the fewest hands.' },
+    lj: { term: 'LJ', phrases: ['LJ'], def: 'The lojack: the seat two to the right of the cutoff. It plays a few more hands than UTG.' },
+    hj: { term: 'HJ', phrases: ['HJ'], def: 'The hijack: the seat two to the right of the button. It opens a bit wider than the earlier seats.' },
+    co: { term: 'CO', phrases: ['CO'], def: 'The cutoff: the seat just right of the button. Only the button and the blinds act after it before the flop.' },
+    vpip: { term: 'VPIP', phrases: ['VPIP'], def: 'The share of hands a player chooses to put money in before the flop, by calling or raising. A high VPIP means a loose player.' },
+    pfr: { term: 'PFR', phrases: ['PFR'], def: 'The share of hands a player raises before the flop. A PFR far below the VPIP means a player who calls a lot.' },
+    tag: { term: 'tight-aggressive', phrases: ['tight-aggressive', 'loose-aggressive'], def: 'Tight means playing few hands, loose means playing many. Aggressive players bet and raise more than they call.' },
+    rock: { term: 'rock', phrases: ['rock'], def: 'A player who plays very few hands and almost never bluffs. A rock that raises nearly always has a strong hand.' },
+    trappy: { term: 'trappy', phrases: ['trappy'], def: 'A player who often checks or calls strong hands to trap you. Their checks are less safe to bet into.' },
+    af: { term: 'AF', phrases: ['AF'], def: 'Aggression factor: bets and raises divided by calls after the flop. Above 3 is aggressive, and below 1 is passive.' }
   };
+  // links the first mention of each glossary term in one paragraph: the reason's own concepts claim their phrases first,
+  // then every other entry. Plurals and -ing/-ed forms count; whole words only; a phrase in capitals (BB, CO, EV) must match its case.
+  var termRe = {};
+  function linkTerms(text, keys, wrap) {
+    var id = (keys || []).join(','), m = termRe[id];
+    if (!m) {
+      var by = {}, list = [];
+      (keys || []).concat(Object.keys(GLOSSARY)).forEach(function (k) {
+        if (GLOSSARY[k]) GLOSSARY[k].phrases.forEach(function (p) { var l = p.toLowerCase(); if (!by[l]) { by[l] = { k: k, p: p }; list.push(p); } });
+      });
+      list.sort(function (a, b) { return b.length - a.length; });
+      m = termRe[id] = { by: by, re: new RegExp('\\b(' + list.map(function (p) { return p.replace(/[.*+?^${}()|[\]\\\/-]/g, '\\$&'); }).join('|') + ')(s|es|ing|ed)?\\b', 'gi') };
+    }
+    var used = {};
+    return text.replace(m.re, function (all, p) {
+      var e = m.by[p.toLowerCase()];
+      if (!e || used[e.k] || (/^[A-Z0-9]+$/.test(e.p) && p !== e.p)) return all;
+      used[e.k] = true;
+      return wrap(all, e.k);
+    });
+  }
   function handDesc(name) {
     var r = 'AKQJT98765432', a = r.indexOf(name[0]), b = r.indexOf(name[1]), s = name[2] === 's';
     if (name.length === 2) return a <= 4 ? 'a big pocket pair' : a <= 7 ? 'a middle pocket pair' : 'a small pocket pair';
@@ -668,6 +818,12 @@
     d.reason = why;
     var dup = why && why.indexOf('The baseline ' + verb3(top) + ' ') >= 0;
     var sf = d.sizeFix = sizeFix(d), sfw = sf ? sizingWhy(d, sf.frac, tex) : '';
+    // graded against the table, not the baseline: the verdict and its numbers first, then the balanced view, then the plan
+    var xf = d.exploit;
+    if (xf && xf.gradedBy === 'exploit' && d.grade !== 'Good' && !sf && !d.evSplit && xf.best !== did && xf.baseGrade !== d.grade && d.feat) {
+      d.multiway = !!mw;
+      return [exploitFirst(d, dr), mapNote(d), closestNote(d), trustNote(d)].filter(Boolean).join(' ').replace(/about (over|under) /g, '$1 ');
+    }
     var head = sf ? d.grade + '. ' + cap(verbIng(sf.noun)) + ' was right. The size was too ' + (sf.bigger ? 'small' : 'big') + '. '
         + (sf.who ? sizeVs(sf, d.exploit.who)
           : 'The baseline ' + (sf.action === 'allin' ? 'moves all in' : verb3(sf.noun) + ' ' + sizeAmt(sf, 'verb')) + ' here.')
@@ -694,6 +850,7 @@
         + (refTo != null ? (refAct === 'allin' ? 'moves all in' : verb3(rv ? 'raise' : 'bet') + ' ' + sizeText(szr, rv ? 'raise' : 'bet', refTo, 'long')) : 'uses a different size') + ' here.' + (sw ? ' ' + sw : ''));
     }
     if (mapNote(d)) out.push(mapNote(d));
+    if (closestNote(d)) out.push(closestNote(d));
     if (po) {
       out.push('The bet was ' + bbs(d.toCall) + ' into ' + bbs(d.potBB) + '.' + (has('potOdds') || has('icm') ? '' : ' A call needed ' + pc(po.need) + ' equity.'));
       var pe = why.indexOf(pc(po.have)) >= 0 ? '' : 'The hand has about ' + pc(po.have) + ' equity against the range that bets here.';
@@ -1256,5 +1413,5 @@
     return out.join('\n');
   }
 
-  return { hand: hand, session: session, toText: toText, gradeFor: gradeFor, GRADES: GRADES, LEAKS: LEAKS, GOOD_FREQ: GOOD_FREQ, mixPct: mixPct, didLabel: didLabel, sizeText: sizeText, GLOSSARY: GLOSSARY, grade: gradeDecision, netLabel: netLabel };
+  return { hand: hand, session: session, toText: toText, gradeFor: gradeFor, GRADES: GRADES, LEAKS: LEAKS, GOOD_FREQ: GOOD_FREQ, mixPct: mixPct, didLabel: didLabel, closestNote: closestNote, sizeText: sizeText, GLOSSARY: GLOSSARY, linkTerms: linkTerms, grade: gradeDecision, netLabel: netLabel };
 });

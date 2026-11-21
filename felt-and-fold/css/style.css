@@ -188,7 +188,10 @@ table.results tr.me td { color: var(--gold2); font-weight: 700; }
 .preset.on { border-color: var(--gold); color: var(--gold2); }
 .slider-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
 .slider-row input { flex: 1; accent-color: var(--gold); height: 28px; }
-.szval { min-width: 78px; text-align: right; font-weight: 700; }
+.szval { display: flex; align-items: center; gap: 3px; flex: none; font-weight: 700; cursor: text; }
+.szval input { width: 72px; height: 30px; padding: 2px 6px; text-align: right; font: inherit; font-weight: 700; color: inherit; background: rgba(0, 0, 0, .28); border: 1px solid rgba(255, 255, 255, .22); border-radius: 6px; }
+.szval input:focus { outline: 2px solid var(--gold); outline-offset: 0; }
+.szunit:empty, .szpre:empty { display: none; }
 .acts { display: flex; gap: 10px; max-width: 640px; margin: 0 auto; }
 .act { flex: 1 1 0; min-height: 54px; font-size: 17px; font-weight: 700; white-space: nowrap; }
 .act.fold { background: #4a2a26; border-color: #7a3a32; }
@@ -233,7 +236,7 @@ table.results tr.me td { color: var(--gold2); font-weight: 700; }
 .mixcol { flex: 1; position: relative; min-width: 0; }
 .mixcol.marked { padding-top: 15px; }
 .youmark { position: absolute; top: 0; transform: translateX(-50%); font-size: 10.5px; font-weight: 800; line-height: 12px; color: #fff; white-space: nowrap; }
-.youmark::after { content: ''; position: absolute; left: 50%; top: 12px; margin-left: -4px; border: 4px solid transparent; border-top-color: #fff; border-bottom: 0; }
+.youcaret { position: absolute; top: 12px; margin-left: -4px; border: 4px solid transparent; border-top-color: #fff; border-bottom: 0; }
 .mixbar { display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: #22392d; }
 .mixbar i { display: block; height: 100%; }
 .mixbar i + i { box-shadow: inset 1px 0 0 rgba(0,0,0,.45); }
@@ -241,6 +244,7 @@ table.results tr.me td { color: var(--gold2); font-weight: 700; }
 .mixlegend .you { color: #fff; font-weight: 700; }
 .dot-you { background: transparent; border: 2px solid #fff; width: 9px; height: 9px; box-sizing: border-box; }
 .tbar .btn.units { min-width: 44px; font-weight: 700; }
+#tb-more { display: none; }
 .m-fold { background: var(--m-fold); } .m-check { background: var(--m-check); } .m-call { background: var(--m-call); }
 .m-bet { background: var(--m-bet); } .m-raise { background: var(--m-raise); } .m-allin { background: var(--m-allin); }
 .mixlegend { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 12px; color: #c9d6ce; margin: 4px 0 6px; }
@@ -265,6 +269,8 @@ table.results tr.me td { color: var(--gold2); font-weight: 700; }
 .hrow:hover { background: #18301f; }
 .hrow .hn { width: 30px; color: var(--muted); }
 .hrow .net { margin-left: auto; font-weight: 700; }
+.hrow .vcards, .hrow .net, .hrow .grade, .hrow .pos { white-space: nowrap; flex-shrink: 0; }
+.hrow .bl-short { display: none; }
 .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .stats-grid div { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px; display: flex; flex-direction: column; }
 .stats-grid b { font-size: 22px; } .stats-grid span { color: var(--muted); font-size: 12px; }
@@ -323,12 +329,30 @@ body.art-markers .dealer { width: 32px; height: 32px; color: #3b2a12; font-famil
 /* phones in portrait */
 @media (max-width: 640px) {
   body { font-size: 14px; }
+  .hrow { gap: 8px; }
+  .hrow .net { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.15; }
+  .hrow .bl-long { display: none; }
+  .hrow .bl-short { display: block; font-size: 10.5px; font-weight: 400; }
   .logo h1 { font-size: 32px; }
-  .tbar { padding: 4px 6px; gap: 4px 6px; }
-  .tinfo { order: 3; flex-basis: 100%; font-size: 11.5px; gap: 0 10px; }
-  .tinfo b { font-size: 12.5px; }
-  .tbtns { margin-left: auto; gap: 4px; }
-  .tbar .btn.sm { padding: 3px 8px; min-height: 32px; font-size: 13px; }
+  /* one slim strip: "←", the table and bankroll, "☰". Sit out, Top up, units, History, Stats, Settings and the
+     hand count live in the ☰ menu (ui-modes.js openTableMenu); every tap target is at least 40px */
+  .tbar { padding: 2px 4px; gap: 6px; flex-wrap: nowrap; }
+  .tinfo { flex: 1 1 auto; flex-wrap: nowrap; align-items: baseline; gap: 8px; font-size: 11.5px; white-space: nowrap; overflow: hidden; }
+  .tinfo b { font-size: 13px; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .tinfo span { flex: none; }
+  .tinfo span ~ span { display: none; }
+  .tbtns { margin-left: auto; gap: 4px; flex-wrap: nowrap; flex: none; }
+  .tbar .btn.sm { padding: 3px 8px; min-height: 40px; min-width: 40px; font-size: 13px; }
+  .tbar .btn.icon { padding: 3px 6px; font-size: 18px; }
+  #tctl, #tb-units, #tb-hist, #tb-stats, #tb-set { display: none; }
+  #tb-more { display: inline-block; font-weight: 700; }
+  #tb-menu .tb-word { display: none; } /* "←" alone; its aria-label says Leave table */
+  #tb-menu { font-size: 18px; padding: 3px 6px; }
+  .tmenu-back { position: fixed; inset: 0; z-index: 55; }
+  .tmenu { position: absolute; top: 46px; right: 6px; width: min(240px, calc(100vw - 12px)); display: flex; flex-direction: column; gap: 4px; padding: 6px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 30px rgba(0,0,0,.6); }
+  .tmenu .tmi { min-height: 44px; justify-content: flex-start; text-align: left; }
+  .tmenu-info { padding: 6px 8px 2px; font-size: 12.5px; color: var(--muted); }
   .table-wrap { padding: 4px 2px; }
   .felt { max-height: none; }
   .felt::before { inset: 11% 13% 13%; border-radius: 46% / 32%; }
@@ -337,31 +361,39 @@ body.art-markers .dealer { width: 32px; height: 32px; color: #3b2a12; font-famil
   html:has(#scr-table.on), html:has(#scr-table.on) body { overflow: hidden; overscroll-behavior: none; }
   #scr-table.on { position: fixed; inset: 0; height: auto; overflow: hidden; }
   /* the bar keeps room for its tallest state, so the felt does not resize between turns */
-  .actionbar { flex: none; min-height: 156px; display: flex; flex-direction: column; justify-content: center; }
+  .actionbar { flex: none; min-height: 138px; display: flex; flex-direction: column; justify-content: center; }
   .actionbar > * { width: 100%; }
   /* phone seats are anchored by the plate's centre (cards above, label and tags below), so bets and the dealer
      button sit at fixed pixel offsets from the plate and never land on a seat's cards, plate or label */
   .seat { width: 96px; transform: translate(-50%, -52px); }
   .seat.hero { transform: translate(-50%, -68px); }
-  .slot-0.seat { left: 50%; top: calc(86% + 10px); } .slot-1.seat { left: 15%; top: 72%; } .slot-2.seat { left: 15%; top: 33.5%; }
-  .slot-3.seat { left: 50%; top: max(9%, 52px); } .slot-4.seat { left: 85%; top: 33.5%; } .slot-5.seat { left: 85%; top: 72%; }
-  /* hero: above the cards. top seat: below its label (and HUD line or read tag). side seats: level with the cards,
-     on the side facing the pot */
+  /* side seats sit at 15% / 85% but never closer than 62px to the edge, so a long name's plate stays on screen */
+  .felt { --sxl: max(15%, 62px); --sxr: min(85%, calc(100% - 62px)); }
+  .slot-0.seat { left: 50%; top: calc(86% + 10px); } .slot-1.seat { left: var(--sxl); top: 72%; } .slot-2.seat { left: var(--sxl); top: 31%; }
+  .slot-3.seat { left: 50%; top: max(9%, 52px); } .slot-4.seat { left: var(--sxr); top: 31%; } .slot-5.seat { left: var(--sxr); top: 72%; }
+  /* each seat's bet has its own spot on the line from its plate to the pot. hero: above the cards. top seat: below
+     its label (and HUD line or read tag) */
   .slot-0.bet { left: 50%; top: calc(86% - 75px); }
   .slot-3.bet { left: 50%; top: calc(max(9%, 52px) + 55px); }
   .felt:has(.slot-3.seat .hudline) .slot-3.bet { top: calc(max(9%, 52px) + 68px); }
   .felt:has(.slot-3.seat .readtag) .slot-3.bet { top: calc(max(9%, 52px) + 71px); }
   .felt:has(.slot-3.seat .hudline):has(.slot-3.seat .readtag) .slot-3.bet { top: calc(max(9%, 52px) + 84px); }
-  .slot-1.bet, .slot-2.bet { left: calc(15% + 38px); transform: translate(0, -50%); }
-  .slot-4.bet, .slot-5.bet { left: calc(85% - 38px); transform: translate(-100%, -50%); }
-  .slot-1.bet, .slot-5.bet { top: calc(72% - 36px); } .slot-2.bet, .slot-4.bet { top: calc(33.5% - 36px); }
-  /* the button disc sits level with its own plate, on the side facing the pot (bottom seats: never down toward the hero) */
-  .slot-0.dealer { left: calc(50% + 72px); top: calc(86% + 10px); } .slot-3.dealer { left: calc(50% + 72px); top: max(9%, 52px); }
-  .slot-1.dealer { left: calc(15% + 74px); top: 72%; } .slot-2.dealer { left: calc(15% + 74px); top: 33.5%; }
-  .slot-4.dealer { left: calc(85% - 74px); top: 33.5%; } .slot-5.dealer { left: calc(85% - 74px); top: 72%; }
+  /* lower side seats: level with the cards, toward the pot. upper side seats: level with the plate, past its edge,
+     so they stay clear of the top seat's bet and label. ui-table.js tidyPhone() slides any bet that still touches
+     something along its line to the pot. */
+  .slot-1.bet { left: calc(var(--sxl) + 46px); transform: translate(0, -50%); } .slot-5.bet { left: calc(var(--sxr) - 46px); transform: translate(-100%, -50%); }
+  .slot-2.bet { left: calc(var(--sxl) + 66px); transform: translate(0, -50%); } .slot-4.bet { left: calc(var(--sxr) - 66px); transform: translate(-100%, -50%); }
+  .slot-1.bet, .slot-5.bet { top: calc(72% - 40px); } .slot-2.bet, .slot-4.bet { top: 31%; }
+  /* the button disc: beside the plate on the pot side. ui-table.js tidyPhone() moves a side seat's disc onto its
+     plate's top inner corner; these spots are the start before it runs */
+  .slot-0.dealer { left: calc(50% + 80px); top: calc(86% + 10px); } .slot-3.dealer { left: calc(50% + 80px); top: max(9%, 52px); }
+  .slot-2.dealer { left: calc(var(--sxl) + 52px); top: calc(31% - 34px); } .slot-4.dealer { left: calc(var(--sxr) - 52px); top: calc(31% - 34px); }
+  .slot-1.dealer { left: calc(var(--sxl) + 80px); top: 72%; } .slot-5.dealer { left: calc(var(--sxr) - 80px); top: 72%; }
   .bet { font-size: 12px; gap: 4px; }
-  .center { top: 53%; width: max-content; gap: 4px; }
-  .pot { white-space: nowrap; }
+  .center { top: 55%; width: max-content; gap: 4px; }
+  .msg { max-width: calc(100vw - 210px); font-size: 13px; } /* wraps between the side seats' cards */
+  .pot { white-space: nowrap; flex-wrap: wrap; justify-content: center; column-gap: 0; }
+  .pot .tot { flex-basis: 100%; text-align: center; font-size: 11.5px; } /* phone: "(x in the middle)" on its own line keeps the pot line narrow */
   .plate { min-width: 0; padding: 3px 8px 3px 3px; gap: 5px; }
   .av { width: 28px; height: 28px; font-size: 10.5px; }
   .seat.hero .av { font-size: 9px; }
@@ -375,22 +407,28 @@ body.art-markers .dealer { width: 32px; height: 32px; color: #3b2a12; font-famil
   .pname { font-size: 11.5px; max-width: 78px; gap: 3px; } /* fits the longest first name (Rosamund) with a position badge */
   .pname .pos { font-size: 10px; }
   .pstack { font-size: 12.5px; }
-  .plabel { font-size: 11px; padding: 0 6px; }
+  .plabel { font-size: 11px; padding: 0 6px; white-space: normal; width: max-content; max-width: 112px; text-align: center; line-height: 1.3; } /* long showdown labels wrap */
+  .seat.hero .plabel { max-width: 240px; } /* the hero's has the width of the table */
   .hole { height: 42px; margin-bottom: -8px; }
   .card.sm { width: 30px; height: 42px; padding: 1px 0 0 3px; }
   .seat.hero .hole { height: 62px; }
   .seat.hero .card.sm { width: 44px; height: 62px; }
-  .card { width: 40px; height: 56px; padding: 2px 0 0 4px; }
-  .board { gap: 3px; min-height: 56px; }
+  .card { width: 38px; height: 53px; padding: 2px 0 0 4px; }
+  .board { gap: 3px; min-height: 53px; }
   .bubble { font-size: 11px; white-space: normal; width: max-content; max-width: 120px; }
   .hudline { font-size: 9px; }
   .readtag { font-size: 9.5px; padding: 0 5px; margin-top: 2px; }
   .readtag .rh { display: none; } /* phone: "calls a lot · 32" */
   .readpop { width: 160px; font-size: 11px; }
-  .actionbar { padding: 6px 8px calc(8px + env(safe-area-inset-bottom)); }
-  .act { flex: 1 1 auto; min-height: 58px; font-size: 15px; padding: 6px 8px; min-width: 0; overflow: hidden; text-overflow: ellipsis; } /* labels stay on one line */
+  /* phone: the bar is kept short (every tap target still 40px or more), so the felt gets the height */
+  .actionbar { padding: 4px 8px calc(6px + env(safe-area-inset-bottom)); }
+  .sizer { margin-bottom: 4px; }
+  .act { flex: 1 1 auto; min-height: 46px; font-size: 15px; padding: 6px 8px; min-width: 0; overflow: hidden; text-overflow: ellipsis; } /* labels stay on one line */
   .acts { gap: 8px; }
-  .preset { padding: 6px 4px; min-height: 40px; }
+  .btn.preset { padding: 4px; min-height: 40px; } /* .btn.sm would hold it at 34px */
+  .slider-row { gap: 8px; margin-top: 4px; }
+  .slider-row input[type=range] { height: 26px; }
+  .szval input { width: 64px; height: 28px; font-size: 16px; } /* 16px keeps phones from zooming in on focus */
   .review { width: 100%; border-left: none; }
   .stats-grid b { font-size: 19px; }
   .modal-btns .btn { flex: 1; }

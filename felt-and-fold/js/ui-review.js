@@ -110,10 +110,17 @@
     const segs = rows.map((r, i) => '<i class="' + (ACT_CLS[r.m.action] || '') + (i === you ? ' you' : '') + '"' + style(i, 'width:' + r.pct + '%') + '></i>').join('');
     let at = 0, mid = null;
     rows.forEach((r, i) => { if (i === you) mid = at + r.pct / 2; at += r.pct; });
-    const mark = mid != null ? '<span class="youmark" style="left:' + Math.min(94, Math.max(6, mid)) + '%">You</span>' : '';
+    // the caret tip sits at the segment's exact centre (kept 3px inside the ends); only the "You" text is held back from the edges
+    const mark = mid != null ? '<span class="youmark" style="left:clamp(12px,' + mid + '%,calc(100% - 12px))">You</span>' +
+      '<span class="youcaret" style="left:clamp(3px,' + mid + '%,calc(100% - 3px))"></span>' : '';
+    const mine = d.did ? UI.esc(didText(d, u).replace(/ \([^)]*\)$/, '')) : '';
+    // a bet of pot matched to the 3/4-pot bucket names both: "You: Bet pot (closest baseline size: three-quarters pot, 3%)"
+    const youText = r => mine && isAgg(r.m.action) && r.m.sizeLabel && mine !== name(r) && Math.abs(d.did.toBB - r.m.toBB) > 0.02 * r.m.toBB
+      ? 'You: ' + mine + ' (closest baseline size: ' + UI.esc(u.text(r.m.sizeLabel)) + ', ' + r.pct + '%)'
+      : 'You: ' + name(r) + ' ' + r.pct + '%';
     let legend = rows.map((r, i) => '<span' + (i === you ? ' class="you"' : '') + '><b class="dot ' + (ACT_CLS[r.m.action] || '') + '"' + style(i) + '></b>' +
-      (i === you ? 'You: ' : '') + name(r) + ' ' + r.pct + '%</span>').join('');
-    if (you < 0 && d.did) legend += '<span class="you"><b class="dot dot-you"></b>You: ' + UI.esc(didText(d, u).replace(/ \([^)]*\)$/, '')) + ' (0%)</span>';
+      (i === you ? youText(r) : name(r) + ' ' + r.pct + '%') + '</span>').join('');
+    if (you < 0 && d.did) legend += '<span class="you"><b class="dot dot-you"></b>You: ' + mine + ' (0%)</span>';
     return '<div class="mixrow"><span class="mixlab">Baseline:</span><div class="mixcol' + (mark ? ' marked' : '') + '">' + mark + '<div class="mixbar">' + segs + '</div></div></div>' +
       '<div class="mixlegend">' + legend + '</div>';
   }
@@ -134,31 +141,21 @@
       (d.evLost > 0 ? '<span class="evlost">-' + evAmt(d.evLost, u) + '</span>' : '') +
       '<span class="src src-' + d.source.toLowerCase() + '" title="' + UI.esc(SOURCE_TIP[d.source] || '') + '">' + d.source + '</span>' +
       (pending ? '<span class="solving">solving…</span>' : '') + '</div>' +
-      '<div class="dspot">' + UI.esc(u.text(d.spot)) + '. Pot ' + u.amt(d.pot) + (d.toCall ? ', ' + u.amt(d.toCall) + ' to call' : '') + '.</div>' +
+      '<div class="dspot">' + termsHtml(UI.esc(u.text(d.spot))) + '. Pot ' + u.amt(d.pot) + (d.toCall ? ', ' + u.amt(d.toCall) + ' to call' : '') + '.</div>' +
       '<div class="ddid">You: <b>' + UI.esc(didText(d, u)) + '</b>' + (d.hand ? ' with ' + UI.esc(d.hand) : '') + '</div>' +
       planHtml(d, u) +
       '<p class="dtext">' + termsHtml(UI.esc(u.text(d.text)), d.concepts) + '</p>' +
-      (d.later ? '<p class="dlater">' + UI.esc(u.text(d.later)) + '</p>' : '') + '</div>';
+      (d.later ? '<p class="dlater">' + termsHtml(UI.esc(u.text(d.later))) + '</p>' : '') + '</div>';
   }
   // an EV figure: two decimals in bb, the unit's own rounding otherwise
   function evAmt(x, u) { return UI.settings.units === 'bb' ? UI.trim(x, 2) + ' bb' : u.amt(x);
   }
-  // the first mention of each concept the reason names becomes a button that opens its definition in place
+  // the first mention of each glossary term in a paragraph becomes a button that opens its definition in place
+  // (the reason's own concepts claim their phrases first; matching lives in FF.Review.linkTerms)
   function termsHtml(html, keys) {
-    const G = FF.Review && FF.Review.GLOSSARY;
-    if (!G || !keys || !keys.length) return html;
-    const byPhrase = {}, phrases = [];
-    keys.forEach(k => { if (G[k]) G[k].phrases.forEach(p => { if (!byPhrase[p.toLowerCase()]) { byPhrase[p.toLowerCase()] = k; phrases.push(p); } }); });
-    if (!phrases.length) return html;
-    phrases.sort((a, b) => b.length - a.length);
-    const re = new RegExp('\\b(' + phrases.map(p => p.replace(/[.*+?^${}()|[\]\\\/-]/g, '\\$&')).join('|') + ')(s|es|ing|ed)?\\b', 'gi');
-    const used = {};
-    return html.replace(re, (all, p) => {
-      const k = byPhrase[p.toLowerCase()];
-      if (!k || used[k]) return all;
-      used[k] = true;
-      return '<button type="button" class="term" data-k="' + k + '" aria-expanded="false">' + all + '</button>';
-    });
+    const R = FF.Review;
+    if (!R || !R.linkTerms) return html;
+    return R.linkTerms(html, keys || [], (all, k) => '<button type="button" class="term" data-k="' + k + '" aria-expanded="false">' + all + '</button>');
   }
   document.addEventListener('click', ev => {
     const b = ev.target && ev.target.closest ? ev.target.closest('button.term') : null;
@@ -185,15 +182,21 @@
       '<div class="villain"><div class="vhead"><b>' + UI.esc(String(v.name || '').split(' ')[0]) + '</b> <span class="pos">' + UI.esc(v.pos) + '</span>' +
       (v.cards ? ' <span class="vcards">' + UI.cardsText(v.cards) + '</span> <span class="made">' + UI.esc(v.made || '') + '</span>' : v.text ? '' : ' <span class="muted">cards not shown</span>') + '</div>' +
       // v.text is the plain-words paragraph (0.8.4 on); older saved hands keep their range and thinking lines
-      (v.text ? '<p>' + UI.esc(v.text) + '</p>' : '') +
-      (v.rangeText ? '<p>' + UI.esc(v.rangeText) + '</p>' : '') +
-      (v.thinking ? '<p class="thinking">' + UI.esc(v.thinking) + '</p>' : '') + '</div>').join('') + '</div>';
+      (v.text ? '<p>' + termsHtml(UI.esc(v.text)) + '</p>' : '') +
+      (v.rangeText ? '<p>' + termsHtml(UI.esc(v.rangeText)) + '</p>' : '') +
+      (v.thinking ? '<p class="thinking">' + termsHtml(UI.esc(v.thinking)) + '</p>' : '') + '</div>').join('') + '</div>';
   }
   // the hand's result: green or red, or muted grey with '(blind)' when only the forced chips were lost
-  function netHtml(rv, label) {
+  function netHtml(rv, label, row) {
     const txt = unitsOf(rv).text(FF.Review.netLabel ? FF.Review.netLabel(rv) : UI.bbs(rv.net));
     return '<span class="net ' + (rv.blind ? 'muted' : rv.net >= 0 ? 'pos-net' : 'neg-net') + '">' +
-      (label ? '<span class="muted" style="font-weight:400">Result</span> ' : '') + UI.esc(txt) + '</span>';
+      (label ? '<span class="muted" style="font-weight:400">Result</span> ' : '') + (row && rv.blind ? blindSplit(txt, rv.blind) : UI.esc(txt)) + '</span>';
+  }
+  // a history row's '(blind)': inline on desktop, a small tag under the amount on phones (the CSS shows one of the two)
+  function blindSplit(txt, kind) {
+    const tail = ' (' + kind + ')', i = txt.lastIndexOf(tail);
+    if (i < 0) return UI.esc(txt);
+    return UI.esc(txt.slice(0, i)) + '<span class="bl-long">' + UI.esc(tail) + '</span><span class="bl-short">' + UI.esc(kind) + '</span>';
   }
   R.render = function () {
     const entry = R.shown; if (!entry) return;
@@ -234,7 +237,7 @@
     const rows = R.entries.slice().reverse().map(e => {
       const rv = e.rv;
       return '<button class="hrow" data-n="' + e.n + '"><span class="hn">' + e.n + '</span><span class="pos">' + rv.heroPos + '</span><span class="vcards">' + UI.cardsText(rv.heroCards) + '</span>' +
-        netHtml(rv, false) +
+        netHtml(rv, false, true) +
         '<span class="grade ' + GRADE_CLS[rv.worst] + '">' + (rv.clean ? 'Clean' : rv.worst) + '</span>' + (e.solving ? '<span class="solving">…</span>' : '') + '</button>';
     }).join('');
     openDrawer('history', 'Hand history', rows ? '<p class="muted">Your last ' + HMAX + ' hands are kept on this device.</p>' + rows : '<p class="muted">No hands yet.</p>');

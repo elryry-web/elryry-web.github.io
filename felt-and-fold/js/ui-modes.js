@@ -8,12 +8,40 @@
   const pick = a => a[Math.floor(Math.random() * a.length)];
   let game = null; // the running session
 
+  // the phone table menu: Sit out / Top up, units, History, Stats, Settings, and the info the slim strip leaves out
+  // ("Hands 37"). Each item clicks the desktop button it stands for, so it behaves exactly the same.
+  // A tap outside or Escape closes it; while it is open no keyboard shortcut reaches the table.
+  let menuCtl = [];
+  function openTableMenu() {
+    if (UI.$('.tmenu-back')) return;
+    const more = UI.$('#tb-more'), back = UI.el('<div class="tmenu-back"><div class="tmenu" role="menu" aria-label="Table menu"></div></div>'), box = UI.$('.tmenu', back);
+    const close = () => { back.remove(); document.removeEventListener('keydown', onKey, true); more.setAttribute('aria-expanded', 'false'); more.focus(); };
+    const onKey = ev => { ev.stopImmediatePropagation(); if (ev.key === 'Escape') { ev.preventDefault(); close(); } };
+    const item = (label, fn, cls) => { const b = UI.el('<button class="btn tmi' + (cls ? ' ' + cls : '') + '" role="menuitem"></button>'); b.textContent = label; b.onclick = () => { close(); fn(); }; box.appendChild(b); };
+    menuCtl.forEach(b => item(b.label, b.onClick));
+    const u = UI.$('#tb-units').textContent, other = u === 'bb' ? (UI.Game.current() && UI.Game.current().mode !== 'cash' ? 'chips' : '$') : 'bb';
+    item('Amounts: ' + u + ' (switch to ' + other + ')', () => UI.$('#tb-units').click(), 'units');
+    item('History', () => UI.$('#tb-hist').click());
+    item('Stats', () => UI.$('#tb-stats').click());
+    item('Settings', () => UI.$('#tb-set').click());
+    const extra = [...UI.$$('#tinfo span')].slice(1).map(s => s.textContent).filter(Boolean);
+    if (extra.length) box.appendChild(UI.el('<div class="tmenu-info">' + extra.map(UI.esc).join(' · ') + '</div>'));
+    back.onclick = ev => { if (ev.target === back) close(); };
+    document.body.appendChild(back);
+    document.addEventListener('keydown', onKey, true);
+    more.setAttribute('aria-expanded', 'true');
+    const first = UI.$('.tmi', box); if (first) first.focus();
+  }
+
   UI.Game = {
     current: () => game,
     setInfo(html) { UI.$('#tinfo').innerHTML = html; },
     setControls(btns) {
       const box = UI.$('#tctl'); box.innerHTML = '';
       (btns || []).forEach(b => { const el = UI.el('<button class="btn sm">' + UI.esc(b.label) + '</button>'); el.onclick = b.onClick; if (b.disabled) el.disabled = true; box.appendChild(el); });
+      // phone: these sit in the top bar's "☰" menu with the other table buttons, so the bar is one slim strip
+      menuCtl = (btns || []).filter(b => !b.disabled);
+      UI.$('#tb-more').onclick = openTableMenu;
     },
     leave() {
       if (!game) { UI.show('title'); return; }

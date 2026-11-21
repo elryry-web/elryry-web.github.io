@@ -12,6 +12,8 @@
   const Table = UI.Table = {};
   Table.mount = function () {
     felt = UI.$('#felt'); bar = UI.$('#actionbar');
+    // phone bets are placed from measured boxes, so a resize (rotation, toolbar) places them again
+    window.addEventListener('resize', () => { if (phoneQ.matches || felt.querySelector('.bet[style], .dealer[style]')) render(); });
     // the read tag on a seat opens its details on tap; a second tap, or a tap elsewhere on the felt, closes them
     felt.addEventListener('click', ev => {
       const b = ev.target.closest ? ev.target.closest('.readtag') : null;
@@ -109,8 +111,64 @@
       html += '<div class="center"><div class="pot"></div><div class="board"></div><div class="msg">' + UI.esc(cur.msg || '') + '</div></div>';
     }
     felt.innerHTML = html;
+    if (phoneQ.matches) tidyPhone();
   }
   Table.render = render;
+
+  // phone: the dealer disc and each bet start at their CSS spot. One that touches a card, plate, label, tag, the pot
+  // or an earlier bet moves to the nearest clear place on the felt, trying its line to the pot first.
+  // This covers narrow felts, long amounts ("$112.75", "All in 67.4 bb") and enlarged system fonts.
+  const phoneQ = window.matchMedia ? window.matchMedia('(max-width: 640px)') : { matches: false };
+  function tidyPhone() {
+    const fr = felt.getBoundingClientRect(), GAP = 2;
+    const box = el => { const r = el.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; };
+    const hit = (a, b) => Math.min(a.r, b.r) - Math.max(a.l, b.l) > 0.5 && Math.min(a.b, b.b) - Math.max(a.t, b.t) > 0.5;
+    const taken = [];
+    felt.querySelectorAll('.seat .card, .seat .plate, .seat .plabel, .seat .hudline, .seat .readtag, .center .pot, .center .board .card, .center .msg').forEach(el => {
+      const b = box(el); if (b.r - b.l >= 1 && b.b - b.t >= 1) taken.push(b);
+    });
+    const cb = box(felt.querySelector('.center')), cx = (cb.l + cb.r) / 2, cy = (cb.t + cb.b) / 2;
+    // a side seat's button disc sits on its plate's top inner corner, just above the plate on the felt-centre side,
+    // so it reads as that seat's and never reaches over toward the hero's cards. The hero's and the top seat's sit
+    // just right of the plate, level with it
+    let base = [0, 0], alts = [];
+    const dl = felt.querySelector('.dealer'), ds = dl && (dl.className.match(/slot-(\d)\b/) || [])[1];
+    const op = ds && felt.querySelector('.seat.slot-' + ds + ' .plate');
+    if (op) {
+      const p = box(op), d = box(dl), w = d.r - d.l, h = d.b - d.t, left = ds === '1' || ds === '2', side = ds !== '0' && ds !== '3';
+      const x = !side ? p.r + 4 + w / 2 : left ? p.r - 6 - w / 2 : p.l + 6 + w / 2, y = side ? p.t - GAP - 1 - h / 2 : (p.t + p.b) / 2;
+      base = [x - (d.l + d.r) / 2, y - (d.t + d.b) / 2];
+      dl.style.translate = base[0].toFixed(1) + 'px ' + base[1].toFixed(1) + 'px';
+      // when the corner is taken (a long message, a wide plate): level with the plate on its inner side, then below
+      // the inner corner, before the general search
+      if (side) {
+        const xs = left ? p.r + 4 + w / 2 : p.l - 4 - w / 2, xc = left ? p.r - 6 - w / 2 : p.l + 6 + w / 2;
+        alts = [[xs - x, (p.t + p.b) / 2 - y], [xc - x, p.b + GAP + 1 + h / 2 - y]];
+      }
+    }
+    [dl].concat([...felt.querySelectorAll('.bet')]).filter(Boolean).forEach(el => {
+      const b0 = box(el), bo = el === dl ? base : [0, 0];
+      let dx = cx - (b0.l + b0.r) / 2, dy = cy - (b0.t + b0.b) / 2;
+      const len = Math.hypot(dx, dy) || 1; dx /= len; dy /= len;
+      const at = (ox, oy) => ({ l: b0.l + ox, r: b0.r + ox, t: b0.t + oy, b: b0.b + oy });
+      const clear = (ox, oy) => {
+        const b = at(ox, oy), g = { l: b.l - GAP, r: b.r + GAP, t: b.t - GAP, b: b.b + GAP };
+        return b.l >= fr.left && b.r <= fr.right && b.t >= fr.top && b.b <= fr.bottom && !taken.some(f => hit(g, f));
+      };
+      // nearest clear place: along the line first, then across, up and down or diagonally
+      const dirs = [[dx, dy], [-dx, -dy], [1, 0], [-1, 0], [0, 1], [0, -1], [.7, .7], [-.7, .7], [.7, -.7], [-.7, -.7]];
+      let off = [0, 0];
+      const alt = el === dl && !clear(0, 0) && alts.find(a => clear(a[0], a[1]));
+      if (alt) off = alt;
+      else if (!clear(0, 0)) {
+        search: for (let k = 2; k <= 120; k += 2) {
+          for (const d of dirs) if (clear(d[0] * k, d[1] * k)) { off = [d[0] * k, d[1] * k]; break search; }
+        }
+      }
+      if (off[0] || off[1]) el.style.translate = (bo[0] + off[0]).toFixed(1) + 'px ' + (bo[1] + off[1]).toFixed(1) + 'px';
+      taken.push(at(off[0], off[1]));
+    });
+  }
 
   // show a table with no hand running (between hands, waiting for players)
   Table.idle = function (t, c, msg) {
@@ -128,7 +186,15 @@
 
   // ---------------------------------------------------------------- hero action bar
   function hideBar() { if (bar) { bar.innerHTML = '<div class="bar-wait">' + UI.esc(cur && cur.barMsg || '') + '</div>'; bar.classList.remove('live'); } }
-  function niceStep(bb) { return Math.max(1, Math.round(bb / 10)); }
+  // sizes sit on a 0.1 bb grid (5 cents at $0.25/$0.50). The slider moves in 0.1 bb when amounts show in bb and in
+  // small blinds ($0.25) when they show in dollars or chips, so dragging lands on round numbers
+  function fineStep(h) { return Math.max(1, Math.round(h.bb / 10)); }
+  function niceStep(h) { return UI.settings.units === 'bb' ? fineStep(h) : Math.max(1, h.sb || Math.round(h.bb / 2)); }
+  // an amount on the step, inside the legal range; anything within half a step of the stack is all in, which stays exact
+  function snapTo(x, L, step) {
+    if (!(x >= L.maxTo - step / 2)) x = Math.round(x / step) * step; else x = L.maxTo;
+    return Math.min(L.maxTo, Math.max(L.minTo, x));
+  }
   function presets(L, h) {
     const out = [], bb = h.bb;
     if (L.street === 'preflop') {
@@ -138,7 +204,7 @@
       [[1 / 3, '⅓'], [0.5, '½'], [2 / 3, '⅔'], [1, 'Pot']].forEach(f => out.push({ label: f[1], to: L.currentBet + f[0] * (L.pot + L.toCall) }));
     }
     out.push({ label: 'All in', to: L.maxTo });
-    return out.map(p => Object.assign(p, { to: Math.min(L.maxTo, Math.max(L.minTo, Math.round(p.to))) }));
+    return out.map(p => Object.assign(p, { to: snapTo(p.to, L, fineStep(h)) }));
   }
   function heroAction(L) {
     const h = cur.h, mode = (cur.c && cur.c.mode) || h.table.mode, bb = h.bb, a = x => UI.amt(x, bb, mode);
@@ -146,13 +212,15 @@
     return new Promise(resolve => {
       const done = act => { heroWait = null; barRelabel = null; document.removeEventListener('keydown', onKey); hideBar(); resolve(act); };
       heroWait = done;
-      let to = L.canRaise ? Math.min(L.maxTo, Math.max(L.minTo, L.street === 'preflop' && L.currentBet <= bb ? Math.round(2.5 * bb) : L.minTo)) : 0;
+      let step = niceStep(h);
+      let to = L.canRaise ? snapTo(L.street === 'preflop' && L.currentBet <= bb ? 2.5 * bb : L.minTo, L, fineStep(h)) : 0;
       const isBet = L.currentBet === 0;
       let html = '';
       if (L.canRaise) {
         html += '<div class="sizer"><div class="presets">' + presets(L, h).map((p, i) => '<button class="btn sm preset" data-i="' + i + '" data-to="' + p.to + '">' + p.label + '</button>').join('') + '</div>' +
-          '<div class="slider-row"><input type="range" id="sz" min="' + L.minTo + '" max="' + L.maxTo + '" step="' + niceStep(bb) + '" value="' + to + '" aria-label="Bet size">' +
-          '<span class="szval" id="szval"></span></div></div>';
+          '<div class="slider-row"><input type="range" id="sz" value="' + to + '" aria-label="Bet size">' +
+          '<label class="szval"><span class="szpre"></span><input type="text" id="szin" inputmode="decimal" autocomplete="off" enterkeyhint="done" aria-label="Bet size, type an amount">' +
+          '<span class="szunit"></span></label></div></div>';
       }
       html += '<div class="acts">';
       if (!L.canCheck) html += '<button class="btn act fold" data-a="fold">Fold</button>';
@@ -161,19 +229,39 @@
       if (L.canRaise) html += '<button class="btn act raise" data-a="raise" id="raisebtn"></button>';
       html += '</div>';
       bar.innerHTML = html; bar.classList.add('live');
-      const sz = UI.$('#sz', bar), szval = UI.$('#szval', bar), rb = UI.$('#raisebtn', bar);
-      function upd() {
+      const sz = UI.$('#sz', bar), szin = UI.$('#szin', bar), rb = UI.$('#raisebtn', bar);
+      // the typed field reads and writes the number in the chosen unit: bb, dollars (cash chips are cents) or chips
+      const unit = () => UI.unitName(mode);
+      const toField = x => unit() === 'bb' ? UI.trim(x / bb, 1) : unit() === '$' ? (x % 100 ? (x / 100).toFixed(2) : String(x / 100)) : String(Math.round(x));
+      const fromField = v => { const n = parseFloat(String(v).replace(/[$\s]/g, '').replace(',', '.')); return isFinite(n) ? (unit() === 'bb' ? n * bb : unit() === '$' ? n * 100 : n) : NaN; };
+      // the slider runs on the step grid and one step past the stack, so its top end is all in
+      function setRange() {
+        if (!sz) return;
+        sz.min = Math.floor(L.minTo / step) * step; sz.max = Math.ceil(L.maxTo / step) * step; sz.step = step;
+        if (szin) { UI.$('.szpre', bar).textContent = unit() === '$' ? '$' : ''; UI.$('.szunit', bar).textContent = unit() === '$' ? '' : unit(); }
+      }
+      function upd(typing) {
         if (!rb) return;
         const allin = to >= L.maxTo;
         rb.textContent = (allin ? 'All in ' : isBet ? 'Bet ' : 'Raise to ') + a(to);
-        szval.textContent = a(to);
+        if (sz) sz.value = to;
+        if (szin && !typing) szin.value = toField(to);
         UI.$$('.preset', bar).forEach(b => b.classList.toggle('on', +b.dataset.to === to));
       }
-      // a units flip mid-decision relabels the call and raise buttons
+      // a units flip mid-decision relabels the call and raise buttons and gives the slider its new step
       const cb = UI.$('.act.call', bar);
-      barRelabel = () => { if (cb) cb.textContent = 'Call ' + a(L.call) + (L.call >= L.stack ? ' (all in)' : ''); upd(); };
-      if (sz) sz.oninput = () => { to = Math.min(L.maxTo, Math.max(L.minTo, +sz.value)); if (+sz.value >= L.maxTo - niceStep(bb) / 2) to = L.maxTo; upd(); };
-      UI.$$('.preset', bar).forEach(b => b.onclick = () => { to = +b.dataset.to; if (sz) sz.value = to; upd(); });
+      barRelabel = () => { if (cb) cb.textContent = 'Call ' + a(L.call) + (L.call >= L.stack ? ' (all in)' : ''); step = niceStep(h); setRange(); upd(); };
+      if (sz) sz.oninput = () => { to = snapTo(+sz.value, L, step); upd(); };
+      if (szin) {
+        // typing moves the slider and the Raise label at once; blur or Enter shows the legal amount on the 0.1 bb grid
+        szin.oninput = () => { const x = fromField(szin.value); if (x > 0) { to = snapTo(x, L, fineStep(h)); upd(true); } };
+        const commit = () => { const x = fromField(szin.value); if (x > 0) to = snapTo(x, L, fineStep(h)); szin.value = toField(to); upd(); };
+        szin.onblur = commit;
+        szin.onfocus = () => szin.select();
+        szin.onkeydown = ev => { if (ev.key === 'Enter') { ev.preventDefault(); commit(); szin.select(); } else if (ev.key === 'Escape') szin.blur(); };
+      }
+      setRange();
+      UI.$$('.preset', bar).forEach(b => b.onclick = () => { to = +b.dataset.to; upd(); });
       UI.$$('.act', bar).forEach(b => b.onclick = () => {
         const k = b.dataset.a;
         if (k === 'raise') done(to >= L.maxTo ? { type: 'allin' } : { type: isBet ? 'bet' : 'raise', to: to });
