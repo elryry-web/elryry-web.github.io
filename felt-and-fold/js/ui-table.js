@@ -58,8 +58,9 @@
       const nm = String(p.name || '').split(' ')[0], word = r ? r.tag.split(' · ')[0] : '';
       return '<button type="button" class="readtag tell" data-id="' + UI.esc(p.id) + '" title="' + UI.esc(tell.line) + '" aria-expanded="' + (openRead === p.id) + '">' +
         UI.esc(tell.tag) + '</button>' +
-        '<div class="readpop"><b>' + UI.esc(nm) + ' opened to ' + UI.esc(tell.amt) + '.</b> ' + UI.esc(tell.line) +
-        (tell.kind === 'big' ? ' Beginners often raise bigger with their best hands.' : ' Beginners often raise smaller with weaker hands.') +
+        '<div class="readpop"><b>' + UI.esc(nm) + ' opened to ' + UI.esc(tell.amt) + '.</b> ' +
+        (tell.kind === 'big' ? 'Beginners often open bigger with their best hands.' : 'Beginners often open smaller with weaker hands.') +
+        UI.esc(tell.line.slice(tell.tag.length + 1)) +
         (r ? ' Read: ' + UI.esc(word) + ' (' + r.hands + ' hands).' : '') + '</div>';
     }
     if (!r) return '';

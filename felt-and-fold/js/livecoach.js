@@ -81,10 +81,11 @@
   function price(h, L, M) {
     // nothing to call, or only the big blind (a first-in decision is not priced by pot odds)
     if (!(L.toCall > 0) || unopened(h)) return null;
-    var call = L.call, pot = L.pot, need = call / (pot + call);
+    // a bet bigger than the hero's stack: the part past the stack comes back, so it is not in the pot the call wins
+    var call = L.call, pot = L.pot - Math.max(0, L.toCall - call), need = call / (pot + call);
     var t = M.tok(pc(need), { title: 'Pot odds', words: 'call ÷ (pot + call)', formula: bbs(call / h.bb) + ' ÷ (' + bbs(pot / h.bb) + ' + ' + bbs(call / h.bb) + ') = ' + pc(need),
       note: 'The price of the call: the chips you put in against the pot you can win.', source: 'The bet and pot on the table.', meaning: 'A call breaks even when the hand wins this often.' });
-    return { need: need, tm: 'It costs ' + bbs(call / h.bb) + ' to call into a pot of ' + bbs(pot / h.bb) + '. The pot odds ask for ' + t + ' equity.' };
+    return { need: need, tm: 'It costs ' + bbs(call / h.bb) + ' to call into a pot of ' + bbs(pot / h.bb) + '. You need ' + t + ' equity (your share of the pot) to break even.' };
   }
   // a beginner's open size, when the opener is the villain and the hero knows the profile (a practice setup, or the read or
   // table prior in opts.reads). Only the size on the table and that profile feed it.
@@ -119,8 +120,8 @@
       var board = tr.board, ds = S.describe(a, b, board), dr = st === 'river' ? null : S.draws(a, b, board);
       var e = ctx.eq[i]; if (!(e === e)) e = 0.5;
       o.eq = e; o.kind = ds.kind; o.draw = dr && dr.label && dr.outs > 0 ? dr : null;
-      var drawTxt = o.draw ? 'a ' + o.draw.label + ' (' + o.draw.outs + ' outs)' : '';
-      var made = ds.kind === 'air' ? (o.draw ? drawTxt + ', with ' + ds.label + ' for now' : 'nothing made yet (' + ds.label + ')') : ds.label + (o.draw ? ' plus ' + drawTxt : '');
+      var drawTxt = o.draw ? 'a ' + o.draw.label + ' (' + o.draw.outs + ' outs: cards that complete it)' : '';
+      var made = ds.kind === 'air' ? (o.draw ? drawTxt + ', with ' + ds.label + ' for now' : 'nothing yet (' + ds.label + ')') : ds.label + (o.draw ? ' plus ' + drawTxt : '');
       vs = ctx.nOpp > 1 ? (ctx.nOpp === 2 ? 'both players\' likely ranges at once' : 'all ' + NUM[ctx.nOpp] + ' players\' likely ranges at once') : first(h.players[v].name) + '\'s likely range';
       o.short = (ds.kind === 'air' ? (o.draw ? '' : ds.label) : ds.label) + (o.draw ? (ds.kind === 'air' ? '' : ' + ') + o.draw.label : '');
       o.tm = 'You have ' + made + '. That is about ' + M.tok(pc(e), eqMath(e, vs)) + ' equity against ' + vs + '.';
@@ -133,7 +134,7 @@
         var why = weakPair ? 'Weak pairs win less often than this number says. They often fold to later bets.'
           : weakDraw ? 'Weak draws win less often than this number says. They often miss and fold to later bets.'
           : 'Out of position, a hand wins less often than this number says. You act first on every later street.';
-        if ((weakPair || weakDraw) && oop) why += ' Out of position it keeps even less.';
+        if ((weakPair || weakDraw) && oop) why += ' Out of position, they win even less.';
         o.tm += ' ' + why + ' In practice this hand gets closer to ' + M.tok(pc(re), { title: 'Realized equity', words: 'raw equity × share you keep',
           formula: pc(e) + ' × ' + rd(Rk, 2) + ' = ' + pc(re),
           note: 'Raw equity is how often the hand wins if all the cards come out. A hand rarely keeps all of it, and out of position it keeps less. Weak hands keep less again.',
@@ -145,11 +146,12 @@
   }
   function eqMath(e, vs) {
     return { title: 'Equity', words: 'Your share of the pot if all the cards were dealt out, averaged over ' + vs + '.', formula: 'about ' + pc(e),
-      note: 'The range comes from the betting so far. The other players\' cards are not used.', source: 'Sampled runouts of the cards still to come.', meaning: 'A hand with this equity wins this share of the pot at showdown.' };
+      note: 'The range comes from the betting so far. The other players\' cards are not used.', source: 'Sampled runouts of the cards still to come.', meaning: 'On average, the hand wins this share of the pot if no more bets go in.' };
   }
-  function traitText(tr) {
+  // skipCalls: the read's tag already says how this player calls
+  function traitText(tr, skipCalls) {
     var s = [];
-    if (tr.calls === 'loose') s.push('Calls bets too often.'); else if (tr.calls === 'tight') s.push('Folds to bets too often.');
+    if (skipCalls) { /* said by the tag */ } else if (tr.calls === 'loose') s.push('Calls bets too often.'); else if (tr.calls === 'tight') s.push('Folds to bets too often.');
     if (tr.bluffs === 'high') s.push('Bluffs often.'); else if (tr.bluffs === 'low') s.push('Rarely bluffs.');
     return s.join(' ');
   }
@@ -163,7 +165,7 @@
     if (opts.readsOff) return { text: 'Reads are off in Settings.', traits: null, name: nm };
     var r = opts.reads && opts.reads[p.id];
     if (r && r.state === 'read') {
-      var tag = String(r.tag || '').split(' · ')[0], tt = traitText(r.traits || {});
+      var tag = String(r.tag || '').split(' · ')[0], tt = traitText(r.traits || {}, /calls a lot|folds a lot/.test(tag));
       return { text: nm + ' ' + (tag || 'plays solid') + ' (' + r.hands + ' hands seen).' + (tt ? ' ' + tt : ''), traits: r.traits || null, name: nm };
     }
     if (r && r.state === 'prior') return { text: 'No read on ' + nm + ' yet. ' + r.line, traits: null, name: nm };
@@ -172,7 +174,7 @@
   function question(h, seat, L, hi, pr, rdI, opp) {
     var st = h.street, eq = hi.eq, t = rdI.traits || {}, nm = rdI.name || 'this player', pos = h.pos[seat];
     if (st === 'preflop') {
-      if (pr) return 'How does ' + hi.name + ' do against the range that put in this bet?';
+      if (pr) return 'How well will ' + hi.name + ' play after the flop against this range?';
       var limped = h.log.some(function (e) { return e.ev === 'act' && e.street === 'preflop' && e.type === 'call'; });
       if (limped) return 'What hands do the players who just called hold?';
       return 'Is ' + hi.name + ' strong enough to play from ' + pos + ', with ' + (opp.length === 1 ? 'one player' : opp.length + ' players') + ' still to act?';
@@ -180,12 +182,12 @@
     if (pr) {
       if (t.bluffs === 'low' && eq < 0.6) return 'How often does ' + nm + ' bet here without a strong hand?';
       if (t.bluffs === 'high') return nm + ' bluffs a lot. How many of those bluffs does your hand beat?';
-      if (hi.draw && st !== 'river') return 'Do your ' + hi.draw.outs + ' outs give you the ' + pc(pr.need) + ' you need?';
+      if (hi.draw && st !== 'river') return 'Is your draw worth the ' + pc(pr.need) + ' you need?';
       if (eq >= pr.need + 0.2) return st === 'river' ? 'Which of the hands that bet here do you beat, and which beat you?' : 'Your equity is well above the price. What could the next card change?';
       if (pc(eq) === pc(pr.need)) return 'Your ' + pc(eq) + ' matches the price almost exactly. ' + (st === 'river' ? 'Which of the hands that bet here do you beat?' : 'Which cards to come help you, and which hurt?');
       return 'Is your ' + pc(eq) + ' above the ' + pc(pr.need) + ' the price asks?';
     }
-    if (eq >= 0.6) return t.calls === 'loose' ? nm + ' calls a lot. Which medium and worse hands of ' + nm + '\'s would pay off a bet?' : 'Which worse hands would call a bet?';
+    if (eq >= 0.6) return t.calls === 'loose' ? nm + ' calls a lot. Which weaker hands would pay off a bet?' : 'Which worse hands would call a bet?';
     if (eq <= 0.35) {
       if (t.calls === 'loose') return nm + ' rarely folds. What does a bet win against a player who calls this much?';
       if (hi.draw) return 'If the next card misses, how often does this hand still win?';
@@ -229,8 +231,8 @@
     });
     var tm = 'Baseline (' + src + '): ' + rows.map(function (r) {
       return M.tok(r.pct + '%', { title: 'Baseline mix', words: 'How often the baseline takes this action with this hand here.', formula: r.pct + '%',
-        source: src === 'chart' ? 'The preflop chart.' : src === 'Nash' ? 'The Nash push/fold range.' : src === 'estimate' ? 'The built-in estimate (the same one the review grades with).' : 'A GTO solve of this spot.',
-        meaning: 'A mixed spot splits between actions. Any action the baseline takes often is fine.' }) + ' ' + r.label;
+        source: src === 'chart' ? 'The preflop chart.' : src === 'Nash' ? 'The Nash push/fold range.' : src === 'estimate' ? 'The built-in estimate, the same one the review grades with.' : 'A solver run on this spot.',
+        meaning: 'A mixed spot splits between actions. An action the baseline takes 15% of the time or more counts as Good.' }) + ' ' + r.label;
     }).join(', ') + '.';
     return { source: src, rows: rows, tm: tm, text: unmark(tm), math: M.list };
   }

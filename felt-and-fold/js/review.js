@@ -184,7 +184,7 @@
       var mf = F(f, 'mdf');
       if (mf && mf.size > 0) m = fx('1 ÷ (1 + bet as a share of the pot)', '1 ÷ (1 + {s})', { s: [mf.size, 'x'] }, v, unit);
       t.source = 'The bet size and the pot it goes into.';
-      t.meaning = 'Fold more than the rest and the bettor profits by bluffing with any two cards.';
+      t.meaning = 'If you fold more than this, the bettor profits by bluffing with any two cards.';
     } else if (k === 'defend') {
       t.title = 'Baseline defense'; m = direct(v, unit, 'from the baseline strategy');
       t.source = srcName(d) + '.';
@@ -361,15 +361,17 @@
   // the hero's action as a label: "Bet half pot (6.5 bb)", "Raise to 3x (19.5 bb)", "All-in (48 bb)", "Raise to 4.7 bb".
   // Works on saved history too: it needs only street, pot, toCall and did {action, toBB, addBB}.
   function didLabel(d, unit) {
-    unit = unit || function (x) { return trim1(x) + ' bb'; };
+    unit = unit || function (x) { return trim1(x) + 'bb'; };
     var a = d.did.action, toBB = d.did.toBB, heroIn = rd(toBB - (d.did.addBB || 0), 2);
-    if (a === 'allin') return 'All-in (' + unit(toBB) + ')';
+    var cc = d.did.canCall != null ? '; they can call ' + unit(d.did.canCall) : '';
+    if (a === 'allin') return 'All-in (' + unit(toBB) + cc + ')';
     if (a === 'call') return 'Call' + (d.toCall ? ' ' + unit(d.toCall) : '');
     if (a !== 'bet' && a !== 'raise') return cap(a);
     var sz = { pot: d.pot, heroIn: heroIn, facing: heroIn + (d.toCall || 0), preflop: d.street === 'preflop' };
     if (sz.preflop) return cap(a) + ' to ' + unit(toBB);
     var s = sizeText(sz, a, toBB, 'short', unit);
-    return cap(a) + ' ' + s + (a === 'raise' && sz.facing > 0 ? ' (' + unit(toBB) + ')' : / pot$/.test(s) || s === 'pot' ? ' (' + unit(d.did.addBB) + ')' : '');
+    var par = a === 'raise' && sz.facing > 0 ? unit(toBB) : / pot$/.test(s) || s === 'pot' ? unit(d.did.addBB) : '';
+    return cap(a) + ' ' + s + (par || cc ? ' (' + (par || unit(a === 'raise' ? toBB : d.did.addBB)) + cc + ')' : '');
   }
   function trim1(x) { var v = rd(x, 1); return v === Math.round(v) ? String(Math.round(v)) : v.toFixed(1); }
   // thresholds in bb, scaled by the pot before the action being faced
@@ -547,8 +549,8 @@
     if (d.street !== 'preflop' && hm.freq < GOOD_FREQ && d.mix[0]) loss = Math.max(loss, 0.1 * d.potBB * Math.max(0, d.mix[0].freq - hm.freq - 0.1));
     if (loss > evLoss + 0.05 && evLoss < 0.3) { d.freqFloor = true; if (d.mix[0] && d.mix[0].action !== d.did.action) bestAct = d.mix[0].action; }
     if (!isAgg(d.did.action) && isAgg(bestAct) && d.feat && d.feat.eq < 0.35) { loss = Math.min(loss, Math.max(0.3 * d.potBB, 1.2)); d.missedBluff = true; }
-    var ref = isAgg(d.did.action) ? sizeRef(d.mix, d.did) : null;
-    var sizeOff = !!(ref && d.did.to && (d.did.to / ref.to > 1.7 || d.did.to / ref.to < 0.55));
+    var dTo = d.did.effTo || d.did.to, ref = isAgg(d.did.action) ? sizeRef(d.mix, { action: d.did.action, to: dTo }) : null;
+    var sizeOff = !!(ref && dTo && (dTo / ref.to > 1.7 || dTo / ref.to < 0.55));
     // a raise over limpers, compared with the target size at sizeOff's gap. When raising is right, a size that far off
     // costs at least LIMP_SIZE_COST or 10% of the pot: the chip model prices a small raise as if the limpers folded to it.
     d.limpSize = null;
@@ -630,6 +632,14 @@
     var bb = h.bb, potBB = (e.potBefore - e.toCall) / bb, did = { action: heroAction(e), to: e.to || 0, add: e.add || 0 };
     did.toBB = rd(did.to / bb, 1); did.addBB = rd(did.add / bb, 1);
     if (isAgg(did.action) && e.street !== 'preflop') did.size = rd(did.add / Math.max(1, e.potBefore), 2);
+    // a bet or raise that puts everyone in: what the opponents can match. Past that the chips come back, and every
+    // size from there up is the same bet (canCall: what the opponent adds to call it)
+    var spc = res.ctx && res.ctx.spec;
+    if (isAgg(did.action) && e.street !== 'preflop' && spc && spc.eff != null) {
+      var capTo = spc.committed + spc.eff;
+      if (did.to >= capTo) did.covers = true;
+      if (did.to > capTo) { did.effTo = capTo; did.effToBB = rd(capTo / bb, 1); did.effAddBB = rd((capTo - spc.committed) / bb, 1); did.canCall = rd((capTo - spc.currentBet) / bb, 1); }
+    }
     var mix = res.mix.map(function (m) {
       var o = { action: m.action, size: m.size, to: m.to || 0, freq: m.freq };
       if (isAgg(m.action)) o.toBB = rd(o.to / bb, 1);
@@ -762,6 +772,10 @@
   function applyExploit(d) {
     var x = d.exploit; if (!x) return;
     x.baseGrade = d.grade; x.baseLost = d.evLost;
+    // an all in that covers the player, against a size that leaves little of their stack behind: the same bet
+    var xb0 = x.info.bet, did0 = d.did.action;
+    if (d.did.covers && isAgg(did0) && isAgg(x.best) && x.best !== did0 && xb0 && xb0.to > 0 && !realSmaller(d, xb0.to / (d.bbChips || 1) - (d.heroIn || 0))) { x.best = did0; x.bestEV = x.heroEV; x.loss = 0; }
+    else if (d.did.covers && x.best === did0 && xb0 && xb0.to > 0 && !realSmaller(d, xb0.to / (d.bbChips || 1) - (d.heroIn || 0))) { x.bestEV = x.heroEV; x.loss = 0; }
     if (x.gradedBy !== 'exploit') return;
     d.grade = gradeFor(x.loss, Math.max(d.potBB, d.toCall || 0), false);
     d.wasted = d.grade !== 'Good' && wasted(d, x.loss);
@@ -773,21 +787,41 @@
     // the bar shows the balanced mix; when the grade wants another kind of play, the panel adds this plan under it
     var top = d.mix && d.mix[0] ? d.mix[0].action : null;
     if (top && actKind(top) !== actKind(x.best)) {
-      var xb = x.info.bet, unit = function (v) { var r = rd(v, 1); return (r === Math.round(r) ? String(Math.round(r)) : r.toFixed(1)) + ' bb'; };
+      var xb = x.info.bet, unit = function (v) { var r = rd(v, 1); return (r === Math.round(r) ? String(Math.round(r)) : r.toFixed(1)) + 'bb'; };
       var lbl = { fold: 'Fold', check: 'Check', call: 'Call', bet: 'Bet', raise: 'Raise', allin: 'All-in' }[x.best] || x.best;
       if (isAgg(x.best) && xb && xb.to && d.bbChips && x.best !== 'allin') lbl += ' ' + sizeText(szOf(d), x.best, xb.to / d.bbChips, 'long', unit);
       x.plan = { action: x.best, label: lbl };
     }
   }
   // a plain read on the player for this spot, or '' when nothing stands out
-  function readLine(d) {
+  // opts.said: the table read already says the player calls too often; opts.smaller: the note will say a smaller size scores more
+  function readLine(d, opts) {
+    opts = opts || {};
     var x = d.exploit, t = x.traits, did = d.did.action, best = x.best, eq = d.feat ? d.feat.eq : 0.5, river = d.street === 'river', facing = d.toCall > 0;
-    if (t.calls === 'loose' && isAgg(best) && eq >= 0.45) return 'This player calls too much. Bet for value with more hands, even medium ones like a weak top pair. Bet bigger with your strong hands.';
+    if (t.calls === 'loose' && isAgg(best) && eq >= 0.45) {
+      // an all in already bets as big as it gets: the tip has nothing to add
+      if (isAgg(did) && d.did.covers) return '';
+      // the read already names the habit: a calling station, or a line that says the player calls too often
+      var said = opts.said || x.style === 'Calling Station' || /calling station|calls? (?:too often|too much|a lot)/i.test(x.who || '');
+      return (said ? '' : 'This player calls too much. ') + 'Bet for value with more hands, even medium ones like a weak top pair.' + (opts.smaller ? '' : ' Bet bigger with your strong hands.');
+    }
     if (t.calls === 'loose' && (isAgg(did) || d.missedBluff) && !isAgg(best) && eq < 0.45) return 'Against a player who rarely folds, skip the bluff.';
     if (t.bluffs === 'low' && facing && best === 'fold') return 'Against a player who rarely bluffs, a' + (river ? ' river' : '') + ' fold here is fine.';
     if (t.bluffs === 'high' && facing && best === 'call') return 'Against a player who bluffs a lot, call down lighter.';
     if (t.calls === 'tight' && isAgg(best) && eq < 0.45) return 'Against a player who folds too much, bluff more.';
     return '';
+  }
+  // a size counts as smaller than an all in that covers the opponent only when it leaves a real part of their stack behind
+  function realSmaller(d, addBB) { var eff = d.did.effAddBB || d.did.addBB || 0; return !(eff > 0) || addBB <= 0.75 * eff; }
+  // a better size is worth naming only when it gains at least 1.5bb and 3% of the pot
+  function sizeGain(d, gain) { return gain >= Math.max(1.5, 0.03 * (d.pot || 0)); }
+  // the table prior in one sentence: "Players at this table are mostly beginners, who call too often."
+  function joinPrior(x, who) {
+    var lead = cap(x.name) + ' ', k = who.indexOf('. ' + lead);
+    if (x.state !== 'prior' || k < 0) return who;
+    var rest = who.slice(k + 2 + lead.length), stop = rest.indexOf('.'), habit = rest.slice(0, stop), tail = rest.slice(stop + 1).trim();
+    habit = habit.replace(/^((?:rarely|often|seldom) )?(\w+?)s\b/, '$1$2');
+    return who.slice(0, k) + ', who ' + habit + '.' + (tail ? ' ' + tail : '');
   }
   function whoLine(x) {
     var st = STYLE_WORD[x.style] || 'a player', tw = x.tier === 'Beginner' ? 'a beginner' : x.tier === 'Casual' ? 'a casual player' : '';
@@ -797,29 +831,38 @@
   // said: the head already opened with the read sentence
   function exploitText(d, said) {
     var x = d.exploit; if (!x) return '';
-    var did = d.did.action, rl = readLine(d), out = [];
+    var did = d.did.action, out = [], xb = x.info.bet, xh = x.info.hero;
+    // a better size is named only when both plays bet, the gain is worth naming, and (against a covering all in)
+    // the size leaves part of the opponent's stack behind
+    var bothAgg = !!(isAgg(x.best) && isAgg(did) && xb && xb.to > 0), xbAdd = bothAgg ? xb.to / (d.bbChips || 1) - (d.heroIn || 0) : 0;
+    var sizeOk = bothAgg && x.loss > 0.05 && sizeGain(d, x.loss) && (!d.did.covers || realSmaller(d, xbAdd));
+    var smaller = !!(sizeOk && x.best === did && xh && xb.to < xh.to);
+    var habitSaid = x.gradedBy === 'exploit' && x.state === 'prior' && /calls? too often\./.test(x.who);
+    var rl = readLine(d, { said: habitSaid, smaller: smaller });
     if (x.gradedBy === 'exploit') {
       if (!x.differ && !rl && x.baseGrade === d.grade) return '';
-      var xb = x.info.bet, xh = x.info.hero, eq = d.feat ? d.feat.eq : 0.5;
+      var eq = d.feat ? d.feat.eq : 0.5;
       // a bluff the player's folds pay for: a loose caller who still folds the hands that missed
       var bluff = isAgg(x.best) && !isAgg(did) && xb && xb.fold != null && eq < 0.45 && !d.sizeFix;
       var who = bluff ? x.who.replace(/ ([^.]*) calls too often\./, function (m, w) { return ' ' + w + ' rarely folds a pair. A hand that missed the board often folds.'; }) : x.who;
+      if (habitSaid && !bluff) who = joinPrior(x, who);
       if (!said) out.push(who); if (rl && !(d.sizeFix && d.sizeFix.tend)) out.push(rl);
       if (bluff) {
         var risk = xb.to / (d.bbChips || 1) - (d.heroIn || 0), need = risk > 0 ? risk / (d.potBB + risk) : 0;
         out.push('Against ' + x.name + ', a bet of ' + bbs(risk) + ' gets folds about ' + P('fold', xb.fold) + ' of the time.' + (need > 0 && (d.reason || '').indexOf('needs folds about') < 0 ? ' A bluff this size needs about ' + P('be', need, { bet: risk, pot: d.potBB }) + '.' : ''));
       }
       if (d.sizeFix) { /* the verdict already names the better size */ }
-      else if (x.best === did && x.loss > 0.05 && xb && xh) out.push('Against ' + x.name + ', a ' + (xb.to > xh.to ? 'bigger' : 'smaller') + ' ' + (did === 'raise' ? 'raise' : 'bet') + ' scores more: about ' + B('xev', x.bestEV, xo(d, x.best)) + ', against ' + B('xev', x.heroEV, xo(d, did)) + ' for yours.');
+      else if (bothAgg && !sizeOk && x.loss > 0.05) out.push('Against ' + x.name + ', ' + verbIng(did) + ' is worth about ' + B('xev', x.heroEV, xo(d, did)) + '. Other sizes score about the same.');
+      else if (sizeOk && x.best === did && xh) out.push('Against ' + x.name + ', a ' + (xb.to > xh.to ? 'bigger' : 'smaller') + ' ' + (did === 'raise' ? 'raise' : 'bet') + ' scores more: about ' + B('xev', x.bestEV, xo(d, x.best)) + ', against ' + B('xev', x.heroEV, xo(d, did)) + ' for yours.');
       else if (x.best !== did && x.loss > 0.05) out.push('Against ' + x.name + ', ' + verbIng(x.best) + ' is worth about ' + B('xev', x.bestEV, xo(d, x.best)) + ' and ' + verbIng(did) + ' about ' + B('xev', x.heroEV, xo(d, did)) + '.');
       else out.push('Against ' + x.name + ', ' + verbIng(did) + ' is the best play here, worth about ' + B('xev', x.heroEV, xo(d, did)) + '.');
-      if (x.baseGrade !== d.grade && !d.sizeFix) out.push('Against a balanced opponent this would be ' + (x.baseGrade === 'Good' ? 'fine' : (x.baseGrade === 'Inaccuracy' ? 'an ' : 'a ') + x.baseGrade.toLowerCase()) + '. The grade follows ' + (x.state === 'prior' ? 'how ' + x.name + ' plays' : x.name + '\'s real play') + '.');
+      if (x.baseGrade !== d.grade && !d.sizeFix) out.push('Against a balanced opponent, this would be ' + (x.baseGrade === 'Good' ? 'fine' : (x.baseGrade === 'Inaccuracy' ? 'an ' : 'a ') + x.baseGrade.toLowerCase()) + '. The grade follows ' + (x.state === 'prior' ? 'how ' + x.name + ' plays' : x.name + '\'s real play') + '.');
       return out.join(' ');
     }
     if (!x.differ) return '';
     out.push(x.who);
     out.push('Against ' + x.name + (x.state === 'prior' ? '\'s usual play, ' : '\'s real play, ') +(x.best === did ? verbIng(did) + ' scores best, worth about ' + B('xev', x.heroEV, xo(d, did)) + '.' : x.bestEV - x.heroEV < 0.3 ? verbIng(x.best) + ' and ' + verbIng(did) + ' score about the same.' : verbIng(x.best) + ' scores about ' + B('gain', x.bestEV - x.heroEV) + ' more than ' + verbIng(did) + '.'));
-    out.push('The grade still follows the baseline, because ' + (x.tier === 'Regular' ? 'a regular' : 'a strong player') + ' adjusts.');
+    out.push('The grade still follows the baseline. ' + (x.tier === 'Regular' ? 'A regular plays close to it.' : 'A strong player adjusts to how you play.'));
     return out.join(' ');
   }
 
@@ -847,14 +890,14 @@
     // 2. the balanced view, and why the baseline plays it
     var f = d.heroFreq, freq = f >= 0.97 ? 'almost always' : P('freq', f) + ' of the time';
     var size = isAgg(did) && did !== 'allin' && d.did.toBB > 0 ? ' ' + sizeText(szOf(d), did, d.did.toBB, 'short') : '';
-    var noun = { bet: 'the bet', raise: 'the raise', allin: 'the all in', check: 'checking', call: 'the call', fold: 'the fold' }[did] || verbIng(did);
+    var noun = { bet: 'the bet', raise: 'the raise', allin: 'the all-in', check: 'checking', call: 'the call', fold: 'the fold' }[did] || verbIng(did);
     if (x.baseGrade === 'Good') {
       var because = isAgg(did) ? (bluffing ? (river ? ', because a balanced opponent folds often enough to pay for it'
           : ', because the folds it gets plus ' + (outs ? 'your outs' : 'the hand\'s equity') + ' pay for it')
           : ', because worse hands and draws pay to continue')
         : isAgg(best) && eq < 0.45 ? ', because a balanced opponent folds too rarely to pay for a bluff' : '';
-      out.push('Against a balanced opponent ' + noun + ' is fine: the baseline ' + verb3(did) + size + ' ' + freq + because + '.');
-    } else out.push('Against a balanced opponent this would be ' + (x.baseGrade === 'Inaccuracy' ? 'an ' : 'a ') + x.baseGrade.toLowerCase() + '.');
+      out.push('Against a balanced opponent, ' + noun + ' is fine: the baseline ' + verb3(did) + size + ' ' + freq + because + '.');
+    } else out.push('Against a balanced opponent, this would be ' + (x.baseGrade === 'Inaccuracy' ? 'an ' : 'a ') + x.baseGrade.toLowerCase() + '.');
     // 3. what to do at this table: the table read joined to its habit, then the plan
     var who = x.who, lead = cap(x.name) + ' ';
     var k = who.indexOf('. ' + lead);
@@ -866,7 +909,7 @@
       who = who.slice(0, k) + ', who ' + habit + '.' + (tail ? ' ' + tail : '');
     }
     out.push(who);
-    var rl = readLine(d), plan;
+    var rl = readLine(d, { said: x.state === 'prior' && /, who call too often\./.test(who) }), plan;
     if (isAgg(did) && !isAgg(best) && eq < 0.45) plan = (outs ? 'With nothing but outs, ' : 'With a weak hand, ') + base(best) + ' rather than bluff.';
     else if (rl) plan = cap(rl.replace(/^Against a player who [^,]*, /, ''));
     else plan = cap(base(best)) + ' rather than ' + base(did) + ' here.';
@@ -878,7 +921,7 @@
   // every concept a reason can name, with the phrases that mark it in the text (the review panel makes them tappable)
   var GLOSSARY = {
     mixed: { term: 'mixed spot', phrases: ['mixed spot'], def: 'A spot where the best strategy plays a hand more than one way. Each option the mix uses scores about the same.' },
-    potOdds: { term: 'pot odds', phrases: ['pot odds'], def: 'The price of a call against the pot you can win. A call of 2bb that makes the pot 7.5bb needs to win 2 / 7.5 of the time, about 27%.' },
+    potOdds: { term: 'pot odds', phrases: ['pot odds'], def: 'The price of a call against the pot you can win. A 2bb call that brings the pot to 7.5bb must win 2 times in 7.5, about 27%.' },
     mdf: { term: 'minimum defense frequency', phrases: ['minimum defense frequency'], def: 'The share of your range you must keep against a bet so that a pure bluff does not profit at once. Against a bet of B into a pot of P it is P / (P + B).' },
     rangeAdv: { term: 'range advantage', phrases: ['range advantage'], def: 'Your whole range has more equity than the opponent\'s on this board. The player with it can bet more often.' },
     nutAdv: { term: 'nut advantage', phrases: ['nut advantage'], def: 'One range holds more of the very strong hands (two pair or better). That side can bet bigger and bluff more.' },
@@ -887,7 +930,7 @@
     bluff: { term: 'bluff', phrases: ['bluff', 'showdown value'], def: 'A bet with a hand that rarely wins at showdown (little showdown value). It profits only when the opponent folds often enough.' },
     protection: { term: 'protection', phrases: ['protection', 'protects'], def: 'Betting a hand that is ahead but can be outdrawn. Draws and weaker hands must pay to see the next card or fold their equity away.' },
     potControl: { term: 'pot control', phrases: ['pot control'], def: 'Checking a medium-strength hand to keep the pot small. Mostly better hands would call a bet.' },
-    spr: { term: 'SPR', phrases: ['SPR'], def: 'Stack-to-pot ratio: the chips left behind divided by the pot. With a low SPR a good hand is committed to getting all in.' },
+    spr: { term: 'SPR', phrases: ['SPR'], def: 'Stack-to-pot ratio: the chips left behind divided by the pot. With a low SPR, a good hand should usually get all in.' },
     slowPlay: { term: 'slow play', phrases: ['slow play'], def: 'Checking or calling with a strong hand instead of betting or raising. It keeps weaker hands and bluffs in the pot for later streets.' },
     checkRaise: { term: 'check-raise', phrases: ['check-raise'], def: 'Checking, then raising after the opponent bets. It builds the pot with strong hands and draws from out of position.' },
     blockers: { term: 'blockers', phrases: ['blockers', 'block'], def: 'Cards in your hand that the opponent cannot hold. Holding them makes some of their hands less likely.' },
@@ -1003,7 +1046,7 @@
     var flush = 'a flush' + (conn ? ' or a straight' : '');
     if (act === 'raise' || act === 'allin') {
       if (cat === 'premium') out.push('A strong hand raises for value' + (ip ? '.' : ', even out of position.'), 'Limpers often hold weaker hands that will pay to see the flop.');
-      else out.push('Limpers often hold weak hands that fold to a raise.', ip ? 'When one calls, you play the flop in position.' : 'This hand is strong enough to raise even out of position.');
+      else out.push('Limpers often hold weak hands. A raise can win the pot now or leave fewer players to beat.', ip ? 'When one calls, you play the flop in position.' : 'This hand is strong enough to raise even out of position.');
     } else if (act === 'check') {
       out.push('From the BB, checking gives you a free flop.');
       if (cat === 'offsuit') out.push(dom());
@@ -1035,7 +1078,7 @@
     }
     if (!kind || kind === 'walk') return { text: '', concepts: K };
     if (kind === 'vsJam' && po) {
-      out.push('The pot odds ask for ' + P('need', po.need) + ' equity. ' + hand + ' has about ' + P('have', po.have) + ' against the shoving range.'); k('potOdds');
+      out.push('The pot odds say a call needs ' + P('need', po.need) + ' equity. ' + hand + ' has about ' + P('have', po.have) + ' against the shoving range.'); k('potOdds');
       if (icm && icm.premium > 0.01) { out.push('The ICM risk premium raises the price to ' + P('needIcm', po.need + icm.premium) + '.'); k('icm'); }
       return { text: out.join(' '), concepts: K };
     }
@@ -1051,9 +1094,9 @@
     }
     else {
       // a priced spot: the share of all hands means little after a small raise, so the line names the hand's action
-      if (d.priced && po) { out.push('The pot odds ask for ' + P('need', po.need) + ' equity. ' + hand + ' has about ' + P('have', po.have) + ' against the raiser\'s range.'); k('potOdds'); }
+      if (d.priced && po) { out.push('The pot odds say a call needs ' + P('need', po.need) + ' equity. ' + hand + ' has about ' + P('have', po.have) + ' against the raiser\'s range.'); k('potOdds'); }
       else out.push('The chart continues with about ' + P('share', share) + ' of hands here. ' + desc);
-      if (po && !d.priced && !good && (did === 'call' || d.bestAction === 'call')) { out.push('The pot odds ask for ' + P('need', po.need) + ' equity. ' + hand + ' has about ' + P('have', po.have) + ' against the raiser\'s range.'); k('potOdds'); }
+      if (po && !d.priced && !good && (did === 'call' || d.bestAction === 'call')) { out.push('The pot odds say a call needs ' + P('need', po.need) + ' equity. ' + hand + ' has about ' + P('have', po.have) + ' against the raiser\'s range.'); k('potOdds'); }
     }
     return { text: out.join(' '), concepts: K };
   }
@@ -1079,20 +1122,20 @@
       var need = po.need + prem, cr = checkedFirst ? 'This check-raise' : 'This raise';
       if (act === 'fold') {
         if (prem && po.have >= po.need) say('The ICM risk premium raises the price of a call from ' + P('need', po.need) + ' to ' + P(prem ? 'needIcm' : 'need', need) + '. The hand has about ' + P('have', po.have) + ' against the betting range.', 'icm');
-        else if (po.have < po.need) say('The pot odds ask for ' + P('need', po.need) + ' equity. The hand has only about ' + P('have', po.have) + ' against the betting range.', 'potOdds');
-        else say('The pot odds ask for ' + P('need', po.need) + ' equity. The hand has about ' + P('have', po.have) + ', but the baseline still folds it at this size.', 'potOdds');
+        else if (po.have < po.need) say('The pot odds say a call needs ' + P('need', po.need) + ' equity. The hand has only about ' + P('have', po.have) + ' against the betting range.', 'potOdds');
+        else say('The pot odds say a call needs ' + P('need', po.need) + ' equity. The hand has about ' + P('have', po.have) + ', but the baseline still folds it at this size.', 'potOdds');
         if (!good && did === 'call' && !river && oopS && po.have >= 0.85 * po.need) say('You are out of position, with more streets to play. You act first on each one. A thin call here often has to fold to the next bet.', 'position');
       } else if (act === 'call') {
         if (po.have >= need) {
-          say('The pot odds ask for ' + P(prem ? 'needIcm' : 'need', need) + ' equity' + (prem ? ' with the ICM risk premium' : '') + '. The hand has about ' + P('have', po.have) + ' against the betting range.', 'potOdds');
+          say('The pot odds say a call needs ' + P(prem ? 'needIcm' : 'need', need) + ' equity' + (prem ? ' with the ICM risk premium' : '') + '. The hand has about ' + P('have', po.have) + ' against the betting range.', 'potOdds');
           if (prem) k('icm');
-        } else if (mdf && !mw && !lowBluff(d)) say('The minimum defense frequency against this size is ' + P('mdf', mdf.mdf) + '. The baseline keeps this hand so the bettor cannot bluff at will.', 'mdf');
-        else say('The pot odds ask for ' + P(prem ? 'needIcm' : 'need', need) + ' equity. The hand has about ' + P('have', po.have) + ' against the betting range, close to the price.', 'potOdds');
+        } else if (mdf && !mw && !lowBluff(d)) say('The hand is short of the price. The baseline still calls with it. Against this size it keeps at least ' + P('mdf', mdf.mdf) + ' of its hands (the minimum defense frequency). Folding more would let the bettor bluff with any two cards.', 'mdf');
+        else say('The pot odds say a call needs ' + P(prem ? 'needIcm' : 'need', need) + ' equity. The hand has about ' + P('have', po.have) + ' against the betting range' + (po.have >= 0.85 * need ? ', close to the price.' : '.'), 'potOdds');
         if (!good && did === 'fold' && !river && ipS && !mw) say('You are in position. You act last on the later streets. That makes a close call easier to play.', 'position');
-        if (spr && spr.spr <= 1.5 && eq >= 0.4 && !good) say('The SPR is only about ' + spr.spr + '. With so little behind, this hand is committed.', 'spr');
+        if (spr && spr.spr <= 1.5 && eq >= 0.4 && !good) say('The SPR is only about ' + spr.spr + '. With so little left behind, this hand should not fold.', 'spr');
       } else if (isAgg(act)) {
         if (po.have >= 0.55) { say((checkedFirst ? 'This is a check-raise for value.' : 'This raise is for value.') + ' The hand has about ' + P('have', po.have) + ' against the betting range.', 'valueBet'); if (checkedFirst) k('checkRaise'); }
-        else if (outs >= 8) { say(cr + ' is a semi-bluff. It can win the pot now, and the ' + dr.label + ' gives ' + outs + ' outs when called.', 'semiBluff'); if (checkedFirst) k('checkRaise'); }
+        else if (outs >= 8) { say(cr + ' is a semi-bluff. It can win the pot now. When called, the ' + dr.label + ' has ' + outs + ' outs to improve.', 'semiBluff'); if (checkedFirst) k('checkRaise'); }
         else { say('The hand has about ' + P('have', po.have) + ' against the betting range. ' + cr + ' turns it into a bluff.', 'bluff'); if (checkedFirst) k('checkRaise'); }
       }
       return done();
@@ -1101,26 +1144,33 @@
     // graded against one player: the win rate when called is that player's, and the text says whose it is
     var xw = d.exploit && d.exploit.gradedBy === 'exploit' && isAgg(did) ? d.exploit.info.hero || d.exploit.info.bet : null;
     var wc = xw && xw.eqVsCall != null ? xw.eqVsCall : evc, whenC = xw && xw.eqVsCall != null ? 'When ' + d.exploit.name + ' calls' : 'When called';
-    function vbet(thin) { return isAgg(did) ? 'Your ' + (did === 'raise' ? 'raise' : 'bet') + ' is a ' + (thin ? 'thin ' : '') + 'value bet.' : thin ? 'Betting here is a thin value bet.' : 'Betting here is for value.'; }
+    // a bet that puts the opponent all in says so, and its win rate follows a colon ("All in for value: when called, ...")
+    var cov = isAgg(did) && d.did.covers, lc = function (t) { return t.charAt(0).toLowerCase() + t.slice(1); };
+    function covLine(thin, when, eqT) {
+      var lead = did === 'allin' ? 'All in ' + (thin ? 'as a thin value bet' : 'for value') : 'Your ' + (did === 'raise' ? 'raise' : 'bet') + ' puts them all in ' + (thin ? 'as a thin value bet' : 'for value');
+      return lead + (when ? ': ' + lc(when) + ', you win about ' + eqT + ' of the time.' : '.');
+    }
+    function vwin(thin, still) { return cov ? covLine(thin, whenC, P('eqc', wc)) : vbet(thin) + ' ' + whenC + ', the hand ' + (still ? 'still ' : '') + 'wins about ' + P('eqc', wc) + ' of the time.'; }
+    function vbet(thin) { if (cov) return covLine(thin); return isAgg(did) ? 'Your ' + (did === 'raise' ? 'raise' : 'bet') + ' is a ' + (thin ? 'thin ' : '') + 'value bet.' : thin ? 'Betting here is a thin value bet.' : 'Betting here is for value.'; }
     if (isAgg(act)) {
       if (eq >= 0.6) {
         if (!river && evc != null && evc < 0.5) say('A bet protects a hand with about ' + P('eq', eq) + ' equity. Weaker hands and draws must pay to see the next card.', 'protection');
         else if (evc != null && evc < 0.5) say('A bet takes the pot at once about ' + P('fold', bet.fold, { base: true }) + ' of the time. When called, the hand still wins about ' + P('eqc', evc) + '.');
-        else if (evc != null && evc < 0.6) say(vbet(true) + ' ' + whenC + ', the hand wins about ' + P('eqc', wc) + ' of the time.', 'valueBet');
-        else if (evc != null) say(vbet(false) + ' ' + whenC + ', the hand still wins about ' + P('eqc', wc) + ' of the time.', 'valueBet');
+        else if (evc != null && evc < 0.6) say(vwin(true), 'valueBet');
+        else if (evc != null) say(vwin(false, true), 'valueBet');
         else say(vbet(false) + ' The hand has about ' + P('eq', eq) + ' equity against the opponent\'s range.', 'valueBet');
         if (!good && na && na.value >= 0.05) say('Your range also has the nut advantage: ' + P('nut', na.mine) + ' strong hands against ' + P('nut', na.theirs) + '.', 'nutAdv');
-        if (!good && spr && spr.spr <= 1.5) say('The SPR is only about ' + spr.spr + '. With so little behind, this hand should get the money in.', 'spr');
+        if (!good && spr && spr.spr <= 1.5) say('The SPR is only about ' + spr.spr + '. With so little left behind, this hand should get all in.', 'spr');
       } else if (outs >= 8) {
-        say('A bet is a semi-bluff. It can win the pot now, and the ' + dr.label + ' gives ' + outs + ' outs when called.', 'semiBluff');
+        say('A bet is a semi-bluff. It can win the pot now. When called, the ' + dr.label + ' has ' + outs + ' outs to improve.', 'semiBluff');
       } else if (eq < 0.35) {
-        say('With about ' + P('eq', eq) + ' equity the hand has little showdown value. Betting turns it into a bluff.', 'bluff');
+        say('With about ' + P('eq', eq) + ' equity, the hand has little showdown value. Betting turns it into a bluff.', 'bluff');
         if (na && na.value >= 0.05) say('Your range holds more strong hands (' + P('nut', na.mine) + ' against ' + P('nut', na.theirs) + '). That nut advantage makes the bluff believable.', 'nutAdv');
         else if (ra && ra.value >= 0.04 && d.street === 'flop') say('Your range has about ' + P('rangeEq', 0.5 + ra.value) + ' equity against ' + opp + '. That range advantage lets you bet often.', 'rangeAdv');
         if (bl && river) say('Your cards also block some of the opponent\'s strong hands.', 'blockers');
       } else if (ra && ra.value >= 0.04 && d.street === 'flop') {
         say('Your range has about ' + P('rangeEq', 0.5 + ra.value) + ' equity against ' + opp + '. That range advantage lets you bet often, even with middling hands.', 'rangeAdv');
-      } else if (evc != null && evc >= 0.5) say(vbet(true) + ' ' + whenC + ', the hand wins about ' + P('eqc', wc) + ' of the time.', 'valueBet');
+      } else if (evc != null && evc >= 0.5) say(vwin(true), 'valueBet');
       else if (!river) say('A bet protects a hand with about ' + P('eq', eq) + ' equity. Weaker hands and draws must pay to see the next card.', 'protection');
       else if (bet && bet.fold != null) say('A bet wins the pot at once about ' + P('fold', bet.fold, { base: true }) + ' of the time. It works as a bluff against better hands.', 'bluff');
       return done();
@@ -1212,12 +1262,12 @@
       if (lowBluff(d)) { /* the bettor rarely bluffs: defending a share of the range does not apply */ }
       else if (mdf && !mw && (did === 'fold' || best === 'fold') && mdf.mdf - mdf.defend > 0.04 && d.street !== 'river') out.push('Against this size the baseline defends ' + P('defend', mdf.defend) + ' of your range. ' + rankLine(rp.pct));
       else if (mdf && !mw && d.street === 'river' && (did === 'fold' || did === 'call')) out.push((has('mdf') ? '' : 'This size asks you to defend ' + P('mdf', mdf.mdf) + ' of your range. ') + rankLine(rp.pct));
-      if (dr && dr.outs >= 4 && d.street !== 'river' && why.indexOf(' outs') < 0) out.push('The ' + dr.label + ' gives ' + dr.outs + ' outs.');
+      if (dr && dr.outs >= 4 && d.street !== 'river' && why.indexOf(' outs') < 0) out.push('The ' + dr.label + ' has ' + dr.outs + ' outs.');
       if (isAgg(did) && hero && hero.fold != null) out.push('The raise gets folds about ' + P('fold', hero.fold, { base: true }) + ' of the time.');
     } else {
       var eqs = pc(d.feat ? d.feat.eq : 0);
       // a reason that already gives the win rate when called needs no second equity number
-      var pe2 = why.indexOf(eqs + ' equity') >= 0 || / wins about [^.]* of the time\./.test(why) ? '' : 'The hand has about ' + P('eq', d.feat ? d.feat.eq : 0, { mw: mw }) + ' equity against ' + (mw ? 'the other ranges.' : 'the opponent\'s range.');
+      var pe2 = why.indexOf(eqs + ' equity') >= 0 || / wins? about [^.]* of the time\./.test(why) ? '' : 'The hand has about ' + P('eq', d.feat ? d.feat.eq : 0, { mw: mw }) + ' equity against ' + (mw ? 'the other ranges.' : 'the opponent\'s range.');
       if (!sf || pe2) out.push(((sf ? '' : handLine(d.feat) + ' ') + pe2).trim());
       if (isAgg(did) || isAgg(best)) {
         if (tex && (d.street === 'flop')) out.push('The board is ' + tex.desc + ', which counts as ' + tex.label + '.');
@@ -1229,7 +1279,7 @@
       var xg = d.exploit && d.exploit.gradedBy === 'exploit' ? d.exploit.info.hero || d.exploit.info.bet : null;
       if (xg && isAgg(did)) {
         if (d.feat && d.feat.eq < 0.35) out.push(cap(d.exploit.name) + ' folds to this bet about ' + P('fold', xg.fold) + ' of the time.');
-        else if (xg.eqVsCall != null && why.indexOf('When ' + d.exploit.name + ' calls') < 0) out.push('When ' + d.exploit.name + ' calls, the hand wins about ' + P('eqc', xg.eqVsCall) + '.');
+        else if (xg.eqVsCall != null && why.toLowerCase().indexOf('when ' + d.exploit.name.toLowerCase() + ' calls') < 0) out.push('When ' + d.exploit.name + ' calls, the hand wins about ' + P('eqc', xg.eqVsCall) + '.');
       } else if (isAgg(did) && hero && hero.fold != null) {
         var bet = d.did.add / h.bb, be = bet / (d.potBB + bet);
         if (why.indexOf('needs folds') >= 0 || why.indexOf(pc(hero.eqVsCall || 0) + ' of the time') >= 0) { /* said in the reason */ }
@@ -1239,10 +1289,10 @@
       } else if (isAgg(best) && did === 'check' && info.bet) {
         if (why.indexOf(pc(info.bet.eqVsCall) + ' of the time') >= 0 || has('semiBluff') || has('protection')) { /* said in the reason */ }
         else if (d.feat && d.feat.eq >= 0.6 && info.bet.eqVsCall >= 0.5) out.push('A bet of ' + betOf(d, bs) + ' gets called by worse hands. It wins about ' + P('eqc', info.bet.eqVsCall) + ' when called.');
-        else if (d.feat && d.feat.eq >= 0.6) out.push('A bet of ' + betOf(d, bs) + ' makes the draws pay. It takes the pot at once about ' + P('fold', info.bet.fold, { base: true }) + ' of the time.');
-        else if (dr && dr.outs >= 8) out.push('The ' + dr.label + ' gives ' + dr.outs + ' outs. Betting wins the pot now ' + P('fold', info.bet.fold, { base: true }) + ' of the time.');
+        else if (d.feat && d.feat.eq >= 0.6) out.push('A bet of ' + betOf(d, bs) + (d.street === 'river' ? ' takes' : ' makes the draws pay. It takes') + ' the pot at once about ' + P('fold', info.bet.fold, { base: true }) + ' of the time.');
+        else if (dr && dr.outs >= 8) out.push('The ' + dr.label + ' has ' + dr.outs + ' outs. A bet wins the pot at once about ' + P('fold', info.bet.fold, { base: true }) + ' of the time.');
         else out.push('A bet wins the pot at once about ' + P('fold', info.bet.fold, { base: true }) + ' of the time.' + (d.missedBluff && d.grade !== 'Good' && !d.capped && !d.evSplit ? ' This estimate depends on how often the opponent folds.' : ''));
-      } else if (dr && dr.outs >= 8 && d.street !== 'river' && why.indexOf(' outs') < 0) out.push('The ' + dr.label + ' gives ' + dr.outs + ' outs.');
+      } else if (dr && dr.outs >= 8 && d.street !== 'river' && why.indexOf(' outs') < 0) out.push('The ' + dr.label + ' has ' + dr.outs + ' outs.');
       if (bl && d.street === 'river' && isAgg(did) && d.feat.eq < 0.35 && !has('blockers')) out.push('Your cards block some of the opponent\'s strong hands.');
     }
     if (mw && why.indexOf(' players in the pot') < 0) out.push('With ' + mw.players + ' players in the pot, the baseline bets and bluffs less.');
@@ -1259,8 +1309,9 @@
     if (d.grade === 'Good' || d.street === 'preflop' || !isAgg(did) || !(d.did.to > 0) || !bb || d.evSplit) return null;
     if (x && x.gradedBy === 'exploit') { if (!isAgg(x.best) || !(x.loss > 0) || !x.info.bet) return null; m = { action: x.best, to: x.info.bet.to }; who = x.name; }
     else { if (!d.sizeOff || !(d.heroFreq >= GOOD_FREQ) || !d.sizeRef) return null; m = d.sizeRef; }
-    var add = m.to / bb - (d.heroIn || 0), mine = d.did.addBB;
+    var add = m.to / bb - (d.heroIn || 0), mine = d.did.effAddBB || d.did.addBB;
     if (!(m.to > 0) || !(d.pot > 0) || Math.abs(add - mine) < 0.1) return null;
+    if (d.did.covers && !realSmaller(d, add)) return null;
     var noun = did === 'raise' || (did === 'allin' && d.toCall > 0) ? 'raise' : 'bet';
     var sf = { action: m.action, noun: noun, add: rd(add, 1), toBB: rd(m.to / bb, 1), frac: add / d.pot, mine: mine, mineTo: d.did.toBB, bigger: add > mine, who: who, sz: szOf(d) };
     if (who) {
@@ -1278,7 +1329,7 @@
   // an exploit-graded size verdict: whether the baseline plays the same size, then what the player's real play adds
   function sizeVs(sf, read) {
     var who = (read ? read + ' ' : '') + 'Against ' + sf.who + (sf.tend ? ', ' + sf.tend + ',' : '\'s real play,'), better = sf.action === 'allin' ? 'moving all in' : verbIng(sf.noun) + ' ' + sizeAmt(sf, 'verb');
-    if (sf.baseSame) return 'The baseline also ' + (sf.action === 'allin' ? 'moves all in' : verb3(sf.noun) + ' ' + sizeAmt(sf, 'verb')) + ' here. ' + who + ' the ' + (sf.action === 'allin' ? 'all in' : (sf.bigger ? 'bigger ' : 'smaller ') + sf.noun) + ' gains even more.';
+    if (sf.baseSame) return 'The baseline also ' + (sf.action === 'allin' ? 'moves all in' : verb3(sf.noun) + ' ' + sizeAmt(sf, 'verb')) + ' here. ' + who + ' the ' + (sf.action === 'allin' ? 'all-in' : (sf.bigger ? 'bigger ' : 'smaller ') + sf.noun) + ' gains even more.';
     var bal = sf.baseFine ? 'Against a balanced player, ' + verbIng(sf.noun) + ' ' + sizeAmt(sf, 'mine') + ' is fine.'
       : sf.base ? 'The baseline ' + (sf.base.action === 'allin' ? 'moves all in' : verb3(sf.noun) + ' ' + sizeAmt(sf.base, 'verb')) + ' here.' : '';
     return (bal ? bal + ' ' : '') + who + ' ' + better + ' gains more.';
@@ -1332,7 +1383,7 @@
       if (!has('potOdds')) out.push(hand + ' has about ' + P('have', po.have) + ' against the raiser\'s range.');
       if (did === 'call' && d.grade !== 'Good' && po.have >= po.need && ch.chart !== 'vsJam' && po.toCall < 0.5 * d.stack && !(icm && icm.premium > 0.01)) out.push(realizedText(h, seat, e, hand, po));
     }
-    if (icm && icm.premium > 0.01 && !has('icm')) out.push('The payouts add an ICM premium of ' + P('icm', icm.premium) + '. ' + (isAgg(did) ? 'Losing the all in costs more than the chip count shows.' : 'A call needs that much more equity than the chips alone suggest.'));
+    if (icm && icm.premium > 0.01 && !has('icm')) out.push('The payouts add an ICM premium of ' + P('icm', icm.premium) + '. ' + (isAgg(did) ? 'Losing the all-in costs more than the chip count shows.' : 'A call needs that much more equity than the chips alone suggest.'));
     if (d.evLost > 0) out.push('The estimated cost is ' + B('cost', d.evLost) + '.');
     if (trustNote(d)) out.push(trustNote(d));
     var txt = out.join(' ').replace(/about (\uE000[^\uE001]*\uE001)?(over|under) /g, '$1$2 ');
@@ -1382,7 +1433,7 @@
     var solo = d.chartKind === 'bbVsLimp' && n === 1 && ip;
     out.push('Over ' + (n === 1 ? 'one limper' : n + ' limpers') + (ip ? '' : ' out of position') + ', a raise should go to about ' + B('size', ls.to, { src: 'The preflop chart\'s sizing rule over limpers.', note: 'The rule uses a set multiple of the big blind, plus one big blind for each limper.' })
       + (solo ? '.' : ': 4bb, plus 1bb per limper' + (ip ? '.' : ', plus 1bb for being out of position.')));
-    if (ls.small) out.push('A small raise offers the limpers a cheap call.', ip ? 'It plays like a limp that costs more, with a bigger pot against several players.' : 'It plays like a check that costs more, and it builds a bigger pot that you play out of position.');
+    if (ls.small) out.push('A small raise offers the limpers a cheap call.', ip ? 'It plays like a limp that costs more, with a bigger pot against several players.' : 'It plays like a check that costs more. It also builds a bigger pot that you play out of position.');
     else out.push('A raise this big risks a lot to win a small pot.', handCat(d.hand || 'xx') === 'premium' ? 'Worse hands fold, and your strong hand wins only what is in the middle.' : 'The hands that call it are mostly ones that beat you.');
     return out.join(' ');
   }
@@ -1425,9 +1476,9 @@
 
   // ---------------------------------------------------------------- leaks
   var LEAKS = {
-    overfoldCbet: 'Overfolding to c-bets', overfoldRiver: 'Overfolding to river bets', callWideBlinds: 'Calling too wide from the blinds',
+    overfoldCbet: 'Folding too often to c-bets', overfoldRiver: 'Folding too often to river bets', callWideBlinds: 'Calling too wide from the blinds',
     foldTooMuchPre: 'Folding too often preflop', playTooWidePre: 'Playing too many hands preflop', missedRiverValue: 'Missed value on the river',
-    missedValue: 'Checking strong hands', bluffNoFE: 'Bluffing with no fold equity', passiveDraws: 'Too passive with draws', callingDown: 'Calling down too light',
+    missedValue: 'Checking strong hands', bluffNoFE: 'Bluffing when a fold is unlikely', passiveDraws: 'Too passive with draws', callingDown: 'Calling down too light',
     missedCbet: 'Missing c-bets', missedBluff: 'Missing bluffs',
     xMissedValue: 'Missed value against loose players', xBluffStation: 'Bluffed calling stations', xPaidOff: 'Paid off players who don\'t bluff', icmCalls: 'Ignoring ICM pressure', sizing: 'Bet sizing', overaggressive: 'Betting or raising too often', other: 'Other'
   };
@@ -1698,7 +1749,7 @@
   }
   // the result as the header shows it: '-1 bb (blind)' when only forced chips were lost (the panel shows it muted, not red)
   function netLabel(rv) {
-    var v = Math.round(rv.net * 10) / 10, t = (v > 0 ? '+' : '') + (v === Math.round(v) ? String(Math.round(v)) : v.toFixed(1)) + ' bb';
+    var v = Math.round(rv.net * 10) / 10, t = (v > 0 ? '+' : '') + (v === Math.round(v) ? String(Math.round(v)) : v.toFixed(1)) + 'bb';
     return rv.blind ? t + ' (' + rv.blind + ')' : t;
   }
   // after an upgrade the Estimate's bet size and its fold and equity numbers can be stale; when the new mix's main

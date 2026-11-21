@@ -24,58 +24,74 @@
   // ---------------------------------------------------------------- 100bb charts: r = raise mix, c = call mix (later tokens overwrite; call is cut so r + c <= 1)
   var RFI = {
     UTG: { r: '55+, 44:0.5, 33:0.25, A2s+, K9s+, Q9s+, J9s+, T9s, 98s:0.6, 87s:0.4, 76s:0.25, 65s:0.25, ATo+, KJo+, KTo:0.25, QJo:0.5' },
-    HJ: { r: '33+, 22:0.5, A2s+, K7s+, K6s:0.4, Q9s+, J9s+, T8s+, 97s+, 87s, 76s, 65s:0.5, 54s:0.25, A9o+, KTo+, QTo+, JTo:0.5' },
-    CO: { r: '22+, A2s+, K5s+, K4s:0.5, Q8s+, Q7s:0.5, J8s+, T8s+, 97s+, 86s+, 75s+, 64s:0.5, 54s, 53s:0.25, A8o+, A7o:0.5, A5o:0.5, KTo+, K9o:0.5, QTo+, JTo, T9o:0.25' },
-    BTN: { r: '22+, A2s+, K2s+, Q3s+, Q2s:0.5, J5s+, J4s:0.5, T6s+, 96s+, 85s+, 74s+, 63s+, 53s+, 43s, 42s:0.5, A2o+, K8o+, K7o:0.5, K6o:0.25, Q9o+, Q8o:0.5, J8o+, T8o+, 97o+, 87o:0.5, 76o:0.25' },
+    HJ: { r: '33+, 22:0.3, A2s+, K8s+, K7s:0.6, K6s:0.2, Q9s+, J9s+, T8s+, 97s+, 87s, 76s, 65s:0.25, A9o+, KTo+, QJo, QTo:0.6, JTo:0.25' },
+    CO: { r: '22+, A2s+, K5s+, K4s:0.5, Q8s+, Q7s:0.5, J8s+, T8s+, 97s+, 86s+, 75s+, 64s:0.5, 54s, A8o+, A7o:0.5, A5o:0.5, KTo+, K9o:0.5, QTo+, JTo, T9o:0.25' },
+    BTN: { r: '22+, A2s+, K2s+, Q3s+, Q2s:0.5, J5s+, T6s+, 96s+, 85s+, 75s+, 64s+, 54s, A2o+, K8o+, K7o:0.5, K6o:0.25, Q9o+, Q8o:0.5, J9o+, T9o, 98o' },
     // small blind: raise 3bb or complete (call = limp)
     SB: { r: '88+, 77:0.6, 66:0.4, A9s+, A8s:0.6, A5s-A3s:0.6, KTs+, QJs, AJo+, KQo, A2s:0.4, K5s:0.3, Q6s:0.3, J7s:0.3, T7s:0.3, 96s:0.3, 85s:0.3, 74s:0.3, 63s:0.3, A2o:0.3, K8o:0.3, Q9o:0.3, J9o:0.3',
       c: '22+, A2s+, K2s+, Q2s+, J4s+, T5s+, 95s+, 84s+, 74s+, 63s+, 53s+, 43s, A2o+, K5o+, Q7o+, J7o+, T7o+, 97o+, 86o+, 76o, 65o' }
   };
   var VS_OPEN = { // hero 'vs' opener
-    'HJ>UTG': { r: 'QQ+, AKs, AKo:0.8, JJ:0.3, AQs:0.3, A5s:0.5, A4s:0.4, KQs:0.3, KJs:0.15', c: 'JJ, TT, 99:0.6, 88:0.4, AQs, AJs:0.6, KQs, QJs:0.3, JTs:0.3, AQo:0.25' },
-    'CO>UTG': { r: 'QQ+, AKs, AKo:0.85, JJ:0.35, AQs:0.4, A5s:0.6, A4s:0.5, KQs:0.35, KJs:0.2, 76s:0.1', c: 'JJ, TT, 99:0.8, 88:0.5, 77:0.3, AQs, AJs:0.8, ATs:0.4, KQs, KJs:0.5, QJs:0.5, JTs:0.5, T9s:0.3, AQo:0.4' },
-    'CO>HJ': { r: 'QQ+, AKs, AKo, JJ:0.5, AQs:0.5, AJs:0.3, A5s:0.7, A4s:0.6, A3s:0.3, KQs:0.5, KJs:0.3, QJs:0.2, AQo:0.3, 65s:0.15', c: 'JJ, TT, 99, 88:0.6, 77:0.4, AQs, AJs, ATs:0.6, KQs, KJs, KTs:0.4, QJs:0.7, JTs:0.6, T9s:0.4, AQo:0.5' },
-    'BTN>UTG': { r: 'QQ+, AKs, AKo:0.85, JJ:0.3, AQs:0.3, A5s:0.5, A4s:0.4, KQs:0.3, KJs:0.2, QJs:0.15', c: 'JJ, TT, 99, 88, 77:0.7, 66:0.5, 55:0.4, AQs, AJs, ATs, A9s:0.3, KQs, KJs, KTs:0.6, QJs, QTs:0.4, JTs, T9s, 98s:0.5, 87s:0.3, AQo:0.6, AJo:0.2, KQo:0.3' },
-    'BTN>HJ': { r: 'QQ+, AKs, AKo, JJ:0.4, AQs:0.4, AJs:0.2, A5s:0.6, A4s:0.5, A3s:0.3, KQs:0.4, KJs:0.3, QJs:0.2, AQo:0.3, 76s:0.2, 65s:0.2', c: 'JJ, TT, 99, 88, 77, 66:0.7, 55:0.5, AQs, AJs, ATs, A9s:0.5, A8s:0.3, KQs, KJs, KTs, K9s:0.3, QJs, QTs, JTs, J9s:0.4, T9s, 98s, 87s:0.6, 76s:0.4, AQo, AJo:0.4, KQo:0.6' },
+    'HJ>UTG': { r: 'QQ+, AKs, AKo:0.8, JJ:0.4, TT:0.15, AQs:0.4, A5s:0.5, A4s:0.4, KQs:0.35, KJs:0.15', c: 'JJ, TT, 99, 88:0.8, 77:0.6, 66:0.4, 55:0.3, AQs, AJs, ATs:0.7, A9s:0.3, KQs, KJs:0.6, KTs:0.3, QJs:0.6, QTs:0.3, JTs:0.7, T9s:0.4, 98s:0.3, AQo:0.5, AJo:0.15' },
+    'CO>UTG': { r: 'QQ+, AKs, AKo:0.85, JJ:0.4, TT:0.15, AQs:0.4, A5s:0.6, A4s:0.5, KQs:0.35, KJs:0.2, 76s:0.1', c: 'JJ, TT, 99, 88, 77:0.6, 66:0.5, 55:0.4, 44:0.3, AQs, AJs, ATs:0.8, A9s:0.4, A8s:0.2, KQs, KJs:0.8, KTs:0.5, QJs:0.8, QTs:0.4, JTs:0.8, T9s:0.6, 98s:0.4, 87s:0.2, AQo:0.6, AJo:0.2, KQo:0.2' },
+    'CO>HJ': { r: 'QQ+, AKs, AKo, JJ:0.5, AQs:0.5, AJs:0.3, A5s:0.7, A4s:0.6, A3s:0.3, KQs:0.5, KJs:0.3, QJs:0.2, AQo:0.3, 65s:0.15', c: 'JJ, TT, 99, 88:0.8, 77:0.6, 66:0.5, 55:0.4, 44:0.3, AQs, AJs, ATs:0.8, A9s:0.4, A8s:0.2, KQs, KJs, KTs:0.6, K9s:0.2, QJs:0.8, QTs:0.5, JTs:0.8, J9s:0.2, T9s:0.6, 98s:0.4, 87s:0.3, AQo:0.6, AJo:0.3, KQo:0.3' },
+    'BTN>UTG': { r: 'QQ+, AKs, AKo:0.85, JJ:0.3, AQs:0.3, A5s:0.5, A4s:0.4, KQs:0.3, KJs:0.2, QJs:0.15', c: 'JJ, TT, 99, 88, 77:0.8, 66:0.6, 55:0.5, 44:0.4, 33:0.3, 22:0.2, AQs, AJs, ATs, A9s:0.6, A8s:0.3, KQs, KJs, KTs:0.8, K9s:0.2, QJs, QTs:0.7, JTs, J9s:0.3, T9s, 98s:0.7, 87s:0.5, 76s:0.3, AQo:0.7, AJo:0.3, KQo:0.4' },
+    'BTN>HJ': { r: 'QQ+, AKs, AKo, JJ:0.4, AQs:0.4, AJs:0.2, A5s:0.6, A4s:0.5, A3s:0.3, KQs:0.4, KJs:0.3, QJs:0.2, AQo:0.3, 76s:0.2, 65s:0.2', c: 'JJ, TT, 99, 88, 77, 66:0.8, 55:0.6, 44:0.5, 33:0.3, 22:0.2, AQs, AJs, ATs, A9s:0.7, A8s:0.4, A7s:0.3, A6s:0.2, KQs, KJs, KTs, K9s:0.5, QJs, QTs, Q9s:0.3, JTs, J9s:0.6, T9s, T8s:0.4, 98s, 87s:0.8, 76s:0.6, 65s:0.4, AQo, AJo:0.6, KQo:0.7, KJo:0.2' },
     'BTN>CO': { r: 'TT+, AKs, AKo, 99:0.3, AQs:0.5, AJs:0.4, ATs:0.3, A5s:0.8, A4s:0.7, A3s:0.5, A2s:0.3, KQs:0.5, KJs:0.4, KTs:0.3, K9s:0.2, QJs:0.3, JTs:0.2, AQo:0.5, AJo:0.2, KQo:0.3, 76s:0.25, 65s:0.25, 54s:0.2',
-      c: '99, 88, 77, 66, 55:0.7, 44:0.5, 33:0.3, AQs, AJs, ATs, A9s, A8s:0.5, A7s:0.3, KQs, KJs, KTs, K9s:0.5, QJs, QTs, Q9s:0.4, JTs, J9s:0.6, T9s, T8s:0.4, 98s, 87s, 76s:0.6, 65s:0.4, AQo, AJo:0.7, ATo:0.2, KQo:0.6, KJo:0.2' },
+      c: '99, 88, 77, 66, 55, 44:0.8, 33:0.6, 22:0.5, AQs, AJs, ATs, A9s, A8s, A7s:0.8, A6s:0.6, A5s, A4s, A3s:0.6, A2s:0.5, KQs, KJs, KTs, K9s:0.8, K8s:0.2, QJs, QTs, Q9s:0.8, JTs, J9s, J8s:0.2, T9s, T8s:0.8, 98s, 87s, 76s, 65s:0.7, AQo, AJo:0.8, ATo:0.4, KQo:0.7, KJo:0.4, QJo:0.3' },
     'SB>UTG': { r: 'TT+, AQs+, AJs:0.6, ATs:0.3, KQs:0.7, KJs:0.4, KTs:0.15, QJs:0.2, A9s:0.15, A5s:0.7, A4s:0.6, A3s:0.3, 99:0.5, AKo, AQo:0.5, AJo:0.15, KQo:0.2, 76s:0.1, 65s:0.1',
-      c: '99:0.3, 88:0.4, 77:0.3, 66:0.2, AJs:0.3, ATs:0.3, KQs:0.3, KJs:0.3, KTs:0.3, QJs:0.3, QTs:0.2, JTs:0.3, T9s:0.15, AQo:0.3' },
+      c: '99:0.3, 88:0.8, 77:0.4, 66:0.2, AJs:0.3, ATs:0.3, KQs:0.3, KJs:0.3, KTs:0.3, QJs:0.3, QTs:0.2, JTs:0.3, T9s:0.15, AQo:0.3' },
     'SB>HJ': { r: '99+, AJs+, ATs:0.5, KQs, KJs:0.5, QJs:0.3, A5s:0.8, A4s:0.6, A3s:0.3, 88:0.4, 76s:0.15, AKo, AQo:0.6, AJo:0.2',
-      c: '88:0.4, 77:0.4, 66:0.3, 55:0.3, A9s:0.3, A8s:0.2, K9s:0.2, AJo:0.3, ATs:0.4, KJs:0.4, KTs:0.3, QJs:0.4, QTs:0.3, JTs:0.4, T9s:0.2, 98s:0.2, AQo:0.3, KQo:0.3' },
+      c: '88:0.6, 77:0.8, 66:0.7, 55:0.3, A9s:0.3, A8s:0.2, K9s:0.2, AJo:0.7, ATs:0.4, KJs:0.4, KTs:0.3, QJs:0.4, QTs:0.3, JTs:0.4, T9s:0.2, 98s:0.2, AQo:0.3, KQo:0.3' },
     'SB>CO': { r: '88+, ATs+, A9s:0.4, KJs+, KTs:0.6, K9s:0.3, QJs, QTs:0.4, JTs:0.5, A5s, A4s, A3s:0.6, A2s:0.4, 77:0.5, 76s:0.3, 65s:0.3, AQo+, AJo:0.6, ATo:0.2, KQo:0.7',
-      c: '77:0.4, 66:0.5, 55:0.4, 44:0.3, 33:0.2, A9s:0.4, A8s:0.3, KTs:0.3, QTs:0.4, Q9s:0.2, JTs:0.5, T9s:0.5, 98s:0.4, 87s:0.3, AJo:0.3, KQo:0.3' },
-    'SB>BTN': { r: '77+, 66:0.6, 55:0.4, A8s+, A7s:0.6, A6s:0.5, A5s-A2s, K9s+, K8s:0.4, QTs+, Q9s:0.4, JTs, J9s:0.5, T9s:0.6, 98s:0.4, 87s:0.3, 76s:0.3, 65s:0.3, ATo+, A9o:0.4, KJo+, KTo:0.4, QJo:0.5',
-      c: '66:0.4, 55:0.5, 44:0.5, 33:0.4, 22:0.4, A7s:0.4, A6s:0.4, K8s:0.4, Q9s:0.4, J9s:0.4, J8s:0.3, T9s:0.4, T8s:0.3, 97s:0.3, 98s:0.5, 87s:0.5, 76s:0.4, 65s:0.3, 54s:0.3, A9o:0.3, KTo:0.2, K9o:0.2, QJo:0.2, QTo:0.2' },
+      c: '77:0.5, 66:0.8, 55:0.5, 44:0.3, 33:0.2, A9s:0.4, A8s:0.3, KTs:0.3, QTs:0.4, Q9s:0.2, JTs:0.5, T9s:0.5, 98s:0.4, 87s:0.3, AJo:0.4, ATo:0.6, KQo:0.3' },
+    'SB>BTN': { r: '77+, 66:0.6, 55:0.4, A8s+, A7s:0.6, A6s:0.5, A5s-A2s, K9s+, K8s:0.3, QTs+, Q9s:0.3, JTs, J9s:0.4, T9s:0.5, 98s:0.3, 87s:0.2, 76s:0.2, 65s:0.2, ATo+, A9o:0.3, KJo+, KTo:0.2, QJo:0.3',
+      // a small flat range: the SB mostly 3-bets or folds against the button
+      c: '66:0.2, 55:0.3, 44:0.7, 33:0.2, 22:0.3, A7s:0.2, A6s:0.3, T9s:0.2, 98s:0.3, 87s:0.3, 76s:0.2, A9o:0.4' },
     'BB>UTG': { r: 'QQ+, AKs, AKo:0.85, JJ:0.5, TT:0.2, AQs:0.5, AJs:0.3, A5s:0.7, A4s:0.5, A3s:0.3, KQs:0.4, KJs:0.2, K9s:0.15, QJs:0.15, 76s:0.2, 65s:0.2, 54s:0.15, AQo:0.3',
       c: '22+, A2s+, K2s+, Q4s+, J5s+, T5s+, 95s+, 85s+, 74s+, 63s+, 53s+, 43s:0.5, A7o+, A6o:0.4, A5o:0.6, A4o:0.4, K9o+, QTo+, Q9o:0.6, JTo, J9o:0.6, T9o:0.7, 98o:0.4' },
     'BB>HJ': { r: 'QQ+, AKs, AKo:0.85, JJ:0.5, TT:0.25, AQs:0.5, AJs:0.4, ATs:0.2, A5s:0.6, A4s:0.5, A3s:0.4, KQs:0.4, KJs:0.25, KTs:0.15, K9s:0.15, QJs:0.2, 76s:0.2, 65s:0.2, 54s:0.2, AQo:0.4',
-      c: '22+, A2s+, K2s+, Q3s+, J5s+, T6s+, 95s+, 85s+, 74s+, 63s+, 52s+, 42s+, 32s:0.5, A5o+, A4o:0.5, A3o:0.4, K9o+, K8o:0.5, K7o:0.3, Q9o+, Q8o:0.4, J9o+, J8o:0.3, T9o, T8o:0.4, 98o:0.6, 97o:0.3, 87o:0.3' },
+      c: '22+, A2s+, K2s+, Q3s+, J5s+, T6s+, 95s+, 85s+, 74s+, 63s+, 52s+, 42s+, 32s:0.5, A5o+, A4o:0.7, A3o:0.6, K9o+, K8o:0.5, K7o:0.3, Q9o+, Q8o:0.4, J9o+, J8o:0.3, T9o, T8o:0.4, 98o:0.6, 97o:0.3, 87o:0.3' },
     'BB>CO': { r: 'JJ+, AQs+, AKo, TT:0.5, 99:0.2, AJs:0.4, ATs:0.3, AQo:0.4, AJo:0.2, A5s:0.6, A4s:0.5, A3s:0.4, KQs:0.4, KJs:0.3, KTs:0.2, QJs:0.2, QTs:0.15, JTs:0.15, K9s:0.15, 76s:0.2, 65s:0.2, 54s:0.2, A9o:0.1, KQo:0.2',
       c: '22+, A2s+, K2s+, Q2s+, J4s+, T5s+, 95s+, 84s+, 73s+, 63s+, 52s+, 42s+, 32s, A2o+, K8o+, K7o:0.5, K6o:0.3, Q8o+, J8o+, T8o+, 97o+, 87o, 86o:0.3, 76o:0.5' },
     'BB>BTN': { r: 'TT+, AJs+, AKo, AQo, 99:0.4, 88:0.3, ATs:0.5, A5s:0.7, A4s:0.6, A3s:0.5, A2s:0.4, KJs+, KTs:0.4, K9s:0.25, QJs:0.4, QTs:0.25, Q9s:0.2, JTs:0.3, J9s:0.2, T9s:0.2, 98s:0.2, 87s:0.25, 76s:0.25, 65s:0.25, 54s:0.25, AJo:0.4, ATo:0.2, KQo:0.5, KJo:0.2, K8o:0.15, Q8o:0.15',
       c: '22+, A2s+, K2s+, Q2s+, J2s+, T3s+, 94s+, 84s+, 73s+, 62s+, 52s+, 42s+, 32s, A2o+, K4o+, K3o:0.5, Q6o+, Q5o:0.5, J7o+, T7o+, 97o+, 86o+, 76o, 75o:0.5, 65o:0.6, 54o:0.4' },
-    'BB>SB': { r: '88+, 77:0.5, A9s+, A5s-A2s, KTs+, K9s:0.4, QJs, Q9s:0.3, J9s:0.3, T8s:0.3, 97s:0.3, 86s:0.3, 75s:0.3, 64s:0.3, 53s:0.3, AJo+, KQo, A8o:0.3, K9o:0.3',
-      c: '22+, A2s+, K2s+, Q2s+, J2s+, T4s+, 95s+, 84s+, 73s+, 63s+, 52s+, 42s+, 32s, A2o+, K4o+, Q6o+, J7o+, T7o+, 97o+, 86o+, 76o, 65o:0.6, 75o:0.4, 54o:0.3' }
+    'BB>SB': { r: 'TT+, 99:0.4, AKs, AQs:0.4, AJs:0.4, ATs:0.3, A5s:0.3, A4s:0.3, A3s:0.2, KQs:0.35, KJs:0.3, KTs:0.3, K9s:0.2, QJs:0.3, Q9s:0.2, J9s:0.2, T8s:0.2, 97s:0.2, 86s:0.2, 75s:0.2, 64s:0.2, 53s:0.2, AKo, AQo:0.35, AJo:0.2, KQo:0.2, A8o:0.2, K9o:0.2',
+      c: '22+, A2s+, K2s+, Q2s+, J2s+, T4s+, 95s+, 84s+, 73s+, 63s+, 52s+, 42s+, 32s, A2o+, K4o+, Q6o+, J9o+, T8o+, 98o, 87o, 76o, 65o:0.6, 75o:0.4, 54o:0.3' }
   };
   // opener facing a 3-bet; ip = the opener has position on the 3-bettor (a blind 3-bet), oop = the 3-bettor is behind
   var VS_3BET = {
-    UTG: { oop: { r: 'KK+, QQ:0.4, AKs:0.6, AKo:0.4, A5s:0.4', c: 'QQ, JJ, TT, 99, 88:0.6, 77:0.4, AKs, AQs, AJs, ATs:0.4, KQs, KJs:0.4, QJs:0.4, JTs:0.5, T9s:0.3, AKo, AQo:0.6' },
-      ip: { r: 'KK+, QQ:0.3, AKs:0.5, AKo:0.4, A5s:0.4, A4s:0.2', c: 'QQ, JJ, TT, 99, 88:0.6, 77:0.4, AKs, AQs, AJs, ATs:0.6, KQs, KJs:0.6, QJs:0.5, JTs:0.6, T9s:0.4, AKo, AQo:0.6' } },
-    HJ: { oop: { r: 'KK+, QQ:0.5, AKs:0.6, AKo:0.5, A5s:0.5, A4s:0.3', c: 'QQ, JJ, TT, 99, 88:0.7, 77:0.5, 66:0.3, AKs, AQs, AJs, ATs:0.6, KQs, KJs:0.7, KTs:0.3, QJs:0.6, JTs:0.6, T9s:0.4, 98s:0.3, AKo, AQo:0.7' },
-      ip: { r: 'KK+, QQ:0.4, AKs:0.5, AKo:0.5, A5s:0.5, A4s:0.3', c: 'QQ, JJ, TT, 99, 88, 77:0.5, 66:0.3, AKs, AQs, AJs, ATs:0.7, A9s:0.3, KQs, KJs, KTs:0.4, QJs:0.7, JTs:0.7, T9s:0.5, 98s:0.3, AKo, AQo:0.7, AJo:0.2' } },
-    CO: { oop: { r: 'QQ+, JJ:0.2, AKs, AKo:0.6, A5s:0.5, A4s:0.4, K9s:0.1', c: 'JJ, TT, 99, 88, 77:0.7, 66:0.5, 55:0.3, AQs, AJs, ATs, A9s:0.4, A8s:0.3, KQs, KJs, KTs:0.6, QJs, QTs:0.5, JTs, T9s:0.6, 98s:0.5, 87s:0.4, 76s:0.3, AKo, AQo, AJo:0.3, KQo:0.4' },
-      ip: { r: 'QQ+, JJ:0.2, AKs, AKo:0.6, A5s:0.5, A4s:0.4, A3s:0.2, K9s:0.1', c: 'JJ, TT, 99, 88, 77, 66:0.5, 55:0.3, AQs, AJs, ATs, A9s:0.5, KQs, KJs, KTs:0.6, QJs, QTs:0.4, JTs, T9s:0.7, 98s:0.5, 87s:0.4, AKo, AQo, AJo:0.4, KQo:0.4' } },
-    BTN: { ip: { r: 'QQ+, JJ:0.2, AKs, AKo:0.6, A5s:0.5, A4s:0.4, K9s:0.15, 76s:0.1', c: 'JJ, TT, 99, 88, 77, 66, 55:0.7, 44:0.5, 33:0.3, A7s:0.3, A6s:0.3, K8s:0.3, J8s:0.3, 97s:0.3, 86s:0.3, 75s:0.3, 54s:0.3, KJo:0.3, QJo:0.3, ATo:0.3, AQs, AJs, ATs, A9s:0.6, A8s:0.4, KQs, KJs, KTs, K9s:0.4, QJs, QTs, Q9s:0.3, JTs, J9s:0.5, T9s, T8s:0.3, 98s, 87s:0.6, 76s:0.5, 65s:0.4, AKo, AQo, AJo:0.5, KQo:0.5' } },
+    UTG: { oop: { r: 'AA, KK, QQ:0.25, AKs:0.3, AKo:0.25, A5s:0.4, A4s:0.2', c: 'QQ, JJ, TT, 99, 88, 77, 66:0.7, 55:0.5, 44:0.3, AKs, AQs, AJs, ATs, A9s:0.6, A8s:0.3, KQs:0.8, KJs:0.4, KTs:0.3, QJs:0.4, JTs:0.6, T9s:0.5, 98s:0.4, AKo, AQo, AJo:0.3' },
+      ip: { r: 'AA, KK, QQ:0.25, AKs:0.3, AKo:0.25, A5s:0.4, A4s:0.2', c: 'QQ, JJ, TT, 99, 88, 77:0.8, 66:0.6, 55:0.4, AKs, AQs, AJs, ATs, A9s:0.5, A8s:0.3, KQs:0.7, KJs:0.4, KTs:0.3, QJs:0.4, QTs:0.2, JTs:0.5, T9s:0.5, 98s:0.4, AKo, AQo, AJo:0.3' } },
+    HJ: { oop: { r: 'KK+, QQ:0.3, AKs:0.4, AKo:0.3, A5s:0.3, A4s:0.2', c: 'QQ, JJ, TT, 99, 88, 77, 66:0.6, 55:0.4, 44:0.3, AKs, AQs, AJs, ATs, A9s:0.6, A8s:0.4, A7s:0.3, KQs, KJs, KTs:0.6, K9s:0.2, QJs:0.7, QTs:0.5, JTs, J9s:0.4, T9s:0.7, T8s:0.3, 98s:0.5, 87s:0.4, 76s:0.3, AKo, AQo, AJo:0.4, KQo:0.3' },
+      ip: { r: 'KK+, QQ:0.3, AKs:0.4, AKo:0.3, A5s:0.3, A4s:0.2', c: 'QQ, JJ, TT, 99, 88, 77, 66:0.7, 55:0.5, 44:0.3, AKs, AQs, AJs, ATs, A9s:0.7, A8s:0.5, A7s:0.3, KQs, KJs, KTs:0.7, K9s:0.3, QJs:0.45, QTs:0.4, Q9s:0.2, JTs, J9s:0.5, T9s:0.8, T8s:0.3, 98s:0.6, 87s:0.5, 76s:0.3, AKo, AQo, AJo:0.5, KQo:0.4' } },
+    CO: { oop: { r: 'QQ+, JJ:0.2, AKs, AKo:0.6, A5s:0.4, A4s:0.4, K9s:0.1', c: 'JJ, TT, 99, 88, 77, 66:0.8, 55:0.5, 44:0.4, 33:0.3, AQs, AJs, ATs, A9s:0.7, A8s:0.5, A7s:0.4, A6s:0.3, KQs, KJs, KTs, K9s:0.5, QJs, QTs, Q9s:0.3, JTs, J9s:0.6, T9s, T8s:0.4, 98s:0.7, 87s:0.6, 76s:0.5, 65s:0.4, AKo, AQo, AJo:0.6, ATo:0.2, KQo:0.6, KJo:0.2' },
+      ip: { r: 'KK+, QQ:0.4, JJ:0.2, AKs:0.7, AKo:0.5, A5s:0.4, A4s:0.4, A3s:0.2, K9s:0.1', c: 'QQ, JJ, TT, 99, 88, 77, 66:0.8, 55:0.6, 44:0.4, 33:0.3, AQs, AJs, ATs, A9s:0.8, A8s:0.5, A7s:0.4, A6s:0.3, KQs, KJs, KTs, K9s:0.4, QJs, QTs, Q9s:0.4, JTs, J9s:0.6, T9s, T8s:0.5, 98s:0.7, 87s:0.6, 76s:0.5, 65s:0.4, AKo, AQo, AJo:0.7, ATo:0.3, KQo:0.45, KJo:0.3' } },
+    BTN: { ip: { r: 'QQ+, JJ:0.2, AKs, AKo:0.6, A5s:0.5, A4s:0.4, A3s:0.3, K9s:0.2, K8s:0.15, 76s:0.15, 65s:0.15',
+      c: 'JJ, TT, 99, 88, 77, 66, 55, 44:0.8, 33:0.6, 22:0.5, AQs, AJs, ATs, A9s, A8s, A7s:0.8, A6s:0.7, A5s, A4s, A3s, A2s:0.6, KQs, KJs, KTs, K9s, K8s:0.5, K7s:0.3, QJs, QTs, Q9s:0.7, Q8s:0.3, JTs, J9s:0.8, J8s:0.4, T9s, T8s:0.6, 97s:0.4, 98s, 87s, 86s:0.3, 76s:0.8, 75s:0.3, 65s:0.6, 54s:0.5, AKo, AQo, AJo, ATo:0.6, A9o:0.2, KQo, KJo:0.6, KTo:0.2, QJo:0.4, QTo:0.2, JTo:0.3' } },
     SB: { oop: { r: 'QQ+, AKs, AKo:0.7, JJ:0.2, A5s:0.5, A4s:0.3', c: 'JJ, TT, 99, 88, 77:0.7, 66:0.5, 55:0.4, AQs, AJs, ATs, A9s:0.5, A8s:0.4, KQs, KJs, KTs:0.6, QJs, QTs:0.5, JTs, T9s:0.6, 98s:0.4, AKo, AQo, AJo:0.4, KQo:0.4' } }
   };
   VS_3BET.BTN.oop = VS_3BET.BTN.ip; VS_3BET.SB.ip = VS_3BET.SB.oop;
-  var VS_4BET = { // 3-bettor facing a 4-bet; raise = 5-bet all-in
-    ip: { r: 'KK+, QQ:0.3, AKs:0.7, AKo:0.5, A5s:0.1', c: 'QQ, JJ:0.7, TT:0.3, AKs, AQs:0.5, AKo' },
-    oop: { r: 'KK+, QQ:0.5, AKs:0.7, AKo:0.6', c: 'QQ, JJ:0.4, AKs, AQs:0.2, AKo' }
+  var VS_4BET = { // 3-bettor facing a 4-bet; raise = 5-bet all-in. AK mostly calls: a tight 4-bet range only calls a jam with better.
+    ip: { r: 'AA, KK:0.6, AKs:0.3, AKo:0.25, A5s:0.1', c: 'KK, QQ, JJ:0.7, TT:0.3, AKs, AQs:0.5, AKo' },
+    oop: { r: 'AA, KK:0.7, AKs:0.3, AKo:0.3', c: 'KK, QQ, JJ:0.5, AKs, AQs:0.3, AKo' },
+    // wide 3-bettors (the blinds against a CO, BTN or SB open, the BTN against a CO open) hold more hands that can call
+    wideIp: { r: 'KK+, AKs:0.4, AKo:0.35, A5s:0.25, A4s:0.15', c: 'QQ, JJ, TT:0.8, 99:0.5, 88:0.3, AKs, AQs, AJs:0.6, ATs:0.3, KQs:0.6, KJs:0.3, AKo, AQo:0.6, AJo:0.2' },
+    wideOop: { r: 'KK+, AKs:0.4, AKo:0.4, A5s:0.25, A4s:0.15', c: 'QQ, JJ, TT:0.8, 99:0.5, 88:0.3, AKs, AQs, AJs:0.5, ATs:0.2, KQs:0.5, KJs:0.2, AKo, AQo:0.5, AJo:0.15' },
+    // the SB against a BTN 4-bet: its 3-bet range is the widest and linear, so it calls the most
+    // the BB against a BTN 4-bet: between the two. Its weak calls play badly out of position, so it calls a little less
+    bbBtn: { r: 'KK+, AKs:0.4, AKo:0.4, A5s:0.25, A4s:0.15', c: 'QQ, JJ, TT:0.8, 99:0.5, 88:0.2, AKs, AQs, AJs:0.4, KQs:0.4, AKo, AQo:0.4' },
+    sbBtn: { r: 'KK+, AKs:0.4, AKo:0.4, A5s:0.25, A4s:0.15', c: 'QQ, JJ, TT, 99, 88:0.7, 77:0.5, 66:0.3, AKs, AQs, AJs, ATs:0.6, A9s:0.3, KQs, KJs:0.6, KTs:0.3, QJs:0.5, JTs:0.4, AKo, AQo:0.8, AJo:0.4, KQo:0.3' }
   };
+  // the chart for a 3-bettor (hero) facing a 4-bet from the opener (villain)
+  function vs4betChart(hero, villain) {
+    var ip = postIx(hero) > postIx(villain), wide = (hero === 'SB' && villain === 'CO') || (hero === 'BB' && villain === 'SB') || (hero === 'BTN' && villain === 'CO');
+    if (hero === 'SB' && villain === 'BTN') return VS_4BET.sbBtn;
+    if (hero === 'BB' && villain === 'BTN') return VS_4BET.bbBtn;
+    return VS_4BET[(wide ? 'wide' : '') + (ip ? (wide ? 'Ip' : 'ip') : (wide ? 'Oop' : 'oop'))];
+  }
   var BB_VS_LIMP = { r: '88+, 77:0.5, A9s+, A5s-A2s:0.5, KTs+, K9s:0.4, QJs, Q9s:0.3, J9s:0.3, T8s:0.3, 97s:0.3, 86s:0.3, 75s:0.3, 64s:0.3, 54s:0.3, ATo+, KJo+, K8o:0.3, Q9o:0.3' };
-  var COLD_4BET = { r: 'KK+, QQ:0.4, AKs:0.5, AKo:0.3, A5s:0.15', c: 'QQ:0.5, JJ:0.3, AKs:0.3, AKo:0.2' };
+  var COLD_4BET = { r: 'KK+, QQ:0.4, AKs:0.4, AKo:0.3, A5s:0.15', c: 'QQ:0.5, JJ:0.3, AKs:0.4, AKo:0.2' };
 
   // ---------------------------------------------------------------- helpers
   function chart(def) {
@@ -169,14 +185,28 @@
       var pq = key.split('>'), hero = pq[0], opener = pq[1], open = opener === 'SB' ? SIZES.openSB[25] : SIZES.open[25];
       var heroIn = hero === 'BB' ? 1 : hero === 'SB' ? 0.5 : 0, P0 = open + 1.5 - (opener === 'SB' ? 0.5 : 0);
       var J = solveJam(rfiAt(opener, 25).raise, 25, open, heroIn, P0, 5 - POS6.indexOf(hero), s.call, 0.3);
-      for (i = 0; i < 169; i++) { var c0 = bbd ? s.call[i] + s.raise[i] : s.call[i]; s.raise[i] = J.jam[i]; s.call[i] = Math.min(1 - J.jam[i], c0 * (speculative(i) ? (bbd ? 0.7 : 0.5) : (bbd ? 0.95 : 0.8))); }
+      // the 100bb continue (calls and 3-bets) is the base for the calls. A hand with half the equity of the opener's range or
+      // more always continues (from 47%, a rising share): at 25bb the price is too good to fold it.
+      var eo = memo('eqo' + opener + 25, function () { return eqVsRange(rfiAt(opener, 25).raise); });
+      for (i = 0; i < 169; i++) {
+        var c0 = (s.call[i] + s.raise[i]) * (speculative(i) ? (bbd ? 0.7 : 0.5) : (bbd ? 0.95 : 0.8));
+        c0 = Math.max(c0, clamp((eo[i] - 0.47) / 0.03, 0, 1));
+        s.raise[i] = J.jam[i]; s.call[i] = Math.min(1 - J.jam[i], c0);
+      }
       return refold(s);
     });
   }
   function vs3betAt(opener, ip, depth) {
     return memo('v3' + opener + ip + depth, function () {
       var s = chart(VS_3BET[opener][ip ? 'ip' : 'oop']);
-      if (depth < 100) for (var i = 0; i < 169; i++) { if (bluffy(i)) s.raise[i] *= depth === 40 ? 0.3 : 0; if (speculative(i)) s.call[i] *= depth === 40 ? 0.6 : 0.4; }
+      // 40bb, the SB against the BB's 3-bet: the 4-bet is an all-in, and the pairs and best broadways that call at 100bb jam
+      // half the time instead. Out of position with little behind, a call plays badly and a jam gets the BB's bluffs to fold.
+      var J40 = depth === 40 && opener === 'SB' ? C.parseRange('JJ-22, AQs, AJs, KQs, AQo') : null;
+      if (depth < 100) for (var i = 0; i < 169; i++) {
+        if (bluffy(i)) s.raise[i] *= depth === 40 ? 0.3 : 0;
+        if (speculative(i)) s.call[i] *= depth === 40 ? 0.6 : 0.4;
+        if (J40 && J40[i]) { var mv = s.call[i] * 0.5; s.call[i] -= mv; s.raise[i] += mv; }
+      }
       return refold(s);
     });
   }
@@ -264,7 +294,14 @@
     if (lastR && (lastR.allIn || toCall >= left * 0.9)) {
       var jr = jammerRange(acts, raises.length - 1, bb, ante, n);
       var call = Math.min(toCall, left), pot = desc.potBB != null ? desc.potBB : potD;
-      return vsJam(jr, call / (pot + call), lastR.pos + ' all in, ' + hero + ' to call', depth);
+      var vj = vsJam(jr, call / (pot + call), lastR.pos + ' all in, ' + hero + ' to call', depth);
+      // a deep 5-bet jam over our own 4-bet: the equity line alone folds QQ and AK to the narrow 5-bet range. The 4-bettor is
+      // priced in near 2:1 and real 5-bet jams hold more bluffs, so QQ+ and AK always call and JJ calls half the time.
+      if (raises.length >= 4 && raises[raises.length - 2].pos === hero && bb > 30) {
+        var fl = C.parseRange('QQ+, AKs, AKo, JJ:0.5');
+        for (var j = 0; j < 169; j++) if (fl[j] > vj.call[j]) { vj.call[j] = fl[j]; vj.fold[j] = 1 - fl[j]; }
+      }
+      return vj;
     }
     // 15bb and under: push/fold
     if (bb <= 15.5) {
@@ -331,7 +368,7 @@
         label += ' to ' + fmtBB(raises[1].toBB);
       } else { s = chart(COLD_4BET); kind = 'cold4bet'; label = hero + ' facing an open and a 3-bet to ' + fmtBB(raises[1].toBB); rt = raises[1].toBB * SIZES.fourBet; approx = true; }
     } else {
-      if (raises[raises.length - 2].pos === hero) { var ip4 = postIx(hero) > postIx(lastR.pos); s = chart(VS_4BET[ip4 ? 'ip' : 'oop']); kind = 'vs4bet'; label = hero + ' 3-bet, ' + lastR.pos + ' 4-bets to ' + fmtBB(lastR.toBB); }
+      if (raises[raises.length - 2].pos === hero) { s = chart(vs4betChart(hero, lastR.pos)); kind = 'vs4bet'; label = hero + ' 3-bet, ' + lastR.pos + ' 4-bets to ' + fmtBB(lastR.toBB); }
       else { s = chart({ r: 'AA, KK:0.5', c: 'KK:0.5, QQ:0.3, AKs:0.3' }); kind = 'approx'; label = hero + ' facing a 4-bet cold, to ' + fmtBB(lastR.toBB); approx = true; }
       rt = bb;
     }
@@ -436,7 +473,7 @@
   function grid(s) { var o = []; for (var i = 0; i < 169; i++) o.push({ name: C.CLASS_NAME[i], fold: s.fold[i], call: s.call[i], raise: s.raise[i] }); return o; }
   function percents(s) { return { fold: C.classPercent(s.fold), call: C.classPercent(s.call), raise: C.classPercent(s.raise) }; }
 
-  return { POS6: POS6, SIZES: SIZES, DEPTHS: DEPTHS, RFI: RFI, VS_OPEN: VS_OPEN, VS_3BET: VS_3BET, VS_4BET: VS_4BET,
+  return { POS6: POS6, SIZES: SIZES, DEPTHS: DEPTHS, RFI: RFI, VS_OPEN: VS_OPEN, VS_3BET: VS_3BET, VS_4BET: VS_4BET, vs4betChart: vs4betChart,
     chart: chart, spot: spot, forHand: forHand, advice: advice, preflopRange: preflopRange, grid: grid, percents: percents,
     equity169: equity169, eqVsRange: eqVsRange, vsRandom: vsRandom, solveJam: solveJam, pushRange: pushRange, callRange: callRange,
     rfiAt: rfiAt, vsOpenAt: vsOpenAt, vs3betAt: vs3betAt };

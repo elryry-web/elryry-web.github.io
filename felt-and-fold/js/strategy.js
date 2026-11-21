@@ -293,7 +293,8 @@
   }
   function facingPolicy(ctx, adj, rto) {
     var sp = ctx.spec, W = sp.W, street = ctx.street, callAmt = Math.min(sp.toCall, sp.stack);
-    var need = callAmt / (sp.pot + callAmt), s = sp.toCall / Math.max(1, sp.pot - sp.toCall), mdf = (sp.pot - sp.toCall) / sp.pot;
+    // facing a bet bigger than our stack, the part we cannot match goes back to the bettor: it is not in the pot we play for
+    var need = callAmt / (sp.pot - (sp.toCall - callAmt) + callAmt), s = sp.toCall / Math.max(1, sp.pot - sp.toCall), mdf = (sp.pot - sp.toCall) / sp.pot;
     var shift = A(adj, 'callShift') + (street === 'river' && s >= 0.7 ? A(adj, 'riverBigFold') : 0);
     var rp = sp.icmRP ? sp.icmRP * Math.min(1, callAmt / Math.max(1, sp.stack) * 2) : 0;
     var needAdj = need + shift + rp, eqR = new Float64Array(NC), c = new Float64Array(NC), D = 0, D0 = 0, base = need + rp;
@@ -438,7 +439,10 @@
   function eqVsAll(calls, board, i) { var p = 1; calls.forEach(function (W) { var e = eqVs(W, board)[i]; p *= e === e ? e : 0.5; }); return p; }
   // EV of an aggressive action putting the actor's street total at `to`
   function aggEV(ctx, i, to, rangeAfter) {
-    var sp = ctx.spec, add = to - sp.committed, pot = sp.pot, potAfter = pot + add;
+    var sp = ctx.spec;
+    // chips past what the opponents can match come back: a bet that covers them plays as all in for their stack
+    if (sp.eff != null && to > sp.committed + sp.eff) to = sp.committed + sp.eff;
+    var add = to - sp.committed, pot = sp.pot, potAfter = pot + add;
     var resp = oppResponse(ctx, rangeAfter, to, sp.currentBet, potAfter), eqc = eqVsAll(resp.calls, ctx.board, i);
     var callIn = Math.min(to, sp.eff + sp.committed) - sp.currentBet, Rr = ctx.street === 'river' ? 1 : realise(ctx, i);
     var win = potAfter + callIn * ctx.nOpp;
@@ -448,6 +452,7 @@
   }
   function evs(ctx, i, extraTo) {
     var sp = ctx.spec, p = policy(ctx), out = {}, info = {}, bb = sp.bb, R0 = realise(ctx, i), W = sp.W;
+    if (extraTo && sp.eff != null) extraTo = Math.min(extraTo, sp.committed + sp.eff);
     if (p.kind === 'open') {
       out.check = ctx.eq[i] * R0 * sp.pot;
       var rangeBet = new Float64Array(NC); for (var k = 0; k < NC; k++) rangeBet[k] = W[k] * (p.bet[k] || 0);
@@ -456,7 +461,7 @@
       if (extraTo && extraTo !== sp.committed + p.amount) { var x = aggEV(ctx, i, extraTo, rangeBet); info.hero = x; }
     } else {
       out.fold = 0;
-      out.call = (ctx.eq[i] * R0 + implied(ctx, i)) * (sp.pot + p.callAmt) - p.callAmt;
+      out.call = (ctx.eq[i] * R0 + implied(ctx, i)) * (sp.pot - (sp.toCall - p.callAmt) + p.callAmt) - p.callAmt;
       if (p.raiseTo) {
         var rangeR = new Float64Array(NC); for (k = 0; k < NC; k++) rangeR[k] = W[k] * (p.raise[k] || 0);
         if (total(rangeR) < 1e-6) rangeR = W;
@@ -639,7 +644,10 @@
     function eqv(W) { var r = C.equityVsRange(hole, W, board, { seed: seed, samples: 6000 }); return r.eq === r.eq ? r.eq : 0.5; }
     var eqX = eqv(WX), R0 = realise(ctx, i), imp = implied(ctx, i), pol = policy(ctx), out = {}, info = {};
     var commV = tr.comm[v] || 0, stackV = tr.stack[v];
+    // a bet past the player's stack plays as all in for that stack: the rest comes back
+    if (heroTo) heroTo = Math.min(heroTo, commV + stackV);
     function agg(to, rangeAfter) {
+      to = Math.min(to, commV + stackV);
       var add = to - sp.committed, potAfter = sp.pot + add, toCallV = to - commV;
       var key = sp.key + ':x' + to + ':' + model.tier + model.style;
       var vs = { key: key, seat: v, street: sp.street, board: board, pot: potAfter, toCall: toCallV, currentBet: to, committed: commV, stack: stackV,
@@ -676,7 +684,7 @@
       if (heroTo && heroTo !== sp.committed + pol.amount) info.hero = agg(heroTo, rb);
     } else {
       out.fold = 0;
-      out.call = (eqX * R0 + imp) * (sp.pot + pol.callAmt) - pol.callAmt;
+      out.call = (eqX * R0 + imp) * (sp.pot - (sp.toCall - pol.callAmt) + pol.callAmt) - pol.callAmt;
       if (pol.raiseTo) {
         var rr = narrowed('raise'), r = agg(pol.raiseTo, rr);
         if (r) { out[pol.raiseJam ? 'allin' : 'raise'] = r.ev; info.raise = r; }

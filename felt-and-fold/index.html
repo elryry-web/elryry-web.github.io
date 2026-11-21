@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <meta name="theme-color" content="#0f2a1e">
 <title>Felt &amp; Fold</title>
-<link rel="stylesheet" href="css/style.css?v=0.9.4">
-<link rel="stylesheet" href="css/cards.css?v=0.9.4">
+<link rel="stylesheet" href="css/style.css?v=0.9.5">
+<link rel="stylesheet" href="css/cards.css?v=0.9.5">
 </head>
 <body class="four-color">
 <div id="app">
@@ -51,25 +51,26 @@
   <section class="screen" id="scr-about">
     <header class="lobby-head"><button class="btn sm back" data-go="title">&#8592; Menu</button><h2>About the coach</h2></header>
     <div class="lobby prose">
-      <p>After each hand you played, the coach looks at every decision you made. It compares your action with a baseline strategy. Each decision gets a grade and a number: the big blinds you gave up against that baseline.</p>
+      <p>After each hand you played, the coach looks at every decision you made. It compares your action with a baseline strategy. Each decision gets a grade and a number: the big blinds you gave up compared with that baseline.</p>
       <h4>Where the baseline comes from</h4>
-      <p>Before the flop, the baseline is a set of opening, 3-bet and defence charts. Short stacks in tournaments use Nash push-or-fold tables.</p>
-      <p>After the flop, the baseline is usually an estimate. It weighs your equity against the range your opponent likely holds, the pot odds and the board. It is a good guide. It is not a solver.</p>
-      <p>Heads-up pots can get a real solver answer. Turn and river spots are solved live while you read the review. Some flops come from a library of solved spots. Pots with three or more players always use the estimate.</p>
+      <p>Before the flop, the baseline is a set of opening, 3-bet and defence charts. Stacks of 15bb or less use push/fold charts: go all in or fold.</p>
+      <p>After the flop, the baseline is usually an estimate. It weighs your chance to win against the hands your opponent likely holds, the pot odds and the board. It is a good guide, not a solver.</p>
+      <p>Pots with two players can get a real solver answer. Some flops come from a library of solved spots. On a computer, turn and river spots are solved live while you read the review. Pots with three or more players always use the estimate.</p>
       <h4>The labels</h4>
       <dl class="labels">
         <dt><span class="src src-solved">Solved</span></dt><dd>Solved for this exact spot, from the start of the street, with ranges from the hand so far.</dd>
-        <dt><span class="src src-library">Library</span></dt><dd>Read from a solved flop with the same structure. Suits are mapped onto your board, and sizes are scaled to your pot.</dd>
-        <dt><span class="src src-estimate">Estimate</span></dt><dd>The heuristic baseline. Treat the grade as advice. An Estimate grade stops at Mistake unless the pot odds settle it.</dd>
+        <dt><span class="src src-library">Library</span></dt><dd>From a solved flop like this one. Suits are mapped onto your board, and bet sizes are scaled to your pot.</dd>
+        <dt><span class="src src-estimate">Estimate</span></dt><dd>A rough estimate. Treat its grade as advice. It never goes past Mistake unless the spot is clear-cut.</dd>
         <dt><span class="src src-chart">Chart</span></dt><dd>From the preflop chart for this position and stack depth.</dd>
-        <dt><span class="src src-nash">Nash</span></dt><dd>From the Nash push/fold ranges for 15bb and under.</dd>
+        <dt><span class="src src-nash">Nash</span></dt><dd>From the push/fold chart for stacks of 15bb or less.</dd>
       </dl>
       <h4>Grades</h4>
       <p><span class="grade g-good">Good</span> <span class="grade g-inacc">Inaccuracy</span> <span class="grade g-mistake">Mistake</span> <span class="grade g-blunder">Blunder</span></p>
-      <p>Each decision shows the baseline's mix of plays as a bar. The bar's colours are actions, not grades: <b class="dot m-check"></b>check, <b class="dot m-call"></b>call, <b class="dot m-bet"></b>bet or raise (lighter for smaller sizes), <b class="dot m-allin"></b>all in and <b class="dot m-fold"></b>fold. The marker shows your play. If the baseline plays an action some of the time, choosing it is fine.</p>
+      <p>Each decision shows the baseline's mix of plays as a bar. The bar's colours are actions, not grades: <b class="dot m-check"></b>check, <b class="dot m-call"></b>call, <b class="dot m-bet"></b>bet or raise (lighter for smaller sizes), <b class="dot m-allin"></b>all-in and <b class="dot m-fold"></b>fold. The marker shows your play. An action the baseline takes at least 15% of the time counts as Good, if your size is close.</p>
       <p>Each grade comes with a reason. Tap an underlined term in it to see what the term means.</p>
       <h4>The players</h4>
-      <p>Opponents come in five tiers, from Beginner to Solver, and seven styles. Each one adapts a little to how you play. Their names are made up.</p>
+      <p>Opponents come in five tiers, from Beginner to Solver, and seven styles. Only Sharks adjust to how you play. Their names are made up.</p>
+      <p>When your read says a player is easy to beat, such as a beginner or a calling station, a heads-up decision after the flop is graded against how that kind of player plays. The review then adds a &ldquo;vs&nbsp;name&rdquo; line with the plan.</p>
       <p class="muted small">Live solving is skipped on phones. Your settings, bankroll and records are saved in this browser only.</p>
     </div>
   </section>
@@ -102,27 +103,27 @@
 <aside id="drawer" class="review drawer" aria-label="Session"></aside>
 <div id="toasts" class="toasts" aria-live="polite"></div>
 
-<script src="js/cards.js?v=0.9.4"></script>
-<script src="js/equity169-data.js?v=0.9.4"></script>
-<script src="js/pushfold-data.js?v=0.9.4"></script>
-<script src="js/engine.js?v=0.9.4"></script>
-<script src="js/tournament.js?v=0.9.4"></script>
-<script src="js/ranges.js?v=0.9.4"></script>
-<script src="js/strategy.js?v=0.9.4"></script>
-<script src="js/ai.js?v=0.9.4"></script>
-<script src="js/reads.js?v=0.9.4"></script>
-<script src="js/review.js?v=0.9.4"></script>
-<script src="js/coach.js?v=0.9.4"></script>
-<script src="js/livecoach.js?v=0.9.4"></script>
-<script src="solver/js/flop-subsets-data.js?v=0.9.4"></script>
-<script src="solver/js/flop-map.js?v=0.9.4"></script>
-<script src="solver/js/library-reader.js?v=0.9.4"></script>
-<script src="solver/js/solver-client.js?v=0.9.4"></script>
-<script src="js/solver-provider.js?v=0.9.4"></script>
-<script src="js/ui-core.js?v=0.9.4"></script>
-<script src="js/ui-table.js?v=0.9.4"></script>
-<script src="js/ui-review.js?v=0.9.4"></script>
-<script src="js/ui-modes.js?v=0.9.4"></script>
-<script src="js/ui-app.js?v=0.9.4"></script>
+<script src="js/cards.js?v=0.9.5"></script>
+<script src="js/equity169-data.js?v=0.9.5"></script>
+<script src="js/pushfold-data.js?v=0.9.5"></script>
+<script src="js/engine.js?v=0.9.5"></script>
+<script src="js/tournament.js?v=0.9.5"></script>
+<script src="js/ranges.js?v=0.9.5"></script>
+<script src="js/strategy.js?v=0.9.5"></script>
+<script src="js/ai.js?v=0.9.5"></script>
+<script src="js/reads.js?v=0.9.5"></script>
+<script src="js/review.js?v=0.9.5"></script>
+<script src="js/coach.js?v=0.9.5"></script>
+<script src="js/livecoach.js?v=0.9.5"></script>
+<script src="solver/js/flop-subsets-data.js?v=0.9.5"></script>
+<script src="solver/js/flop-map.js?v=0.9.5"></script>
+<script src="solver/js/library-reader.js?v=0.9.5"></script>
+<script src="solver/js/solver-client.js?v=0.9.5"></script>
+<script src="js/solver-provider.js?v=0.9.5"></script>
+<script src="js/ui-core.js?v=0.9.5"></script>
+<script src="js/ui-table.js?v=0.9.5"></script>
+<script src="js/ui-review.js?v=0.9.5"></script>
+<script src="js/ui-modes.js?v=0.9.5"></script>
+<script src="js/ui-app.js?v=0.9.5"></script>
 </body>
 </html>

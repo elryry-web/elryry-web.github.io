@@ -62,17 +62,17 @@
   UI.dollars = function (d) { return (d < 0 ? '-$' : '$') + Math.abs(d).toLocaleString('en-US', { maximumFractionDigits: 2 }); };
   // amount in table chips -> text, in bb or chips per setting
   UI.amt = function (chips, bb, mode, forceChips) {
-    if (UI.settings.units === 'bb' && !forceChips && bb) return UI.trim(chips / bb, 1) + ' bb';
+    if (UI.settings.units === 'bb' && !forceChips && bb) return UI.trim(chips / bb, 1) + 'bb';
     if (mode === 'cash') return UI.money(chips);
     return Math.round(chips).toLocaleString('en-US');
   };
-  UI.bbs = function (x) { return (x > 0 ? '+' : '') + UI.trim(x, 1) + ' bb'; };
+  UI.bbs = function (x) { return (x > 0 ? '+' : '') + UI.trim(x, 1) + 'bb'; };
   // the unit the amounts show in: 'bb', or '$' at cash tables and 'chips' in tournaments
   UI.unitName = mode => UI.settings.units === 'bb' ? 'bb' : mode === 'cash' ? '$' : 'chips';
   // a figure in big blinds (the review's unit) in the chosen unit; bbChips is that hand's big blind in table chips
   UI.bbAmt = function (x, bbChips, mode, signed) {
     const plus = signed && x > 0 ? '+' : '';
-    if (UI.settings.units === 'bb' || !bbChips) return plus + UI.trim(x, 1) + ' bb';
+    if (UI.settings.units === 'bb' || !bbChips) return plus + UI.trim(x, 1) + 'bb';
     return plus + UI.amt(Math.round(x * bbChips), bbChips, mode, true);
   };
   // review text with "6.5 bb" / "6.5bb" figures in the chosen unit; a Nash stack depth ("At about 12bb") stays in bb

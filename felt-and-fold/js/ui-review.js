@@ -6,10 +6,10 @@
   const GRADE_CLS = { Good: 'g-good', Inaccuracy: 'g-inacc', Mistake: 'g-mistake', Blunder: 'g-blunder' };
   const SOURCE_TIP = {
     Solved: 'Solved live for this exact spot, from the start of this street.',
-    Library: 'Read from a solved flop with the same structure. Suits are mapped onto your board.',
-    Estimate: 'A heuristic estimate from equity, ranges and pot odds. Not a solver answer.',
+    Library: 'From the solver library: a solved flop like this one, mapped onto your board.',
+    Estimate: 'A rough estimate from equity, ranges and pot odds. Not a solver answer.',
     Chart: 'From the preflop chart for this position and stack depth.',
-    Nash: 'From the Nash push/fold ranges for 15bb and under.'
+    Nash: 'From the push/fold chart for stacks of 15bb or less.'
   };
   const ACT_CLS = { fold: 'm-fold', check: 'm-check', call: 'm-call', bet: 'm-bet', raise: 'm-raise', allin: 'm-allin' };
   const ACT_NAME = { fold: 'Fold', check: 'Check', call: 'Call', bet: 'Bet', raise: 'Raise', allin: 'All-in' };
@@ -27,7 +27,7 @@
   }
   function packDecision(d, math) {
     return { street: d.street, boardStr: d.boardStr, grade: d.grade, evLost: d.evLost, source: d.source, spot: d.spot, pot: d.pot, toCall: d.toCall,
-      did: { action: d.did.action, toBB: d.did.toBB, addBB: d.did.addBB }, hand: d.hand, leak: d.leak, text: d.text, concepts: d.concepts || [],
+      did: { action: d.did.action, toBB: d.did.toBB, addBB: d.did.addBB, canCall: d.did.canCall }, hand: d.hand, leak: d.leak, text: d.text, concepts: d.concepts || [],
       mix: d.mix.filter(m => m.freq >= 0.005).map(m => ({ action: m.action, sizeLabel: m.sizeLabel, freq: r2(m.freq), toBB: m.toBB })),
       exploit: d.exploit ? { gradedBy: d.exploit.gradedBy, name: d.exploit.name, best: d.exploit.best, baseGrade: d.exploit.baseGrade, state: d.exploit.state, plan: d.exploit.plan || null } : null,
       sizeTell: d.sizeTell ? { kind: d.sizeTell.kind, toBB: d.sizeTell.toBB } : undefined,
@@ -143,7 +143,7 @@
     return mixBar(d, u) + '<div class="ddid"><span class="muted">vs ' + UI.esc(x.name) + ':</span> <b>' + UI.esc(u.text(p.label)) + '</b></div>';
   }
   // "Bet half pot (6.5 bb)", "Raise to 3x (19.5 bb)", "All-in (48 bb)"; preflop "Raise to 4.7 bb" (see FF.Review.didLabel)
-  function didText(d, u) { return FF.Review.didLabel(d, x => u ? u.amt(x) : UI.trim(x, 1) + ' bb'); }
+  function didText(d, u) { return FF.Review.didLabel(d, x => u ? u.amt(x) : UI.trim(x, 1) + 'bb'); }
   function decisionHtml(d, entry) {
     const u = unitsOf(entry.rv), pending = entry.solving && d.source === 'Estimate' && d.street !== 'preflop';
     const board = d.boardStr ? '<span class="dboard">' + UI.cardsText(d.boardStr) + '</span>' : '';
@@ -160,7 +160,7 @@
       (d.later ? '<p class="dlater">' + termsHtml(UI.esc(u.text(d.later))) + '</p>' : '') + '</div>';
   }
   // an EV figure: two decimals in bb, the unit's own rounding otherwise
-  function evAmt(x, u) { return UI.settings.units === 'bb' ? UI.trim(x, 2) + ' bb' : u.amt(x);
+  function evAmt(x, u) { return UI.settings.units === 'bb' ? UI.trim(x, 2) + 'bb' : u.amt(x);
   }
   // the first mention of each glossary term in a paragraph becomes a button that opens its definition in place
   // (the reason's own concepts claim their phrases first; matching lives in FF.Review.linkTerms)
@@ -346,7 +346,7 @@
     if (want && rvs.length && !evConv) note = rvs.some(r => !r.bb) ? 'Some amounts stay in bb. Older saved hands do not store the stakes.'
       : !sameBB ? 'Some amounts stay in bb. These hands come from different tables.' : 'EV figures stay in bb in tournaments.';
     return { sameBB, evConv, note,
-      ev: x => evConv ? UI.amt(Math.round(x * rvs[0].bb), rvs[0].bb, 'cash', true) : UI.trim(x, 1) + ' bb',
+      ev: x => evConv ? UI.amt(Math.round(x * rvs[0].bb), rvs[0].bb, 'cash', true) : UI.trim(x, 1) + 'bb',
       text: t => sameBB ? UI.bbText(t, rvs[0].bb, rvs[0].mode) : t };
   }
   // "This session" or "All saved hands", remembered per viewer (ff.statsView)
@@ -375,7 +375,7 @@
         '<div><b>' + s.clean + '</b><span>clean hands</span></div></div>' +
         '<div class="gradecount">' + ['Good', 'Inaccuracy', 'Mistake', 'Blunder'].map(g => '<span class="grade ' + GRADE_CLS[g] + '">' + g + ' ' + s.grades[g] + '</span>').join('') + '</div>';
       html += '<h4>Top leaks</h4>' + (s.leaks.length ? '<ol class="leaks">' + s.leaks.slice(0, 5).map(x => '<li>' + UI.esc(u.text(x.text)) + '</li>').join('') + '</ol>' : '<p class="muted">No leaks found yet.</p>');
-      if (untagged) html += '<p class="muted small">Leaks: — for ' + untagged + ' older decision' + (untagged > 1 ? 's' : '') + '. Hands saved before leak tags have none.</p>';
+      if (untagged) html += '<p class="muted small">' + untagged + ' older decision' + (untagged > 1 ? 's have' : ' has') + ' no leak tag and ' + (untagged > 1 ? 'are' : 'is') + ' not in this list.</p>';
       if (s.exploitLeaks.length) html += '<h4>Against this table&rsquo;s players</h4><ol class="leaks">' + s.exploitLeaks.slice(0, 3).map(x => '<li>' + UI.esc(u.text(x.text)) + '</li>').join('') + '</ol>';
       if (u.note) html += '<p class="muted small">' + UI.esc(u.note) + '</p>';
     }
@@ -408,7 +408,7 @@
       html += '<p class="muted">No saved hands yet. Play some hands and come back.</p>';
     } else {
       const n = c.need;
-      html += '<p>There is not enough data yet. The Coach names a leak once it has ' + FF.Coach.MIN + ' examples.' +
+      html += '<p>Not enough hands yet. The Coach names a leak once it has ' + FF.Coach.MIN + ' examples.' +
         (n.closest ? ' The closest is &ldquo;' + UI.esc(n.closest) + '&rdquo; with ' + n.count + '.' : '') + ' Play about ' + n.more + ' more hands.</p>';
     }
     if (c.also.length) html += '<h4>Also watch</h4><ul class="leaks">' + c.also.map(x => '<li><b>' + UI.esc(x.title) + '</b>: ' + x.count + ' spots, about ' + u.ev(x.evLost) + ' lost.</li>').join('') + '</ul>';
@@ -422,7 +422,7 @@
     if (!hb.hands) html += '<p class="muted">No preflop decisions yet.</p>';
     else {
       html += '<p class="muted small">Targets for ' + (hb.seats === 6 ? 'a 6-max table' : 'tables of ' + hb.tableName) + ' against weak players. From ' + hb.hands + ' hands.</p>' +
-        hb.stats.map(st => '<div class="habit"><div class="hline"><b>' + st.name + '</b> <span class="hv">' + (st.value == null ? '—' : Math.round(st.value) + '%') + '</span>' +
+        hb.stats.map(st => '<div class="habit"><div class="hline"><b>' + st.name + '</b>' + (st.what ? ' <span class="muted small">(' + st.what + ')</span>' : '') + ' <span class="hv">' + (st.value == null ? '—' : Math.round(st.value) + '%') + '</span>' +
           ' <span class="muted small">target ' + st.band[0] + '–' + st.band[1] + '%</span>' + (st.state === 'ok' ? ' <span class="hok">on target</span>' : st.state === 'none' ? '' : ' <span class="hoff">' + st.state + '</span>') + '</div>' +
           para(st.line) + '</div>').join('');
     }

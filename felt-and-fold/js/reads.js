@@ -14,11 +14,11 @@
   // expected rates per tier/style, from tools/reads-table.js (mixed 6-max tables, 100bb):
   // vpip, pfr (shares of hands), fold and raise (shares of postflop bets faced), bet (share of unopened postflop spots)
   var EXPECT = {
-    "Beginner/Nit": [0.212,0.063,0.433,0.175,0.335], "Beginner/Rock": [0.367,0.107,0.416,0.144,0.362], "Beginner/TAG": [0.363,0.177,0.478,0.154,0.367], "Beginner/LAG": [0.516,0.295,0.365,0.156,0.391], "Beginner/Calling Station": [0.684,0.124,0.309,0.135,0.342], "Beginner/Maniac": [0.781,0.499,0.347,0.252,0.48], "Beginner/Trappy": [0.444,0.168,0.358,0.165,0.337],
-    "Casual/Nit": [0.171,0.084,0.471,0.113,0.351], "Casual/Rock": [0.287,0.119,0.445,0.123,0.346], "Casual/TAG": [0.295,0.187,0.429,0.113,0.39], "Casual/LAG": [0.436,0.308,0.374,0.114,0.404], "Casual/Calling Station": [0.617,0.1,0.296,0.111,0.31], "Casual/Maniac": [0.747,0.57,0.373,0.168,0.543], "Casual/Trappy": [0.336,0.174,0.325,0.136,0.323],
-    "Regular/Nit": [0.131,0.088,0.477,0.061,0.331], "Regular/Rock": [0.168,0.087,0.492,0.061,0.344], "Regular/TAG": [0.206,0.144,0.475,0.07,0.408], "Regular/LAG": [0.331,0.248,0.412,0.091,0.485], "Regular/Calling Station": [0.444,0.102,0.32,0.041,0.289], "Regular/Maniac": [0.528,0.406,0.437,0.072,0.559], "Regular/Trappy": [0.277,0.166,0.429,0.072,0.345],
-    "Shark/Nit": [0.129,0.094,0.518,0.04,0.338], "Shark/Rock": [0.168,0.109,0.483,0.054,0.415], "Shark/TAG": [0.208,0.142,0.399,0.053,0.438], "Shark/LAG": [0.308,0.244,0.447,0.057,0.542], "Shark/Calling Station": [0.329,0.117,0.355,0.04,0.331], "Shark/Maniac": [0.405,0.306,0.464,0.065,0.609], "Shark/Trappy": [0.267,0.175,0.435,0.05,0.372],
-    "Solver/Nit": [0.154,0.122,0.396,0.054,0.416], "Solver/Rock": [0.152,0.118,0.498,0.074,0.465], "Solver/TAG": [0.197,0.148,0.47,0.02,0.43], "Solver/LAG": [0.238,0.197,0.461,0.034,0.47], "Solver/Calling Station": [0.247,0.142,0.435,0.038,0.409], "Solver/Maniac": [0.238,0.184,0.475,0.029,0.514], "Solver/Trappy": [0.243,0.177,0.471,0.044,0.416]
+    "Beginner/Nit": [0.236,0.069,0.467,0.195,0.339], "Beginner/Rock": [0.369,0.108,0.429,0.153,0.348], "Beginner/TAG": [0.385,0.179,0.436,0.136,0.377], "Beginner/LAG": [0.54,0.302,0.356,0.171,0.395], "Beginner/Calling Station": [0.708,0.122,0.312,0.132,0.325], "Beginner/Maniac": [0.808,0.514,0.38,0.212,0.497], "Beginner/Trappy": [0.458,0.179,0.353,0.164,0.341],
+    "Casual/Nit": [0.189,0.085,0.48,0.095,0.334], "Casual/Rock": [0.322,0.115,0.421,0.112,0.337], "Casual/TAG": [0.328,0.19,0.444,0.109,0.399], "Casual/LAG": [0.479,0.332,0.419,0.105,0.409], "Casual/Calling Station": [0.63,0.111,0.289,0.085,0.303], "Casual/Maniac": [0.757,0.562,0.379,0.149,0.526], "Casual/Trappy": [0.359,0.182,0.383,0.114,0.354],
+    "Regular/Nit": [0.155,0.098,0.528,0.064,0.348], "Regular/Rock": [0.193,0.097,0.504,0.074,0.354], "Regular/TAG": [0.222,0.134,0.503,0.066,0.371], "Regular/LAG": [0.347,0.25,0.5,0.071,0.459], "Regular/Calling Station": [0.491,0.101,0.345,0.046,0.287], "Regular/Maniac": [0.545,0.404,0.433,0.089,0.569], "Regular/Trappy": [0.302,0.169,0.415,0.075,0.318],
+    "Shark/Nit": [0.141,0.087,0.42,0.045,0.339], "Shark/Rock": [0.177,0.097,0.456,0.077,0.38], "Shark/TAG": [0.21,0.134,0.464,0.046,0.411], "Shark/LAG": [0.322,0.227,0.492,0.061,0.505], "Shark/Calling Station": [0.363,0.12,0.436,0.039,0.34], "Shark/Maniac": [0.434,0.323,0.447,0.061,0.558], "Shark/Trappy": [0.285,0.173,0.444,0.051,0.393],
+    "Solver/Nit": [0.173,0.125,0.43,0.031,0.393], "Solver/Rock": [0.163,0.111,0.473,0.051,0.41], "Solver/TAG": [0.21,0.145,0.506,0.046,0.402], "Solver/LAG": [0.273,0.205,0.486,0.034,0.483], "Solver/Calling Station": [0.264,0.139,0.454,0.045,0.387], "Solver/Maniac": [0.262,0.182,0.454,0.044,0.438], "Solver/Trappy": [0.262,0.177,0.439,0.025,0.42]
   };
 
   // ---------------------------------------------------------------- observing hands
@@ -170,8 +170,8 @@
       aggPct: pct(st.bets + F[3], st.bets + F[3] + F[1]), shows: st.shows.length };
   }
   function detailText(dt) {
-    return 'VPIP ' + dt.vpip + '%, PFR ' + dt.pfr + '%. Calls ' + dt.callPct + '% of bets after the flop, folds ' + dt.foldPct + '%, raises ' + dt.raisePct + '% (' + dt.faced + ' bets). '
-      + dt.aggPct + '% of bets, raises and calls are bets or raises. ' + dt.hands + ' hands' + (dt.shows ? ', ' + dt.shows + ' shown at showdown' : '') + '.';
+    return 'Plays ' + dt.vpip + '% of hands and raises ' + dt.pfr + '% before the flop. Against bets after the flop: calls ' + dt.callPct + '%, folds ' + dt.foldPct + '%, raises ' + dt.raisePct + '% (' + dt.faced + ' bets). '
+      + 'Of the calls, bets and raises after the flop, ' + dt.aggPct + '% are bets or raises. ' + dt.hands + ' hands' + (dt.shows ? ', ' + dt.shows + ' shown down' : '') + '.';
   }
   // reads for every opponent in hand h, as of before h: {id: read}. ctx as in prior().
   function forReview(book, h, heroId, ctx) {

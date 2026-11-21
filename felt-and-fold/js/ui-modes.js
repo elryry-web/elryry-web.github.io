@@ -153,7 +153,7 @@
     const body = '<p>' + UI.esc(st.name) + ', blinds ' + UI.money(Math.round(st.sb * 100)) + ' / ' + UI.money(bb) + '.</p>' +
       '<label class="buyin">Buy-in <input type="range" id="bi" min="40" max="' + Math.floor(max / bb) + '" step="1" value="' + Math.floor(max / bb) + '"> <b id="biv"></b></label>';
     const p = UI.modal('Buy in', body, [{ label: 'Sit down', value: 'go', cls: 'primary' }, { label: 'Cancel', value: null }]);
-    const bi = UI.$('#bi'), biv = UI.$('#biv'), upd = () => { biv.textContent = UI.money(+bi.value * bb) + ' (' + bi.value + ' bb)'; };
+    const bi = UI.$('#bi'), biv = UI.$('#biv'), upd = () => { biv.textContent = UI.money(+bi.value * bb) + ' (' + bi.value + 'bb)'; };
     bi.oninput = upd; upd();
     let chosen = +bi.value; bi.addEventListener('input', () => { chosen = +bi.value; });
     if (await p !== 'go') return;
@@ -225,13 +225,13 @@
   async function heroRebuy(g, t, bb) {
     const hs = heroSeatOf(t);
     if (g.practice) {
-      const v = await UI.modal('Out of chips', '<p>Rebuy for ' + g.depth + ' bb in practice chips?</p>', [{ label: 'Rebuy', value: 1, cls: 'primary' }, { label: 'Leave', value: 0 }]);
+      const v = await UI.modal('Out of chips', '<p>Rebuy for ' + g.depth + 'bb in practice chips?</p>', [{ label: 'Rebuy', value: 1, cls: 'primary' }, { label: 'Leave', value: 0 }]);
       if (v) t.seats[hs].stack = g.depth * bb;
       return !!v;
     }
     const c = bank(), max = Math.min(100 * bb, Math.floor(c.bank / bb) * bb);
     if (max < 40 * bb) { await UI.modal('Out of chips', '<p>Your bankroll is too small to rebuy here.</p>', [{ label: 'Leave', value: 0 }]); return false; }
-    const v = await UI.modal('Out of chips', '<p>Rebuy for ' + UI.money(max) + ' (' + Math.round(max / bb) + ' bb)?</p>', [{ label: 'Rebuy', value: 1, cls: 'primary' }, { label: 'Leave', value: 0 }]);
+    const v = await UI.modal('Out of chips', '<p>Rebuy for ' + UI.money(max) + ' (' + Math.round(max / bb) + 'bb)?</p>', [{ label: 'Rebuy', value: 1, cls: 'primary' }, { label: 'Leave', value: 0 }]);
     if (!v) return false;
     c.bank -= max; t.seats[hs].stack = max; c.seat = { stake: g.stake.id, stack: max }; saveBank(c);
     return true;
@@ -385,7 +385,7 @@
       '<div class="crow"><label>Stacks ' + sel('c-depth', ['20', '30', '40', '60', '100', '150', '200'], String(c.depth)) + ' bb</label>' +
       '<label>Structure ' + sel('c-struct', [['cash', 'Cash game'], ['tournament', 'Tournament']], c.structure) + '</label>' +
       '<label class="c-speedl">Speed ' + sel('c-speed', [['regular', 'Regular'], ['turbo', 'Turbo'], ['hyper', 'Hyper']], c.speed) + '</label></div>' +
-      '<p class="muted small">Practice chips. A tournament needs all five seats filled, so empty seats get a Regular TAG.</p>' +
+      '<p class="muted small">Practice chips. In a tournament, empty seats get a Regular TAG.</p>' +
       '<button class="btn primary big" id="custom-go">Deal</button>';
     const read = () => {
       const o = { seats: UI.$$('#custom-body .cseat[data-i]').map(el => [UI.$('.c-tier', el).value, UI.$('.c-style', el).value]),
