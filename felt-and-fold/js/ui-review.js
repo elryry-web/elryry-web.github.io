@@ -30,7 +30,7 @@
       did: { action: d.did.action, toBB: d.did.toBB, addBB: d.did.addBB }, hand: d.hand, leak: d.leak, text: d.text, concepts: d.concepts || [],
       mix: d.mix.filter(m => m.freq >= 0.005).map(m => ({ action: m.action, sizeLabel: m.sizeLabel, freq: r2(m.freq), toBB: m.toBB })),
       exploit: d.exploit ? { gradedBy: d.exploit.gradedBy, name: d.exploit.name, best: d.exploit.best, baseGrade: d.exploit.baseGrade, state: d.exploit.state, plan: d.exploit.plan || null } : null,
-      later: d.later || '', tm: math && d.tm ? d.tm : undefined, math: math && d.tm ? packMath(d.math) : undefined };
+      later: d.later || '', hint: d.hint || undefined, tm: math && d.tm ? d.tm : undefined, math: math && d.tm ? packMath(d.math) : undefined };
   }
   function pack(e, math) {
     const rv = e.rv, rc = rv.recap;
@@ -89,6 +89,7 @@
     const r = resolveClose; resolveClose = null; if (r) r();
   };
   R.isOpen = () => !!R.shown;
+  R.termsHtml = termsHtml; R.mathHtml = mathHtml; R.unitsOf = unitsOf; // the live coach panel uses the same links and math buttons
 
   // Amounts in the chosen unit for one review: rv.bb is that hand's big blind in table chips (older saved hands lack it: bb only)
   function unitsOf(rv) {
@@ -150,7 +151,7 @@
       '<span class="grade ' + GRADE_CLS[d.grade] + '">' + d.grade + '</span>' +
       (d.evLost > 0 ? '<span class="evlost">-' + evAmt(d.evLost, u) + '</span>' : '') +
       '<span class="src src-' + d.source.toLowerCase() + '" title="' + UI.esc(SOURCE_TIP[d.source] || '') + '">' + d.source + '</span>' +
-      (pending ? '<span class="solving">solving…</span>' : '') + '</div>' +
+      (pending ? '<span class="solving">solving…</span>' : '') + (d.hint ? '<span class="hintused" title="You opened the live coach hint before this decision.">hint used</span>' : '') + '</div>' +
       '<div class="dspot">' + termsHtml(UI.esc(u.text(d.spot))) + '. Pot ' + u.amt(d.pot) + (d.toCall ? ', ' + u.amt(d.toCall) + ' to call' : '') + '.</div>' +
       '<div class="ddid">You: <b>' + UI.esc(didText(d, u)) + '</b>' + (d.hand ? ' with ' + UI.esc(d.hand) : '') + '</div>' +
       planHtml(d, u) +

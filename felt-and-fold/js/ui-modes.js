@@ -61,7 +61,7 @@
   }
   function ctxFor(g) {
     return {
-      mode: g.mode, heroId: HERO.id, agents: g.agents, profiles: g.profiles,
+      mode: g.mode, heroId: HERO.id, agents: g.agents, profiles: g.profiles, practice: !!g.practice, // profiles are hidden unless practice (the hero chose them)
       autoFold: () => g.leave,
       fastForward: h => { const s = h.order.find(x => h.players[x].id === HERO.id); return g.leave || s == null || h.players[s].folded; }
     };

@@ -644,6 +644,7 @@
       d.raiseCtx = { n: rz.length, open: rz[0] || 0, last: rz[rz.length - 1] || 0, callers: cl, ip: lastS != null && ord(seat) > ord(lastS) && h.pos[seat] !== 'SB' && h.pos[seat] !== 'BB' };
     }
     if (e.street === 'preflop' && res.spot) { var cs = 0; for (var q2 = 0; q2 < 169; q2++) cs += res.spot.call[q2] * C.CLASS_SIZE[q2]; d.chartCall = rd(cs / 1326, 3); if (res.spot.priced) d.priced = res.spot.priced; }
+    if (h.coachHints && h.coachHints[e.n]) d.hint = true; // the live coach's hint was shown before this decision
     d.boardStr = C.cardsStr(d.board);
     d.heroIn = rd((e.betBefore - e.toCall) / bb, 2); // the hero's chips already in on this street, in bb
     d.facing = rd(e.betBefore / bb, 2); // the bet the hero faces (street total), in bb
@@ -733,7 +734,7 @@
   // a plain read on the player for this spot, or '' when nothing stands out
   function readLine(d) {
     var x = d.exploit, t = x.traits, did = d.did.action, best = x.best, eq = d.feat ? d.feat.eq : 0.5, river = d.street === 'river', facing = d.toCall > 0;
-    if (t.calls === 'loose' && isAgg(best) && eq >= 0.45) return 'Against a player who calls too much, bet thinner and bigger for value.';
+    if (t.calls === 'loose' && isAgg(best) && eq >= 0.45) return 'This player calls too much. Bet for value with more hands, even medium ones like a weak top pair. Bet bigger with your strong hands.';
     if (t.calls === 'loose' && (isAgg(did) || d.missedBluff) && !isAgg(best) && eq < 0.45) return 'Against a player who rarely folds, skip the bluff.';
     if (t.bluffs === 'low' && facing && best === 'fold') return 'Against a player who rarely bluffs, a' + (river ? ' river' : '') + ' fold here is fine.';
     if (t.bluffs === 'high' && facing && best === 'call') return 'Against a player who bluffs a lot, call down lighter.';

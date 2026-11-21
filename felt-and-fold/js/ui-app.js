@@ -32,18 +32,20 @@
     { k: 'chat', label: 'Table chat', type: 'check' },
     { k: 'hud', label: 'HUD stats (VPIP / PFR / 3-bet, AF)', type: 'check' },
     { k: 'reads', label: 'Show player reads', type: 'check' },
+    { k: 'liveCoach', label: 'Live coach', type: 'check' }, // its own key, ff.livecoach (UI.LiveCoach)
     { k: 'fourColor', label: 'Four-colour deck', type: 'check' },
     { k: 'cardBack', label: 'Card backs', type: 'select', opts: [['oxblood', 'Oxblood lattice'], ['vines', 'Green vines'], ['rosette', 'Navy rosette'], ['deco', 'Charcoal deco']] },
     { k: 'autoSkip', label: 'Skip the review of clean hands', type: 'check' },
     { k: 'sound', label: 'Sound', type: 'check' }
   ];
   function renderSettings(box) {
-    const s = UI.settings;
+    const s = Object.assign({}, UI.settings, { liveCoach: !UI.LiveCoach || UI.LiveCoach.state.on });
     box.innerHTML = '<div class="settings">' + OPTS.map(o => {
       if (o.type === 'check') return '<label class="srow"><span>' + o.label + '</span><input type="checkbox" data-k="' + o.k + '"' + (s[o.k] ? ' checked' : '') + '></label>';
       return '<label class="srow"><span>' + o.label + '</span><select data-k="' + o.k + '">' + o.opts.map(v => '<option value="' + v[0] + '"' + (s[o.k] === v[0] ? ' selected' : '') + '>' + v[1] + '</option>').join('') + '</select></label>';
     }).join('') + '</div><p class="muted small">Settings are saved in this browser.</p>';
     UI.$$('[data-k]', box).forEach(el => el.onchange = () => {
+      if (el.dataset.k === 'liveCoach') { if (UI.LiveCoach) UI.LiveCoach.setOn(el.checked); return; }
       UI.settings[el.dataset.k] = el.type === 'checkbox' ? el.checked : el.value;
       UI.saveSettings();
       if (el.dataset.k === 'units') UI.unitListeners.forEach(f => f()); else UI.Table.render();

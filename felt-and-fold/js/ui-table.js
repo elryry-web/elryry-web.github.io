@@ -12,6 +12,7 @@
   const Table = UI.Table = {};
   Table.mount = function () {
     felt = UI.$('#felt'); bar = UI.$('#actionbar');
+    LC.mount();
     // phone bets are placed from measured boxes, so a resize (rotation, toolbar) places them again
     window.addEventListener('resize', () => { if (phoneQ.matches || felt.querySelector('.bet[style], .dealer[style]')) render(); });
     // the read tag on a seat opens its details on tap; a second tap, or a tap elsewhere on the felt, closes them
@@ -210,7 +211,8 @@
     const h = cur.h, mode = (cur.c && cur.c.mode) || h.table.mode, bb = h.bb, a = x => UI.amt(x, bb, mode);
     UI.beep('turn');
     return new Promise(resolve => {
-      const done = act => { heroWait = null; barRelabel = null; document.removeEventListener('keydown', onKey); hideBar(); resolve(act); };
+      const done = act => { heroWait = null; barRelabel = null; document.removeEventListener('keydown', onKey); hideBar(); LC.end(); resolve(act); };
+      LC.start(h, L.seat != null ? L.seat : cur.heroSeat, L);
       heroWait = done;
       let step = niceStep(h);
       let to = L.canRaise ? snapTo(L.street === 'preflop' && L.currentBet <= bb ? 2.5 * bb : L.minTo, L, fineStep(h)) : 0;
@@ -293,11 +295,102 @@
       if (cur.shownBoard < toLen) await UI.wait(1000);
     }
   }
+  // ---------------------------------------------------------------- live coach (FF.LiveCoach): a short read of the open decision
+  // Above the action bar. Collapsed it is one line; the state and the on/off switch live in ff.livecoach.
+  const LC = UI.LiveCoach = (function () {
+    const st = (function () { const v = UI.load('livecoach', null); return { on: !(v && v.on === false), open: !(v && v.open === false) }; })(); // open until the player folds it away
+    let box = null, live = null; // live: { h, seat, n, L, data, hint, solving }
+    const save = () => UI.save('livecoach', { on: st.on, open: st.open });
+    function units(h) { const mode = (cur && cur.c && cur.c.mode) || h.table.mode; return UI.Review && UI.Review.unitsOf ? UI.Review.unitsOf({ bb: h.bb, mode: mode }) : { amt: x => x, text: t => t }; }
+    function html(plain, tm, math, u) { return UI.Review && UI.Review.mathHtml ? UI.Review.mathHtml(plain, tm, math, u, []) : UI.esc(plain); }
+    function draw() {
+      if (!box) return;
+      box.hidden = !st.on || !cur || !cur.h;
+      if (box.hidden) return;
+      const d = live && live.data, u = live ? units(live.h) : null;
+      const sum = !live ? 'Waits for your turn.' : d ? html(d.summary, null, null, u) : 'Reading the spot…';
+      let out = '<div class="lc-head"><button type="button" class="lc-tog" aria-expanded="' + st.open + '" title="Show or hide the live coach"><span class="lc-car">' + (st.open ? '▾' : '▸') + '</span> Coach</button>' +
+        '<span class="lc-sum">' + sum + '</span>' +
+        '<button type="button" class="btn sm lc-hint"' + (live && d ? '' : ' disabled') + '>' + (live && live.hint ? 'Hint used' : 'Hint') + '</button></div>';
+      if (st.open) {
+        out += '<div class="lc-body">';
+        if (!live) out += '<p class="lc-idle">The coach reads each spot when it is your turn.</p>';
+        else if (!d) out += '<p class="lc-idle">Reading the spot…</p>';
+        else {
+          d.lines.forEach(l => { out += '<p class="lc-' + l.k + '"><b>' + l.label + ':</b> ' + html(l.text, l.tm, d.math, u) + '</p>'; });
+          if (live.hint) out += '<p class="lc-hinttxt"><b>Hint:</b> ' + html(live.hint.text, live.hint.tm, live.hint.math, u) + (live.solving ? ' <span class="lc-solving">Checking the solver…</span>' : '') + '</p>';
+        }
+        out += '</div>';
+      }
+      box.innerHTML = out;
+      box.classList.toggle('open', st.open);
+    }
+    function compute() {
+      const lv = live; if (!lv || lv.data) return;
+      const h = lv.h, c = (cur && cur.c) || {};
+      const opts = { reads: UI.settings.reads && UI.Reads.ctx ? UI.Reads.before(h) : null, readsOff: !UI.settings.reads && !!UI.Reads.ctx, profiles: c.practice ? c.profiles : null };
+      try { lv.data = FF.LiveCoach.panel(h, lv.seat, opts); } catch (e) { console.error('live coach failed', e); lv.data = { lines: [], summary: 'The coach could not read this spot.', math: {} }; }
+      if (live === lv) draw();
+    }
+    // a solved mix for the hint, when the solver covers this spot (the same provider the review upgrades with)
+    function askSolver(lv) {
+      const h = lv.h, L = lv.L, S = FF.Strategy, SP = FF.SolverProvider;
+      if (h.street === 'preflop' || !S.hasSolver() || !SP) return;
+      // the provider reads the hero's act entry at n: a stand-in check or call, on a copy of the hand
+      const hc = Object.create(h), n = h.log.length;
+      hc.log = h.log.concat([{ ev: 'act', n: n, seat: lv.seat, pos: h.pos[lv.seat], street: h.street, type: L.toCall > 0 ? 'call' : 'check', to: L.toCall > 0 ? L.committed + L.call : 0,
+        add: L.toCall > 0 ? L.call : 0, potBefore: L.pot, toCall: L.toCall, stackBefore: L.stack, betBefore: L.currentBet, minTo: L.minTo, maxTo: L.canRaise ? L.maxTo : 0 }]);
+      let p;
+      try { SP.remember(hc); p = S.askSolver(hc, lv.seat, n); } catch (e) { p = null; } finally { SP.remember(h); }
+      if (!p) return;
+      lv.solving = true; draw();
+      p.then(r => {
+        lv.solving = false;
+        if (r && r.mix && r.mix.length) {
+          const mix = r.mix.slice().sort((a, b) => b.freq - a.freq);
+          lv.hint = FF.LiveCoach.hintFrom(mix, r.source === 'Library' ? 'solved library' : 'solver', h, L);
+        }
+        if (live === lv) draw();
+      }, () => { lv.solving = false; if (live === lv) draw(); });
+    }
+    function onHint() {
+      const lv = live; if (!lv || !lv.data) return;
+      if (!lv.hint) {
+        FF.LiveCoach.markHint(lv.h);
+        try { lv.hint = FF.LiveCoach.hint(lv.h, lv.seat); } catch (e) { console.error('hint failed', e); return; }
+        askSolver(lv);
+      }
+      if (!st.open) { st.open = true; save(); }
+      draw();
+    }
+    UI.unitListeners.push(() => draw());
+    return {
+      state: st,
+      mount() {
+        box = UI.$('#livecoach'); if (!box) return;
+        box.addEventListener('click', ev => {
+          const t = ev.target.closest ? ev.target : null;
+          if (t && t.closest('.lc-hint')) { onHint(); return; }
+          if (t && t.closest('.lc-tog, .lc-sum') && !t.closest('button.num, button.term')) { st.open = !st.open; save(); draw(); }
+        });
+      },
+      start(h, seat, L) {
+        live = { h: h, seat: seat, n: h.log.length, L: L, data: null, hint: null };
+        draw();
+        if (st.on) setTimeout(compute, 30); // after the action bar paints
+      },
+      end() { live = null; draw(); },
+      setOn(on) { st.on = !!on; save(); if (st.on && live && !live.data) setTimeout(compute, 30); draw(); },
+      draw: draw
+    };
+  })();
+
   Table.play = async function (h, c) {
     const hero = h.order.find(s => h.players[s].id === c.heroId);
     const heroSeat = hero != null ? hero : (c.watchSeat != null ? c.watchSeat : 0);
     cur = { t: h.table, h: h, c: c, heroSeat: heroSeat, shownBoard: 0, labels: {}, reveal: {}, chat: {}, thinking: -1, winName: {}, showName: {}, msg: '', final: false };
     render(); hideBar();
+    LC.end();
     await UI.wait(300);
     let guard = 0;
     while (!h.done && h.toAct >= 0) {
