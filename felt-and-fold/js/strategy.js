@@ -434,13 +434,14 @@
   }
 
   // ---------------------------------------------------------------- EVs (bb, fold = 0)
-  function oppResponse(ctx, actorRangeAfter, amount, oppCommitted, potAfter) {
-    // each opponent continues when its equity vs the actor's new range beats the price; a light MDF pull, as in facingPolicy
-    var sp = ctx.spec, fAll = 1, calls = [];
+  function oppResponse(ctx, actorRangeAfter, amount, oppCommitted, potAfter, hi) {
+    // each opponent continues when its equity vs the actor's new range beats the price; a light MDF pull, as in facingPolicy.
+    // hi: the actor's own combo. The opponent cannot hold its cards, so those combos count toward neither the fold nor the call share
+    var sp = ctx.spec, fAll = 1, calls = [], h1 = hi != null ? C1[hi] : -1, h2 = hi != null ? C2[hi] : -1;
     sp.opps.forEach(function (Wo, j) {
       var e = eqVs(actorRangeAfter, ctx.board), callAmt = Math.min(amount - oppCommitted, sp.oppStacks ? sp.oppStacks[j] : 1e9), need = callAmt / (potAfter + callAmt);
       var cont = new Float64Array(NC), tw = 0, cw = 0, list = [];
-      for (var i = 0; i < NC; i++) if (Wo[i] > 0 && e[i] === e[i]) { list.push(i); var r = ctx.street === 'river' ? 1 : sp.ip ? 0.9 : 0.97; cont[i] = sig((e[i] * r - need) / 0.02); tw += Wo[i]; cw += Wo[i] * cont[i]; }
+      for (var i = 0; i < NC; i++) if (Wo[i] > 0 && e[i] === e[i] && C1[i] !== h1 && C1[i] !== h2 && C2[i] !== h1 && C2[i] !== h2) { list.push(i); var r = ctx.street === 'river' ? 1 : sp.ip ? 0.9 : 0.97; cont[i] = sig((e[i] * r - need) / 0.02); tw += Wo[i]; cw += Wo[i] * cont[i]; }
       var D = tw ? cw / tw : 0, mdf = potAfter / (potAfter + callAmt) * 0 + (potAfter - (amount - oppCommitted)) / potAfter;
       if (D < mdf - 0.05 && ctx.nOpp === 1) { // pull toward MDF the same way the baseline defends
         // river bluff-catchers call more than the raw equity says. The threshold is found so the calling share lands on
@@ -466,7 +467,7 @@
     // chips past what the opponents can match come back: a bet that covers them plays as all in for their stack
     if (sp.eff != null && to > sp.committed + sp.eff) to = sp.committed + sp.eff;
     var add = to - sp.committed, pot = sp.pot, potAfter = pot + add;
-    var resp = oppResponse(ctx, rangeAfter, to, sp.currentBet, potAfter), eqc = eqVsAll(resp.calls, ctx.board, i);
+    var resp = oppResponse(ctx, rangeAfter, to, sp.currentBet, potAfter, i), eqc = eqVsAll(resp.calls, ctx.board, i);
     var callIn = Math.min(to, sp.eff + sp.committed) - sp.currentBet, Rr = ctx.street === 'river' ? 1 : realise(ctx, i);
     var win = potAfter + callIn * ctx.nOpp;
     var ev = resp.fold * pot + (1 - resp.fold) * (eqc * win * Rr - add);
@@ -541,7 +542,7 @@
     return f;
   }
   function legalAt(sp) {
-    return { toCall: sp.toCall, pot: sp.pot, call: Math.min(sp.toCall, sp.stack), canRaise: sp.canRaise, committed: sp.committed, minTo: sp.minTo, maxTo: sp.maxTo, currentBet: sp.currentBet, isBet: sp.toCall === 0 };
+    return { toCall: sp.toCall, pot: sp.pot, call: Math.min(sp.toCall, sp.stack), stack: sp.stack, canRaise: sp.canRaise, committed: sp.committed, minTo: sp.minTo, maxTo: sp.maxTo, currentBet: sp.currentBet, isBet: sp.toCall === 0 };
   }
   // narrow a modelled range by the chance the model takes the logged action. A bet keeps the share of the size nearest
   // the one logged: a player who sizes by strength bets pot with strong hands and a third with weak ones, so the size is

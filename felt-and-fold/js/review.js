@@ -869,11 +869,28 @@
       var said = opts.said || x.style === 'Calling Station' || /calling station|calls? (?:too often|too much|a lot)/i.test(x.who || '');
       return (said ? '' : 'This player calls too much. ') + 'Bet for value with more hands, even medium ones like a weak top pair.' + (opts.smaller ? '' : ' Bet bigger with your strong hands.');
     }
-    if (t.calls === 'loose' && (isAgg(did) || d.missedBluff) && !isAgg(best) && eq < 0.45) return 'Against a player who rarely folds, skip the bluff.';
+    // a hand with value against a balanced range is no bluff, even when this player's range has it beat
+    if (t.calls === 'loose' && (isAgg(did) || d.missedBluff) && !isAgg(best) && eq < 0.45 && !valueHand(d)) return 'Against a player who rarely folds, skip the bluff.';
     if (t.bluffs === 'low' && facing && best === 'fold') return 'Against a player who rarely bluffs, a' + (river ? ' river' : '') + ' fold here is fine.';
     if (t.bluffs === 'high' && facing && best === 'call') return 'Against a player who bluffs a lot, call down lighter.';
     if (t.calls === 'tight' && isAgg(best) && eq < 0.45) return 'Against a player who folds too much, bluff more.';
     return '';
+  }
+  function valueHand(d) { return !!(d.feat && d.feat.eq >= 0.6); }
+  // why the exploit's best play is another kind of play than the baseline's: the player's range, from the numbers
+  // ('' when the range is not the reason)
+  function xWhy(d) {
+    var x = d.exploit, top = d.mix && d.mix[0] ? d.mix[0].action : null;
+    if (!x || !top || actKind(top) === actKind(x.best) || !d.feat || !(d.feat.eq - x.eq >= 0.1) || d.toCall > 0) return '';
+    return 'The hands ' + x.name + ' plays this way are stronger. Against them the hand has only about ' + P('eq', x.eq, { x: true }) + ' equity.';
+  }
+  // the baseline's own play when the hero's size is one it does not use: "moves all in", "bets half the pot (72.7bb)"
+  function baseSize(d) {
+    var r = d.sizeOff && d.sizeRef ? d.sizeRef : null, t = d.mix && d.mix[0];
+    // a bet short of all in where the baseline moves all in is another play, even inside sizeOff's gap
+    if (!r && isAgg(d.did.action) && d.did.action !== 'allin' && !d.did.covers && t && t.action === 'allin' && t.freq >= 0.5) r = t;
+    if (!r || !d.bbChips) return '';
+    return r.action === 'allin' ? 'moves all in' : verb3(r.action) + ' ' + sizeText(szOf(d), r.action, r.to / d.bbChips, 'long');
   }
   // a size counts as smaller than an all in that covers the opponent only when it leaves a real part of their stack behind
   function realSmaller(d, addBB) { var eff = d.did.effAddBB || d.did.addBB || 0; return !(eff > 0) || addBB <= 0.75 * eff; }
@@ -904,13 +921,16 @@
     var habitSaid = x.gradedBy === 'exploit' && x.state === 'prior' && /calls? too often\./.test(x.who);
     var rl = readLine(d, { said: habitSaid, smaller: smaller });
     if (x.gradedBy === 'exploit') {
-      if (!x.differ && !rl && x.baseGrade === d.grade) return '';
+      // the player's best play is another kind of play than the baseline's: the text says so, and why when the range explains it
+      var top0 = d.mix && d.mix[0] ? d.mix[0].action : null, why = xWhy(d);
+      if (!x.differ && !rl && x.baseGrade === d.grade && !(top0 && actKind(top0) !== actKind(x.best))) return '';
       var eq = x.eq;
       // a bluff the player's folds pay for: a loose caller who still folds the hands that missed
       var bluff = isAgg(x.best) && !isAgg(did) && xb && xb.fold != null && eq < 0.45 && !d.sizeFix;
       var who = bluff ? x.who.replace(/ ([^.]*) calls too often\./, function (m, w) { return ' ' + w + ' rarely folds a pair. A hand that missed the board often folds.'; }) : x.who;
       if (habitSaid && !bluff) who = joinPrior(x, who);
       if (!said) out.push(who); if (rl && !(d.sizeFix && d.sizeFix.tend)) out.push(rl);
+      if (why) out.push(why);
       if (bluff) {
         var risk = xb.to / (d.bbChips || 1) - (d.heroIn || 0), need = risk > 0 ? risk / (d.potBB + risk) : 0;
         out.push('Against ' + x.name + ', a bet of ' + bbs(risk) + ' gets folds about ' + P('fold', xb.fold) + ' of the time.' + (need > 0 && (d.reason || '').indexOf('needs folds about') < 0 ? ' A bluff this size needs about ' + P('be', need, { bet: risk, pot: d.potBB }) + '.' : ''));
@@ -918,9 +938,11 @@
       if (d.sizeFix) { /* the verdict already names the better size */ }
       else if (bothAgg && !sizeOk && x.loss > 0.05) out.push('Against ' + x.name + ', ' + verbIng(did) + ' is worth about ' + B('xev', x.heroEV, xo(d, did)) + '. Other sizes score about the same.');
       else if (sizeOk && x.best === did && xh) out.push('Against ' + x.name + ', a ' + (xb.to > xh.to ? 'bigger' : 'smaller') + ' ' + (did === 'raise' ? 'raise' : 'bet') + ' scores more: about ' + B('xev', x.bestEV, xo(d, x.best)) + ', against ' + B('xev', x.heroEV, xo(d, did)) + ' for yours.');
-      else if (x.best !== did && x.loss > 0.05) out.push('Against ' + x.name + ', ' + verbIng(x.best) + ' is worth about ' + B('xev', x.bestEV, xo(d, x.best)) + ' and ' + verbIng(did) + ' about ' + B('xev', x.heroEV, xo(d, did)) + '.');
+      else if (x.best !== did && x.loss > 0.05) out.push('Against ' + x.name + ', ' + verbIng(x.best) + ' is worth about ' + B('xev', x.bestEV, xo(d, x.best)) + ' and ' + verbIng(did) + ' about ' + B('xev', x.heroEV, xo(d, did)) + '.'
+        + (d.grade === 'Good' ? ' The gap is too small to count as an error.' : ''));
       else out.push('Against ' + x.name + ', ' + verbIng(did) + ' is the best play here, worth about ' + B('xev', x.heroEV, xo(d, did)) + '.');
-      if (x.baseGrade !== d.grade && !d.sizeFix) out.push('Against a balanced opponent, this would be ' + (x.baseGrade === 'Good' ? 'fine' : (x.baseGrade === 'Inaccuracy' ? 'an ' : 'a ') + x.baseGrade.toLowerCase()) + '. The grade follows ' + (x.state === 'prior' ? 'how ' + x.name + ' plays' : x.name + '\'s real play') + '.');
+      if (x.baseGrade !== d.grade && !d.sizeFix) out.push('Against a balanced opponent, this would be ' + (x.baseGrade === 'Good' ? 'fine' : (x.baseGrade === 'Inaccuracy' ? 'an ' : 'a ') + x.baseGrade.toLowerCase()) + '.'
+        + (x.baseGrade !== 'Good' && x.baseLost > 0.05 ? ' It would cost about ' + B('cost', x.baseLost) + ' there.' : '') + ' The grade follows ' + (x.state === 'prior' ? 'how ' + x.name + ' plays' : x.name + '\'s real play') + '.');
       return out.join(' ');
     }
     if (!x.differ) return '';
@@ -936,12 +958,12 @@
     var x = d.exploit, did = d.did.action, best = x.best, eq = x.eq, river = d.street === 'river';
     var xb = x.info.bet, xg = x.info.hero || xb, Name = cap(x.name), out = [];
     var base = function (a) { return { allin: 'move all in' }[a] || a; };
-    var bluffing = isAgg(did) && eq < 0.45, outs = dr && dr.outs >= 4 && !river;
+    var bluffing = isAgg(did) && eq < 0.45 && !valueHand(d), outs = dr && dr.outs >= 4 && !river;
     // 1. the verdict against the table type, with the numbers
     out.push(d.grade + ' against ' + x.name + '.');
     if (d.feat) out.push(handLine(d.feat) + ' ' + xEqLine(d));
     if (isAgg(did) && xg && xg.fold != null && bluffing) out.push(Name + ' folds to this bet only about ' + P('fold', xg.fold) + ' of the time.');
-    else if (isAgg(did) && xg && xg.eqVsCall != null) out.push('When ' + x.name + ' calls, the hand wins about ' + P('eqc', xg.eqVsCall) + '.');
+    else if (isAgg(did) && xg && xg.eqVsCall != null) out.push('When ' + x.name + ' calls, the hand wins ' + (xg.eqVsCall < 0.5 ? 'only ' : '') + 'about ' + P('eqc', xg.eqVsCall) + '.' + (xg.eqVsCall < 0.5 && valueHand(d) ? ' ' + Name + ' calls mostly with better hands.' : ''));
     else if (isAgg(best) && xb && xb.fold != null && eq < 0.45) {
       var risk = xb.to / (d.bbChips || 1) - (d.heroIn || 0), need = risk > 0 ? risk / (d.potBB + risk) : 0;
       out.push('Against ' + x.name + ', a bet of ' + bbs(risk) + ' gets folds about ' + P('fold', xb.fold) + ' of the time.' + (need > 0 ? ' A bluff this size needs about ' + P('be', need, { bet: risk, pot: d.potBB }) + '.' : ''));
@@ -951,14 +973,16 @@
     else if (cost) out.push(cost);
     // 2. the balanced view, and why the baseline plays it
     var f = d.heroFreq, freq = f >= 0.97 ? 'almost always' : P('freq', f) + ' of the time';
-    var size = isAgg(did) && did !== 'allin' && d.did.toBB > 0 ? ' ' + sizeText(szOf(d), did, d.did.toBB, 'short') : '';
-    var noun = { bet: 'the bet', raise: 'the raise', allin: 'the all-in', check: 'checking', call: 'the call', fold: 'the fold' }[did] || verbIng(did);
+    // the baseline's own size when it does not use the hero's: "betting is fine: the baseline moves all in almost always"
+    var bs0 = isAgg(did) ? baseSize(d) : '';
+    var size = bs0 ? '' : isAgg(did) && did !== 'allin' && d.did.toBB > 0 ? ' ' + sizeText(szOf(d), did, d.did.toBB, 'short') : '';
+    var noun = bs0 ? verbIng(did) : { bet: 'the bet', raise: 'the raise', allin: 'the all-in', check: 'checking', call: 'the call', fold: 'the fold' }[did] || verbIng(did);
     if (x.baseGrade === 'Good') {
       var because = isAgg(did) ? (bluffing ? (river ? ', because a balanced opponent folds often enough to pay for it'
           : ', because the folds it gets plus ' + (outs ? 'your outs' : 'the hand\'s equity') + ' pay for it')
           : ', because worse hands and draws pay to continue')
         : isAgg(best) && eq < 0.45 ? ', because a balanced opponent folds too rarely to pay for a bluff' : '';
-      out.push('Against a balanced opponent, ' + noun + ' is fine: the baseline ' + verb3(did) + size + ' ' + freq + because + '.');
+      out.push('Against a balanced opponent, ' + noun + ' is fine: the baseline ' + (bs0 || verb3(did) + size) + ' ' + freq + because + '.');
     } else out.push('Against a balanced opponent, this would be ' + (x.baseGrade === 'Inaccuracy' ? 'an ' : 'a ') + x.baseGrade.toLowerCase() + '.');
     // 3. what to do at this table: the table read joined to its habit, then the plan
     var who = x.who, lead = cap(x.name) + ' ';
@@ -972,7 +996,8 @@
     }
     out.push(who);
     var rl = readLine(d, { said: x.state === 'prior' && /, who call too often\./.test(who) }), plan;
-    if (isAgg(did) && !isAgg(best) && eq < 0.45) plan = (outs ? 'With nothing but outs, ' : 'With a weak hand, ') + base(best) + ' rather than bluff.';
+    if (isAgg(did) && !isAgg(best) && eq < 0.45 && valueHand(d)) plan = cap(base(best)) + ' rather than bet here.';
+    else if (isAgg(did) && !isAgg(best) && eq < 0.45) plan = (outs ? 'With nothing but outs, ' : 'With a weak hand, ') + base(best) + ' rather than bluff.';
     else if (rl) plan = cap(rl.replace(/^Against a player who [^,]*, /, ''));
     else plan = cap(base(best)) + ' rather than ' + base(did) + ' here.';
     out.push(plan);
@@ -1227,10 +1252,13 @@
     function vbet(thin) { if (cov) return covLine(thin); return isAgg(did) ? 'Your ' + (did === 'raise' ? 'raise' : 'bet') + ' is a ' + (thin ? 'thin ' : '') + 'value bet.' : thin ? 'Betting here is a thin value bet.' : 'Betting here is for value.'; }
     if (isAgg(act)) {
       if (eq >= 0.6) {
-        if (!river && evc != null && evc < 0.5) say('A bet protects a hand with about ' + P('eq', eq) + ' equity. Weaker hands and draws must pay to see the next card.', 'protection');
-        else if (evc != null && evc < 0.5) say('A bet takes the pot at once about ' + P('fold', bet.fold, { base: true }) + ' of the time. When called, the hand still wins about ' + P('eqc', evc) + '.');
-        else if (evc != null && evc < 0.6) say(vwin(true), 'valueBet');
-        else if (evc != null) say(vwin(false, true), 'valueBet');
+        // graded against one player: that player's win rate picks the sentence, so the text never says "still wins" about a loser
+        var xc = !!(xw && xw.eqVsCall != null), ec = xc ? wc : evc;
+        if (xc && wc < 0.5) say('Against a balanced range, your ' + (did === 'raise' ? 'raise' : 'bet') + ' is a value bet. ' + whenC + ', the hand wins only about ' + P('eqc', wc) + ' of the time. ' + cap(d.exploit.name) + ' calls mostly with better hands.', 'valueBet');
+        else if (!xc && !river && evc != null && evc < 0.5) say('A bet protects a hand with about ' + P('eq', eq) + ' equity. Weaker hands and draws must pay to see the next card.', 'protection');
+        else if (!xc && evc != null && evc < 0.5) say('A bet takes the pot at once about ' + P('fold', bet.fold, { base: true }) + ' of the time. When called, the hand still wins about ' + P('eqc', evc) + '.');
+        else if (ec != null && ec < 0.6) say(vwin(true), 'valueBet');
+        else if (ec != null) say(vwin(false, true), 'valueBet');
         else say(vbet(false) + ' The hand has about ' + P('eq', eq) + ' equity against the opponent\'s range.', 'valueBet');
         if (!good && na && na.value >= 0.05) say('Your range also has the nut advantage: ' + P('nut', na.mine) + ' strong hands against ' + P('nut', na.theirs) + '.', 'nutAdv', true);
         if (!good && spr && spr.spr <= 1.5) say('The SPR is only about ' + spr.spr + '. With so little left behind, this hand should get all in.', 'spr');
@@ -1370,7 +1398,8 @@
       : d.evSplit ? d.grade + '. The baseline ' + verb3(top) + ' here ' + (d.mix[0].freq < 0.97 ? P('freq', d.mix[0].freq) + ' of the time' : 'almost always') + ', but its EV estimate rates ' + verbIng(did) + ' ' + (d.evSplit < 1 ? 'slightly' : 'about ' + B('split', d.evSplit)) + ' higher. This spot is unsettled.' + (why ? ' The case for ' + verbIng(top) + ': ' + why.charAt(0).toLowerCase() + why.slice(1) : '')
       : d.grade !== 'Good' ? d.grade + '. ' + (why ? why + (dup ? '' : ' ') : '') + (dup ? '' : pref)
       : has('mixed') ? 'Good. ' + why + ' The mix is ' + mt + '.'
-      : d.heroFreq >= 0.7 ? 'Good. ' + (why ? why + ' ' : '') + cap(verbIng(did)) + ' is the baseline play.'
+      // a size the baseline does not use: the size line below names the baseline's play
+      : d.heroFreq >= 0.7 ? 'Good. ' + (baseSize(d) ? why + (d.sizeOff ? '' : (why ? ' ' : '') + 'The baseline ' + baseSize(d) + ' here.') : (why ? why + ' ' : '') + cap(verbIng(did)) + ' is the baseline play.')
       : d.heroFreq >= GOOD_FREQ ? 'Good. ' + (why ? why + ' ' : '') + 'The baseline mixes here: ' + mt + '.'
       : d.exploit && d.exploit.gradedBy === 'exploit' && d.exploit.baseGrade !== 'Good' ? 'Good. ' + (why ? why + (dup ? '' : ' ') : '') + (dup ? '' : pref) + ' ' + cap(verbIng(did)) + (d.exploit.best === did ? ' scores better' : ' is close') + ' against this player.'
       // a play the baseline rarely makes, graded Good: say it is close and why, then how little the baseline's play gains
@@ -1386,8 +1415,10 @@
       out.push(xt);
       [['station', 'calling station'], ['maniac', 'maniac'], ['nit', ' nit']].forEach(function (c) { if (xt.indexOf(c[1]) >= 0 && K.indexOf(c[0]) < 0) K.push(c[0]); });
     }
-    if (d.sizeOff && !sf && d.did.size != null && !(d.exploit && d.exploit.gradedBy === 'exploit' && d.grade === 'Good')) {
-      var rf = d.sizeRef ? potFrac(d, d.sizeRef) : bs ? bs.size : null, sw = rf != null ? sizingWhy(d, rf, tex) : '', szr = szOf(d), rv = did === 'raise';
+    // graded Good against the player: the line still names the baseline's size, without the baseline's case for it
+    var xGood = !!(d.exploit && d.exploit.gradedBy === 'exploit' && d.grade === 'Good');
+    if (d.sizeOff && !sf && d.did.size != null && (!xGood || baseSize(d))) {
+      var rf = d.sizeRef ? potFrac(d, d.sizeRef) : bs ? bs.size : null, sw = rf != null && !xGood ? sizingWhy(d, rf, tex) : '', szr = szOf(d), rv = did === 'raise';
       var refTo = d.sizeRef ? d.sizeRef.to / d.bbChips : bs ? (d.heroIn || 0) + bs.amount : null, refAct = d.sizeRef ? d.sizeRef.action : rv ? 'raise' : 'bet';
       out.push('You ' + (rv ? 'raised ' : 'bet ') + sizeText(szr, did, d.did.toBB, 'long') + '. The baseline '
         + (refTo != null ? (refAct === 'allin' ? 'moves all in' : verb3(rv ? 'raise' : 'bet') + ' ' + sizeText(szr, rv ? 'raise' : 'bet', refTo, 'long')) : 'uses a different size') + ' here.' + (sw ? ' ' + sw : ''));

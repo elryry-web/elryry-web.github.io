@@ -221,6 +221,18 @@
   }
   // the bet size, as a share of the pot, of a player who sizes by strength
   var STRENGTH_FRAC = { strong: 1, pair: 0.6, weak: 0.33 };
+  // a low-tier player who has built a big pot with two big cards does not let go of them on the flop or turn: no pair,
+  // both cards above the board (or ace-king), a stack under 1.5 times the pot before the bet, and a price under 35%.
+  // The rule's call rate by style: loose styles hardly ever fold, a TAG rarely does, a Rock or a Nit folds a third of the
+  // time or more. After the blend with the baseline and the slips, a Beginner TAG calls ace-king about 60-65% of the time.
+  var COMMIT_CALL = { Nit: 0.6, Rock: 0.7, TAG: 0.9, LAG: 0.95, 'Calling Station': 0.95, Maniac: 0.95, Trappy: 0.9 };
+  function committedBigCards(f, i, board, L, price) {
+    if (i == null || !board || board.length < 3 || board.length > 4 || price >= 0.35 || L.stack == null) return false;
+    var ra = C.C1[i] >> 2, rb = C.C2[i] >> 2, top = Math.max.apply(null, board.map(C.rankOf));
+    if (!((ra > top && rb > top) || Math.min(ra, rb) === 11 && Math.max(ra, rb) === 12)) return false;
+    var potBefore = Math.max(1, L.pot - L.currentBet - L.committed);
+    return L.stack + L.committed < 1.5 * potBefore;
+  }
   function naiveMix(ag, h, seat, L, res) {
     var f = res.feat, kind = f.hand.kind, nc = naiveClass(f), strong = nc === 'strong';
     var pair = nc === 'pair', weakPair = kind === 'midpair' || kind === 'lowpair' || kind === 'underpair';
@@ -241,6 +253,7 @@
     if (strong) c = 1; else if (pair) c = TIERS[ag.tier].noFoldTopPair ? 1 : price < 0.4 ? 0.95 : 0.6;
     else if (weakPair) c = price < 0.25 ? 0.85 : price < 0.35 ? 0.55 : 0.25; else if (drawy) c = price < 0.3 ? 0.85 : 0.4;
     else c = (loose ? 0.25 : 0.08) * (price < 0.25 ? 1.5 : 1);
+    if (kind === 'air' && committedBigCards(f, res.combo, h.board, L, price)) c = Math.max(c, COMMIT_CALL[ag.style] || 0.9);
     var r = L.canRaise ? (strong ? 0.45 : ag.style === 'Maniac' ? 0.15 : 0.02) : 0;
     if (ag.style === 'Calling Station') r *= 0.3;
     // a raise is at least half the pot after calling postflop, so a tiny bet never gets a min-click
@@ -266,7 +279,7 @@
       var tp = st.trap * Math.min(1, tier.styleW + 0.3);
       if (L.toCall === 0) base = blend(base, 1 - tp, [{ action: 'check', to: 0, freq: 1 }], tp);
     }
-    var mix = tier.skill >= 0.999 ? base : blend(base, tier.skill, naiveMix(ag, { board: ctx.board }, ctx.spec.seat, L, { feat: feat }), 1 - tier.skill);
+    var mix = tier.skill >= 0.999 ? base : blend(base, tier.skill, naiveMix(ag, { board: ctx.board }, ctx.spec.seat, L, { feat: feat, combo: i }), 1 - tier.skill);
     return tier.sizeByStrength ? strengthSized(mix, L, feat) : mix;
   }
   // a player who sizes by strength bets every hand at its class size, whatever share of the bet came from the baseline:
