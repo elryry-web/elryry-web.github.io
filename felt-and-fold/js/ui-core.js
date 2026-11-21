@@ -225,12 +225,12 @@
   Art.pileHtml = function (amount, bb) {
     if (!Art.ok.stacks || !(amount > 0)) return '';
     const x = amount / bb, f = x < 10 ? 'pile-s' : x < 40 ? 'pile-m' : 'pile-l';
-    return '<img class="pile" src="art/stacks/' + f + '.webp" alt=""' + Art.onerr + '>';
+    return '<img class="pile ' + f + '" src="art/stacks/' + f + '.webp" alt=""' + Art.onerr + '>';
   };
   Art.stackHtml = function (amount, bb, mode) {
     if (!Art.ok.stacks || !(amount > 0) || !bb) return '';
     const x = amount / bb, n = x < 15 ? 2 : x < 40 ? 4 : x < 80 ? 7 : 10;
-    return '<img class="pstk" src="art/stacks/' + (mode === 'cash' ? 'red-' : 'dark-') + n + '.webp" alt=""' + Art.onerr + '>';
+    return '<img class="pstk pstk-' + n + '" src="art/stacks/' + (mode === 'cash' ? 'red-' : 'dark-') + n + '.webp" alt=""' + Art.onerr + '>';
   };
   Art.icon = function (name, cls) {
     return Art.ok.markers ? '<img class="' + (cls || 'ico') + '" src="art/markers/' + name + '.webp" alt=""' + Art.onerr + '>' : '';

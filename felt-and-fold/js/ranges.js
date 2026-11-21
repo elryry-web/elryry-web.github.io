@@ -312,14 +312,56 @@
           sizeR = sizeScale(potD - raises[1].toBB, raises[1].toBB - tIn, t0 - tIn);
           s = resize(s, sizeR, VS_OPEN[k3] ? vsOpenAt(k3, depth).raise : C.parseRange('TT+, AQs+, AKo, A5s, A4s'), 'v3' + k3 + depth + ip);
         }
-      } else { s = chart(COLD_4BET); kind = 'cold4bet'; label = hero + ' facing an open and a 3-bet'; rt = raises[1].toBB * SIZES.fourBet; approx = true; }
+        label += ' to ' + fmtBB(raises[1].toBB);
+      } else { s = chart(COLD_4BET); kind = 'cold4bet'; label = hero + ' facing an open and a 3-bet to ' + fmtBB(raises[1].toBB); rt = raises[1].toBB * SIZES.fourBet; approx = true; }
     } else {
-      if (raises[raises.length - 2].pos === hero) { var ip4 = postIx(hero) > postIx(lastR.pos); s = chart(VS_4BET[ip4 ? 'ip' : 'oop']); kind = 'vs4bet'; label = hero + ' 3-bet, ' + lastR.pos + ' 4-bets'; }
-      else { s = chart({ r: 'AA, KK:0.5', c: 'KK:0.5, QQ:0.3, AKs:0.3' }); kind = 'approx'; label = hero + ' facing a 4-bet cold'; approx = true; }
+      if (raises[raises.length - 2].pos === hero) { var ip4 = postIx(hero) > postIx(lastR.pos); s = chart(VS_4BET[ip4 ? 'ip' : 'oop']); kind = 'vs4bet'; label = hero + ' 3-bet, ' + lastR.pos + ' 4-bets to ' + fmtBB(lastR.toBB); }
+      else { s = chart({ r: 'AA, KK:0.5', c: 'KK:0.5, QQ:0.3, AKs:0.3' }); kind = 'approx'; label = hero + ' facing a 4-bet cold, to ' + fmtBB(lastR.toBB); approx = true; }
       rt = bb;
     }
+    // a 3-bet or 4-bet far below the size the chart is built for: the chart's folds are priced by pot odds instead
+    var priced = null;
+    if (raises.length >= 2 && kind !== 'vs3bet' && depth >= 40 && !desc.noPrice) {
+      var gone = {}, live = {};
+      (desc.actions || []).forEach(function (a) { var p = norm(a.pos, n); if (a.type === 'fold') gone[p] = 1; else live[p] = 1; });
+      var others = 0; for (var lp in live) if (!gone[lp] && lp !== hero && lp !== lastR.pos) others++;
+      var pz = priceWiden(s, acts, raises, hero, desc, potD, toCall, bb, ante, n, others);
+      if (pz) { s = pz.s; priced = pz.info; approx = true; }
+    }
     var jam = rt >= bb * SIZES.jamAt;
-    return result(kind, label, depth, s, jam ? bb : Math.round(rt * 10) / 10, { jam: jam, sizeScale: Math.round(sizeR * 100) / 100, approx: approx || acts.length > raises.length + (callers ? callers : 0) + limps.length });
+    return result(kind, label, depth, s, jam ? bb : Math.round(rt * 10) / 10, { jam: jam, sizeScale: Math.round(sizeR * 100) / 100, priced: priced, approx: approx || acts.length > raises.length + (callers ? callers : 0) + limps.length });
+  }
+  function fmtBB(x) { var v = Math.round(x * 10) / 10; return (v === Math.round(v) ? String(Math.round(v)) : v.toFixed(1)) + 'bb'; }
+  // The size the chart assumes for the last raise: the 3-bet at 3x the open in position or 4x out of position, plus 1x the
+  // open per caller before it, and the 4-bet at 2.2x that. A raise under 60% of it gets a price-based defence: each hand
+  // the chart folds calls when its equity against the raiser's range, times a realization share for position, beats the
+  // pot odds, less 15% for each other player still in. A small raise comes from a wider range: the raiser's raising hands,
+  // half of the hands their chart calls with (before this pricing), then the strongest hands up to a width set by the size gap.
+  var PRICE_SMALL = 0.6;
+  function priceWiden(s, acts, raises, hero, desc, potD, toCall, bb, ante, n, others) {
+    var o = raises[0], t = raises[1], last = raises[raises.length - 1], c1 = 0, k = acts.indexOf(o);
+    for (var q = k + 1; q < acts.indexOf(t); q++) if (acts[q].type === 'call') c1++;
+    var t0 = o.toBB * (postIx(t.pos) > postIx(o.pos) ? SIZES.threeBetIP : SIZES.threeBetOOP) + c1 * o.toBB;
+    var std = raises.length === 2 ? t0 : raises.length === 3 ? t0 * SIZES.fourBet : 0;
+    if (!(std > 0) || last.allIn || !(last.toBB < PRICE_SMALL * std)) return null;
+    var prior = acts.slice(0, acts.indexOf(last)), sp = spot({ hero: last.pos, actions: prior, stackBB: bb, ante: ante, nPlayers: n, heroLeftBB: 1e9, noPrice: true });
+    var jr = new Float64Array(169), any = 0;
+    for (var x = 0; x < 169; x++) { jr[x] = Math.min(1, sp.raise[x] + 0.5 * sp.call[x]); any += jr[x]; }
+    if (!any) return null;
+    // a raise this far under the usual size is wider than the chart's raises: fill to about the raise share times the
+    // size gap, between 5% and 20% of hands, with the strongest hands first
+    var want = clamp(C.classPercent(sp.raise) * (std / last.toBB) * 1.5, 0.05, 0.2), vr = vsRandom();
+    var order = []; for (x = 0; x < 169; x++) order.push(x);
+    order.sort(function (i, j) { return vr[j] - vr[i]; });
+    for (var oi = 0; oi < 169 && C.classPercent(jr) < want; oi++) jr[order[oi]] = 1;
+    var e = eqVsRange(jr), pot = desc.potBB != null ? desc.potBB : potD, need = toCall / (pot + toCall), ip = postIx(hero) > postIx(last.pos);
+    var w = clone(s);
+    for (x = 0; x < 169; x++) {
+      var real = clamp((ip ? 0.95 : 0.82) + 0.4 * (e[x] - 0.5), 0.6, 1.2) * Math.pow(0.85, others || 0), g = sig((e[x] * real - need) / 0.02);
+      w.call[x] = s.call[x] + Math.max(0, 1 - s.raise[x] - s.call[x]) * g;
+    }
+    refold(w);
+    return { s: w, info: { what: raises.length === 2 ? '3-bet' : '4-bet', std: Math.round(std * 10) / 10, faced: Math.round(last.toBB * 10) / 10, need: Math.round(need * 1000) / 1000, by: last.pos, ip: ip } };
   }
   // the range a jammer holds: the raise part of their own spot (first-in shove, or the chart at their decision)
   function jammerRange(acts, ri, bb, ante, n) {

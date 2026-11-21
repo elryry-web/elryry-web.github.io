@@ -172,6 +172,13 @@
   // Estimate, Chart and Nash grades stop at Mistake unless simple math settles the case (see settled());
   // an Estimate missed bluff stops at Inaccuracy. Solved and Library grades keep the full range.
   var LIMP_SIZE_COST = 0.35;
+  // a preflop raise (an open, 3-bet, squeeze or 4-bet) far from the chart's size, where raising is right: at least
+  // RAISE_SIZE_COST or 10% of the pot. A re-raise under 40% of the chart's size costs at least RAISE_TINY_COST or 20% of
+  // the pot: it offers every player a cheap price and folds out no one, and the chip model cannot see that.
+  var RAISE_SIZE_COST = 0.35, RAISE_TINY_COST = 1.2;
+  // preflop, a play the chart never makes (under 3% while one action holds 97%) is at least an Inaccuracy once it costs
+  // NEVER_COST: a cheap spot keeps its small cost, but the grade does not call it Good
+  var NEVER_COST = 0.15;
   var SETTLE_GAP = 0.12, SETTLE_JAM_GAP = 0.06, SETTLE_PRE_OFF = 0.05, SETTLE_PRE_TOP = 0.85;
   function thresholds(d) {
     var p = Math.max(d.potBB, d.toCall || 0), pre = d.street === 'preflop';
@@ -216,6 +223,19 @@
         if (hm.freq >= GOOD_FREQ) { sizeOff = true; loss = Math.max(loss, LIMP_SIZE_COST, 0.1 * (d.potBB || 0)); }
       }
     }
+    d.raiseSize = null;
+    if (!d.limpSize && d.street === 'preflop' && d.did.action === 'raise' && d.did.to > 0 && ref && ref.action === 'raise' && ref.to > 0 && d.raiseCtx) {
+      var rr = d.did.to / ref.to;
+      if (rr < 0.55 || rr > 1.7) {
+        d.raiseSize = { to: ref.toBB, small: rr < 1 };
+        if (hm.freq >= GOOD_FREQ) {
+          sizeOff = true;
+          var fl = Math.max(RAISE_SIZE_COST, 0.1 * (d.potBB || 0));
+          if (d.raiseCtx.n >= 1 && rr < 0.4) fl = Math.max(fl, RAISE_TINY_COST, 0.2 * (d.potBB || 0));
+          loss = Math.max(loss, fl);
+        }
+      }
+    }
     d.sizeRef = sizeOff ? ref : null;
     var good = hm.freq >= GOOD_FREQ && !sizeOff;
     d.heroFreq = rd(hm.freq, 3); d.bestAction = bestAct; d.bestEV = rd(best, 2); d.heroEVUsed = heroEV == null ? null : rd(heroEV, 2);
@@ -223,6 +243,8 @@
     d.cost = rd(loss, 2);
     // a call is graded against the pot it plays for, so a big shove call is not judged by the blinds alone
     d.grade = good ? 'Good' : gradeFor(loss, Math.max(d.potBB, d.toCall || 0), d.street === 'preflop');
+    d.never = false;
+    if (d.grade === 'Good' && !good && d.street === 'preflop' && hm.freq < 0.03 && d.mix[0] && d.mix[0].freq >= 0.97 && loss >= NEVER_COST) { d.grade = 'Inaccuracy'; d.never = true; }
     if (d.forceGrade && GRADES.indexOf(d.forceGrade) > GRADES.indexOf(d.grade)) { d.grade = d.forceGrade; d.evLost = Math.max(d.evLost, d.forceLoss || 0); }
     d.sizeOff = !!sizeOff;
     if (d.grade !== 'Good' && d.source !== 'Solved' && d.source !== 'Library') {
@@ -291,6 +313,14 @@
         d.limpTo = sp.jam || !sp.raiseToBB ? 0 : sp.raiseToBB; // the raise size over the limpers, in bb (none when the raise would be all in)
       }
     }
+    if (e.street === 'preflop' && res.spot && isAgg(did.action) && ['push', 'reshove', 'vsJam', 'bbVsLimp', 'isolate', 'walk'].indexOf(res.spot.kind) < 0) {
+      // the raises and callers before this one, for the size text: the open, callers after it, the last raise, position
+      var rz = [], cl = 0, n2 = h.order.length, ord = function (s) { return (s - h.button - 1 + n2) % n2; }, lastS = null;
+      h.log.slice(0, e.n).forEach(function (x) { if (x.ev !== 'act' || x.street !== 'preflop' || x.seat === seat) return;
+        if (x.type === 'raise' || x.type === 'bet') { rz.push(x.to / bb); lastS = x.seat; } else if (x.type === 'call' && rz.length === 1) cl++; });
+      d.raiseCtx = { n: rz.length, open: rz[0] || 0, last: rz[rz.length - 1] || 0, callers: cl, ip: lastS != null && ord(seat) > ord(lastS) && h.pos[seat] !== 'SB' && h.pos[seat] !== 'BB' };
+    }
+    if (e.street === 'preflop' && res.spot) { var cs = 0; for (var q2 = 0; q2 < 169; q2++) cs += res.spot.call[q2] * C.CLASS_SIZE[q2]; d.chartCall = rd(cs / 1326, 3); if (res.spot.priced) d.priced = res.spot.priced; }
     d.boardStr = C.cardsStr(d.board);
     d.heroIn = rd((e.betBefore - e.toCall) / bb, 2); // the hero's chips already in on this street, in bb
     d.facing = rd(e.betBefore / bb, 2); // the bet the hero faces (street total), in bb
@@ -511,12 +541,16 @@
       out.push('At about ' + d.depth + 'bb, the Nash push/fold range ' + (kind === 'push' ? 'from ' + pos + ' shoves' : 'against this raise re-shoves') + ' about ' + pc(share) + ' of hands. ' + desc); k('nash');
     } else if (kind === 'rfi') out.push('The chart opens about ' + pc(share) + ' of hands from ' + pos + '. ' + desc);
     else if (kind === 'bbVsLimp' || kind === 'isolate') {
-      out.push('The chart raises about ' + pc(share) + ' of hands here. ' + desc);
+      // a chart that only raises or folds says so, and names the hand's one action
+      if (!(d.chartCall > 0.005) && d.mix.length === 1) { out.push('The chart raises about ' + pc(share) + ' of hands here and folds the rest. ' + hand + ' is ' + (d.mix[0].action === 'fold' ? 'a fold' : 'a raise') + '.'); d.saidAct = true; }
+      else out.push('The chart raises about ' + pc(share) + ' of hands here. ' + desc);
       if (d.limpers && hand) { var lw = limpWhy(h, seat, d); if (lw.text) out.push(lw.text); lw.concepts.forEach(k); }
     }
     else {
-      out.push('The chart continues with about ' + pc(share) + ' of hands here. ' + desc);
-      if (po && !good && (did === 'call' || d.bestAction === 'call')) { out.push('The pot odds ask for ' + pc(po.need) + ' equity. ' + hand + ' has about ' + pc(po.have) + ' against the raiser\'s range.'); k('potOdds'); }
+      // a priced spot: the share of all hands means little after a small raise, so the line names the hand's action
+      if (d.priced && po) { out.push('The pot odds ask for ' + pc(po.need) + ' equity. ' + hand + ' has about ' + pc(po.have) + ' against the raiser\'s range.'); k('potOdds'); }
+      else out.push('The chart continues with about ' + pc(share) + ' of hands here. ' + desc);
+      if (po && !d.priced && !good && (did === 'call' || d.bestAction === 'call')) { out.push('The pot odds ask for ' + pc(po.need) + ' equity. ' + hand + ' has about ' + pc(po.have) + ' against the raiser\'s range.'); k('potOdds'); }
     }
     return { text: out.join(' '), concepts: K };
   }
@@ -643,8 +677,10 @@
       : has('mixed') ? 'Good. ' + why + ' The mix is ' + mt + '.'
       : d.heroFreq >= 0.7 ? 'Good. ' + (why ? why + ' ' : '') + cap(verbIng(did)) + ' is the baseline play.'
       : d.heroFreq >= GOOD_FREQ ? 'Good. ' + (why ? why + ' ' : '') + 'The baseline mixes here: ' + mt + '.'
-      : d.exploit && d.exploit.gradedBy === 'exploit' && d.exploit.baseGrade !== 'Good' ? 'Good. ' + pref
-      : 'Good. ' + pref + ' ' + cap(verbIng(did)) + ((d.cost || 0) < 0.1 ? ' scores about the same in EV.' : ' costs about ' + bbs(d.cost) + '. That is too small to count as an error.');
+      : d.exploit && d.exploit.gradedBy === 'exploit' && d.exploit.baseGrade !== 'Good' ? 'Good. ' + (why ? why + (dup ? '' : ' ') : '') + (dup ? '' : pref) + ' ' + cap(verbIng(did)) + (d.exploit.best === did ? ' scores better' : ' is close') + ' against this player.'
+      // a play the baseline rarely makes, graded Good: say it is close and why, then how little the baseline's play gains
+      : 'Good. ' + cap(verbIng(did)) + ' is close here. ' + (why ? why + (dup ? '' : ' ') : '') + (dup ? '' : pref) + ' '
+        + ((d.cost || 0) < 0.1 ? cap(verbIng(top)) + ' scores about the same in EV.' : cap(verbIng(top)) + ' gains only about ' + bbs(d.cost) + '. That is too small to count as an error.');
     out.push(head);
     var xt = exploitText(d, !!(sf && sf.who));
     if (xt) {
@@ -763,15 +799,22 @@
     var mixed = d.mix.length > 1 && d.mix[1].freq >= GOOD_FREQ;
     var why = reasonFor(h, seat, d), K = d.concepts, has = function (x) { return K.indexOf(x) >= 0; }, who = d.source === 'Nash' ? 'The Nash range' : 'The chart';
     d.reason = why;
-    var ls = d.limpSize, lsRight = !!(ls && d.grade !== 'Good' && d.sizeOff);
+    var ls = d.limpSize, lsRight = !!(ls && d.grade !== 'Good' && d.sizeOff), rs = d.raiseSize, rsRight = !!(rs && d.grade !== 'Good' && d.sizeOff);
     if (lsRight) out.push(d.grade + '. Raising was right. The size was too ' + (ls.small ? 'small' : 'big') + '. ' + limpSizeText(d, false) + (why ? ' ' + why : '') + approx);
+    else if (rsRight) out.push(d.grade + '. Raising was right. The size was too ' + (rs.small ? 'small' : 'big') + '. ' + raiseSizeText(d, false) + (why ? ' ' + why : '') + approx);
+    else if (d.grade === 'Good' && d.heroFreq < GOOD_FREQ && !has('mixed') && d.mix[0]) out.push('Good. ' + cap(verbIng(did)) + ' ' + hand + ' is close here. ' + (why ? why + ' ' : '')
+      + who + ' ' + chartVerb(d.mix[0]) + ' it. ' + cap(verbIng(d.mix[0].action)) + ((d.cost || 0) < 0.1 ? ' scores about the same.' : ' gains only about ' + bbs(d.cost) + '. That is too small to count as an error.') + approx);
     else if (d.grade === 'Good') out.push('Good. ' + (has('mixed') ? why + ' The mix is ' + mt + '.'
-      : why ? why + ' ' + who + ' ' + (mixed ? 'mixes it: ' + mt + '.' : chartVerb(d.mix[0]) + ' it here.')
+      : why ? why + (d.saidAct && !mixed ? '' : ' ' + who + ' ' + (mixed ? 'mixes it: ' + mt + '.' : chartVerb(d.mix[0]) + ' it here.'))
       : mixed ? 'The chart mixes ' + hand + ' here: ' + mt + '.' : 'The chart ' + chartVerb(d.mix[0]) + ' ' + hand + ' here.') + approx);
-    else out.push(d.grade + '. ' + (why ? why + ' ' : '') + 'You ' + verbPast(did) + ' ' + hand + '. ' + who + ' ' + (mixed ? 'mixes it: ' + mt : chartVerb(d.mix[0]) + ' it' + (d.mix[0].freq < 0.97 ? ' ' + pc(d.mix[0].freq) + ' of the time' : '')) + '.' + approx);
+    else out.push(d.grade + '. ' + (why ? why + ' ' : '') + 'You ' + verbPast(did) + ' ' + hand + '.' + (d.saidAct && !mixed ? '' : ' ' + who + ' ' + (mixed ? 'mixes it: ' + mt : chartVerb(d.mix[0]) + ' it' + (d.mix[0].freq < 0.97 ? ' ' + pc(d.mix[0].freq) + ' of the time' : '')) + '.') + approx);
     if (ls && !lsRight) out.push(limpSizeText(d, true));
+    if (rs && !rsRight && d.grade !== 'Good') out.push(raiseSizeText(d, true));
+    if (d.priced) out.push(pricedText(d));
+    if (d.never) out.push('The chart never ' + ({ call: 'calls with', raise: 'raises', allin: 'moves all in with', fold: 'folds', check: 'checks' }[did] || 'plays') + ' ' + hand + ' here. The cost is small, but the play is still an error.');
+    if (did === 'call' && d.evLost > (d.toCall || 0) + 0.05 && d.toCall > 0) out.push('The cost is more than the ' + bbs(d.toCall) + ' call. The hand plays on after the flop' + (pos === 'SB' || pos === 'BB' ? ', out of position' : '') + '. It loses more chips on later streets.');
     if (d.jamOversize) out.push('Moving all in risks ' + bbs(d.stack) + ' where the chart raises to ' + bbs(d.jamOversize.toBB) + '. ' + jamWhy(d, po));
-    if (po && !isAgg(did) && (ch.chart === 'vsJam' || po.toCall >= 0.25 * d.stack || d.grade !== 'Good')) {
+    if (po && !isAgg(did) && (ch.chart === 'vsJam' || po.toCall >= 0.25 * d.stack || d.grade !== 'Good' || d.heroFreq < GOOD_FREQ)) {
       out.push('The call was ' + bbs(po.toCall) + ' into ' + bbs(d.potBB + po.toCall) + '.' + (has('potOdds') ? '' : ' A call needed ' + pc(po.need) + ' equity.'));
       if (!has('potOdds')) out.push(hand + ' has about ' + pc(po.have) + ' against the raiser\'s range.');
       if (did === 'call' && d.grade !== 'Good' && po.have >= po.need && ch.chart !== 'vsJam' && po.toCall < 0.5 * d.stack && !(icm && icm.premium > 0.01)) out.push(realizedText(h, seat, e, hand, po));
@@ -824,6 +867,34 @@
     if (ls.small) out.push('A small raise offers the limpers a cheap call.', ip ? 'It plays like a limp that costs more, with a bigger pot against several players.' : 'It plays like a check that costs more, and it builds a bigger pot that you play out of position.');
     else out.push('A raise this big risks a lot to win a small pot.', handCat(d.hand || 'xx') === 'premium' ? 'Worse hands fold, and your strong hand wins only what is in the middle.' : 'The hands that call it are mostly ones that beat you.');
     return out.join(' ');
+  }
+  // a preflop raise far from the chart's size: the size it should be and why (also: the action was wrong too)
+  function raiseSizeText(d, also) {
+    var rs = d.raiseSize, c = d.raiseCtx || {}, out = [], hand = d.hand || 'this hand';
+    out.push(also ? 'Your raise to ' + bbs(d.did.toBB) + ' was also too ' + (rs.small ? 'small' : 'big') + '.' : 'You raised to ' + bbs(d.did.toBB) + '.');
+    var near = function (x) { return x > 0 && Math.abs(x / rs.to - 1) < 0.12; }, where = c.ip ? 'In position' : 'Out of position';
+    if (!c.n) out.push('An open from here should go to about ' + bbs(rs.to) + '.');
+    else if (c.n === 1) {
+      var mult = c.ip ? 3 : 4, rule = c.open * mult + c.callers * c.open, what = c.callers ? 'a squeeze' : 'a 3-bet';
+      out.push(where + ' over an open' + (c.callers ? (c.callers === 1 ? ' and one caller' : ' and ' + c.callers + ' callers') : '') + ', ' + what + ' should go to about ' + bbs(rs.to) + '.');
+      if (near(rule)) out.push('That is ' + mult + 'x the open' + (c.callers ? ', plus 1x for ' + (c.callers === 1 ? 'the caller' : 'each caller') : '') + '.');
+    } else {
+      out.push('A ' + (c.n === 2 ? '4-bet' : 're-raise') + ' here should go to about ' + bbs(rs.to) + '.');
+      if (c.n === 2 && near(c.last * 2.2)) out.push('That is about 2.2x the 3-bet.');
+    }
+    var many = c.n === 1 && c.callers > 0;
+    if (rs.small) {
+      out.push(many ? 'A small raise gives both players a cheap price to call.' : c.n ? 'A small raise gives the raiser a cheap price to call or raise again.' : 'A small open gives the blinds a cheap price to call.');
+      if (c.n && !c.ip) out.push('It builds a bigger pot that you play out of position with ' + hand + '.');
+      else if (c.n) out.push('It builds a bigger pot against more hands.');
+      if (c.n) out.push('It does not fold anyone out.');
+    } else out.push('A raise this big risks a lot to win a small pot.', handCat(d.hand || 'xx') === 'premium' ? 'Worse hands fold, and your strong hand wins only what is in the middle.' : 'The hands that call it are mostly ones that beat you.');
+    return out.join(' ');
+  }
+  // facing a raise far under the chart's size: the chart was built for another price, and the grade uses pot odds
+  function pricedText(d) {
+    var p = d.priced;
+    return 'The chart is built for a ' + (p.what || 'raise') + ' to about ' + bbs(p.std) + '. This one was ' + bbs(p.faced) + '. At this price the chart uses the pot odds instead. The grade is less sure here.';
   }
   function rankLine(pct) {
     if (pct <= 0.5) return 'Your hand is in the top ' + pc(Math.max(0.01, pct)) + ' of your range.';

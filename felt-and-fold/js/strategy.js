@@ -837,14 +837,16 @@
     var lastR = null; h.log.slice(0, n).forEach(function (e) { if (e.ev === 'act' && e.street === 'preflop' && (e.type === 'raise' || e.type === 'bet')) lastR = e.seat; });
     if (lastR != null && lastR !== seat) { eqx = eqVsSeatRange(h, seat, lastR, cls, n); factors.push({ kind: 'potOdds', need: rd(need, 3), have: rd(eqx, 3), toCall: rd(callBB, 1), pot: rd(potBB, 1) }); }
     var gap = eqx != null ? Math.abs(eqx - need) : Math.abs(vr - 0.5);
-    var V = risk * (0.2 + gap) + (sp.kind === 'push' || sp.kind === 'reshove' ? 0 : potBB * 0.1);
-    if (sp.kind === 'push' || sp.kind === 'reshove') V = Math.min(V, risk * 0.35);
+    var vOf = function (rk) { var v = rk * (0.2 + gap) + (sp.kind === 'push' || sp.kind === 'reshove' ? 0 : potBB * 0.1); return sp.kind === 'push' || sp.kind === 'reshove' ? Math.min(v, rk * 0.35) : v; };
     var all = [callName, 'fold'];
     if (d.canRaise) all.unshift(jam ? 'allin' : 'raise');
     if (canCheck) all = all.filter(function (x) { return x !== 'fold'; });
+    // an action risks its own chips, or the favourite's when that risks more: folding where the chart calls risks the call,
+    // not the chart's jam
+    var riskOf = function (act) { return act === 'fold' || act === 'check' ? 0 : act === callName ? Math.max(callBB, 1) : risk; };
     all.forEach(function (act) {
       var m = mix.filter(function (q) { return q.action === act; })[0], f = m ? m.freq : 0;
-      ev[act] = rd(-V * Math.pow(Math.max(0, pMax - f), 1.3), 2);
+      ev[act] = rd(-vOf(Math.max(riskOf(act), riskOf(mix[0].action))) * Math.pow(Math.max(0, pMax - f), 1.3), 2);
     });
     // the chip model sizes clear deviations (folding a hand the chart always raises, a deep jam); the relative
     // estimate stays as a floor at half weight. A real mix (both actions well above 15%) costs little either way.
@@ -863,7 +865,17 @@
         var M2 = preflopModel(h, seat, n, d, cls, Math.min(hTo, d.maxTo || hTo), hTo >= d.maxTo, sp);
         var aggF = mix.filter(function (q) { return q.action === aggKey; }).reduce(function (t, q) { return t + q.freq; }, 0);
         // when the chart raises, the other size is judged against the chart's own raise
-        var hv = aggF >= pMax - 0.15 ? (ev[aggKey] || 0) + Math.min(0, M2.raise - M.raise) : costOf(aggKey, M2.raise);
+        var hv;
+        if (aggF >= pMax - 0.15) hv = (ev[aggKey] || 0) + Math.min(0, M2.raise - M.raise);
+        else {
+          // the relative floor for the hero's own size: it risks what that raise puts in, not the chart's raise. Facing a
+          // raise far under the chart's size (sp.priced) the chart is a guess: the floor is halved, and cut by 30% more
+          // when the chip model rates the play at least as well as the chart's
+          var hRisk = Math.max(callBB, (Math.min(hTo, d.maxTo || hTo) - d.committed) / bb, 1), mf = mix.filter(function (q) { return q.action === aggKey; })[0];
+          rel[aggKey] = -vOf(Math.max(hRisk, riskOf(fav))) * Math.pow(Math.max(0, pMax - (mf ? mf.freq : 0)), 1.3);
+          if (sp.priced) rel[aggKey] *= M2.raise >= mv(fav) ? 0.35 : 0.5;
+          hv = costOf(aggKey, M2.raise);
+        }
         // a deep all in where the chart raises small folds out the worse hands, whatever the model says
         if (aggF >= pMax - 0.15 && hTo >= d.maxTo && !jam && d.stack / bb > 40) hv = Math.min(hv, -Math.min(2, 0.015 * d.stack / bb));
         info = { hero: { evBB: rd(hv, 2), modelEV: rd(M2.raise, 2), foldEq: rd(M2.foldEq, 3) } };

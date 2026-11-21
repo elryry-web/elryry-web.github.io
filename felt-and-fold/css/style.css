@@ -286,10 +286,17 @@ body.art-markers .dealer { width: 28px; height: 28px; color: transparent; backgr
 .chips img:first-child { margin-left: 0; }
 .bet:has(.chips) { padding-left: 2px; }
 .pot { display: flex; align-items: center; gap: 6px; }
-.pot .pile { height: 54px; width: auto; filter: drop-shadow(0 2px 3px rgba(0,0,0,.5)); }
+.pot .pile { height: 54px; width: auto; flex: none; filter: drop-shadow(0 2px 3px rgba(0,0,0,.5)); }
+/* one chip is ~22px wide in every pot pile (chip widths in the art: s 58px, m 56px, l 56px); each pile sits on the same baseline in a 57x54 slot (the large one rises 9px above it) so the pot line never jumps */
+.pot .pile-s { height: 42px; margin: 12px 6.5px 0; }
+.pot .pile-m { height: 54px; margin: 0 2px; }
+.pot .pile-l { height: 63px; margin: -9px 0 0; }
 .av { position: relative; overflow: hidden; }
 .av .portrait { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 50%; }
-.pstk { height: 30px; width: auto; flex: none; margin-left: auto; filter: drop-shadow(0 1px 2px rgba(0,0,0,.6)); }
+.pstk { width: 28px; height: auto; flex: none; margin-left: auto; filter: drop-shadow(0 1px 2px rgba(0,0,0,.6)); }
+/* the stack art is one chip wide (~104px) at every height, so a fixed width keeps each chip 28px; tall stacks borrow the plate padding instead of growing it */
+.pstk-7 { margin-block: -1px; }
+.pstk-10 { margin-block: -5px; }
 .ico { width: 16px; height: 16px; vertical-align: -3px; margin-right: 4px; }
 .fin-star { width: 64px; height: 64px; display: block; margin: 0 auto 10px; }
 
