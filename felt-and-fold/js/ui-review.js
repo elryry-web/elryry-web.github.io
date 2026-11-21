@@ -16,24 +16,33 @@
   let resolveClose = null;
 
   // ---------------------------------------------------------------- saved history: the last 200 reviews, under one ff. key
-  const HKEY = 'history', HMAX = 200, HBYTES = 600000;
+  const HKEY = 'history', HMAX = 200, HBYTES = 600000, HMATH = 25; // number tokens are saved for the newest 25 hands only
   const r2 = x => Math.round(x * 100) / 100;
-  function packDecision(d) {
+  // a hand's number tokens, saved without the fields the popover does not show
+  function packMath(m) {
+    if (!m) return null;
+    const out = {};
+    Object.keys(m).forEach(id => { const t = m[id]; out[id] = { title: t.title, words: t.words, formula: t.formula, note: t.note || '', source: t.source || '', meaning: t.meaning || '' }; });
+    return out;
+  }
+  function packDecision(d, math) {
     return { street: d.street, boardStr: d.boardStr, grade: d.grade, evLost: d.evLost, source: d.source, spot: d.spot, pot: d.pot, toCall: d.toCall,
       did: { action: d.did.action, toBB: d.did.toBB, addBB: d.did.addBB }, hand: d.hand, leak: d.leak, text: d.text, concepts: d.concepts || [],
       mix: d.mix.filter(m => m.freq >= 0.005).map(m => ({ action: m.action, sizeLabel: m.sizeLabel, freq: r2(m.freq), toBB: m.toBB })),
       exploit: d.exploit ? { gradedBy: d.exploit.gradedBy, name: d.exploit.name, best: d.exploit.best, baseGrade: d.exploit.baseGrade, state: d.exploit.state, plan: d.exploit.plan || null } : null,
-      later: d.later || '' };
+      later: d.later || '', tm: math && d.tm ? d.tm : undefined, math: math && d.tm ? packMath(d.math) : undefined };
   }
-  function pack(e) {
+  function pack(e, math) {
     const rv = e.rv, rc = rv.recap;
     return { n: e.n, at: e.at, label: e.meta.label || '', rv: { handId: rv.handId, mode: rv.mode, bb: rv.bb, heroPos: rv.heroPos, heroCards: rv.heroCards, board: rv.board,
       net: rv.net, blind: rv.blind || null, worst: rv.worst, clean: rv.clean, evLost: rv.evLost, solved: rv.solved || 0,
-      recap: rc ? { villains: rc.villains.map(v => ({ name: v.name, pos: v.pos, cards: v.cards, made: v.made, text: v.text, rangeText: v.rangeText, thinking: v.thinking })) } : null,
-      decisions: rv.decisions.map(packDecision) } };
+      recap: rc ? { villains: rc.villains.map(v => ({ name: v.name, pos: v.pos, cards: v.cards, made: v.made, text: v.text, rangeText: v.rangeText, thinking: v.thinking,
+        tm: math && v.tm ? v.tm : undefined, math: math && v.tm ? packMath(v.math) : undefined })) } : null,
+      decisions: rv.decisions.map(d => packDecision(d, math)) } };
   }
   function saveHistory() {
-    let list = R.entries.slice(-HMAX).map(pack), str = JSON.stringify(list);
+    const keep = R.entries.slice(-HMAX);
+    let list = keep.map((e, i) => pack(e, i >= keep.length - HMATH)), str = JSON.stringify(list);
     while (str.length > HBYTES && list.length > 1) { list = list.slice(Math.ceil(list.length / 10)); str = JSON.stringify(list); } // size guard: drop the oldest
     try { localStorage.setItem('ff.' + HKEY, str); } catch (err) { /* full or private mode: keep the page copy only */ }
   }
@@ -144,7 +153,7 @@
       '<div class="dspot">' + termsHtml(UI.esc(u.text(d.spot))) + '. Pot ' + u.amt(d.pot) + (d.toCall ? ', ' + u.amt(d.toCall) + ' to call' : '') + '.</div>' +
       '<div class="ddid">You: <b>' + UI.esc(didText(d, u)) + '</b>' + (d.hand ? ' with ' + UI.esc(d.hand) : '') + '</div>' +
       planHtml(d, u) +
-      '<p class="dtext">' + termsHtml(UI.esc(u.text(d.text)), d.concepts) + '</p>' +
+      '<p class="dtext">' + mathHtml(d.text, d.tm, d.math, u, d.concepts) + '</p>' +
       (d.later ? '<p class="dlater">' + termsHtml(UI.esc(u.text(d.later))) + '</p>' : '') + '</div>';
   }
   // an EV figure: two decimals in bb, the unit's own rounding otherwise
@@ -157,6 +166,49 @@
     if (!R || !R.linkTerms) return html;
     return R.linkTerms(html, keys || [], (all, k) => '<button type="button" class="term" data-k="' + k + '" aria-expanded="false">' + all + '</button>');
   }
+  // ---------------------------------------------------------------- show the math
+  // review.js marks each derived number in tm as \uE000 id \uE001 text \uE002, with its working in math[id];
+  // the marks pass through esc, the units switch and the glossary links, then become buttons. Old saved hands have no tm.
+  let MATH = [];
+  function mathHtml(plain, tm, math, u, keys) {
+    if (!tm || !math) return termsHtml(UI.esc(u.text(plain)), keys);
+    const at = MATH.push({ math: math, u: u }) - 1;
+    return termsHtml(UI.esc(u.text(tm)), keys).replace(/\uE000(\w+)\uE001([^\uE002]*)\uE002/g, (all, id, txt) => math[id]
+      ? '<button type="button" class="num" data-m="' + at + '" data-id="' + id + '" aria-expanded="false">' + txt + '</button>' : txt);
+  }
+  // the block under a paragraph (a glossary definition or a math popover); one at a time per paragraph
+  function closeBelow(para) {
+    const nx = para.nextElementSibling;
+    if (nx && (nx.classList.contains('termdef') || nx.classList.contains('mathpop'))) nx.remove();
+    para.querySelectorAll('button.term[aria-expanded="true"], button.num[aria-expanded="true"]').forEach(x => x.setAttribute('aria-expanded', 'false'));
+  }
+  function closeMath() {
+    let any = false;
+    document.querySelectorAll('.mathpop').forEach(x => { if (x.previousElementSibling) closeBelow(x.previousElementSibling); else x.remove(); any = true; });
+    return any;
+  }
+  document.addEventListener('click', ev => {
+    const t = ev.target && ev.target.closest ? ev.target : null;
+    const b = t && t.closest('button.num');
+    if (!b) { if (t && !t.closest('.mathpop') && !t.closest('button.term')) closeMath(); return; }
+    const reg = MATH[+b.dataset.m], tk = reg && reg.math[b.dataset.id];
+    if (!tk) return;
+    const para = b.closest('p') || b.parentElement, wasOpen = b.getAttribute('aria-expanded') === 'true';
+    closeMath(); closeBelow(para); // one popover on the sheet at a time
+    if (wasOpen) return;
+    const v = FF.Review.mathView ? FF.Review.mathView(tk, reg.u.text) : tk;
+    const s = document.createElement('div');
+    s.className = 'mathpop';
+    s.setAttribute('role', 'note');
+    s.innerHTML = '<b>' + UI.esc(v.title || 'How this was worked out') + '</b>' +
+      (v.words ? '<div class="mwords">' + UI.esc(v.words) + '</div>' : '') +
+      '<div class="mform">' + UI.esc(v.formula) + '</div>' +
+      (v.note ? '<div class="mnote">' + UI.esc(v.note) + '</div>' : '') +
+      (v.source ? '<div class="msrc">Source: ' + UI.esc(v.source) + '</div>' : '') +
+      (v.meaning ? '<div class="mmean">' + UI.esc(v.meaning) + '</div>' : '');
+    para.after(s);
+    b.setAttribute('aria-expanded', 'true');
+  });
   document.addEventListener('click', ev => {
     const b = ev.target && ev.target.closest ? ev.target.closest('button.term') : null;
     if (!b) return;
@@ -164,10 +216,8 @@
     if (!g) return;
     // one definition block per paragraph, placed after the paragraph so the sentence stays whole
     const para = b.closest('p') || b.parentElement;
-    const open = para.nextElementSibling && para.nextElementSibling.classList.contains('termdef') ? para.nextElementSibling : null;
     const wasOpen = b.getAttribute('aria-expanded') === 'true';
-    para.querySelectorAll('button.term[aria-expanded="true"]').forEach(x => x.setAttribute('aria-expanded', 'false'));
-    if (open) open.remove();
+    closeBelow(para);
     if (wasOpen) return;
     const s = document.createElement('div');
     s.className = 'termdef';
@@ -182,7 +232,7 @@
       '<div class="villain"><div class="vhead"><b>' + UI.esc(String(v.name || '').split(' ')[0]) + '</b> <span class="pos">' + UI.esc(v.pos) + '</span>' +
       (v.cards ? ' <span class="vcards">' + UI.cardsText(v.cards) + '</span> <span class="made">' + UI.esc(v.made || '') + '</span>' : v.text ? '' : ' <span class="muted">cards not shown</span>') + '</div>' +
       // v.text is the plain-words paragraph (0.8.4 on); older saved hands keep their range and thinking lines
-      (v.text ? '<p>' + termsHtml(UI.esc(v.text)) + '</p>' : '') +
+      (v.text ? '<p>' + mathHtml(v.text, v.tm, v.math, unitsOf(rv)) + '</p>' : '') +
       (v.rangeText ? '<p>' + termsHtml(UI.esc(v.rangeText)) + '</p>' : '') +
       (v.thinking ? '<p class="thinking">' + termsHtml(UI.esc(v.thinking)) + '</p>' : '') + '</div>').join('') + '</div>';
   }
@@ -200,6 +250,7 @@
   }
   R.render = function () {
     const entry = R.shown; if (!entry) return;
+    MATH = []; // the popover registry belongs to the sheet being drawn
     const rv = entry.rv, m = entry.meta;
     const head = '<div class="rv-head"><div><h3>Hand ' + entry.n + '</h3><div class="rv-sub">' + UI.esc(m.label || '') + '</div></div>' +
       '<button class="btn close-x" id="rv-x" aria-label="Close">✕</button></div>' +
@@ -271,6 +322,6 @@
   R.reset = function () { R.entries.forEach(e => { e.saved = true; }); }; // starts a fresh session; the saved history stays
   R.sessionCount = () => R.entries.filter(e => !e.saved).length;
   document.addEventListener('keydown', ev => {
-    if (ev.key === 'Escape') { if (R.isOpen()) R.close(); else if (drawerKind) R.closeDrawer(); }
+    if (ev.key === 'Escape') { if (closeMath()) return; if (R.isOpen()) R.close(); else if (drawerKind) R.closeDrawer(); }
   });
 })();

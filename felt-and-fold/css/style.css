@@ -3,7 +3,7 @@
   --bg: #0b1812; --panel: #13251c; --panel2: #1a3125; --line: #2a4536; --text: #e7efe9; --muted: #9db3a6;
   --gold: #d9b44a; --gold2: #f0cf6a; --red: #c94a3d; --green: #3fa66b;
   --felt1: #1f6b45; --felt2: #134a2f; --rail: #3a2416;
-  --c-c: #1d7a3a; --c-d: #1f5fbf; --c-h: #c62828; --c-s: #161616;
+  --math: #7fd0e0; --c-c: #1d7a3a; --c-d: #1f5fbf; --c-h: #c62828; --c-s: #161616;
   --g-good: #3fa66b; --g-inacc: #d4b13c; --g-mistake: #e07b30; --g-blunder: #d23d3d;
   /* action colours share nothing with the grade colours: check slate, call blue, bet and raise violet, all in deep violet, fold dark grey */
   --m-fold: #4a5059; --m-check: #7c9ca6; --m-call: #3d7fd6; --m-bet: #a98bec; --m-raise: #8a66dd; --m-allin: #5b35a8;
@@ -258,6 +258,17 @@ table.results tr.me td { color: var(--gold2); font-weight: 700; }
 .termdef { display: block; margin: 5px 0 6px; padding: 6px 9px; font-size: 13px; color: var(--text); background: var(--panel2);
   border: 1px solid var(--line); border-left: 3px solid var(--gold); border-radius: 6px; }
 .termdef b { color: var(--gold2); }
+.num { font: inherit; color: var(--math); background: none; border: none; padding: 0; margin: 0; cursor: pointer; white-space: nowrap;
+  text-decoration: underline dotted; text-decoration-color: var(--math); text-underline-offset: 3px; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+.num[aria-expanded="true"] { text-decoration-style: solid; }
+.num:focus-visible { outline: 2px solid var(--math); outline-offset: 1px; border-radius: 3px; }
+.mathpop { display: block; margin: 5px 0 6px; padding: 7px 9px; font-size: 13px; color: var(--text); background: var(--panel2); max-width: 100%;
+  border: 1px solid var(--line); border-left: 3px solid var(--math); border-radius: 6px; overflow-wrap: anywhere; }
+.mathpop b { color: var(--math); }
+.mathpop .mwords { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.mathpop .mform { font-family: ui-monospace, Consolas, monospace; font-size: 13px; color: #f2f7f4; margin: 3px 0; }
+.mathpop .msrc, .mathpop .mnote { color: #b8cbbf; font-size: 12px; margin-top: 3px; }
+.mathpop .mmean { margin-top: 4px; }
 .recap { margin-top: 14px; }
 .recap h4 { color: var(--gold2); margin-bottom: 6px; }
 .villain { padding: 8px 0; border-bottom: 1px solid #22392d; font-size: 14px; }

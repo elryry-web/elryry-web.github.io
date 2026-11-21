@@ -397,7 +397,7 @@
     if (f.draw.outs || f.draw.backdoor) out.push({ kind: 'draw', label: f.draw.label, outs: f.draw.outs });
     if (ctx.street === 'river' && f.blocker > 0.25) out.push({ kind: 'blocker', score: rd(f.blocker, 2) });
     if (p.kind === 'facing') {
-      out.push({ kind: 'potOdds', need: rd(p.need, 3), have: rd(f.eqR, 3), toCall: rd(p.callAmt / bbv, 1), pot: rd(sp.pot / bbv, 1) });
+      out.push({ kind: 'potOdds', need: rd(p.need, 3), have: rd(f.eqR, 3), toCall: rd(p.callAmt / bbv, 1), pot: rd(sp.pot / bbv, 1), raw: rd(f.eq, 3), R: rd(f.R, 3), imp: rd(implied(ctx, i), 3) });
       out.push({ kind: 'mdf', mdf: rd(p.mdf, 3), defend: rd(p.defend, 3), size: rd(p.s, 2) });
     } else {
       out.push({ kind: 'betSize', size: p.size, amount: rd(p.amount / bbv, 1), jam: p.jam });
@@ -443,7 +443,8 @@
     var callIn = Math.min(to, sp.eff + sp.committed) - sp.currentBet, Rr = ctx.street === 'river' ? 1 : realise(ctx, i);
     var win = potAfter + callIn * ctx.nOpp;
     var ev = resp.fold * pot + (1 - resp.fold) * (eqc * win * Rr - add);
-    return { ev: ev, fold: resp.fold, eqVsCall: eqc };
+    // parts (chips) let the review show the sum: fold x pot + call share x (win share x final pot x realized share - chips added)
+    return { ev: ev, fold: resp.fold, eqVsCall: eqc, parts: { pot: pot, add: add, win: win, R: Rr } };
   }
   function evs(ctx, i, extraTo) {
     var sp = ctx.spec, p = policy(ctx), out = {}, info = {}, bb = sp.bb, R0 = realise(ctx, i), W = sp.W;
@@ -465,6 +466,7 @@
     }
     for (var a in out) out[a] = rd(out[a] / bb, 2);
     if (info.hero) info.hero.evBB = rd(info.hero.ev / bb, 2);
+    info.parts = { eq: ctx.eq[i], R: R0, imp: implied(ctx, i), pot: sp.pot, call: p.kind === 'open' ? 0 : p.callAmt, bb: bb };
     return { ev: out, info: info };
   }
 
@@ -661,7 +663,7 @@
         eqr = eqv(raiseW);
         ev += Rw * Math.max(-add, eqr * (sp.pot + heroTot + vTot) * Rr - heroTot);
       }
-      return { ev: ev, to: to, fold: F, call: Cw, raise: Rw, eqVsCall: eqc, eqVsRaise: eqr };
+      return { ev: ev, to: to, fold: F, call: Cw, raise: Rw, eqVsCall: eqc, eqVsRaise: eqr, parts: { pot: sp.pot, add: add, win: potAfter + callIn, R: Rr, rest: ev - (F * sp.pot + Cw * (eqc * (potAfter + callIn) * Rr - add)) } };
     }
     function narrowed(field) {
       var W = sp.W, r = new Float64Array(NC); for (var k = 0; k < NC; k++) r[k] = W[k] * (pol[field][k] || 0);
@@ -683,6 +685,7 @@
     }
     for (var a in out) out[a] = rd(out[a] / bb, 2);
     if (info.hero) info.hero.evBB = rd(info.hero.ev / bb, 2);
+    info.parts = { eq: eqX, R: R0, imp: imp, pot: sp.pot, call: pol.kind === 'open' ? 0 : pol.callAmt, bb: bb };
     return { ev: out, info: info, eq: eqX, eqBase: ctx.eq[i], villain: v, rangePct: rd(effPct(WX) * 100, 1), basePct: rd(effPct(tr.W[v]) * 100, 1) };
   }
   function rangeOf(h, seat, upto) { var tr = advance(tracker(h), upto); return tr.W[seat] || C.classToCombos(preflopRange(h, seat)); }
@@ -930,7 +933,7 @@
     catch (err) { return Promise.resolve(null); }
   }
 
-  return { setQuality: setQuality, quality: function () { return Q.name; }, texture: texture, draws: draws, describe: describe, eqVs: eqVs, node: node, policy: policy,
+  return { setQuality: setQuality, quality: function () { return Q.name; }, qualityInfo: function () { return { flop: Q.flop, turn: Q.turn, name: Q.name }; }, texture: texture, draws: draws, describe: describe, eqVs: eqVs, node: node, policy: policy,
     comboMix: comboMix, features: features, factorsFor: factorsFor, evs: evs, actionProb: actionProb, BASE: BASE,
     tracker: tracker, advance: advance, rangeOf: rangeOf, preflopRange: preflopRange, specFor: specFor, nodeAt: nodeAt,
     decisionFromEntry: decisionFromEntry, decisionFromLegal: decisionFromLegal, activeSeats: activeSeats,
