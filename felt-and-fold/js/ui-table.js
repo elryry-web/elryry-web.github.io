@@ -6,7 +6,8 @@
   'use strict';
   const FF = window.FF, UI = FF.UI, E = FF.Engine;
   const HERO_COLOR = '#d9b44a';
-  let cur = null, felt = null, bar = null, heroWait = null;
+  let cur = null, felt = null, bar = null, heroWait = null, barRelabel = null;
+  UI.unitListeners.push(() => { if (barRelabel) barRelabel(); });
 
   const Table = UI.Table = {};
   Table.mount = function () {
@@ -78,7 +79,9 @@
       const won = cur.final && h && h.result && h.result.won && h.result.won[s];
       const cls = ['seat', 'slot-' + slot, isHero ? 'hero' : '', !isHero && openRead === p.id ? 'readopen' : '', folded ? 'folded' : '', cur.thinking === s ? 'acting' : '', h && !h.done && h.toAct === s && cur.thinking !== s ? 'to-act' : '',
         won ? 'winner' : '', !inHand ? 'idle' : ''].join(' ');
-      let label = cur.labels[s] || state;
+      // labels keep the action itself so a units flip redraws them
+      const lb = cur.labels[s];
+      let label = (lb && typeof lb === 'object' ? labelText(lb, bb, mode) : lb) || state;
       if (won) label = '+' + UI.amt(won, bb, mode) + (cur.winName[s] ? ' · ' + cur.winName[s] : '');
       else if (cur.final && cur.showName[s] && !folded) label = cur.showName[s];
       html += '<div class="' + cls + '" data-seat="' + s + '">' +
@@ -95,7 +98,7 @@
     });
     if (h) {
       const bslot = slotOf(h.button, hero, t.nSeats);
-      html += '<div class="dealer slot-' + bslot + '">D</div>';
+      html += '<div class="dealer slot-' + bslot + '" title="Button (dealer)">BTN</div>';
       let pot = E.pot(h);
       if (!h.done) h.order.forEach(s => { pot -= h.players[s].committed; });
       const total = E.pot(h);
@@ -141,7 +144,7 @@
     const h = cur.h, mode = (cur.c && cur.c.mode) || h.table.mode, bb = h.bb, a = x => UI.amt(x, bb, mode);
     UI.beep('turn');
     return new Promise(resolve => {
-      const done = act => { heroWait = null; document.removeEventListener('keydown', onKey); hideBar(); resolve(act); };
+      const done = act => { heroWait = null; barRelabel = null; document.removeEventListener('keydown', onKey); hideBar(); resolve(act); };
       heroWait = done;
       let to = L.canRaise ? Math.min(L.maxTo, Math.max(L.minTo, L.street === 'preflop' && L.currentBet <= bb ? Math.round(2.5 * bb) : L.minTo)) : 0;
       const isBet = L.currentBet === 0;
@@ -166,6 +169,9 @@
         szval.textContent = a(to);
         UI.$$('.preset', bar).forEach(b => b.classList.toggle('on', +b.dataset.to === to));
       }
+      // a units flip mid-decision relabels the call and raise buttons
+      const cb = UI.$('.act.call', bar);
+      barRelabel = () => { if (cb) cb.textContent = 'Call ' + a(L.call) + (L.call >= L.stack ? ' (all in)' : ''); upd(); };
       if (sz) sz.oninput = () => { to = Math.min(L.maxTo, Math.max(L.minTo, +sz.value)); if (+sz.value >= L.maxTo - niceStep(bb) / 2) to = L.maxTo; upd(); };
       UI.$$('.preset', bar).forEach(b => b.onclick = () => { to = +b.dataset.to; if (sz) sz.value = to; upd(); });
       UI.$$('.act', bar).forEach(b => b.onclick = () => {
@@ -194,7 +200,7 @@
   async function revealBoard(h, toLen) {
     while (cur.shownBoard < toLen) {
       cur.shownBoard = cur.shownBoard < 3 ? 3 : cur.shownBoard + 1;
-      for (const s in cur.labels) if (!/^All in|^Fold/.test(cur.labels[s])) delete cur.labels[s];
+      for (const s in cur.labels) if (!(cur.labels[s] && (cur.labels[s].type === 'fold' || cur.labels[s].allIn))) delete cur.labels[s];
       UI.beep('deal'); render();
       if (cur.shownBoard < toLen) await UI.wait(1000);
     }
@@ -224,7 +230,7 @@
       const n0 = h.log.length;
       E.act(h, { type: a.type, to: a.to });
       const e = h.log.slice(n0).find(x => x.ev === 'act');
-      cur.labels[seat] = labelText(e, h.bb, c.mode);
+      if (e) cur.labels[seat] = e;
       if (e && e.type !== 'fold' && e.type !== 'check') UI.beep('chip');
       render();
       if (h.board.length > cur.shownBoard) {

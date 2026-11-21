@@ -1000,6 +1000,36 @@
     return 'a medium or weak hand';
   }
   function isSlip(x) { return !!(x && (x.slip || /usual plan/.test(x.vague || ''))); }
+  // The bot's model flagged a slip; the recap calls it a mistake only when the hand really is off the range it describes.
+  // kept: the share of the range the street's play kept. pct and eq (from the note) place the hand in the bot's own range.
+  // A raise with trips that the plan meant to call is no mistake: trips sit at the top of a raising range.
+  function slipStands(x, kept) {
+    if (!x || x.pct == null) return true; // preflop and older notes: the model's flag stands
+    var did = AGG[x.type], from = AGG[x.planned];
+    if (from == null || did === from || x.type === 'fold') return true;
+    if (did > from) return x.pct < 1 - Math.max(1.5 * (kept == null ? 0.3 : kept), 0.15) && !(x.eq >= 0.75);
+    return x.pct >= 0.6 || x.eq >= 0.6; // "only called with something stronger" needs a strong hand
+  }
+  // what a shown slip was made with: "On the flop he had only the board pair." (older notes read "Misjudged X and chose to raise.")
+  function slipHand(x, pr) {
+    var r = String(x.reason || '').trim(), m = /^(?:Misjudged|Raised with|Bet with|Called with|Moved all in with|Checked|Folded) (.+?)(?: and chose [^.]*)?\.$/.exec(r);
+    return m ? cap(STREET_ON[x.street]) + ' ' + pr.he + ' had ' + m[1].replace('no pair of its own', 'only the board pair') + '.' : cap(pr.he) + ' ' + lc(r);
+  }
+  // the share of the player's own range a postflop play kept, in words ("about a third of his hands"); null when tiny
+  var KEPT = [[0.75, 'about three quarters of'], [0.667, 'about two thirds of'], [0.5, 'about half of'], [0.4, 'about 2 in 5 of'],
+    [0.333, 'about a third of'], [0.25, 'about a quarter of'], [0.2, 'about 1 in 5 of']];
+  function keptWords(kept, his) {
+    if (kept < 0.06) return null;
+    if (kept >= 0.9) return 'almost all of ' + his + ' hands';
+    if (kept >= 0.18) { var best = KEPT[0]; KEPT.forEach(function (x) { if (Math.abs(Math.log(kept / x[0])) < Math.abs(Math.log(kept / best[0]))) best = x; }); return best[1] + ' ' + his + ' hands'; }
+    return 'about 1 in ' + Math.round(1 / kept) + ' of ' + his + ' hands';
+  }
+  // "He raises the flop here only with his very best hands." (they raise, they move all in)
+  function keptLine(pr, play, st, kept) {
+    var they = pr.he === 'they', kw = keptWords(kept, pr.his);
+    var verb = play.noun === 'all-in' ? (they ? 'move' : 'moves') + ' all in on the ' + st : play.noun + (they ? '' : 's') + ' the ' + st;
+    return cap(pr.he) + ' ' + verb + ' here ' + (kw ? 'with ' + kw : 'only with ' + pr.his + ' very best hands') + '.';
+  }
   var RANK_LC = C.RANK_NAME.map(function (r) { return r.toLowerCase(); });
   // When the shown hand's made part is all on the board (a board pair, two pair, trips or quads with the same ranks,
   // or a straight, flush or full house that is the board itself), the hole cards only add a kicker, or nothing.
@@ -1029,9 +1059,6 @@
   // A slip is told as the exception to the range sentence.
   function recapText(h, s, heroSeat, v, notes, shows) {
     var name = v.name.split(' ')[0], pr = pronouns(v.name), out = [], show = shows[s], hs = shows[heroSeat];
-    var slipNote = notes.filter(isSlip).pop(), plain = notes.filter(function (x) { return !isSlip(x); });
-    var key = plain.filter(function (x) { return x.type !== 'check' && x.type !== 'fold' && x.street !== 'preflop'; }).pop() || plain[plain.length - 1];
-    if (key && slipNote && key.n < slipNote.n) key = null; // a note from before the slip adds nothing
     var vb = boardMade(show, h.board);
     if (show) {
       var hb = hs ? boardMade(hs, h.board) : null;
@@ -1047,7 +1074,7 @@
     } else out.push(name + ' never showed ' + pr.his + ' cards.');
     // the range: the preflop width, then the one postflop bet or raise that narrowed it most
     var acts = {}; h.log.forEach(function (e) { if (e.ev === 'act' && e.seat === s) (acts[e.street] = acts[e.street] || []).push(e); });
-    var prev = null, best = null, bestCall = null, figSt = 'preflop';
+    var prev = null, best = null, bestCall = null, figSt = 'preflop', keptOn = {};
     ['preflop', 'flop', 'turn', 'river'].forEach(function (st) {
       var p = v.range[st]; if (p == null) return;
       var play = streetPlay(acts[st] || []);
@@ -1056,14 +1083,22 @@
         out.push('Before the flop ' + name + ' ' + pre + shareWords(p) + '.');
       } else if (play && prev) {
         var c = { st: st, p: p, play: play, kept: p / prev };
+        keptOn[st] = c.kept;
         if (AGG[play.type] >= 2) { if (!best || c.kept < best.kept) best = c; }
         else if (play.type === 'call' && (!bestCall || c.kept < bestCall.kept)) bestCall = c;
       }
       prev = p;
     });
+    // a flagged slip whose hand fits the range is no mistake; its note then reads like any other
+    var slipNote = notes.filter(function (x) { return isSlip(x) && slipStands(x, keptOn[x.street]); }).pop();
+    // a dismissed slip's vague note still says "outside the usual plan", so it only counts once the cards are shown
+    var plain = notes.filter(function (x) { return !isSlip(x) || (show && !slipStands(x, keptOn[x.street])); });
+    var key = plain.filter(function (x) { return x.type !== 'check' && x.type !== 'fold' && x.street !== 'preflop'; }).pop() || plain[plain.length - 1];
+    if (key && slipNote && key.n < slipNote.n) key = null; // a note from before the slip adds nothing
     if (best) {
-      var mean = meaning(best.play, best.kept, best.st), w = shareWords(best.p), lead = cap(pr.his) + ' ' + best.st + ' ' + best.play.noun;
-      out.push(/^a wide/.test(mean) && best.p < 15 ? lead + ' can mean many kinds of hands. It left ' + w + '.' : lead + ' usually means ' + mean + ', ' + w + '.');
+      // the meaning, then the share of the player's own range that makes this play (never a share of all hands)
+      var mean = meaning(best.play, best.kept, best.st), lead = cap(pr.his) + ' ' + best.st + ' ' + best.play.noun;
+      out.push((/^a wide/.test(mean) ? lead + ' can mean many kinds of hands.' : lead + ' usually means ' + mean + '.') + ' ' + keptLine(pr, best.play, best.st, best.kept));
       if (!slipNote && show && !vb && madeCat(show.name) >= 2 && best.kept < 0.4) out.push('That fits a ' + best.st + ' ' + best.play.noun + '.');
       figSt = best.st;
     } else if (bestCall) {
@@ -1080,7 +1115,7 @@
       } else how = ' and played differently from ' + pr.his + ' usual pattern.';
       out.push('This time ' + name + ' made a mistake' + when + how);
       // the shown cards already name a preflop hand; a postflop slip's reason adds what the hand was
-      if (show && slipNote.street !== 'preflop') out.push(cap(pr.he) + ' ' + lc(String(slipNote.reason).trim()));
+      if (show && slipNote.street !== 'preflop') out.push(slipHand(slipNote, pr));
       var tier = slipNote.tier;
       out.push(tier === 'Beginner' || tier === 'Casual' ? 'Weaker players do this now and then.' : tier ? 'Even good players do this now and then.' : 'Players make mistakes like this now and then.');
     }

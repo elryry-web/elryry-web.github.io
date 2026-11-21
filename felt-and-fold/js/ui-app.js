@@ -14,6 +14,7 @@
   UI.show = function (name) {
     UI.$$('.screen').forEach(s => s.classList.toggle('on', s.id === 'scr-' + name));
     document.body.dataset.screen = name;
+    if (name === 'table' && UI.unitLabel) UI.unitLabel();
     if (ENTER[name]) ENTER[name]();
     window.scrollTo(0, 0);
   };
@@ -47,7 +48,7 @@
     UI.$$('[data-k]', box).forEach(el => el.onchange = () => {
       UI.settings[el.dataset.k] = el.type === 'checkbox' ? el.checked : el.value;
       UI.saveSettings();
-      UI.Table.render();
+      if (el.dataset.k === 'units') UI.unitListeners.forEach(f => f()); else UI.Table.render();
     });
   }
   UI.openSettings = function () {
@@ -67,6 +68,13 @@
         [{ label: 'Leave', value: 1, cls: 'danger' }, { label: 'Stay', value: 0 }]);
       if (v) UI.Game.leave();
     };
+    // bb or $ (chips in a tournament): one tap flips the setting and every amount on screen
+    const ub = UI.$('#tb-units');
+    const unitLabel = () => { const g = UI.Game.current(); ub.textContent = UI.unitName(g ? g.mode : 'cash'); ub.setAttribute('aria-label', 'Amounts in ' + (ub.textContent === 'bb' ? 'big blinds' : ub.textContent === '$' ? 'dollars' : 'chips') + '. Tap to switch.'); };
+    ub.onclick = UI.toggleUnits;
+    UI.unitListeners.push(unitLabel, () => UI.Table.render());
+    UI.unitLabel = unitLabel;
+    unitLabel();
     UI.$('#tb-hist').onclick = UI.Review.openHistory;
     UI.$('#tb-stats').onclick = UI.Review.openStats;
     UI.$('#tb-set').onclick = UI.openSettings;

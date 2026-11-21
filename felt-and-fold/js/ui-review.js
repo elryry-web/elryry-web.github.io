@@ -21,13 +21,13 @@
   function packDecision(d) {
     return { street: d.street, boardStr: d.boardStr, grade: d.grade, evLost: d.evLost, source: d.source, spot: d.spot, pot: d.pot, toCall: d.toCall,
       did: { action: d.did.action, toBB: d.did.toBB, addBB: d.did.addBB }, hand: d.hand, leak: d.leak, text: d.text, concepts: d.concepts || [],
-      mix: d.mix.filter(m => m.freq >= 0.005).map(m => ({ action: m.action, sizeLabel: m.sizeLabel, freq: r2(m.freq) })),
+      mix: d.mix.filter(m => m.freq >= 0.005).map(m => ({ action: m.action, sizeLabel: m.sizeLabel, freq: r2(m.freq), toBB: m.toBB })),
       exploit: d.exploit ? { gradedBy: d.exploit.gradedBy, name: d.exploit.name, best: d.exploit.best, baseGrade: d.exploit.baseGrade, state: d.exploit.state, plan: d.exploit.plan || null } : null,
       later: d.later || '' };
   }
   function pack(e) {
     const rv = e.rv, rc = rv.recap;
-    return { n: e.n, at: e.at, label: e.meta.label || '', rv: { handId: rv.handId, heroPos: rv.heroPos, heroCards: rv.heroCards, board: rv.board,
+    return { n: e.n, at: e.at, label: e.meta.label || '', rv: { handId: rv.handId, mode: rv.mode, bb: rv.bb, heroPos: rv.heroPos, heroCards: rv.heroCards, board: rv.board,
       net: rv.net, blind: rv.blind || null, worst: rv.worst, clean: rv.clean, evLost: rv.evLost, solved: rv.solved || 0,
       recap: rc ? { villains: rc.villains.map(v => ({ name: v.name, pos: v.pos, cards: v.cards, made: v.made, text: v.text, rangeText: v.rangeText, thinking: v.thinking })) } : null,
       decisions: rv.decisions.map(packDecision) } };
@@ -80,36 +80,68 @@
   };
   R.isOpen = () => !!R.shown;
 
-  function mixBar(mix) {
-    const rows = FF.Review.mixPct(mix); // whole percentages that add up to 100
-    const segs = rows.map(r => '<i class="' + (ACT_CLS[r.m.action] || '') + '" style="width:' + r.pct + '%"></i>').join('');
-    const legend = rows.map(r => '<span><b class="dot ' + (ACT_CLS[r.m.action] || '') + '"></b>' + ACT_NAME[r.m.action] +
-      (r.m.sizeLabel && r.m.action !== 'allin' ? ' ' + UI.esc(r.m.sizeLabel) : '') + ' ' + r.pct + '%</span>').join('');
-    return '<div class="mixbar">' + segs + '</div><div class="mixlegend">' + legend + '</div>';
+  // Amounts in the chosen unit for one review: rv.bb is that hand's big blind in table chips (older saved hands lack it: bb only)
+  function unitsOf(rv) {
+    const bb = rv && rv.bb, mode = rv && rv.mode;
+    return { amt: (x, signed) => UI.bbAmt(x, bb, mode, signed), text: t => UI.bbText(t, bb, mode) };
   }
-  // the balanced bar, and under it the plan the grade follows when the player's real play wants something else
-  function planHtml(d) {
+  // Action colours never reuse a grade colour (green, yellow, orange, red): check slate, call blue, bets and raises violet
+  // (lighter for smaller sizes), all in deep violet, fold dark grey.
+  const AGG_SHADES = ['#cbb8f7', '#a98bec', '#8a66dd'];
+  const isAgg = a => a === 'bet' || a === 'raise';
+  // the segment that is the player's own play: same action, and for a bet or raise the nearest size within 0.55-1.7x
+  function heroIndex(rows, did) {
+    let best = -1, bd = Infinity;
+    rows.forEach((r, i) => {
+      if (r.m.action !== did.action) return;
+      const x = isAgg(did.action) && r.m.toBB > 0 && did.toBB > 0 ? Math.abs(Math.log(did.toBB / r.m.toBB)) : 0;
+      if (x < bd) { bd = x; best = i; }
+    });
+    return best >= 0 && bd <= Math.log(1.7) ? best : -1;
+  }
+  function mixBar(d, u) {
+    const rows = FF.Review.mixPct(d.mix); // whole percentages that add up to 100
+    const agg = rows.map((r, i) => i).filter(i => isAgg(rows[i].m.action)).sort((a, b) => (rows[a].m.toBB || 0) - (rows[b].m.toBB || 0));
+    const shade = {};
+    agg.forEach((i, k) => { shade[i] = AGG_SHADES[agg.length === 1 ? 1 : Math.round(k * 2 / (agg.length - 1))]; });
+    const you = d.did ? heroIndex(rows, d.did) : -1;
+    const style = (i, extra) => ' style="' + (shade[i] ? 'background:' + shade[i] + ';' : '') + (extra || '') + '"';
+    const name = r => ACT_NAME[r.m.action] + (r.m.sizeLabel && r.m.action !== 'allin' ? ' ' + UI.esc(u.text(r.m.sizeLabel)) : '');
+    const segs = rows.map((r, i) => '<i class="' + (ACT_CLS[r.m.action] || '') + (i === you ? ' you' : '') + '"' + style(i, 'width:' + r.pct + '%') + '></i>').join('');
+    let at = 0, mid = null;
+    rows.forEach((r, i) => { if (i === you) mid = at + r.pct / 2; at += r.pct; });
+    const mark = mid != null ? '<span class="youmark" style="left:' + Math.min(94, Math.max(6, mid)) + '%">You</span>' : '';
+    let legend = rows.map((r, i) => '<span' + (i === you ? ' class="you"' : '') + '><b class="dot ' + (ACT_CLS[r.m.action] || '') + '"' + style(i) + '></b>' +
+      (i === you ? 'You: ' : '') + name(r) + ' ' + r.pct + '%</span>').join('');
+    if (you < 0 && d.did) legend += '<span class="you"><b class="dot dot-you"></b>You: ' + UI.esc(didText(d, u).replace(/ \([^)]*\)$/, '')) + ' (0%)</span>';
+    return '<div class="mixrow"><span class="mixlab">Baseline:</span><div class="mixcol' + (mark ? ' marked' : '') + '">' + mark + '<div class="mixbar">' + segs + '</div></div></div>' +
+      '<div class="mixlegend">' + legend + '</div>';
+  }
+  // the baseline bar, and under it the plan the grade follows when the player's real play wants something else
+  function planHtml(d, u) {
     const x = d.exploit, p = x && x.gradedBy === 'exploit' && x.plan;
-    if (!p) return mixBar(d.mix);
-    return '<div class="ddid muted">Balanced:</div>' + mixBar(d.mix) +
-      '<div class="ddid"><span class="muted">vs ' + UI.esc(x.name) + ':</span> <b>' + UI.esc(p.label) + '</b></div>';
+    if (!p) return mixBar(d, u);
+    return mixBar(d, u) + '<div class="ddid"><span class="muted">vs ' + UI.esc(x.name) + ':</span> <b>' + UI.esc(u.text(p.label)) + '</b></div>';
   }
   // "Bet half pot (6.5 bb)", "Raise to 3x (19.5 bb)", "All-in (48 bb)"; preflop "Raise to 4.7 bb" (see FF.Review.didLabel)
-  function didText(d) { return FF.Review.didLabel(d, x => UI.trim(x, 1) + ' bb'); }
+  function didText(d, u) { return FF.Review.didLabel(d, x => u ? u.amt(x) : UI.trim(x, 1) + ' bb'); }
   function decisionHtml(d, entry) {
-    const pending = entry.solving && d.source === 'Estimate' && d.street !== 'preflop';
+    const u = unitsOf(entry.rv), pending = entry.solving && d.source === 'Estimate' && d.street !== 'preflop';
     const board = d.boardStr ? '<span class="dboard">' + UI.cardsText(d.boardStr) + '</span>' : '';
     return '<div class="decision">' +
       '<div class="dhead"><span class="street">' + d.street.charAt(0).toUpperCase() + d.street.slice(1) + '</span>' + board +
       '<span class="grade ' + GRADE_CLS[d.grade] + '">' + d.grade + '</span>' +
-      (d.evLost > 0 ? '<span class="evlost">-' + UI.trim(d.evLost, 2) + ' bb</span>' : '') +
+      (d.evLost > 0 ? '<span class="evlost">-' + evAmt(d.evLost, u) + '</span>' : '') +
       '<span class="src src-' + d.source.toLowerCase() + '" title="' + UI.esc(SOURCE_TIP[d.source] || '') + '">' + d.source + '</span>' +
       (pending ? '<span class="solving">solving…</span>' : '') + '</div>' +
-      '<div class="dspot">' + UI.esc(d.spot) + '. Pot ' + UI.trim(d.pot, 1) + ' bb' + (d.toCall ? ', ' + UI.trim(d.toCall, 1) + ' bb to call' : '') + '.</div>' +
-      '<div class="ddid">You: <b>' + UI.esc(didText(d)) + '</b>' + (d.hand ? ' with ' + UI.esc(d.hand) : '') + '</div>' +
-      planHtml(d) +
-      '<p class="dtext">' + termsHtml(UI.esc(d.text), d.concepts) + '</p>' +
-      (d.later ? '<p class="dlater">' + UI.esc(d.later) + '</p>' : '') + '</div>';
+      '<div class="dspot">' + UI.esc(u.text(d.spot)) + '. Pot ' + u.amt(d.pot) + (d.toCall ? ', ' + u.amt(d.toCall) + ' to call' : '') + '.</div>' +
+      '<div class="ddid">You: <b>' + UI.esc(didText(d, u)) + '</b>' + (d.hand ? ' with ' + UI.esc(d.hand) : '') + '</div>' +
+      planHtml(d, u) +
+      '<p class="dtext">' + termsHtml(UI.esc(u.text(d.text)), d.concepts) + '</p>' +
+      (d.later ? '<p class="dlater">' + UI.esc(u.text(d.later)) + '</p>' : '') + '</div>';
+  }
+  // an EV figure: two decimals in bb, the unit's own rounding otherwise
+  function evAmt(x, u) { return UI.settings.units === 'bb' ? UI.trim(x, 2) + ' bb' : u.amt(x);
   }
   // the first mention of each concept the reason names becomes a button that opens its definition in place
   function termsHtml(html, keys) {
@@ -159,7 +191,7 @@
   }
   // the hand's result: green or red, or muted grey with '(blind)' when only the forced chips were lost
   function netHtml(rv, label) {
-    const txt = FF.Review.netLabel ? FF.Review.netLabel(rv) : UI.bbs(rv.net);
+    const txt = unitsOf(rv).text(FF.Review.netLabel ? FF.Review.netLabel(rv) : UI.bbs(rv.net));
     return '<span class="net ' + (rv.blind ? 'muted' : rv.net >= 0 ? 'pos-net' : 'neg-net') + '">' +
       (label ? '<span class="muted" style="font-weight:400">Result</span> ' : '') + UI.esc(txt) + '</span>';
   }
@@ -172,7 +204,7 @@
       (rv.board ? ' <span class="muted">board</span> <span class="vcards">' + UI.cardsText(rv.board) + '</span>' : '') +
       netHtml(rv, true) + '</div>' +
       '<div class="rv-grade"><span class="grade ' + GRADE_CLS[rv.worst] + '">' + (rv.clean ? 'Clean hand' : 'Worst: ' + rv.worst) + '</span>' +
-      (rv.evLost > 0 ? '<span class="evlost">EV lost ' + UI.trim(rv.evLost, 2) + ' bb</span>' : '') +
+      (rv.evLost > 0 ? '<span class="evlost">EV lost ' + evAmt(rv.evLost, unitsOf(rv)) + '</span>' : '') +
       (entry.solving ? '<span class="solving">Checking with the solver…</span>' : rv.solved ? '<span class="muted">' + rv.solved + ' solver answer' + (rv.solved > 1 ? 's' : '') + '</span>' : '') + '</div>';
     let body;
     if (rv.clean && !entry.expanded) {
@@ -213,17 +245,26 @@
     });
   };
   R.openStats = function () {
-    const s = FF.Review.session(R.entries.filter(e => !e.saved).map(e => e.rv)); // this visit only; older hands stay in the history
+    const rvs = R.entries.filter(e => !e.saved).map(e => e.rv), s = FF.Review.session(rvs); // this visit only; older hands stay in the history
+    // dollars or chips need one table's big blind: hands from one cash stake share it; tournament levels and mixed tables add up hand by hand
+    const sameBB = rvs.length && rvs.every(r => r.bb && r.mode === rvs[0].mode && (r.mode !== 'cash' || r.bb === rvs[0].bb));
+    let netTxt = UI.bbs(s.net), evTxt = UI.trim(s.evLostPer100, 1) + ' bb';
+    if (UI.settings.units !== 'bb' && sameBB) {
+      const chips = rvs.reduce((a, r) => a + r.net * r.bb, 0), mode = rvs[0].mode;
+      netTxt = (chips > 0 ? '+' : '') + UI.amt(Math.round(chips), rvs[0].bb, mode, true);
+      if (mode === 'cash') evTxt = UI.amt(Math.round(s.evLostPer100 * rvs[0].bb), rvs[0].bb, mode, true);
+    }
     let html = '<div class="stats-grid">' +
       '<div><b>' + s.hands + '</b><span>hands reviewed</span></div>' +
-      '<div><b class="' + (s.net >= 0 ? 'pos-net' : 'neg-net') + '">' + UI.bbs(s.net) + '</b><span>net</span></div>' +
-      '<div><b>' + UI.trim(s.evLostPer100, 1) + ' bb</b><span>EV lost per 100 hands</span></div>' +
+      '<div><b class="' + (s.net >= 0 ? 'pos-net' : 'neg-net') + '">' + netTxt + '</b><span>net</span></div>' +
+      '<div><b>' + evTxt + '</b><span>EV lost per 100 hands</span></div>' +
       '<div><b>' + s.clean + '</b><span>clean hands</span></div></div>' +
       '<div class="gradecount">' + ['Good', 'Inaccuracy', 'Mistake', 'Blunder'].map(g => '<span class="grade ' + GRADE_CLS[g] + '">' + g + ' ' + s.grades[g] + '</span>').join('') + '</div>';
-    html += '<h4>Top leaks</h4>' + (s.leaks.length ? '<ol class="leaks">' + s.leaks.slice(0, 5).map(x => '<li>' + UI.esc(x.text) + '</li>').join('') + '</ol>' : '<p class="muted">No leaks found yet.</p>');
-    if (s.exploitLeaks.length) html += '<h4>Against this table&rsquo;s players</h4><ol class="leaks">' + s.exploitLeaks.slice(0, 3).map(x => '<li>' + UI.esc(x.text) + '</li>').join('') + '</ol>';
+    html += '<h4>Top leaks</h4>' + (s.leaks.length ? '<ol class="leaks">' + s.leaks.slice(0, 5).map(x => '<li>' + UI.esc(sameBB ? UI.bbText(x.text, rvs[0].bb, rvs[0].mode) : x.text) + '</li>').join('') + '</ol>' : '<p class="muted">No leaks found yet.</p>');
+    if (s.exploitLeaks.length) html += '<h4>Against this table&rsquo;s players</h4><ol class="leaks">' + s.exploitLeaks.slice(0, 3).map(x => '<li>' + UI.esc(sameBB ? UI.bbText(x.text, rvs[0].bb, rvs[0].mode) : x.text) + '</li>').join('') + '</ol>';
     openDrawer('stats', 'Session stats', html);
   };
+  UI.unitListeners.push(() => { if (R.shown) R.render(); refreshLists(); });
   R.reset = function () { R.entries.forEach(e => { e.saved = true; }); }; // starts a fresh session; the saved history stays
   R.sessionCount = () => R.entries.filter(e => !e.saved).length;
   document.addEventListener('keydown', ev => {

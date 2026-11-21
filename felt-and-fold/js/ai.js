@@ -339,7 +339,8 @@
     var chosen = pick(mix, r()), slip = false, planned = chosen;
     if (tier.mistake && r() < tier.mistake) { // a slip: a plausible wrong action
       var alt = mix.length > 1 ? mix.slice().sort(function (a, b) { return a.freq - b.freq; })[0] : null;
-      if (alt && alt !== chosen) { chosen = alt; slip = true; }
+      // an alternative the plan itself takes 15% of the time or more is a mixed play, not a slip
+      if (alt && alt !== chosen) { chosen = alt; slip = alt.freq < 0.15; }
       else if (L.toCall && chosen.action !== 'call') { chosen = { action: 'call', to: 0, freq: 0 }; slip = true; }
     }
     var act = toEngine(chosen, L), maxF = mix.reduce(function (m, x) { return Math.max(m, x.freq); }, 0);
@@ -350,7 +351,9 @@
     var notes = h.botNotes || (h.botNotes = []);
     // slip and planned (the action the bot meant to take) let the recap say which way the mistake went
     notes.push({ n: h.log.length, seat: seat, id: ag.id, tier: ag.tier, street: street, type: act.type, reason: act.reason, vague: vagueReason(act, res, street, L, slip),
-      slip: slip, planned: slip ? toEngine(planned, L).type : null });
+      slip: slip, planned: slip ? toEngine(planned, L).type : null,
+      // where the hand sat in the bot's own range (0 weakest, 1 best) and its equity: the recap checks a slip against them
+      pct: res && res.feat ? Math.round(res.feat.pct * 1000) / 1000 : null, eq: res && res.feat ? Math.round(res.feat.eq * 1000) / 1000 : null });
     return act;
   }
 
@@ -388,6 +391,8 @@
     if (t === 'call') return 'Called with ' + cls + ' at a price of ' + pct(L.toCall ? L.call / (L.pot + L.call) : 0) + '.';
     return verb + ' with ' + cls + (f.eq < 0.35 && f.draw.outs < 8 ? ' as a bluff.' : '.');
   }
+  // a hand label for a bot's note: "no pair of its own" would read as the player's "its"
+  function botHand(label) { return String(label).replace('no pair of its own', 'only the board pair'); }
   function reasonFor(ag, h, seat, L, act, res, street, slip) {
     var t = act.type;
     if (street === 'preflop') {
@@ -399,8 +404,9 @@
       if (t === 'allin') return 'Moved all in with ' + cls + '.';
       return 'Raised with ' + cls + '.';
     }
-    var f = res.feat, hand = f.hand.label, need = L.toCall ? L.call / (L.pot + L.call) : 0;
-    if (slip) return 'Misjudged ' + hand + ' and chose ' + (t === 'allin' ? 'to move all in' : t === 'raise' ? 'to raise' : t === 'bet' ? 'to bet' : 'to ' + t) + '.';
+    var f = res.feat, hand = botHand(f.hand.label), need = L.toCall ? L.call / (L.pot + L.call) : 0;
+    // a slip names the action and the hand; the recap says which way it went
+    if (slip) return { fold: 'Folded', check: 'Checked', call: 'Called with', bet: 'Bet with', raise: 'Raised with', allin: 'Moved all in with' }[t] + ' ' + hand + '.';
     if (t === 'fold') return 'Folded ' + hand + '. The price was ' + pct(need) + ' and the hand had about ' + pct(f.eq) + '.';
     if (t === 'call') return f.draw.outs >= 8 && f.eq < 0.5 ? 'Called with a ' + f.draw.label + ' (' + f.draw.outs + ' outs).' : 'Called with ' + hand + '. The price was ' + pct(need) + ' and the hand had about ' + pct(f.eq) + '.';
     if (t === 'check') return f.eq > 0.75 ? 'Checked ' + hand + ' to keep weaker hands in.' : 'Checked ' + hand + '.';

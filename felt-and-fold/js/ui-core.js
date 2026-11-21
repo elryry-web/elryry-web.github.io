@@ -56,7 +56,9 @@
   // chips are cents at cash tables and plain chips in tournaments
   UI.round1 = x => Math.round(x * 10) / 10;
   UI.trim = function (x, d) { const s = x.toFixed(d); return s.indexOf('.') >= 0 ? s.replace(/\.?0+$/, '') : s; };
-  UI.money = function (cents) { const d = cents / 100; return (d < 0 ? '-$' : '$') + (Math.abs(d) >= 1000 || Math.abs(d) === Math.round(Math.abs(d)) ? Math.abs(d).toLocaleString('en-US', { maximumFractionDigits: 2 }) : Math.abs(d).toFixed(2)); };
+  // "$13", "$1.25", "$1,250.50": cents only when needed
+  UI.money = function (cents) { const c = Math.round(cents), d = Math.abs(c) / 100, whole = c % 100 === 0;
+    return (c < 0 ? '-$' : '$') + d.toLocaleString('en-US', { minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: whole ? 0 : 2 }); };
   UI.dollars = function (d) { return (d < 0 ? '-$' : '$') + Math.abs(d).toLocaleString('en-US', { maximumFractionDigits: 2 }); };
   // amount in table chips -> text, in bb or chips per setting
   UI.amt = function (chips, bb, mode, forceChips) {
@@ -65,6 +67,26 @@
     return Math.round(chips).toLocaleString('en-US');
   };
   UI.bbs = function (x) { return (x > 0 ? '+' : '') + UI.trim(x, 1) + ' bb'; };
+  // the unit the amounts show in: 'bb', or '$' at cash tables and 'chips' in tournaments
+  UI.unitName = mode => UI.settings.units === 'bb' ? 'bb' : mode === 'cash' ? '$' : 'chips';
+  // a figure in big blinds (the review's unit) in the chosen unit; bbChips is that hand's big blind in table chips
+  UI.bbAmt = function (x, bbChips, mode, signed) {
+    const plus = signed && x > 0 ? '+' : '';
+    if (UI.settings.units === 'bb' || !bbChips) return plus + UI.trim(x, 1) + ' bb';
+    return plus + UI.amt(Math.round(x * bbChips), bbChips, mode, true);
+  };
+  // review text with "6.5 bb" / "6.5bb" figures in the chosen unit; a Nash stack depth ("At about 12bb") stays in bb
+  UI.bbText = function (text, bbChips, mode) {
+    if (UI.settings.units === 'bb' || !bbChips || !text) return text;
+    return String(text).replace(/(At about |At )?(-?\d+(?:\.\d+)?) ?bb\b/g, (all, at, n) => at ? all : UI.bbAmt(+n, bbChips, mode));
+  };
+  // flips bb and chips/dollars at once; listeners redraw what they own
+  UI.unitListeners = [];
+  UI.toggleUnits = function () {
+    UI.settings.units = UI.settings.units === 'bb' ? 'chips' : 'bb';
+    UI.saveSettings();
+    UI.unitListeners.forEach(f => { try { f(); } catch (e) { console.error(e); } });
+  };
 
   // ---------------------------------------------------------------- cards
   const SUIT_SYM = ['♣', '♦', '♥', '♠'], SUIT_CLS = ['c', 'd', 'h', 's'], RANK_TXT = '23456789TJQKA';

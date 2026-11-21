@@ -5,7 +5,8 @@
   --felt1: #1f6b45; --felt2: #134a2f; --rail: #3a2416;
   --c-c: #1d7a3a; --c-d: #1f5fbf; --c-h: #c62828; --c-s: #161616;
   --g-good: #3fa66b; --g-inacc: #d4b13c; --g-mistake: #e07b30; --g-blunder: #d23d3d;
-  --m-fold: #66707f; --m-check: #3fa66b; --m-call: #3b82c4; --m-bet: #e0a030; --m-raise: #e07b30; --m-allin: #c0392b;
+  /* action colours share nothing with the grade colours: check slate, call blue, bet and raise violet, all in deep violet, fold dark grey */
+  --m-fold: #4a5059; --m-check: #7c9ca6; --m-call: #3d7fd6; --m-bet: #a98bec; --m-raise: #8a66dd; --m-allin: #5b35a8;
   --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 * { box-sizing: border-box; }
@@ -114,8 +115,15 @@ table.results tr.me td { color: var(--gold2); font-weight: 700; }
 }
 .slot-0.bet { left: 50%; top: 66%; } .slot-1.bet { left: 27%; top: 61%; } .slot-2.bet { left: 27%; top: 38%; }
 .slot-3.bet { left: 50%; top: 30%; } .slot-4.bet { left: 73%; top: 38%; } .slot-5.bet { left: 73%; top: 61%; }
-.slot-0.dealer { left: 61%; top: 72%; } .slot-1.dealer { left: 21%; top: 54%; } .slot-2.dealer { left: 21%; top: 44%; }
-.slot-3.dealer { left: 40%; top: 25%; } .slot-4.dealer { left: 79%; top: 44%; } .slot-5.dealer { left: 79%; top: 54%; }
+/* the button disc hugs its own seat's plate on the felt side (beside the plate, nudged toward the pot), so it never
+   sits between two seats or on the bet chips; offsets grow with the table (--s) */
+.dealer { --ds: var(--s, 1); }
+.slot-0.dealer { left: calc(50% + 100px * var(--ds)); top: calc(88% + 14px * var(--ds)); }
+.slot-3.dealer { left: calc(50% + 100px * var(--ds)); top: calc(10% + 30px * var(--ds)); }
+.slot-1.dealer { left: calc(11% + 102px * var(--ds)); top: calc(69% + 16px * var(--ds)); }
+.slot-2.dealer { left: calc(11% + 102px * var(--ds)); top: calc(28% + 28px * var(--ds)); }
+.slot-4.dealer { left: calc(89% - 102px * var(--ds)); top: calc(28% + 28px * var(--ds)); }
+.slot-5.dealer { left: calc(89% - 102px * var(--ds)); top: calc(69% + 16px * var(--ds)); }
 .hole { display: flex; gap: 3px; height: 50px; margin-bottom: -10px; position: relative; z-index: 1; }
 .seat.hero .hole { height: 66px; margin-bottom: -12px; }
 .plate { position: relative; z-index: 2; display: flex; align-items: center; gap: 7px; background: rgba(10,22,16,.92); border: 1px solid #2f4d3d; border-radius: 30px; padding: 4px 12px 4px 4px; min-width: 120px; box-shadow: 0 4px 12px rgba(0,0,0,.35); }
@@ -150,7 +158,7 @@ table.results tr.me td { color: var(--gold2); font-weight: 700; }
 @keyframes pulse { from { box-shadow: 0 0 0 2px rgba(217,180,74,.25); } to { box-shadow: 0 0 0 5px rgba(217,180,74,.45); } }
 .bet { display: flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 700; background: rgba(0,0,0,.35); padding: 1px 8px 1px 3px; border-radius: 12px; z-index: 2; white-space: nowrap; }
 .chip { width: 14px; height: 14px; border-radius: 50%; background: radial-gradient(circle, #e9d9a0 0 35%, #b8452f 36% 100%); border: 2px dashed #f3e7c4; display: inline-block; }
-.dealer { width: 22px; height: 22px; border-radius: 50%; background: #f4f1e6; color: #222; font-weight: 800; font-size: 12px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,.5); z-index: 2; }
+.dealer { width: 30px; height: 30px; border-radius: 50%; background: #f4f1e6; color: #222; font-weight: 800; font-size: 10px; letter-spacing: .3px; line-height: 1; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,.5); z-index: 2; }
 .center { left: 50%; top: 48%; display: flex; flex-direction: column; align-items: center; gap: 6px; z-index: 1; }
 .pot { font-weight: 700; font-size: 15px; min-height: 20px; color: #f4ecd0; }
 .pot .tot { color: var(--muted); font-weight: 500; font-size: 13px; }
@@ -220,8 +228,19 @@ table.results tr.me td { color: var(--gold2); font-weight: 700; }
 .street { font-weight: 800; }
 .dspot { color: var(--muted); font-size: 13px; }
 .ddid { margin: 3px 0 6px; }
+.mixrow { display: flex; align-items: flex-end; gap: 8px; }
+.mixlab { font-size: 12px; color: var(--muted); line-height: 12px; flex: none; }
+.mixcol { flex: 1; position: relative; min-width: 0; }
+.mixcol.marked { padding-top: 15px; }
+.youmark { position: absolute; top: 0; transform: translateX(-50%); font-size: 10.5px; font-weight: 800; line-height: 12px; color: #fff; white-space: nowrap; }
+.youmark::after { content: ''; position: absolute; left: 50%; top: 12px; margin-left: -4px; border: 4px solid transparent; border-top-color: #fff; border-bottom: 0; }
 .mixbar { display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: #22392d; }
 .mixbar i { display: block; height: 100%; }
+.mixbar i + i { box-shadow: inset 1px 0 0 rgba(0,0,0,.45); }
+.mixbar i.you { box-shadow: inset 0 0 0 2px #fff; }
+.mixlegend .you { color: #fff; font-weight: 700; }
+.dot-you { background: transparent; border: 2px solid #fff; width: 9px; height: 9px; box-sizing: border-box; }
+.tbar .btn.units { min-width: 44px; font-weight: 700; }
 .m-fold { background: var(--m-fold); } .m-check { background: var(--m-check); } .m-call { background: var(--m-call); }
 .m-bet { background: var(--m-bet); } .m-raise { background: var(--m-raise); } .m-allin { background: var(--m-allin); }
 .mixlegend { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 12px; color: #c9d6ce; margin: 4px 0 6px; }
@@ -280,7 +299,8 @@ body.art-backs .card.back { border: none; background: url(../art/backs/oxblood.w
 body.art-backs[data-back="vines"] .card.back { background-image: url(../art/backs/vines.webp); background-color: #22402a; }
 body.art-backs[data-back="rosette"] .card.back { background-image: url(../art/backs/rosette.webp); background-color: #1d2a4a; }
 body.art-backs[data-back="deco"] .card.back { background-image: url(../art/backs/deco.webp); background-color: #222; }
-body.art-markers .dealer { width: 28px; height: 28px; color: transparent; background: url(../art/markers/dealer.webp) center / contain no-repeat; box-shadow: none; filter: drop-shadow(0 2px 2px rgba(0,0,0,.55)); }
+/* the marker art has a baked-in D, so the disc is drawn here in its colours and reads BTN like the seat tags */
+body.art-markers .dealer { width: 32px; height: 32px; color: #3b2a12; font-family: Georgia, 'Times New Roman', serif; font-size: 10.5px; background: radial-gradient(circle, #f6edd6 0 58%, #e9dcb8 70%); border: 2.5px solid #b08a4a; box-shadow: inset 0 0 0 1.5px #f6edd6, inset 0 0 0 2.5px #c9a463, 0 2px 4px rgba(0,0,0,.55); }
 .chips { display: inline-flex; align-items: center; padding-left: 2px; }
 .chips img { width: 28px; height: 28px; margin-left: -18px; filter: drop-shadow(0 1px 1px rgba(0,0,0,.6)); }
 .chips img:first-child { margin-left: 0; }
@@ -335,9 +355,10 @@ body.art-markers .dealer { width: 28px; height: 28px; color: transparent; backgr
   .slot-1.bet, .slot-2.bet { left: calc(15% + 38px); transform: translate(0, -50%); }
   .slot-4.bet, .slot-5.bet { left: calc(85% - 38px); transform: translate(-100%, -50%); }
   .slot-1.bet, .slot-5.bet { top: calc(72% - 36px); } .slot-2.bet, .slot-4.bet { top: calc(33.5% - 36px); }
-  .slot-0.dealer { left: calc(50% + 62px); top: calc(86% - 30px); } .slot-3.dealer { left: calc(50% - 78px); top: max(9%, 52px); }
-  .slot-1.dealer { left: calc(15% + 62px); top: calc(72% + 40px); } .slot-2.dealer { left: calc(15% + 78px); top: 33.5%; }
-  .slot-4.dealer { left: calc(85% - 78px); top: 33.5%; } .slot-5.dealer { left: calc(85% - 62px); top: calc(72% + 40px); }
+  /* the button disc sits level with its own plate, on the side facing the pot (bottom seats: never down toward the hero) */
+  .slot-0.dealer { left: calc(50% + 72px); top: calc(86% + 10px); } .slot-3.dealer { left: calc(50% + 72px); top: max(9%, 52px); }
+  .slot-1.dealer { left: calc(15% + 74px); top: 72%; } .slot-2.dealer { left: calc(15% + 74px); top: 33.5%; }
+  .slot-4.dealer { left: calc(85% - 74px); top: 33.5%; } .slot-5.dealer { left: calc(85% - 74px); top: 72%; }
   .bet { font-size: 12px; gap: 4px; }
   .center { top: 53%; width: max-content; gap: 4px; }
   .pot { white-space: nowrap; }
@@ -347,7 +368,7 @@ body.art-markers .dealer { width: 28px; height: 28px; color: transparent; backgr
   .pstk { display: none; } /* phone: the stack number is enough */
   .pot .pile { display: none; } /* phone: the pot line stays narrow so bets beside it never overlap */
   .chips img { width: 16px; height: 16px; margin-left: -10px; }
-  body.art-markers .dealer { width: 24px; height: 24px; }
+  .dealer, body.art-markers .dealer { width: 28px; height: 28px; font-size: 9.5px; }
   body.art-title .title-wrap { padding-top: 24vh; }
   body.art-title #scr-title { background: linear-gradient(180deg, rgba(11,24,18,.35) 0%, rgba(11,24,18,.75) 60%, var(--bg) 100%) 50% 0 / 100% 64vh no-repeat,
     url(../art/title.webp) 50% 0 / auto 64vh no-repeat var(--bg); }
