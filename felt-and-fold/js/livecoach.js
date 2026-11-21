@@ -86,16 +86,28 @@
       note: 'The price of the call: the chips you put in against the pot you can win.', source: 'The bet and pot on the table.', meaning: 'A call breaks even when the hand wins this often.' });
     return { need: need, tm: 'It costs ' + bbs(call / h.bb) + ' to call into a pot of ' + bbs(pot / h.bb) + '. The pot odds ask for ' + t + ' equity.' };
   }
+  // a beginner's open size, when the opener is the villain and the hero knows the profile (a practice setup, or the read or
+  // table prior in opts.reads). Only the size on the table and that profile feed it.
+  function sizeTellFor(h, seat, v, opts) {
+    if (v == null || h.street !== 'preflop' || !AI || !AI.openSize) return null;
+    var p = h.players[v], pr = opts.profiles && opts.profiles[p.id], r = !opts.readsOff && opts.reads && opts.reads[p.id];
+    var tier = pr && pr.tier ? pr.tier : r && r.profile ? r.profile.tier : null;
+    if (tier !== 'Beginner') return null;
+    var o = AI.openSize(h, v, h.log.length);
+    return o && o.kind ? o : null;
+  }
   // the hand's class and its equity against what the opponents' betting says they hold
-  function handInfo(h, seat, L, opp, v, M) {
+  function handInfo(h, seat, L, opp, v, M, tell) {
     var p = h.players[seat], a = p.hole[0], b = p.hole[1], st = h.street, o = { eq: null, kind: null, draw: null };
     if (st === 'preflop') {
       var cls = C.classOfCards(a, b), name = C.CLASS_NAME[cls], aggr = h.log.some(function (e) { return e.ev === 'act' && e.street === 'preflop' && e.seat === v && e.type !== 'fold'; });
       var vs, eq;
       if (v != null && aggr) {
-        var f = S.preflopRange(h, v, h.log.length); eq = R.eqVsRange(f)[cls];
+        var f = S.preflopRange(h, v, h.log.length);
+        if (tell) f = AI.sizeRange(f, tell.kind); // a beginner's big open keeps mostly strong hands, a small one drops them
+        eq = R.eqVsRange(f)[cls];
         var raised = h.log.some(function (e) { return e.ev === 'act' && e.street === 'preflop' && e.seat === v && isAgg(e); });
-        vs = first(h.players[v].name) + (raised ? '\'s raising range' : '\'s calling range');
+        vs = first(h.players[v].name) + (tell ? '\'s range for a ' + tell.kind + ' open' : raised ? '\'s raising range' : '\'s calling range');
       } else { eq = R.vsRandom()[cls]; vs = 'one random hand'; }
       o.eq = eq; o.kind = 'preflop'; o.name = name; o.short = name;
       o.tm = 'You hold ' + name + '. It has about ' + M.tok(pc(eq), eqMath(eq, vs)) + ' equity against ' + vs + '.';
@@ -109,9 +121,25 @@
       o.eq = e; o.kind = ds.kind; o.draw = dr && dr.label && dr.outs > 0 ? dr : null;
       var drawTxt = o.draw ? 'a ' + o.draw.label + ' (' + o.draw.outs + ' outs)' : '';
       var made = ds.kind === 'air' ? (o.draw ? drawTxt + ', with ' + ds.label + ' for now' : 'nothing made yet (' + ds.label + ')') : ds.label + (o.draw ? ' plus ' + drawTxt : '');
-      vs = ctx.nOpp > 1 ? 'the likely ranges of the ' + NUM[ctx.nOpp] + ' players still in' : first(h.players[v].name) + '\'s likely range';
+      vs = ctx.nOpp > 1 ? (ctx.nOpp === 2 ? 'both players\' likely ranges at once' : 'all ' + NUM[ctx.nOpp] + ' players\' likely ranges at once') : first(h.players[v].name) + '\'s likely range';
       o.short = (ds.kind === 'air' ? (o.draw ? '' : ds.label) : ds.label) + (o.draw ? (ds.kind === 'air' ? '' : ' + ') + o.draw.label : '');
       o.tm = 'You have ' + made + '. That is about ' + M.tok(pc(e), eqMath(e, vs)) + ' equity against ' + vs + '.';
+      if (ctx.nOpp > 1) o.tm += ' One hand has to beat every player still in.';
+      // facing a bet before the river: weak pairs, weak draws and hands out of position win less than the raw number
+      var weakPair = ds.kind === 'underpair' || ds.kind === 'midpair' || ds.kind === 'lowpair', weakDraw = ds.kind === 'air' && !!o.draw && o.draw.outs < 8;
+      var oop = !!(ctx.spec && ctx.spec.ip === false);
+      if (L.toCall > 0 && st !== 'river' && (weakPair || weakDraw || oop) && S.realise) {
+        var Rk = S.realise(ctx, i), re = e * Rk;
+        var why = weakPair ? 'Weak pairs win less often than this number says. They often fold to later bets.'
+          : weakDraw ? 'Weak draws win less often than this number says. They often miss and fold to later bets.'
+          : 'Out of position, a hand wins less often than this number says. You act first on every later street.';
+        if ((weakPair || weakDraw) && oop) why += ' Out of position it keeps even less.';
+        o.tm += ' ' + why + ' In practice this hand gets closer to ' + M.tok(pc(re), { title: 'Realized equity', words: 'raw equity × share you keep',
+          formula: pc(e) + ' × ' + rd(Rk, 2) + ' = ' + pc(re),
+          note: 'Raw equity is how often the hand wins if all the cards come out. A hand rarely keeps all of it, and out of position it keeps less. Weak hands keep less again.',
+          source: 'The same share the review uses for this spot.', meaning: 'The part of its raw equity the hand wins once more bets come.' }) + '.';
+        o.realized = re;
+      }
     } finally { S.setQuality(q); }
     return o;
   }
@@ -169,7 +197,10 @@
   function panel(h, seat, opts) {
     opts = opts || {};
     var L = E.legal(h, seat), opp = opponents(h, seat), v = villainOf(h, seat, L), M = Mx();
-    var pr = price(h, L, M), hi = handInfo(h, seat, L, opp, v, M), rdI = readInfo(h, seat, v, opts);
+    var tell = sizeTellFor(h, seat, v, opts);
+    var pr = price(h, L, M), hi = handInfo(h, seat, L, opp, v, M, tell), rdI = readInfo(h, seat, v, opts);
+    if (tell) rdI.text += ' ' + (rdI.name || 'They') + ' opened to ' + bbs(tell.toBB) + '. A normal open here is ' + bbs(tell.std) + '. '
+      + (tell.kind === 'big' ? 'Beginners usually open bigger with strong hands.' : 'Beginners usually open smaller with weaker hands.');
     var lines = [{ k: 'sit', label: 'Situation', tm: situation(h, seat, L, opp, v) }];
     if (pr) lines.push({ k: 'price', label: 'Price', tm: pr.tm });
     lines.push({ k: 'hand', label: 'Hand', tm: hi.tm });
@@ -177,7 +208,7 @@
     lines.push({ k: 'ask', label: 'Ask yourself', tm: question(h, seat, L, hi, pr, rdI, opp) });
     lines.forEach(function (l) { l.text = unmark(l.tm); });
     var sum = cap(hi.short || 'your hand') + ' · about ' + pc(hi.eq) + (pr ? ' · need ' + pc(pr.need) : '');
-    return { lines: lines, math: M.list, summary: sum, eq: hi.eq, need: pr ? pr.need : null, villain: v };
+    return { lines: lines, math: M.list, summary: sum, eq: hi.eq, need: pr ? pr.need : null, villain: v, tell: tell ? tell.kind : null, realized: hi.realized == null ? null : hi.realized };
   }
 
   // ---------------------------------------------------------------- the hint: the baseline the review grades against

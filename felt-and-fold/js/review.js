@@ -265,6 +265,18 @@
       if (m) m.note = 'The words round this share. Offsuit hands lose a little, more without a high card.';
       t.source = 'The preflop model of realized equity, the same one the chart uses.';
       t.meaning = 'The part of its raw equity this hand wins once more bets come.';
+    } else if (k === 'openTo') {
+      var tl = d.sizeTell || {};
+      t.title = 'Open size'; m = direct(v, unit, 'from the table');
+      t.source = 'The raise on the table.';
+      if (tl.std) m.note = 'A normal open here is ' + bbs(tl.std) + '.';
+      t.meaning = 'How big the open was. Beginners size their opens by hand strength.';
+    } else if (k === 'eqTell' || k === 'eqStd') {
+      t.title = k === 'eqTell' ? 'Equity against this open size' : 'Equity against a normal open'; m = direct(v, unit, 'from an equity run');
+      m.note = k === 'eqTell' ? 'The range narrowed by the open size. A big beginner open keeps mostly 99+ and AK. A small one drops most of those.'
+        : 'The range from the chart, with no size tell.';
+      t.source = 'Your hand against the likely hands of the player who opened.';
+      t.meaning = 'How often the hand wins at showdown if nobody folds.';
     } else if (k === 'width' || k === 'kept') {
       t.title = k === 'width' ? 'Preflop range' : 'Range kept';
       if (k === 'width') m = fx('hands this player plays ÷ all 1326 hands', '{n} ÷ 1326', { n: [Math.round(v * 1326), 'x'] }, v, unit);
@@ -636,6 +648,7 @@
         d.limpTo = sp.jam || !sp.raiseToBB ? 0 : sp.raiseToBB; // the raise size over the limpers, in bb (none when the raise would be all in)
       }
     }
+    if (e.street === 'preflop' && res.spot && (res.spot.kind === 'vsOpen' || res.spot.kind === 'squeeze') && res.cls != null) d.sizeTell = sizeTellAt(h, seat, e, opts, res.cls);
     if (e.street === 'preflop' && res.spot && isAgg(did.action) && ['push', 'reshove', 'vsJam', 'bbVsLimp', 'isolate', 'walk'].indexOf(res.spot.kind) < 0) {
       // the raises and callers before this one, for the size text: the open, callers after it, the last raise, position
       var rz = [], cl = 0, n2 = h.order.length, ord = function (s) { return (s - h.button - 1 + n2) % n2; }, lastS = null;
@@ -674,6 +687,25 @@
     Maniac: 'a maniac', Trappy: 'a trappy player' };
   // the profile the review may use: the read as of this hand (opts.reads, from FF.Reads), or a profile the hero
   // chose (opts.profiles, custom tables and tests). The hidden profile at the seat is never used.
+  // facing a beginner's open: the open size against the normal size, and the hero's equity against the range that size
+  // leaves (AI.sizeRange) next to the equity against a normal open. Only a known profile counts (a read or a practice setup).
+  function sizeTellAt(h, seat, e, opts, cls) {
+    if (!AI || !AI.openSize) return null;
+    var op = null;
+    h.log.slice(0, e.n).forEach(function (x) { if (op == null && x.ev === 'act' && x.street === 'preflop' && (x.type === 'raise' || x.type === 'bet')) op = x.seat; });
+    if (op == null || op === seat) return null;
+    var pr = profileOf(h, op, opts || {}); if (!pr || pr.tier !== 'Beginner') return null;
+    var o = AI.openSize(h, op, e.n); if (!o || !o.kind) return null;
+    var f = S.preflopRange(h, op, e.n), eqStd = R.eqVsRange(f)[cls], eqTell = R.eqVsRange(AI.sizeRange(f, o.kind))[cls];
+    return { kind: o.kind, seat: op, name: String(h.players[op].name || 'The opener').split(' ')[0], toBB: rd(o.toBB, 1), std: o.std, eqStd: rd(eqStd, 3), eqTell: rd(eqTell, 3) };
+  }
+  function sizeTellText(d) {
+    var t = d.sizeTell; if (!t) return '';
+    var big = t.kind === 'big', hand = d.hand || 'Your hand';
+    return t.name + ' opened to ' + B('openTo', t.toBB) + '. ' + (big ? 'Beginners usually open bigger with strong hands. Their range here is stronger than a normal open.'
+      : 'Beginners usually open smaller with weaker hands. Their range here is weaker than a normal open.')
+      + ' ' + hand + ' has about ' + P('eqTell', t.eqTell) + ' against it. Against a normal open it has ' + P('eqStd', t.eqStd) + '.';
+  }
   function profileOf(h, s, opts) {
     var p = h.players[s], rr = opts.reads && p && opts.reads[p.id];
     if (rr && rr.profile && rr.profile.tier) return { tier: rr.profile.tier, style: rr.profile.style, name: p.name, read: rr };
@@ -1272,6 +1304,7 @@
     else out.push(d.grade + '. ' + (why ? why + ' ' : '') + 'You ' + verbPast(did) + ' ' + hand + '.' + (d.saidAct && !mixed ? '' : ' ' + who + ' ' + (mixed ? 'mixes it: ' + mt : chartVerb(d.mix[0]) + ' it' + (d.mix[0].freq < 0.97 ? ' ' + P('freq', d.mix[0].freq) + ' of the time' : '')) + '.') + approx);
     if (ls && !lsRight) out.push(limpSizeText(d, true));
     if (rs && !rsRight && d.grade !== 'Good') out.push(raiseSizeText(d, true));
+    if (d.sizeTell) out.push(sizeTellText(d));
     if (d.priced) out.push(pricedText(d));
     if (d.never) out.push('The chart never ' + ({ call: 'calls with', raise: 'raises', allin: 'moves all in with', fold: 'folds', check: 'checks' }[did] || 'plays') + ' ' + hand + ' here. The cost is small, but the play is still an error.');
     if (did === 'call' && d.evLost > (d.toCall || 0) + 0.05 && d.toCall > 0) out.push('The cost is more than the ' + bbs(d.toCall) + ' call. The hand plays on after the flop' + (pos === 'SB' || pos === 'BB' ? ', out of position' : '') + '. It loses more chips on later streets.');

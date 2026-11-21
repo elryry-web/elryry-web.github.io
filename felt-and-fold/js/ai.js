@@ -117,11 +117,63 @@
     if (toCall === 0) { call = 1 - raise; }
     return { raise: raise, call: call, a: a };
   }
+  // ---- facing a deep jam. The chart guesses the jammer's range from its own small 4-bet, and good players folded QQ and AK
+  // to a 94bb jam. Regular and better players always call with QQ+ and AK when nobody else is in yet. JJ, TT, AQs and AQo
+  // call by how wide the jammer plays in this bot's own notes (looser jammers get more calls).
+  var JAM_FLOOR = { JJ: [0.2, 0.6, 1], TT: [0, 0, 0.45], AQs: [0, 0.3, 0.8], AQo: [0, 0, 0.45] };
+  function jammerWidth(st) {
+    if (!st || st.hands < 12) return 1;
+    var vp = st.vpip / st.hands, pr = st.pfr / st.hands;
+    return vp > 0.4 || pr > 0.3 ? 2 : vp < 0.15 ? 0 : 1;
+  }
+  function jamFloor(ag, h, seat, L, sp, cls) {
+    if (sp.kind !== 'vsJam' || ag.tier === 'Beginner' || ag.tier === 'Casual' || !L.toCall || L.toCall < 25 * h.bb) return 0;
+    var jam = null, after = false;
+    h.log.forEach(function (e) {
+      if (e.ev !== 'act' || e.street !== 'preflop') return;
+      if (e.type === 'raise' || e.type === 'bet') { jam = e; after = false; } else if (e.type === 'call' && jam) after = true;
+    });
+    if (!jam || after) return 0; // someone already called the jam: keep the chart
+    var n = C.CLASS_NAME[cls];
+    if (n === 'AA' || n === 'KK' || n === 'QQ' || n === 'AKs' || n === 'AKo') return 1;
+    var f = JAM_FLOOR[n];
+    return f ? f[jammerWidth(ag.stats[h.players[jam.seat].id])] : 0;
+  }
+  // ---- the beginner size tell. Beginners raise about 1.6x the normal size with strong hands (99+ and AK) and about
+  // 0.85x with the rest. Only public facts feed the tell: the raise size against the chart size at that spot.
+  function bigOpenClass(cls) { strengths(); var n = C.CLASS_NAME[cls]; return STR[cls] > 0.7 || n === 'AKs' || n === 'AKo'; }
+  function sizeKind(sp, e, bb) {
+    if (!e || e.allIn || !(e.type === 'raise' || e.type === 'bet') || !sp || sp.jam || !(sp.raiseToBB > 0)) return null;
+    var r = e.to / bb / sp.raiseToBB;
+    return r >= 1.3 ? 'big' : r <= 0.96 ? 'small' : null;
+  }
+  // the first open (a raise with no raise before it) by seat before log index upto, with its size tell
+  function openSize(h, seat, upto) {
+    var log = h.log, n = upto == null ? log.length : upto;
+    for (var i = 0; i < n; i++) {
+      var e = log[i];
+      if (e.ev !== 'act' || e.street !== 'preflop') continue;
+      if (e.type === 'raise' || e.type === 'bet') {
+        if (e.seat !== seat) return null;
+        var sp = R.forHand(h, seat, i);
+        return { seat: seat, to: e.to, toBB: e.to / h.bb, std: sp.raiseToBB, kind: sizeKind(sp, e, h.bb), at: i };
+      }
+    }
+    return null;
+  }
+  // a deterministic narrowing of a 169-class range for a beginner's sized raise
+  function sizeRange(f, kind) {
+    var o = Float64Array.from(f);
+    if (kind !== 'big' && kind !== 'small') return o;
+    for (var i = 0; i < 169; i++) { var st = bigOpenClass(i); if (kind === 'big' && !st) o[i] *= 0.05; if (kind === 'small' && st) o[i] *= 0.15; }
+    return o;
+  }
   function preflopMix(ag, h, seat, L, mood) {
     var p = h.players[seat], cls = C.classOfCards(p.hole[0], p.hole[1]), sp = R.forHand(h, seat);
     var pf = prefCore(ag, sp, cls, mood, h.pos[seat], L.canRaise, L.toCall), raise = pf.raise, call = pf.call, a = pf.a;
+    var fl = jamFloor(ag, h, seat, L, sp, cls); if (fl > call) { call = Math.min(fl, 1 - raise); }
     var to = sp.jam || !sp.raiseToBB ? L.maxTo : Math.round(sp.raiseToBB * h.bb);
-    if (L.canRaise && ag.tier === 'Beginner' && !sp.jam) to = Math.round(to * (STR[cls] > 0.7 ? 1.6 : 0.85));
+    if (L.canRaise && ag.tier === 'Beginner' && !sp.jam) to = Math.round(to * (bigOpenClass(cls) ? 1.6 : 0.85));
     if (L.canRaise) to = clamp(to, L.minTo, L.maxTo);
     var mix = [];
     if (raise > 0.001) mix.push({ action: to >= L.maxTo ? 'allin' : 'raise', to: to, freq: raise });
@@ -234,6 +286,10 @@
         var p = t === 'fold' ? fold : t === 'raise' || t === 'bet' || (t === 'allin' && e.to > e.betBefore) ? raise : call;
         return p * (1 - m) + m / 3;
       },
+      // beginners size their raises by strength: a big or small raise narrows the range on top of pre (applied after its floor)
+      size: ag.tier === 'Beginner' ? function (sp, e, cls, bb) {
+        var k = sizeKind(sp, e, bb); return !k ? 1 : k === 'big' ? (bigOpenClass(cls) ? 1 : 0.05) : (bigOpenClass(cls) ? 0.15 : 1);
+      } : null,
       post: function (ctx, i, L, feat) {
         var mix = withSlips(postMix(ag, ctx, i, L, feat, adj), tier.mistake, L), out = { fold: 0, call: 0, agg: 0, to: 0 };
         mix.forEach(function (x) {
@@ -314,7 +370,7 @@
     return ag;
   }
   function observe(ag, h) {
-    if (TIERS[ag.tier].adapt) observeHand(ag.stats, h);
+    if (TIERS[ag.tier].adapt || ag.tier === 'Regular' || ag.tier === 'Solver') observeHand(ag.stats, h); // Regular and Solver use the notes for jam calls only
     var me = null; h.order.forEach(function (s) { if (h.players[s].id === ag.id) me = h.players[s]; });
     ag.mood.tilt *= 0.86; ag.mood.tight *= 0.86;
     if (!me) return;
@@ -470,6 +526,6 @@
   }
 
   return { TIERS: TIERS, STYLES: STYLES, TIER_NAMES: TIER_NAMES, STYLE_NAMES: STYLE_NAMES, CASH_STAKES: CASH, TOURNEY_FIELDS: TOURNEY,
-    profile: profile, firstName: firstName, genderOf: genderOf, GENDER: GENDER, uniqueProfile: uniqueProfile, takenNames: takenNames, create: create, field: field, exploitFor: exploitFor, observeHand: observeHand, emptyStats: emptyStats, postAdj: postAdj,
+    profile: profile, firstName: firstName, genderOf: genderOf, GENDER: GENDER, uniqueProfile: uniqueProfile, takenNames: takenNames, create: create, field: field, exploitFor: exploitFor, jamFloor: jamFloor, jammerWidth: jammerWidth, bigOpenClass: bigOpenClass, sizeKind: sizeKind, openSize: openSize, sizeRange: sizeRange, observeHand: observeHand, emptyStats: emptyStats, postAdj: postAdj,
     model: model, traits: traits, exploitable: exploitable, STYLE_BY_TIER: STYLE_BY_TIER };
 });

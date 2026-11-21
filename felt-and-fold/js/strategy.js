@@ -495,7 +495,7 @@
       if (e.ev !== 'act' || e.seat !== seat || e.street !== 'preflop') return;
       var s = R.forHand(h, seat, i);
       // floor 0.12, not 0.02: a profile is a guess about a person, so hands the model rarely plays this way keep real weight
-      for (var x = 0; x < 169; x++) f[x] *= 0.12 + 0.88 * model.pre(s, e, h.pos[seat], x);
+      for (var x = 0; x < 169; x++) f[x] *= (0.12 + 0.88 * model.pre(s, e, h.pos[seat], x)) * (model.size ? model.size(s, e, x, h.bb) : 1);
     });
     return f;
   }
@@ -933,7 +933,7 @@
     catch (err) { return Promise.resolve(null); }
   }
 
-  return { setQuality: setQuality, quality: function () { return Q.name; }, qualityInfo: function () { return { flop: Q.flop, turn: Q.turn, name: Q.name }; }, texture: texture, draws: draws, describe: describe, eqVs: eqVs, node: node, policy: policy,
+  return { realise: realise, setQuality: setQuality, quality: function () { return Q.name; }, qualityInfo: function () { return { flop: Q.flop, turn: Q.turn, name: Q.name }; }, texture: texture, draws: draws, describe: describe, eqVs: eqVs, node: node, policy: policy,
     comboMix: comboMix, features: features, factorsFor: factorsFor, evs: evs, actionProb: actionProb, BASE: BASE,
     tracker: tracker, advance: advance, rangeOf: rangeOf, preflopRange: preflopRange, specFor: specFor, nodeAt: nodeAt,
     decisionFromEntry: decisionFromEntry, decisionFromLegal: decisionFromLegal, activeSeats: activeSeats,

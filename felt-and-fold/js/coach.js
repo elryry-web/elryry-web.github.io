@@ -53,6 +53,7 @@
     foldVsOpen: ['Folding too much against raises', 'You fold good hands when someone opens before you. Some of these hands should call or 3-bet.', 'Against a late-seat open, keep playing strong pairs, big aces and suited broadway cards.'],
     callBlinds: ['Calling raises too wide from the blinds', 'You call raises from the blinds with hands that are too weak. You play the rest of the hand out of position. Weak hands win too rarely to pay for it.', 'From the SB, 3-bet or fold most hands. From the BB, call with hands that play well after the flop.'],
     callVsOpen: ['Calling raises too wide', 'You call opens with hands that the chart folds. These hands often lose to the raiser’s range. They are also hard to play after the flop.', 'Against an early-seat open, fold most offsuit hands. Call with pairs and strong suited hands.'],
+    vsBigOpen: ['Playing on against big beginner opens', 'You call or 3-bet when a beginner opens big. Beginners open bigger with strong hands, often 99 or better and AK. Most hands that would play on against a normal open lose to that range.', 'When a beginner opens much bigger than usual, play on only with strong pairs and AK. Fold the rest.'],
     threeBetLight: ['3-betting too light', 'You re-raise opens with hands that are too weak. A 3-bet with a weak hand risks many chips. Strong hands call or 4-bet. Then you are behind.', 'Against weak players, 3-bet for value: big pairs, AK and AQ. Fold or call the rest.'],
     foldVs3bet: ['Folding too much to 3-bets', 'You fold too often after you open and someone re-raises. Your open already put chips in. Strong hands should call or 4-bet.', 'After a 3-bet, keep pairs from 99 up, AK, AQ and suited broadway cards.'],
     callVs3bet: ['Calling 3-bets too wide', 'You call 3-bets with hands that are too weak. The pot is big and the other player’s range is strong. Weak hands lose a lot after the flop.', 'Against a 3-bet, fold weak offsuit hands and small suited ones. Their range is much stronger than an open.'],
@@ -94,6 +95,7 @@
         return { fam: g === 'early' ? 'openEarly' : 'openLate', street: null };
       }
       if (sp === 'vsOpen') {
+        if (a !== 'fold' && d.sizeTell && d.sizeTell.kind === 'big') return { fam: 'vsBigOpen', street: null };
         if (a === 'fold') return { fam: pos === 'BB' ? 'foldBB' : 'foldVsOpen', street: null };
         if (a === 'call') return { fam: g === 'SB' || g === 'BB' ? 'callBlinds' : 'callVsOpen', street: null };
         return { fam: 'threeBetLight', street: null };

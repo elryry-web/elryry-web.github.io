@@ -23,9 +23,10 @@
 
   // ---------------------------------------------------------------- observing hands
   function blank(name) {
-    return { name: name || '', hands: 0, vpip: 0, pfr: 0, faced: { flop: [0, 0, 0, 0], turn: [0, 0, 0, 0], river: [0, 0, 0, 0] }, open: 0, bets: 0, shows: [], last: null, at: 0 };
+    return { name: name || '', hands: 0, vpip: 0, pfr: 0, faced: { flop: [0, 0, 0, 0], turn: [0, 0, 0, 0], river: [0, 0, 0, 0] }, open: 0, bets: 0, shows: [], opens: blankOpens(), last: null, at: 0 };
   }
   // totals over the three streets: [faced, called, folded, raised]
+  function blankOpens() { return { big: 0, small: 0, norm: 0, bigShown: 0, bigStrong: 0 }; }
   function facedAll(st) { var o = [0, 0, 0, 0]; STREETS.forEach(function (k) { var f = st.faced[k]; for (var i = 0; i < 4; i++) o[i] += f[i]; }); return o; }
   function isAggr(e) { return e.type === 'bet' || e.type === 'raise' || (e.type === 'allin' && e.to > e.betBefore); }
   // a shown hand is weak when it is no better than a pair below the board's top card
@@ -52,6 +53,12 @@
       });
       if (vp) st.vpip++; if (pf) st.pfr++;
       var sh = h.log.filter(function (e) { return e.ev === 'show' && e.seat === seat; })[0];
+      // open sizes: how often this player opened big, small or normal, and what the big opens showed down
+      var os = AI.openSize ? AI.openSize(h, seat) : null;
+      if (os) {
+        var ob = st.opens || (st.opens = blankOpens()); ob[os.kind || 'norm']++;
+        if (os.kind === 'big' && sh) { ob.bigShown++; if (AI.bigOpenClass(C.classOfCards(sh.cards[0], sh.cards[1]))) ob.bigStrong++; }
+      }
       if (sh && h.board.length === 5) {
         var weak = weakHand(sh.score, h.board), line = !lastRiver ? '' : lastRiver.type === 'call' || (lastRiver.type === 'allin' && !isAggr(lastRiver)) ? 'call' : isAggr(lastRiver) ? 'bet' : 'check';
         st.shows.push({ hand: h.id, cards: C.cardsStr(sh.cards), made: sh.name, line: line, weak: weak, callDown: weak && line === 'call', bluff: weak && line === 'bet' });
@@ -173,6 +180,17 @@
     return out;
   }
   // a gentle note for a decision graded with an earlier read, once a newer read shows a different player. Never a grade.
+  // ---- the beginner size tell. tier is a profile the hero knows (a read, the table's usual player, or one they set up).
+  // Returns null, or {kind:'big'|'small', toBB, std, tag, line, seen} for the open by seat before log index upto.
+  function knownTier(r, custom) { return custom && custom.tier ? custom.tier : r && r.profile ? r.profile.tier : null; }
+  function sizeTell(h, seat, upto, tier, st) {
+    if (tier !== 'Beginner' || !AI.openSize) return null;
+    var o = AI.openSize(h, seat, upto); if (!o || !o.kind) return null;
+    var ob = st && st.opens, big = o.kind === 'big', seen = ob ? ob[o.kind] : 0, line = big ? 'Big open: usually a strong hand.' : 'Small open: usually not a top hand.';
+    if (big && ob && ob.bigShown) line += ' ' + ob.bigStrong + ' of ' + ob.bigShown + ' big opens shown so far were strong.';
+    else if (seen) line += ' Seen ' + seen + (seen === 1 ? ' time' : ' times') + ' before.';
+    return { kind: o.kind, toBB: o.toBB, std: o.std, to: o.to, tag: big ? 'Big open: usually a strong hand' : 'Small open: usually not a top hand', line: line, seen: seen };
+  }
   function laterNote(usedTraits, now) {
     if (!usedTraits || !now || now.state !== 'read') return '';
     var t = now.traits, n = now.name, what = '';
@@ -185,6 +203,6 @@
   }
 
   return { blank: blank, observe: observe, prune: prune, prior: prior, posterior: posterior, established: established, read: read, forReview: forReview,
-    laterNote: laterNote, detailText: detailText, facedAll: facedAll, weakHand: weakHand, EXPECT: EXPECT,
+    laterNote: laterNote, sizeTell: sizeTell, knownTier: knownTier, detailText: detailText, facedAll: facedAll, weakHand: weakHand, EXPECT: EXPECT,
     READ_HANDS: READ_HANDS, READ_FACED: READ_FACED, SD_HANDS: SD_HANDS, SD_STRONG: SD_STRONG };
 });

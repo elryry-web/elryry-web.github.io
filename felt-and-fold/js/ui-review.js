@@ -30,6 +30,7 @@
       did: { action: d.did.action, toBB: d.did.toBB, addBB: d.did.addBB }, hand: d.hand, leak: d.leak, text: d.text, concepts: d.concepts || [],
       mix: d.mix.filter(m => m.freq >= 0.005).map(m => ({ action: m.action, sizeLabel: m.sizeLabel, freq: r2(m.freq), toBB: m.toBB })),
       exploit: d.exploit ? { gradedBy: d.exploit.gradedBy, name: d.exploit.name, best: d.exploit.best, baseGrade: d.exploit.baseGrade, state: d.exploit.state, plan: d.exploit.plan || null } : null,
+      sizeTell: d.sizeTell ? { kind: d.sizeTell.kind, toBB: d.sizeTell.toBB } : undefined,
       later: d.later || '', hint: d.hint || undefined, tm: math && d.tm ? d.tm : undefined, math: math && d.tm ? packMath(d.math) : undefined };
   }
   function pack(e, math) {

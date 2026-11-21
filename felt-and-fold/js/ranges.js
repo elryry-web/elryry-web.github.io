@@ -369,7 +369,17 @@
     if (bb <= 15.5 && ri === 0 && jr.pos !== 'BB') { var p = pushRange(jr.pos, bb, ante); if (p) return p; }
     var sp = spot({ hero: jr.pos, actions: prior, stackBB: bb, ante: ante, nPlayers: n, heroLeftBB: 1e9 });
     var f = Float64Array.from(sp.raise), any = 0; for (var i = 0; i < 169; i++) any += f[i];
-    return any > 0 ? f : C.parseRange('TT+, AQs+, AKo');
+    if (!any) return C.parseRange('TT+, AQs+, AKo');
+    // a deep all-in far above the chart's raise size (a 4-bet jam instead of a 2.2x 4-bet). Real players jam their strong
+    // hands here, not only the chart's small 4-bet value set: add the strong calls at half weight and halve the small bluffs.
+    if (jr.allIn && sp.raiseToBB && !sp.jam && jr.toBB > 1.8 * sp.raiseToBB && jr.toBB > 25) {
+      var strong = C.parseRange('TT+, AQs+, AKo');
+      for (i = 0; i < 169; i++) {
+        if (strong[i]) f[i] = Math.max(f[i], 0.5 * Math.min(1, sp.raise[i] + sp.call[i]), 0.5);
+        else if (bluffy(i)) f[i] *= 0.5;
+      }
+    }
+    return f;
   }
   function advice(s, cls) { return { fold: s.fold[cls], call: s.call[cls], raise: s.raise[cls] }; }
 

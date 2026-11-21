@@ -29,8 +29,29 @@
   };
   // the seat tag for an opponent with an established read ("calls a lot · 32 hands"), behind "Show player reads"
   let openRead = null;
-  function readTagHtml(p) {
-    const r = UI.Reads && UI.Reads.tag(p);
+  // a beginner's open size this hand: public size plus a known profile (a read, the table's usual player, or a practice setup)
+  function sizeTellOf(p, s, c, mode) {
+    const h = cur && cur.h, RD = FF.Reads, U = UI.Reads; if (!h || !h.players[s] || !RD || !RD.sizeTell) return null;
+    const custom = c.practice && c.profiles ? c.profiles[p.id] : null;
+    let tier = custom && custom.tier, st = null;
+    if (!tier) {
+      if (!U || !U.ctx || !UI.settings.reads) return null;
+      st = U.book[p.id]; tier = RD.knownTier(RD.read(st, RD.prior(U.ctx), p.name));
+    }
+    const t = RD.sizeTell(h, s, h.log.length, tier, st);
+    if (t) t.amt = UI.amt(t.to, h.bb, mode);
+    return t;
+  }
+  function readTagHtml(p, s, c, mode) {
+    const r = UI.Reads && UI.Reads.tag(p), tell = s != null ? sizeTellOf(p, s, c || {}, mode) : null;
+    if (tell) {
+      const nm = String(p.name || '').split(' ')[0], word = r ? r.tag.split(' · ')[0] : '';
+      return '<button type="button" class="readtag tell" data-id="' + UI.esc(p.id) + '" title="' + UI.esc(tell.line) + '" aria-expanded="' + (openRead === p.id) + '">' +
+        UI.esc(tell.tag) + '</button>' +
+        '<div class="readpop"><b>' + UI.esc(nm) + ' opened to ' + UI.esc(tell.amt) + '.</b> ' + UI.esc(tell.line) +
+        (tell.kind === 'big' ? ' Beginners often raise bigger with their best hands.' : ' Beginners often raise smaller with weaker hands.') +
+        (r ? ' Read: ' + UI.esc(word) + ' (' + r.hands + ' hands).' : '') + '</div>';
+    }
     if (!r) return '';
     const dt = FF.Reads.detailText(r.detail), word = r.tag.split(' · ')[0];
     return '<button type="button" class="readtag" data-id="' + UI.esc(p.id) + '" title="' + UI.esc(dt) + '" aria-expanded="' + (openRead === p.id) + '">' +
@@ -95,7 +116,7 @@
         '<div class="pstack">' + (stack > 0 || inHand ? UI.amt(stack, bb, mode) : 'Busted') + '</div></div>' + Art.stackHtml(stack, bb, mode) + '</div>' +
         (label ? '<div class="plabel">' + UI.esc(label) + '</div>' : '') +
         (!isHero && UI.settings.hud ? '<div class="hudline">' + UI.esc(UI.hudText(p.id)) + '</div>' : '') +
-        (!isHero ? readTagHtml(p) : '') +
+        (!isHero ? readTagHtml(p, s, c, mode) : '') +
         (cur.chat[s] ? '<div class="bubble">' + UI.esc(cur.chat[s]) + '</div>' : '') + '</div>';
       if (inHand && v.hp.committed > 0 && !h.done) html += '<div class="bet slot-' + slot + '">' + Art.chipsHtml(v.hp.committed, bb) + UI.amt(v.hp.committed, bb, mode) + '</div>';
     });
