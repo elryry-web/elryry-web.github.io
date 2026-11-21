@@ -305,13 +305,35 @@ body.art-markers .dealer { width: 28px; height: 28px; color: transparent; backgr
   .table-wrap { padding: 4px 2px; }
   .felt { max-height: none; }
   .felt::before { inset: 11% 13% 13%; border-radius: 46% / 32%; }
-  .seat { width: 96px; }
-  .slot-0.seat { left: 50%; top: 86%; } .slot-1.seat { left: 15%; top: 68%; } .slot-2.seat { left: 15%; top: 31%; }
-  .slot-3.seat { left: 50%; top: 10%; } .slot-4.seat { left: 85%; top: 31%; } .slot-5.seat { left: 85%; top: 68%; }
-  .slot-0.bet { left: 50%; top: 69%; } .slot-1.bet { left: 32%; top: 60%; } .slot-2.bet { left: 32%; top: 40%; }
-  .slot-3.bet { left: 50%; top: 26%; } .slot-4.bet { left: 68%; top: 40%; } .slot-5.bet { left: 68%; top: 60%; }
-  .slot-0.dealer { left: 74%; top: 80%; } .slot-1.dealer { left: 29%; top: 72%; } .slot-2.dealer { left: 29%; top: 25%; }
-  .slot-3.dealer { left: 30%; top: 12%; } .slot-4.dealer { left: 71%; top: 25%; } .slot-5.dealer { left: 71%; top: 72%; }
+  /* the table screen is pinned to the visible viewport and never scrolls: a scrollable page let Firefox Android
+     hide its toolbar, the viewport grew and the felt grew past the screen */
+  html:has(#scr-table.on), html:has(#scr-table.on) body { overflow: hidden; overscroll-behavior: none; }
+  #scr-table.on { position: fixed; inset: 0; height: auto; overflow: hidden; }
+  /* the bar keeps room for its tallest state, so the felt does not resize between turns */
+  .actionbar { flex: none; min-height: 156px; display: flex; flex-direction: column; justify-content: center; }
+  .actionbar > * { width: 100%; }
+  /* phone seats are anchored by the plate's centre (cards above, label and tags below), so bets and the dealer
+     button sit at fixed pixel offsets from the plate and never land on a seat's cards, plate or label */
+  .seat { width: 96px; transform: translate(-50%, -52px); }
+  .seat.hero { transform: translate(-50%, -68px); }
+  .slot-0.seat { left: 50%; top: calc(86% + 10px); } .slot-1.seat { left: 15%; top: 72%; } .slot-2.seat { left: 15%; top: 33.5%; }
+  .slot-3.seat { left: 50%; top: max(9%, 52px); } .slot-4.seat { left: 85%; top: 33.5%; } .slot-5.seat { left: 85%; top: 72%; }
+  /* hero: above the cards. top seat: below its label (and HUD line or read tag). side seats: level with the cards,
+     on the side facing the pot */
+  .slot-0.bet { left: 50%; top: calc(86% - 75px); }
+  .slot-3.bet { left: 50%; top: calc(max(9%, 52px) + 55px); }
+  .felt:has(.slot-3.seat .hudline) .slot-3.bet { top: calc(max(9%, 52px) + 68px); }
+  .felt:has(.slot-3.seat .readtag) .slot-3.bet { top: calc(max(9%, 52px) + 71px); }
+  .felt:has(.slot-3.seat .hudline):has(.slot-3.seat .readtag) .slot-3.bet { top: calc(max(9%, 52px) + 84px); }
+  .slot-1.bet, .slot-2.bet { left: calc(15% + 38px); transform: translate(0, -50%); }
+  .slot-4.bet, .slot-5.bet { left: calc(85% - 38px); transform: translate(-100%, -50%); }
+  .slot-1.bet, .slot-5.bet { top: calc(72% - 36px); } .slot-2.bet, .slot-4.bet { top: calc(33.5% - 36px); }
+  .slot-0.dealer { left: calc(50% + 62px); top: calc(86% - 30px); } .slot-3.dealer { left: calc(50% - 78px); top: max(9%, 52px); }
+  .slot-1.dealer { left: calc(15% + 62px); top: calc(72% + 40px); } .slot-2.dealer { left: calc(15% + 78px); top: 33.5%; }
+  .slot-4.dealer { left: calc(85% - 78px); top: 33.5%; } .slot-5.dealer { left: calc(85% - 62px); top: calc(72% + 40px); }
+  .bet { font-size: 12px; gap: 4px; }
+  .center { top: 53%; width: max-content; gap: 4px; }
+  .pot { white-space: nowrap; }
   .plate { min-width: 0; padding: 3px 8px 3px 3px; gap: 5px; }
   .av { width: 28px; height: 28px; font-size: 10.5px; }
   .seat.hero .av { font-size: 9px; }
@@ -332,7 +354,6 @@ body.art-markers .dealer { width: 28px; height: 28px; color: transparent; backgr
   .seat.hero .card.sm { width: 44px; height: 62px; }
   .card { width: 40px; height: 56px; padding: 2px 0 0 4px; }
   .board { gap: 3px; min-height: 56px; }
-  .center { top: 48%; }
   .bubble { font-size: 11px; white-space: normal; width: max-content; max-width: 120px; }
   .hudline { font-size: 9px; }
   .readtag { font-size: 9.5px; padding: 0 5px; margin-top: 2px; }
