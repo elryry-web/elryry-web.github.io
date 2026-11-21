@@ -8,7 +8,7 @@
   const pick = a => a[Math.floor(Math.random() * a.length)];
   let game = null; // the running session
 
-  // the phone table menu: Sit out / Top up, units, History, Stats, Settings, and the info the slim strip leaves out
+  // the phone table menu: Sit out / Top up, units, History, Stats, Coach, Settings, and the info the slim strip leaves out
   // ("Hands 37"). Each item clicks the desktop button it stands for, so it behaves exactly the same.
   // A tap outside or Escape closes it; while it is open no keyboard shortcut reaches the table.
   let menuCtl = [];
@@ -23,6 +23,7 @@
     item('Amounts: ' + u + ' (switch to ' + other + ')', () => UI.$('#tb-units').click(), 'units');
     item('History', () => UI.$('#tb-hist').click());
     item('Stats', () => UI.$('#tb-stats').click());
+    item('Coach', () => UI.$('#tb-coach').click());
     item('Settings', () => UI.$('#tb-set').click());
     const extra = [...UI.$$('#tinfo span')].slice(1).map(s => s.textContent).filter(Boolean);
     if (extra.length) box.appendChild(UI.el('<div class="tmenu-info">' + extra.map(UI.esc).join(' · ') + '</div>'));
@@ -56,6 +57,7 @@
   function seatAI(g, t, seat, prof, stack) {
     makeAgent(g, prof);
     E.sit(t, seat, { id: prof.id, name: prof.name, initials: prof.initials, color: prof.color, tier: prof.tier, style: prof.style, stack: stack });
+    if (t.seats[seat]) t.seats[seat].handsHere = 0; // hands played at this table; no one leaves by choice before 30
   }
   function ctxFor(g) {
     return {
@@ -200,17 +202,18 @@
     if (practice) UI.show('custom'); else { Cash.lobby(); UI.show('cash'); }
   };
   function aiBuyIn(bb) { return Math.round((Math.random() < 0.6 ? 100 : 40 + Math.floor(Math.random() * 61)) * bb); }
-  // players come and go: busts, top-ups, the odd departure, new faces in empty seats
+  // players come and go: busts, top-ups, the odd departure (not before 30 hands here, then 1 in 100), new faces in empty seats
   function turnover(g, t, bb) {
     let left = 0;
     t.seats.forEach((p, s) => {
       if (!p || p.id === HERO.id) return;
+      p.handsHere = (p.handsHere || 0) + 1;
       if (p.stack <= 0) { if (Math.random() < 0.5) { E.stand(t, s); left++; } else p.stack = 100 * bb; return; }
       if (p.stack < 40 * bb && Math.random() < 0.3) p.stack = 100 * bb;
-      if (Math.random() < 0.04) { E.stand(t, s); left++; UI.toast(p.name + ' left the table.', 1800); }
+      if (p.handsHere >= 30 && Math.random() < 0.01) { E.stand(t, s); left++; UI.toast(p.name + ' left the table.', 1800); }
     });
     const empty = []; t.seats.forEach((p, s) => { if (!p) empty.push(s); });
-    if (empty.length && (Math.random() < 0.35 || t.seats.filter(Boolean).length < 3)) {
+    if (empty.length && (Math.random() < 0.7 || t.seats.filter(Boolean).length < 3)) {
       const prof = AI.field({ kind: 'cash', stake: g.stake.id, seats: 1, seed: uid(), avoid: t.seats.filter(Boolean) })[0];
       prof.id = 'ai' + uid();
       seatAI(g, t, pick(empty), prof, aiBuyIn(bb));

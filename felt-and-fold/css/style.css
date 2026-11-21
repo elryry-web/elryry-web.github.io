@@ -6,7 +6,7 @@
   --math: #7fd0e0; --c-c: #1d7a3a; --c-d: #1f5fbf; --c-h: #c62828; --c-s: #161616;
   --g-good: #3fa66b; --g-inacc: #d4b13c; --g-mistake: #e07b30; --g-blunder: #d23d3d;
   /* action colours share nothing with the grade colours: check slate, call blue, bet and raise violet, all in deep violet, fold dark grey */
-  --m-fold: #4a5059; --m-check: #7c9ca6; --m-call: #3d7fd6; --m-bet: #a98bec; --m-raise: #8a66dd; --m-allin: #5b35a8;
+  --coach-bar: #c2b59b; --m-fold: #4a5059; --m-check: #7c9ca6; --m-call: #3d7fd6; --m-bet: #a98bec; --m-raise: #8a66dd; --m-allin: #5b35a8;
   --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 * { box-sizing: border-box; }
@@ -255,14 +255,14 @@ table.results tr.me td { color: var(--gold2); font-weight: 700; }
   text-decoration: underline dotted; text-underline-offset: 3px; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
 .term[aria-expanded="true"] { text-decoration-style: solid; }
 .term:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; border-radius: 3px; }
-.termdef { display: block; margin: 5px 0 6px; padding: 6px 9px; font-size: 13px; color: var(--text); background: var(--panel2);
+.termdef { display: block; margin: 5px 0 6px; padding: 6px 9px; font-size: 13px; font-style: normal; color: var(--text); background: var(--panel2);
   border: 1px solid var(--line); border-left: 3px solid var(--gold); border-radius: 6px; }
 .termdef b { color: var(--gold2); }
 .num { font: inherit; color: var(--math); background: none; border: none; padding: 0; margin: 0; cursor: pointer; white-space: nowrap;
   text-decoration: underline dotted; text-decoration-color: var(--math); text-underline-offset: 3px; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
 .num[aria-expanded="true"] { text-decoration-style: solid; }
 .num:focus-visible { outline: 2px solid var(--math); outline-offset: 1px; border-radius: 3px; }
-.mathpop { display: block; margin: 5px 0 6px; padding: 7px 9px; font-size: 13px; color: var(--text); background: var(--panel2); max-width: 100%;
+.mathpop { display: block; margin: 5px 0 6px; padding: 7px 9px; font-size: 13px; font-style: normal; color: var(--text); background: var(--panel2); max-width: 100%;
   border: 1px solid var(--line); border-left: 3px solid var(--math); border-radius: 6px; overflow-wrap: anywhere; }
 .mathpop b { color: var(--math); }
 .mathpop .mwords { color: var(--muted); font-size: 12px; margin-top: 2px; }
@@ -282,11 +282,32 @@ table.results tr.me td { color: var(--gold2); font-weight: 700; }
 .hrow .net { margin-left: auto; font-weight: 700; }
 .hrow .vcards, .hrow .net, .hrow .grade, .hrow .pos { white-space: nowrap; flex-shrink: 0; }
 .hrow .bl-short { display: none; }
+/* a hand left out of Stats and the Coach: dimmed in History, with a small tag */
+.hrow.hx > :not(.xtag) { opacity: .45; }
+.hrow .xtag { flex-shrink: 0; white-space: nowrap; font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 6px; padding: 1px 5px; }
+.rv-excl { margin-left: auto; padding: 5px 11px; min-height: 34px; font-size: 14px; }
+.rv-exnote { flex-basis: 100%; text-align: right; }
 .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .stats-grid div { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px; display: flex; flex-direction: column; }
 .stats-grid b { font-size: 22px; } .stats-grid span { color: var(--muted); font-size: 12px; }
 .gradecount { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
 .leaks { padding-left: 20px; } .leaks li { margin-bottom: 6px; }
+/* stats switch and the Coach (bars use one neutral sand colour, never a grade or baseline colour) */
+.seg { display: flex; gap: 0; margin: 0 0 12px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.seg .segb { flex: 1 1 50%; border: none; border-radius: 0; margin: 0; padding: 8px 6px; min-height: 40px; background: transparent; color: var(--muted); font-size: 13px; }
+.seg .segb.on { background: var(--panel); color: var(--text, #eee); font-weight: 700; }
+.coach h4 { margin: 18px 0 8px; } .coach h5 { margin: 10px 0 4px; font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.coach-focus { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.coach-focus p { margin: 6px 0; } .coach-focus .ctitle { font-size: 16px; } .crule { border-left: 3px solid var(--coach-bar); padding-left: 8px; }
+.cex { margin-top: 8px; } .cex .hrow { margin-top: 4px; } .cex .cst { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.cbar { display: flex; align-items: center; gap: 8px; margin: 3px 0; font-size: 13px; }
+.cbar .cl { flex: 0 0 104px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cbar .ct { flex: 1 1 auto; height: 10px; background: rgba(255,255,255,.06); border-radius: 5px; overflow: hidden; }
+.cbar .ct i { display: block; height: 100%; background: var(--coach-bar); border-radius: 5px; }
+.cbar .cv { flex: 0 0 auto; min-width: 52px; text-align: right; white-space: nowrap; color: var(--muted); }
+.habit { margin: 8px 0; } .habit p { margin: 2px 0 0; } .habit .hv { font-weight: 700; }
+.hok, .hoff { font-size: 11px; padding: 1px 6px; border-radius: 8px; border: 1px solid var(--line); color: var(--muted); }
+.hoff { border-color: var(--coach-bar); color: var(--coach-bar); }
 
 /* modal and toasts */
 .modal-back { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; z-index: 60; padding: 16px; }
@@ -355,7 +376,7 @@ body.art-markers .dealer { width: 32px; height: 32px; color: #3b2a12; font-famil
   .tbtns { margin-left: auto; gap: 4px; flex-wrap: nowrap; flex: none; }
   .tbar .btn.sm { padding: 3px 8px; min-height: 40px; min-width: 40px; font-size: 13px; }
   .tbar .btn.icon { padding: 3px 6px; font-size: 18px; }
-  #tctl, #tb-units, #tb-hist, #tb-stats, #tb-set { display: none; }
+  #tctl, #tb-units, #tb-hist, #tb-stats, #tb-coach, #tb-set { display: none; }
   #tb-more { display: inline-block; font-weight: 700; }
   #tb-menu .tb-word { display: none; } /* "←" alone; its aria-label says Leave table */
   #tb-menu { font-size: 18px; padding: 3px 6px; }

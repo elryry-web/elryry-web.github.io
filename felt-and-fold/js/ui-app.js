@@ -21,10 +21,8 @@
 
   function renderTitle() {
     const n = UI.Review.entries.length;
-    const ns = UI.Review.sessionCount();
-    UI.$('#title-session').innerHTML = n ? '<button class="btn link" id="t-hist">Hand history (' + n + ')</button>' + (ns ? ' <button class="btn link" id="t-stats">Session stats</button>' : '') : '';
-    if (n) UI.$('#t-hist').onclick = UI.Review.openHistory;
-    if (ns) UI.$('#t-stats').onclick = UI.Review.openStats;
+    UI.$('#title-session').innerHTML = n ? '<button class="btn link" id="t-hist">Hand history (' + n + ')</button> <button class="btn link" id="t-stats">Stats</button> <button class="btn link" id="t-coach">Coach</button>' : '';
+    if (n) { UI.$('#t-hist').onclick = UI.Review.openHistory; UI.$('#t-stats').onclick = UI.Review.openStats; UI.$('#t-coach').onclick = UI.Review.openCoach; }
   }
 
   // ---------------------------------------------------------------- settings (a screen, and a modal during play)
@@ -77,6 +75,7 @@
     unitLabel();
     UI.$('#tb-hist').onclick = UI.Review.openHistory;
     UI.$('#tb-stats').onclick = UI.Review.openStats;
+    UI.$('#tb-coach').onclick = UI.Review.openCoach;
     UI.$('#tb-set').onclick = UI.openSettings;
   }
 

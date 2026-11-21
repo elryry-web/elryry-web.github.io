@@ -1690,7 +1690,9 @@
 
   // ---------------------------------------------------------------- session
   function session(reviews) {
-    var s = { hands: reviews.length, net: 0, evLost: 0, decisions: 0, grades: { Good: 0, Inaccuracy: 0, Mistake: 0, Blunder: 0 }, clean: 0, leaks: [], exploitLeaks: [] }, L = {};
+    var excluded = reviews.filter(function (rv) { return rv.excluded; }).length; // hands the player took out of coaching
+    reviews = reviews.filter(function (rv) { return !rv.excluded; });
+    var s = { hands: reviews.length, excluded: excluded, net: 0, evLost: 0, decisions: 0, grades: { Good: 0, Inaccuracy: 0, Mistake: 0, Blunder: 0 }, clean: 0, leaks: [], exploitLeaks: [] }, L = {};
     reviews.forEach(function (rv) {
       s.net += rv.net; s.evLost += rv.evLost; if (rv.clean) s.clean++;
       rv.decisions.forEach(function (d) {

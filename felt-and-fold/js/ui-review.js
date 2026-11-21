@@ -1,4 +1,4 @@
-/* Felt & Fold UI: hand review panel, session hand history, session stats. */
+/* Felt & Fold UI: hand review panel, hand history, stats (this session or all saved hands), the Coach. */
 (function () {
   'use strict';
   const FF = window.FF, UI = FF.UI;
@@ -34,8 +34,8 @@
   }
   function pack(e, math) {
     const rv = e.rv, rc = rv.recap;
-    return { n: e.n, at: e.at, label: e.meta.label || '', rv: { handId: rv.handId, mode: rv.mode, bb: rv.bb, heroPos: rv.heroPos, heroCards: rv.heroCards, board: rv.board,
-      net: rv.net, blind: rv.blind || null, worst: rv.worst, clean: rv.clean, evLost: rv.evLost, solved: rv.solved || 0,
+    return { n: e.n, at: e.at, label: e.meta.label || '', rv: { handId: rv.handId, mode: rv.mode, bb: rv.bb, seats: rv.seats || undefined, heroPos: rv.heroPos, heroCards: rv.heroCards, board: rv.board,
+      net: rv.net, blind: rv.blind || null, excluded: rv.excluded || undefined, worst: rv.worst, clean: rv.clean, evLost: rv.evLost, solved: rv.solved || 0,
       recap: rc ? { villains: rc.villains.map(v => ({ name: v.name, pos: v.pos, cards: v.cards, made: v.made, text: v.text, rangeText: v.rangeText, thinking: v.thinking,
         tm: math && v.tm ? v.tm : undefined, math: math && v.tm ? packMath(v.math) : undefined })) } : null,
       decisions: rv.decisions.map(d => packDecision(d, math)) } };
@@ -59,6 +59,7 @@
     if (FF.SolverProvider) FF.SolverProvider.remember(h);
     const m = meta || {};
     const rv = FF.Review.hand(h, heroSeat, { reads: m.reads || null, profiles: m.profiles || null });
+    rv.seats = h.order ? h.order.length : null; // the table size, for the Coach's preflop targets
     const last = R.entries[R.entries.length - 1];
     const entry = { n: last ? last.n + 1 : 1, rv: rv, h: h, meta: meta || {}, solving: false, at: Date.now() };
     R.entries.push(entry);
@@ -84,7 +85,7 @@
     return new Promise(res => { resolveClose = res; });
   };
   R.close = function () {
-    sheet().classList.remove('open'); R.shown = null;
+    sheet().classList.remove('open'); R.shown = null; drawn = null;
     const r = resolveClose; resolveClose = null; if (r) r();
   };
   R.isOpen = () => !!R.shown;
@@ -180,12 +181,29 @@
   function closeBelow(para) {
     const nx = para.nextElementSibling;
     if (nx && (nx.classList.contains('termdef') || nx.classList.contains('mathpop'))) nx.remove();
+    para.querySelectorAll(':scope > .termdef, :scope > .mathpop').forEach(x => x.remove());
+    para.normalize();
     para.querySelectorAll('button.term[aria-expanded="true"], button.num[aria-expanded="true"]').forEach(x => x.setAttribute('aria-expanded', 'false'));
   }
   function closeMath() {
     let any = false;
-    document.querySelectorAll('.mathpop').forEach(x => { if (x.previousElementSibling) closeBelow(x.previousElementSibling); else x.remove(); any = true; });
+    document.querySelectorAll('.mathpop').forEach(x => { const host = x.parentElement.closest('p') || x.previousElementSibling; if (host) closeBelow(host); else x.remove(); any = true; });
     return any;
+  }
+  // the block opens under the sentence that holds the link, so the sentence stays whole; after the whole paragraph
+  // it could land a screen or more below the tap on a phone. The paragraph's end is the fallback.
+  function placeBelow(b, para, s) {
+    const w = document.createTreeWalker(para, NodeFilter.SHOW_TEXT);
+    w.currentNode = b.lastChild || b;
+    for (let t = w.nextNode(); t; t = w.nextNode()) {
+      if (t.parentElement.closest('button')) continue;
+      const m = /[.!?](?=\s|$)/.exec(t.data);
+      if (!m) continue;
+      if (m.index + 1 < t.data.length || t.nextSibling) { t.splitText(m.index + 1).before(s); break; }
+      break; // the sentence ends the paragraph
+    }
+    if (!s.isConnected) para.after(s);
+    s.scrollIntoView({ block: 'nearest' });
   }
   document.addEventListener('click', ev => {
     const t = ev.target && ev.target.closest ? ev.target : null;
@@ -206,7 +224,7 @@
       (v.note ? '<div class="mnote">' + UI.esc(v.note) + '</div>' : '') +
       (v.source ? '<div class="msrc">Source: ' + UI.esc(v.source) + '</div>' : '') +
       (v.meaning ? '<div class="mmean">' + UI.esc(v.meaning) + '</div>' : '');
-    para.after(s);
+    placeBelow(b, para, s);
     b.setAttribute('aria-expanded', 'true');
   });
   document.addEventListener('click', ev => {
@@ -214,7 +232,7 @@
     if (!b) return;
     const G = FF.Review && FF.Review.GLOSSARY, g = G && G[b.dataset.k];
     if (!g) return;
-    // one definition block per paragraph, placed after the paragraph so the sentence stays whole
+    // one definition block per paragraph, placed under the link's sentence (placeBelow)
     const para = b.closest('p') || b.parentElement;
     const wasOpen = b.getAttribute('aria-expanded') === 'true';
     closeBelow(para);
@@ -223,7 +241,7 @@
     s.className = 'termdef';
     s.setAttribute('role', 'note');
     s.innerHTML = '<b>' + UI.esc(g.term.charAt(0).toUpperCase() + g.term.slice(1)) + '.</b> ' + UI.esc(g.def);
-    para.after(s);
+    placeBelow(b, para, s);
     b.setAttribute('aria-expanded', 'true');
   });
   function recapHtml(rv) {
@@ -248,8 +266,17 @@
     if (i < 0) return UI.esc(txt);
     return UI.esc(txt.slice(0, i)) + '<span class="bl-long">' + UI.esc(tail) + '</span><span class="bl-short">' + UI.esc(kind) + '</span>';
   }
+  // a re-render (the solver finishing, the units switch) keeps the sheet's scroll and reopens the open note
+  // when the same link is still in the same place
+  let drawn = null; // the entry the sheet shows now
+  function openNote() {
+    const bs = UI.$$('button.num, button.term', sheet()), i = bs.findIndex(b => b.getAttribute('aria-expanded') === 'true');
+    return i < 0 ? null : { i: i, t: bs[i].textContent };
+  }
   R.render = function () {
     const entry = R.shown; if (!entry) return;
+    const same = drawn === entry, bodyEl = same && sheet().querySelector('.rv-body'), top = bodyEl ? bodyEl.scrollTop : 0, note = same ? openNote() : null;
+    drawn = entry;
     MATH = []; // the popover registry belongs to the sheet being drawn
     const rv = entry.rv, m = entry.meta;
     const head = '<div class="rv-head"><div><h3>Hand ' + entry.n + '</h3><div class="rv-sub">' + UI.esc(m.label || '') + '</div></div>' +
@@ -259,7 +286,10 @@
       netHtml(rv, true) + '</div>' +
       '<div class="rv-grade"><span class="grade ' + GRADE_CLS[rv.worst] + '">' + (rv.clean ? 'Clean hand' : 'Worst: ' + rv.worst) + '</span>' +
       (rv.evLost > 0 ? '<span class="evlost">EV lost ' + evAmt(rv.evLost, unitsOf(rv)) + '</span>' : '') +
-      (entry.solving ? '<span class="solving">Checking with the solver…</span>' : rv.solved ? '<span class="muted">' + rv.solved + ' solver answer' + (rv.solved > 1 ? 's' : '') + '</span>' : '') + '</div>';
+      (entry.solving ? '<span class="solving">Checking with the solver…</span>' : rv.solved ? '<span class="muted">' + rv.solved + ' solver answer' + (rv.solved > 1 ? 's' : '') + '</span>' : '') +
+      // a misclick hand can be left out of Stats and the Coach; the chips stay as they fell
+      '<button class="btn rv-excl" id="rv-excl" aria-pressed="' + !!rv.excluded + '">' + (rv.excluded ? 'Include again' : 'Exclude') + '</button>' +
+      (rv.excluded ? '<span class="muted small rv-exnote">Left out of Stats and the Coach.</span>' : '') + '</div>';
     let body;
     if (rv.clean && !entry.expanded) {
       body = '<div class="clean-line">Every decision was fine. <button class="btn link" id="rv-more">Show the decisions</button></div>';
@@ -271,12 +301,15 @@
     UI.$('#rv-x').onclick = R.close;
     UI.$('#rv-next').onclick = R.close;
     const more = UI.$('#rv-more'); if (more) more.onclick = () => { entry.expanded = true; R.render(); };
+    UI.$('#rv-excl').onclick = () => { rv.excluded = !rv.excluded || undefined; saveHistory(); R.render(); refreshLists(); };
+    if (bodyEl) sheet().querySelector('.rv-body').scrollTop = top;
+    if (note) { const b = UI.$$('button.num, button.term', sheet())[note.i]; if (b && b.textContent === note.t) b.click(); }
   };
 
   // ---------------------------------------------------------------- history and stats drawers
   const drawer = () => UI.$('#drawer');
   let drawerKind = null;
-  function refreshLists() { if (drawerKind === 'history') R.openHistory(); else if (drawerKind === 'stats') R.openStats(); }
+  function refreshLists() { if (drawerKind === 'history') R.openHistory(); else if (drawerKind === 'stats') R.openStats(); else if (drawerKind === 'coach') R.openCoach(); }
   function openDrawer(kind, title, html) {
     drawerKind = kind;
     drawer().innerHTML = '<div class="sheet"><div class="rv-head"><h3>' + UI.esc(title) + '</h3><button class="btn close-x" id="dr-x" aria-label="Close">✕</button></div><div class="rv-body">' + html + '</div></div>';
@@ -287,36 +320,120 @@
   R.openHistory = function () {
     const rows = R.entries.slice().reverse().map(e => {
       const rv = e.rv;
-      return '<button class="hrow" data-n="' + e.n + '"><span class="hn">' + e.n + '</span><span class="pos">' + rv.heroPos + '</span><span class="vcards">' + UI.cardsText(rv.heroCards) + '</span>' +
+      return '<button class="hrow' + (rv.excluded ? ' hx' : '') + '" data-n="' + e.n + '"><span class="hn">' + e.n + '</span><span class="pos">' + rv.heroPos + '</span><span class="vcards">' + UI.cardsText(rv.heroCards) + '</span>' +
         netHtml(rv, false, true) +
-        '<span class="grade ' + GRADE_CLS[rv.worst] + '">' + (rv.clean ? 'Clean' : rv.worst) + '</span>' + (e.solving ? '<span class="solving">…</span>' : '') + '</button>';
+        '<span class="grade ' + GRADE_CLS[rv.worst] + '">' + (rv.clean ? 'Clean' : rv.worst) + '</span>' + (rv.excluded ? '<span class="xtag">excluded</span>' : '') + (e.solving ? '<span class="solving">…</span>' : '') + '</button>';
     }).join('');
     openDrawer('history', 'Hand history', rows ? '<p class="muted">Your last ' + HMAX + ' hands are kept on this device.</p>' + rows : '<p class="muted">No hands yet.</p>');
+    bindRows();
+  };
+  // a tap on a hand row (History or a Coach example) opens that hand's review over the drawer
+  function bindRows() {
     UI.$$('.hrow', drawer()).forEach(b => b.onclick = () => {
       const e = byN(+b.dataset.n); if (!e) return;
       if (R.isOpen()) { R.shown = e; e.expanded = true; R.render(); sheet().scrollTop = 0; }
       else { e.expanded = true; R.open(e, 'Close'); }
     });
-  };
+  }
+  // amounts for a set of hands: dollars or chips need one table's big blind. Hands from one cash stake share it;
+  // tournament levels and mixed tables add up hand by hand for the net, and EV figures stay in bb.
+  function unitsFor(rvs) {
+    const sameBB = !!rvs.length && rvs.every(r => r.bb && r.mode === rvs[0].mode && (r.mode !== 'cash' || r.bb === rvs[0].bb));
+    const want = UI.settings.units !== 'bb', evConv = want && sameBB && rvs[0].mode === 'cash';
+    let note = '';
+    if (want && rvs.length && !evConv) note = rvs.some(r => !r.bb) ? 'Some amounts stay in bb. Older saved hands do not store the stakes.'
+      : !sameBB ? 'Some amounts stay in bb. These hands come from different tables.' : 'EV figures stay in bb in tournaments.';
+    return { sameBB, evConv, note,
+      ev: x => evConv ? UI.amt(Math.round(x * rvs[0].bb), rvs[0].bb, 'cash', true) : UI.trim(x, 1) + ' bb',
+      text: t => sameBB ? UI.bbText(t, rvs[0].bb, rvs[0].mode) : t };
+  }
+  // "This session" or "All saved hands", remembered per viewer (ff.statsView)
+  const exLine = n => n ? '<p class="muted small">' + n + ' hand' + (n > 1 ? 's' : '') + ' excluded. Tap a hand in History to include it again.</p>' : '';
+  const statsView = () => UI.load('statsView', 'session') === 'all' ? 'all' : 'session';
   R.openStats = function () {
-    const rvs = R.entries.filter(e => !e.saved).map(e => e.rv), s = FF.Review.session(rvs); // this visit only; older hands stay in the history
-    // dollars or chips need one table's big blind: hands from one cash stake share it; tournament levels and mixed tables add up hand by hand
-    const sameBB = rvs.length && rvs.every(r => r.bb && r.mode === rvs[0].mode && (r.mode !== 'cash' || r.bb === rvs[0].bb));
-    let netTxt = UI.bbs(s.net), evTxt = UI.trim(s.evLostPer100, 1) + ' bb';
-    if (UI.settings.units !== 'bb' && sameBB) {
-      const chips = rvs.reduce((a, r) => a + r.net * r.bb, 0), mode = rvs[0].mode;
-      netTxt = (chips > 0 ? '+' : '') + UI.amt(Math.round(chips), rvs[0].bb, mode, true);
-      if (mode === 'cash') evTxt = UI.amt(Math.round(s.evLostPer100 * rvs[0].bb), rvs[0].bb, mode, true);
+    const view = statsView(), all = R.entries.map(e => e.rv), sess = R.entries.filter(e => !e.saved).map(e => e.rv);
+    const pick = view === 'all' ? all : sess, s = FF.Review.session(pick), rvs = pick.filter(r => !r.excluded), u = unitsFor(rvs); // session() skips excluded hands
+    let html = '<div class="seg" role="group" aria-label="Which hands">' +
+      '<button class="btn segb' + (view === 'session' ? ' on' : '') + '" data-v="session" aria-pressed="' + (view === 'session') + '">This session</button>' +
+      '<button class="btn segb' + (view === 'all' ? ' on' : '') + '" data-v="all" aria-pressed="' + (view === 'all') + '">All saved hands (' + all.length + ')</button></div>';
+    if (!rvs.length) {
+      html += '<p class="muted">' + (view === 'session' ? 'No hands this session yet.' + (all.length ? ' Tap All saved hands to see your history.' : '') : 'No saved hands yet.') + '</p>';
+    } else {
+      let netTxt = UI.bbs(s.net);
+      if (UI.settings.units !== 'bb' && u.sameBB) {
+        const chips = rvs.reduce((a, r) => a + r.net * r.bb, 0);
+        netTxt = (chips > 0 ? '+' : '') + UI.amt(Math.round(chips), rvs[0].bb, rvs[0].mode, true);
+      }
+      // a saved hand from an old version may lack leak tags: the leak list leaves those decisions out and says so
+      const untagged = rvs.reduce((a, r) => a + r.decisions.filter(d => d.grade !== 'Good' && !('leak' in d)).length, 0);
+      html += '<div class="stats-grid">' +
+        '<div><b>' + s.hands + '</b><span>hands reviewed</span></div>' +
+        '<div><b class="' + (s.net >= 0 ? 'pos-net' : 'neg-net') + '">' + netTxt + '</b><span>net</span></div>' +
+        '<div><b>' + u.ev(s.evLostPer100) + '</b><span>EV lost per 100 hands</span></div>' +
+        '<div><b>' + s.clean + '</b><span>clean hands</span></div></div>' +
+        '<div class="gradecount">' + ['Good', 'Inaccuracy', 'Mistake', 'Blunder'].map(g => '<span class="grade ' + GRADE_CLS[g] + '">' + g + ' ' + s.grades[g] + '</span>').join('') + '</div>';
+      html += '<h4>Top leaks</h4>' + (s.leaks.length ? '<ol class="leaks">' + s.leaks.slice(0, 5).map(x => '<li>' + UI.esc(u.text(x.text)) + '</li>').join('') + '</ol>' : '<p class="muted">No leaks found yet.</p>');
+      if (untagged) html += '<p class="muted small">Leaks: — for ' + untagged + ' older decision' + (untagged > 1 ? 's' : '') + '. Hands saved before leak tags have none.</p>';
+      if (s.exploitLeaks.length) html += '<h4>Against this table&rsquo;s players</h4><ol class="leaks">' + s.exploitLeaks.slice(0, 3).map(x => '<li>' + UI.esc(u.text(x.text)) + '</li>').join('') + '</ol>';
+      if (u.note) html += '<p class="muted small">' + UI.esc(u.note) + '</p>';
     }
-    let html = '<div class="stats-grid">' +
-      '<div><b>' + s.hands + '</b><span>hands reviewed</span></div>' +
-      '<div><b class="' + (s.net >= 0 ? 'pos-net' : 'neg-net') + '">' + netTxt + '</b><span>net</span></div>' +
-      '<div><b>' + evTxt + '</b><span>EV lost per 100 hands</span></div>' +
-      '<div><b>' + s.clean + '</b><span>clean hands</span></div></div>' +
-      '<div class="gradecount">' + ['Good', 'Inaccuracy', 'Mistake', 'Blunder'].map(g => '<span class="grade ' + GRADE_CLS[g] + '">' + g + ' ' + s.grades[g] + '</span>').join('') + '</div>';
-    html += '<h4>Top leaks</h4>' + (s.leaks.length ? '<ol class="leaks">' + s.leaks.slice(0, 5).map(x => '<li>' + UI.esc(sameBB ? UI.bbText(x.text, rvs[0].bb, rvs[0].mode) : x.text) + '</li>').join('') + '</ol>' : '<p class="muted">No leaks found yet.</p>');
-    if (s.exploitLeaks.length) html += '<h4>Against this table&rsquo;s players</h4><ol class="leaks">' + s.exploitLeaks.slice(0, 3).map(x => '<li>' + UI.esc(sameBB ? UI.bbText(x.text, rvs[0].bb, rvs[0].mode) : x.text) + '</li>').join('') + '</ol>';
-    openDrawer('stats', 'Session stats', html);
+    html += exLine(s.excluded);
+    openDrawer('stats', 'Stats', html);
+    UI.$$('.segb', drawer()).forEach(b => b.onclick = () => { UI.save('statsView', b.dataset.v); R.openStats(); });
+  };
+
+  // ---------------------------------------------------------------- the Coach: patterns over all saved hands (FF.Coach)
+  // bars in one neutral sand colour: never a grade colour or a baseline-bar colour
+  function barsHtml(title, rows, u, name) {
+    const max = Math.max(0, ...rows.map(r => r.evLost));
+    return '<div class="cbars"><h5>' + title + '</h5>' + rows.map(r => '<div class="cbar"><span class="cl">' + UI.esc(name ? name(r) : r.label) + '</span>' +
+      '<span class="ct"><i style="width:' + (max > 0 ? Math.max(r.evLost > 0 ? 2 : 0, Math.round(100 * r.evLost / max)) : 0) + '%"></i></span><span class="cv">' + u.ev(r.evLost) + '</span></div>').join('') + '</div>';
+  }
+  const para = t => '<p>' + termsHtml(UI.esc(t)) + '</p>';
+  R.openCoach = function () {
+    const rvs = R.entries.map(e => e.rv).filter(r => !r.excluded), u = unitsFor(rvs);
+    const c = FF.Coach.analyze(R.entries.map(e => ({ n: e.n, rv: e.rv })));
+    let html = '<p class="muted">From your last ' + c.hands + ' saved hand' + (c.hands === 1 ? '' : 's') + '.</p><h4>Work on this</h4>';
+    if (c.focus) {
+      const f = c.focus;
+      html += '<div class="coach-focus"><p class="ctitle"><b>' + UI.esc(f.title) + '</b></p>' + para(f.why) +
+        '<p>You lost about <b>' + u.ev(f.evLost) + '</b> in ' + f.count + ' spots. That is about ' + u.ev(f.avg) + ' each time.</p>' +
+        '<p class="crule"><b>Rule of thumb:</b> ' + termsHtml(UI.esc(f.rule)) + '</p>' +
+        '<div class="cex"><span class="muted small">Example hands. Tap one to review it.</span>' + f.examples.filter(x => byN(x.n)).map(x =>
+          '<button class="hrow" data-n="' + x.n + '"><span class="hn">' + x.n + '</span><span class="pos">' + UI.esc(x.heroPos) + '</span><span class="vcards">' + UI.cardsText(x.heroCards) + '</span>' +
+          '<span class="cst">' + UI.esc(x.street) + '</span><span class="net neg-net">-' + u.ev(x.evLost) + '</span></button>').join('') + '</div></div>';
+    } else if (!c.hands) {
+      html += '<p class="muted">No saved hands yet. Play some hands and come back.</p>';
+    } else {
+      const n = c.need;
+      html += '<p>There is not enough data yet. The Coach names a leak once it has ' + FF.Coach.MIN + ' examples.' +
+        (n.closest ? ' The closest is &ldquo;' + UI.esc(n.closest) + '&rdquo; with ' + n.count + '.' : '') + ' Play about ' + n.more + ' more hands.</p>';
+    }
+    if (c.also.length) html += '<h4>Also watch</h4><ul class="leaks">' + c.also.map(x => '<li><b>' + UI.esc(x.title) + '</b>: ' + x.count + ' spots, about ' + u.ev(x.evLost) + ' lost.</li>').join('') + '</ul>';
+    if (c.mistakes) {
+      const GW = { Inaccuracy: 'Inaccuracies', Mistake: 'Mistakes', Blunder: 'Blunders' };
+      html += '<h4>Where the EV goes</h4>' + barsHtml('By position', c.byPos, u) + barsHtml('By street', c.byStreet, u) +
+        barsHtml('By grade', c.byGrade, u, r => GW[r.key]) + barsHtml('By action', c.byAction, u);
+    }
+    const hb = c.habits;
+    html += '<h4>Preflop habits</h4>';
+    if (!hb.hands) html += '<p class="muted">No preflop decisions yet.</p>';
+    else {
+      html += '<p class="muted small">Targets for ' + (hb.seats === 6 ? 'a 6-max table' : 'tables of ' + hb.tableName) + ' against weak players. From ' + hb.hands + ' hands.</p>' +
+        hb.stats.map(st => '<div class="habit"><div class="hline"><b>' + st.name + '</b> <span class="hv">' + (st.value == null ? '—' : Math.round(st.value) + '%') + '</span>' +
+          ' <span class="muted small">target ' + st.band[0] + '–' + st.band[1] + '%</span>' + (st.state === 'ok' ? ' <span class="hok">on target</span>' : st.state === 'none' ? '' : ' <span class="hoff">' + st.state + '</span>') + '</div>' +
+          para(st.line) + '</div>').join('');
+    }
+    const tr = c.trend;
+    if (tr) {
+      html += '<h4>Trend</h4><p>Your last 50 hands against the ' + tr.prev.hands + ' before: <b>' + tr.verdict + '</b>.</p>' +
+        '<p>EV lost per 100 hands: ' + u.ev(tr.last.per100) + ' now, ' + u.ev(tr.prev.per100) + ' before. Mistakes: ' + tr.last.mistakes + ' now, ' + tr.prev.mistakes + ' before' +
+        (tr.prev.hands !== 50 ? ' (' + tr.prev.mistakesPer100 + ' per 100 hands)' : '') + '.</p>';
+    }
+    if (u.note) html += '<p class="muted small">' + UI.esc(u.note) + '</p>';
+    html += exLine(c.excluded);
+    openDrawer('coach', 'Coach', '<div class="coach">' + html + '</div>');
+    bindRows();
   };
   UI.unitListeners.push(() => { if (R.shown) R.render(); refreshLists(); });
   R.reset = function () { R.entries.forEach(e => { e.saved = true; }); }; // starts a fresh session; the saved history stays
