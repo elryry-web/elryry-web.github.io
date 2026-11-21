@@ -8,6 +8,7 @@
     cash: () => UI.Cash.lobby(),
     tour: () => UI.Tourney.lobby(),
     custom: () => UI.Custom.lobby(),
+    drill: () => UI.Drill.enter(),
     settings: () => renderSettings(UI.$('#settings-body')),
     title: () => renderTitle()
   };
