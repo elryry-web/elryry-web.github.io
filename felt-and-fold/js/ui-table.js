@@ -13,8 +13,18 @@
   Table.mount = function () {
     felt = UI.$('#felt'); bar = UI.$('#actionbar');
     LC.mount();
-    // phone bets are placed from measured boxes, so a resize (rotation, toolbar) places them again
-    window.addEventListener('resize', () => { if (phoneQ.matches || felt.querySelector('.bet[style], .dealer[style]')) render(); });
+    // phone bets are placed from measured boxes, so a resize (rotation, toolbar, keyboard) places them again: once on
+    // the next frame and once more when the sizes settle, since a phone keyboard resizes the page in steps as it slides
+    const relayout = () => { fitView(); if (phoneQ.matches || felt.querySelector('.bet[style], .dealer[style]')) render(); };
+    let rafId = 0, settle = 0;
+    const refit = () => {
+      if (!rafId) rafId = requestAnimationFrame(() => { rafId = 0; relayout(); });
+      clearTimeout(settle); settle = setTimeout(relayout, 160);
+    };
+    window.addEventListener('resize', refit);
+    if (window.visualViewport) { visualViewport.addEventListener('resize', refit); visualViewport.addEventListener('scroll', fitView); }
+    // the typed size field: when it loses focus (✓, Back, a tap elsewhere) the keyboard closes after it, so measure again then
+    bar.addEventListener('focusout', () => { refit(); setTimeout(refit, 400); });
     // the read tag on a seat opens its details on tap; a second tap, or a tap elsewhere on the felt, closes them
     felt.addEventListener('click', ev => {
       const b = ev.target.closest ? ev.target.closest('.readtag') : null;
@@ -141,6 +151,22 @@
   // or an earlier bet moves to the nearest clear place on the felt, trying its line to the pot first.
   // This covers narrow felts, long amounts ("$112.75", "All in 67.4 bb") and enlarged system fonts.
   const phoneQ = window.matchMedia ? window.matchMedia('(max-width: 640px)') : { matches: false };
+  // phone keyboard. index.html asks for interactive-widget=resizes-content, so the keyboard shrinks the page and the
+  // pinned table screen (felt, coach, sizer and buttons) fits above it. A browser that ignores that overlays the
+  // keyboard and only the visual viewport shrinks: then the screen is pinned to the visible part until it grows back.
+  // Either way the screen is never left scrolled: focusing the field can scroll the overflow:hidden screen or the page
+  // to bring it into view, and nothing scrolls them back, which left the bar off screen after the keyboard closed.
+  function fitView() {
+    const scr = UI.$('#scr-table'); if (!scr) return;
+    const vv = window.visualViewport, on = scr.classList.contains('on') && phoneQ.matches;
+    const short = on && vv && Math.abs(vv.scale - 1) < 0.01 && vv.height < window.innerHeight - 1;
+    if (short) { scr.style.top = Math.max(0, vv.offsetTop) + 'px'; scr.style.height = vv.height + 'px'; scr.style.bottom = 'auto'; scr.style.minHeight = '0'; }
+    else if (scr.style.height) { scr.style.top = scr.style.height = scr.style.bottom = scr.style.minHeight = ''; }
+    if (!on) return;
+    if (scr.scrollTop || scr.scrollLeft) scr.scrollTop = scr.scrollLeft = 0;
+    if (!short && (window.scrollX || window.scrollY)) window.scrollTo(0, 0);
+  }
+  Table.fitView = fitView;
   function tidyPhone() {
     const fr = felt.getBoundingClientRect(), GAP = 2;
     const box = el => { const r = el.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; };
@@ -276,12 +302,13 @@
       barRelabel = () => { if (cb) cb.textContent = 'Call ' + a(L.call) + (L.call >= L.stack ? ' (all in)' : ''); step = niceStep(h); setRange(); upd(); };
       if (sz) sz.oninput = () => { to = snapTo(+sz.value, L, step); upd(); };
       if (szin) {
-        // typing moves the slider and the Raise label at once; blur or Enter shows the legal amount on the 0.1 bb grid
+        // typing moves the slider and the Raise label at once; blur or Enter shows the legal amount on the 0.1 bb grid.
+        // Enter (the keyboard's ✓) sets the size and leaves the field, so the phone keyboard closes; it never raises
         szin.oninput = () => { const x = fromField(szin.value); if (x > 0) { to = snapTo(x, L, fineStep(h)); upd(true); } };
         const commit = () => { const x = fromField(szin.value); if (x > 0) to = snapTo(x, L, fineStep(h)); szin.value = toField(to); upd(); };
         szin.onblur = commit;
         szin.onfocus = () => szin.select();
-        szin.onkeydown = ev => { if (ev.key === 'Enter') { ev.preventDefault(); commit(); szin.select(); } else if (ev.key === 'Escape') szin.blur(); };
+        szin.onkeydown = ev => { if (ev.key === 'Enter' || ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); commit(); szin.blur(); } };
       }
       setRange();
       UI.$$('.preset', bar).forEach(b => b.onclick = () => { to = +b.dataset.to; upd(); });
@@ -332,7 +359,8 @@
       const sum = !live ? 'Waits for your turn.' : d ? html(d.summary, null, null, u) : 'Reading the spot…';
       let out = '<div class="lc-head"><button type="button" class="lc-tog" aria-expanded="' + st.open + '" title="Show or hide the live coach"><span class="lc-car">' + (st.open ? '▾' : '▸') + '</span> Coach</button>' +
         '<span class="lc-sum">' + sum + '</span>' +
-        '<button type="button" class="btn sm lc-hint"' + (live && d ? '' : ' disabled') + '>' + (live && live.hint ? 'Hint used' : 'Hint') + '</button></div>';
+        '<button type="button" class="btn sm lc-hint"' + (live && d ? '' : ' disabled') + '>' + (live && live.hint ? 'Hint used' : 'Hint') + '</button>' +
+        '<button type="button" class="btn sm lc-off" aria-label="Turn off live coach" title="Turn off live coach">✕</button></div>';
       if (st.open) {
         out += '<div class="lc-body">';
         if (!live) out += '<p class="lc-idle">The coach reads each spot when it is your turn.</p>';
@@ -392,6 +420,7 @@
         box.addEventListener('click', ev => {
           const t = ev.target.closest ? ev.target : null;
           if (t && t.closest('.lc-hint')) { onHint(); return; }
+          if (t && t.closest('.lc-off')) { LC.setOn(false); UI.toast('Live coach off. Turn it on from the ☰ menu or Settings.', 3200); return; }
           if (t && t.closest('.lc-tog, .lc-sum') && !t.closest('button.num, button.term')) { st.open = !st.open; save(); draw(); }
         });
       },
@@ -401,7 +430,12 @@
         if (st.on) setTimeout(compute, 30); // after the action bar paints
       },
       end() { live = null; draw(); },
-      setOn(on) { st.on = !!on; save(); if (st.on && live && !live.data) setTimeout(compute, 30); draw(); },
+      // the panel's height goes to (or comes from) the felt, so the phone bets and button are placed again
+      setOn(on) {
+        st.on = !!on; save(); if (st.on && live && !live.data) setTimeout(compute, 30); draw();
+        const set = UI.$('input[data-k="liveCoach"]'); if (set) set.checked = st.on;
+        render();
+      },
       draw: draw
     };
   })();

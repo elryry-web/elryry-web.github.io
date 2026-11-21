@@ -17,6 +17,7 @@
     if (name === 'table' && UI.unitLabel) UI.unitLabel();
     if (ENTER[name]) ENTER[name]();
     window.scrollTo(0, 0);
+    if (UI.Table && UI.Table.fitView) UI.Table.fitView();
   };
 
   function renderTitle() {

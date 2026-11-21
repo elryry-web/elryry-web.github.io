@@ -24,6 +24,7 @@
     item('History', () => UI.$('#tb-hist').click());
     item('Stats', () => UI.$('#tb-stats').click());
     item('Coach', () => UI.$('#tb-coach').click());
+    if (UI.LiveCoach) item('Live coach: ' + (UI.LiveCoach.state.on ? 'on' : 'off'), () => UI.LiveCoach.setOn(!UI.LiveCoach.state.on), 'lcoach');
     item('Settings', () => UI.$('#tb-set').click());
     const extra = [...UI.$$('#tinfo span')].slice(1).map(s => s.textContent).filter(Boolean);
     if (extra.length) box.appendChild(UI.el('<div class="tmenu-info">' + extra.map(UI.esc).join(' · ') + '</div>'));
