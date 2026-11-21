@@ -22,13 +22,13 @@
     return { street: d.street, boardStr: d.boardStr, grade: d.grade, evLost: d.evLost, source: d.source, spot: d.spot, pot: d.pot, toCall: d.toCall,
       did: { action: d.did.action, toBB: d.did.toBB, addBB: d.did.addBB }, hand: d.hand, leak: d.leak, text: d.text, concepts: d.concepts || [],
       mix: d.mix.filter(m => m.freq >= 0.005).map(m => ({ action: m.action, sizeLabel: m.sizeLabel, freq: r2(m.freq) })),
-      exploit: d.exploit ? { gradedBy: d.exploit.gradedBy, name: d.exploit.name, best: d.exploit.best, baseGrade: d.exploit.baseGrade, state: d.exploit.state } : null,
+      exploit: d.exploit ? { gradedBy: d.exploit.gradedBy, name: d.exploit.name, best: d.exploit.best, baseGrade: d.exploit.baseGrade, state: d.exploit.state, plan: d.exploit.plan || null } : null,
       later: d.later || '' };
   }
   function pack(e) {
     const rv = e.rv, rc = rv.recap;
     return { n: e.n, at: e.at, label: e.meta.label || '', rv: { handId: rv.handId, heroPos: rv.heroPos, heroCards: rv.heroCards, board: rv.board,
-      net: rv.net, worst: rv.worst, clean: rv.clean, evLost: rv.evLost, solved: rv.solved || 0,
+      net: rv.net, blind: rv.blind || null, worst: rv.worst, clean: rv.clean, evLost: rv.evLost, solved: rv.solved || 0,
       recap: rc ? { villains: rc.villains.map(v => ({ name: v.name, pos: v.pos, cards: v.cards, made: v.made, text: v.text, rangeText: v.rangeText, thinking: v.thinking })) } : null,
       decisions: rv.decisions.map(packDecision) } };
   }
@@ -87,6 +87,13 @@
       (r.m.sizeLabel && r.m.action !== 'allin' ? ' ' + UI.esc(r.m.sizeLabel) : '') + ' ' + r.pct + '%</span>').join('');
     return '<div class="mixbar">' + segs + '</div><div class="mixlegend">' + legend + '</div>';
   }
+  // the balanced bar, and under it the plan the grade follows when the player's real play wants something else
+  function planHtml(d) {
+    const x = d.exploit, p = x && x.gradedBy === 'exploit' && x.plan;
+    if (!p) return mixBar(d.mix);
+    return '<div class="ddid muted">Balanced:</div>' + mixBar(d.mix) +
+      '<div class="ddid"><span class="muted">vs ' + UI.esc(x.name) + ':</span> <b>' + UI.esc(p.label) + '</b></div>';
+  }
   // "Bet half pot (6.5 bb)", "Raise to 3x (19.5 bb)", "All-in (48 bb)"; preflop "Raise to 4.7 bb" (see FF.Review.didLabel)
   function didText(d) { return FF.Review.didLabel(d, x => UI.trim(x, 1) + ' bb'); }
   function decisionHtml(d, entry) {
@@ -100,7 +107,7 @@
       (pending ? '<span class="solving">solving…</span>' : '') + '</div>' +
       '<div class="dspot">' + UI.esc(d.spot) + '. Pot ' + UI.trim(d.pot, 1) + ' bb' + (d.toCall ? ', ' + UI.trim(d.toCall, 1) + ' bb to call' : '') + '.</div>' +
       '<div class="ddid">You: <b>' + UI.esc(didText(d)) + '</b>' + (d.hand ? ' with ' + UI.esc(d.hand) : '') + '</div>' +
-      mixBar(d.mix) +
+      planHtml(d) +
       '<p class="dtext">' + termsHtml(UI.esc(d.text), d.concepts) + '</p>' +
       (d.later ? '<p class="dlater">' + UI.esc(d.later) + '</p>' : '') + '</div>';
   }
@@ -150,6 +157,12 @@
       (v.rangeText ? '<p>' + UI.esc(v.rangeText) + '</p>' : '') +
       (v.thinking ? '<p class="thinking">' + UI.esc(v.thinking) + '</p>' : '') + '</div>').join('') + '</div>';
   }
+  // the hand's result: green or red, or muted grey with '(blind)' when only the forced chips were lost
+  function netHtml(rv, label) {
+    const txt = FF.Review.netLabel ? FF.Review.netLabel(rv) : UI.bbs(rv.net);
+    return '<span class="net ' + (rv.blind ? 'muted' : rv.net >= 0 ? 'pos-net' : 'neg-net') + '">' +
+      (label ? '<span class="muted" style="font-weight:400">Result</span> ' : '') + UI.esc(txt) + '</span>';
+  }
   R.render = function () {
     const entry = R.shown; if (!entry) return;
     const rv = entry.rv, m = entry.meta;
@@ -157,7 +170,7 @@
       '<button class="btn close-x" id="rv-x" aria-label="Close">✕</button></div>' +
       '<div class="rv-sum"><span class="pos">' + rv.heroPos + '</span> <span class="vcards">' + UI.cardsText(rv.heroCards) + '</span>' +
       (rv.board ? ' <span class="muted">board</span> <span class="vcards">' + UI.cardsText(rv.board) + '</span>' : '') +
-      '<span class="net ' + (rv.net >= 0 ? 'pos-net' : 'neg-net') + '">' + UI.bbs(rv.net) + '</span></div>' +
+      netHtml(rv, true) + '</div>' +
       '<div class="rv-grade"><span class="grade ' + GRADE_CLS[rv.worst] + '">' + (rv.clean ? 'Clean hand' : 'Worst: ' + rv.worst) + '</span>' +
       (rv.evLost > 0 ? '<span class="evlost">EV lost ' + UI.trim(rv.evLost, 2) + ' bb</span>' : '') +
       (entry.solving ? '<span class="solving">Checking with the solver…</span>' : rv.solved ? '<span class="muted">' + rv.solved + ' solver answer' + (rv.solved > 1 ? 's' : '') + '</span>' : '') + '</div>';
@@ -189,7 +202,7 @@
     const rows = R.entries.slice().reverse().map(e => {
       const rv = e.rv;
       return '<button class="hrow" data-n="' + e.n + '"><span class="hn">' + e.n + '</span><span class="pos">' + rv.heroPos + '</span><span class="vcards">' + UI.cardsText(rv.heroCards) + '</span>' +
-        '<span class="net ' + (rv.net >= 0 ? 'pos-net' : 'neg-net') + '">' + UI.bbs(rv.net) + '</span>' +
+        netHtml(rv, false) +
         '<span class="grade ' + GRADE_CLS[rv.worst] + '">' + (rv.clean ? 'Clean' : rv.worst) + '</span>' + (e.solving ? '<span class="solving">…</span>' : '') + '</button>';
     }).join('');
     openDrawer('history', 'Hand history', rows ? '<p class="muted">Your last ' + HMAX + ' hands are kept on this device.</p>' + rows : '<p class="muted">No hands yet.</p>');

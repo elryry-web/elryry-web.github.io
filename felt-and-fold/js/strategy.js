@@ -542,8 +542,16 @@
       if (tr.models && tr.models[s]) tr.WX[s] = C.removeDead(C.classToCombos(preflopRangeX(h, s, tr.models[s])), tr.board);
     });
   }
+  // back to the start of the hand (a tracker only moves forward; an earlier decision rebuilds it)
+  function rewind(tr) {
+    var h = tr.h;
+    tr.i = 0; tr.street = 'preflop'; tr.board = []; tr.W = {}; if (tr.WX) tr.WX = {}; tr.active = {}; tr.stack = {}; tr.comm = {}; tr.aggr = {};
+    tr.raises = 0; tr.snaps = {}; tr.acts = {}; tr.streetBet = false; tr.checks = 0; tr.prevAggr = null; tr.ended = false;
+    h.order.forEach(function (s) { tr.active[s] = true; tr.stack[s] = h.players[s].stackStart; tr.comm[s] = 0; tr.snaps[s] = {}; });
+  }
   function advance(tr, upto) {
     var h = tr.h; upto = upto == null ? h.log.length : Math.min(upto, h.log.length);
+    if (upto < tr.i) rewind(tr);
     for (; tr.i < upto; tr.i++) {
       var e = h.log[tr.i];
       if (e.ev === 'post') { tr.stack[e.seat] -= e.amount; if (e.kind !== 'ante') tr.comm[e.seat] = (tr.comm[e.seat] || 0) + e.amount; }
