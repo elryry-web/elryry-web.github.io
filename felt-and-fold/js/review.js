@@ -506,6 +506,8 @@
   // preflop, a play the chart never makes (under 3% while one action holds 97%) is at least an Inaccuracy once it costs
   // NEVER_COST: a cheap spot keeps its small cost, but the grade does not call it Good
   var NEVER_COST = 0.15;
+  // a preflop chart call that keeps at least this much realized equity over the price is graded Good
+  var REAL_MARGIN = 0.03;
   var SETTLE_GAP = 0.12, SETTLE_JAM_GAP = 0.06, SETTLE_PRE_OFF = 0.05, SETTLE_PRE_TOP = 0.85;
   function thresholds(d) {
     var p = Math.max(d.potBB, d.toCall || 0), pre = d.street === 'preflop';
@@ -592,6 +594,12 @@
     var hv = evOf(d.ev, d.did.action), bv = bestAct ? evOf(d.ev, bestAct) : null;
     d.evSplit = d.grade !== 'Good' && d.freqFloor && hv != null && bv != null && hv - bv > 0.3 ? rd(hv - bv, 2) : 0;
     if (d.evSplit && !d.wasted && GRADES.indexOf(d.grade) > 1) { d.grade = 'Inaccuracy'; d.evLost = rd(Math.min(d.evLost, thresholds(d).mistake - 0.05), 2); }
+    // a preflop call off a chart (not a solve) whose realized equity clears the price by REAL_MARGIN is Good:
+    // the chart is a rough guide, and the review will not call a priced call an error
+    d.realizedOk = false;
+    if (d.realEq && d.grade !== 'Good' && !d.wasted && d.realEq.have * d.realEq.r >= d.realEq.need + REAL_MARGIN) {
+      d.grade = 'Good'; d.evLost = 0; d.realizedOk = true; d.never = false; d.capped = null; d.evSplit = 0; d.settled = false;
+    }
     return d;
   }
   // whole percentages for a mix that add up to 100: actions under 1% are dropped, the rest rounded by largest remainder
@@ -671,6 +679,14 @@
     }
     if (e.street === 'preflop' && res.cls != null) d.hand = C.CLASS_NAME[res.cls];
     else if (res.feat) d.hand = res.feat.hand.label;
+    // a preflop call off a chart: the realized equity the review quotes, for the price check in gradeDecision
+    if (e.street === 'preflop' && did.action === 'call' && d.source === 'Chart' && d.chartKind !== 'vsJam' && d.hand) {
+      var po0 = F(res.factors || [], 'potOdds'), icm0 = F(res.factors || [], 'icm');
+      if (po0 && po0.have >= po0.need && po0.toCall < 0.5 * d.stack && !(icm0 && icm0.premium > 0.01)) {
+        var rq = realizedShare(h, seat, e, d.hand, po0.have);
+        d.realEq = { r: rd(rq.r, 3), have: po0.have, need: po0.need, o: { ip: rq.ip, have: po0.have, cut: rq.weak ? 0.1 : !rq.pair && !rq.suited ? 0.04 : 0, k: rq.k } };
+      }
+    }
     gradeDecision(d);
     if (e.street !== 'preflop' && opts._models) exploitView(h, seat, e, d, opts);
     applyExploit(d);
@@ -1296,6 +1312,8 @@
     var ls = d.limpSize, lsRight = !!(ls && d.grade !== 'Good' && d.sizeOff), rs = d.raiseSize, rsRight = !!(rs && d.grade !== 'Good' && d.sizeOff);
     if (lsRight) out.push(d.grade + '. Raising was right. The size was too ' + (ls.small ? 'small' : 'big') + '. ' + limpSizeText(d, false) + (why ? ' ' + why : '') + approx);
     else if (rsRight) out.push(d.grade + '. Raising was right. The size was too ' + (rs.small ? 'small' : 'big') + '. ' + raiseSizeText(d, false) + (why ? ' ' + why : '') + approx);
+    else if (d.realizedOk && d.mix[0]) out.push('Good. Calling ' + hand + ' is close here. ' + who + ' ' + chartVerb(d.mix[0]) + ' it' + (d.mix[0].freq < 0.97 ? ' ' + P('freq', d.mix[0].freq) + ' of the time' : '') + '. The price is good enough for its realized equity. '
+      + hand + ' keeps ' + tok(realWords(d.realEq.r), mathOf('realize', d.realEq.r, 'pct', d.realEq.o)) + ' of its ' + P('have', d.realEq.have) + ' equity. That is more than the ' + P('need', d.realEq.need) + ' the call needs.' + (approx || ' The chart is a rough guide, not a solve.'));
     else if (d.grade === 'Good' && d.heroFreq < GOOD_FREQ && !has('mixed') && d.mix[0]) out.push('Good. ' + cap(verbIng(did)) + ' ' + hand + ' is close here. ' + (why ? why + ' ' : '')
       + who + ' ' + chartVerb(d.mix[0]) + ' it. ' + cap(verbIng(d.mix[0].action)) + ((d.cost || 0) < 0.1 ? ' scores about the same.' : ' gains only about ' + B('gain', d.cost) + '. That is too small to count as an error.') + approx);
     else if (d.grade === 'Good') out.push('Good. ' + (has('mixed') ? why + ' The mix is ' + mt + '.'
@@ -1309,7 +1327,7 @@
     if (d.never) out.push('The chart never ' + ({ call: 'calls with', raise: 'raises', allin: 'moves all in with', fold: 'folds', check: 'checks' }[did] || 'plays') + ' ' + hand + ' here. The cost is small, but the play is still an error.');
     if (did === 'call' && d.evLost > (d.toCall || 0) + 0.05 && d.toCall > 0) out.push('The cost is more than the ' + bbs(d.toCall) + ' call. The hand plays on after the flop' + (pos === 'SB' || pos === 'BB' ? ', out of position' : '') + '. It loses more chips on later streets.');
     if (d.jamOversize) out.push('Moving all in risks ' + bbs(d.stack) + ' where the chart raises to ' + bbs(d.jamOversize.toBB) + '. ' + jamWhy(d, po));
-    if (po && !isAgg(did) && (ch.chart === 'vsJam' || po.toCall >= 0.25 * d.stack || d.grade !== 'Good' || d.heroFreq < GOOD_FREQ)) {
+    if (po && !isAgg(did) && !d.realizedOk && (ch.chart === 'vsJam' || po.toCall >= 0.25 * d.stack || d.grade !== 'Good' || d.heroFreq < GOOD_FREQ)) {
       out.push('The call was ' + bbs(po.toCall) + ' into ' + bbs(d.potBB + po.toCall) + '.' + (has('potOdds') ? '' : ' A call needed ' + P('need', po.need) + ' equity.'));
       if (!has('potOdds')) out.push(hand + ' has about ' + P('have', po.have) + ' against the raiser\'s range.');
       if (did === 'call' && d.grade !== 'Good' && po.have >= po.need && ch.chart !== 'vsJam' && po.toCall < 0.5 * d.stack && !(icm && icm.premium > 0.01)) out.push(realizedText(h, seat, e, hand, po));
@@ -1327,7 +1345,7 @@
   // (position after the flop, the number of players, the hand type), with a rough share. The share follows the
   // realization the preflop model uses (0.82 out of position, 0.95 in position, less for weak equity), less again for
   // offsuit hands without a high card and for each extra player.
-  function realizedText(h, seat, e, hand, po) {
+  function realizedShare(h, seat, e, hand, have) {
     var n = h.players.length, ord = function (s) { return (s - h.button - 1 + n) % n; };
     var opp = {};
     h.log.slice(0, e.n).forEach(function (x) { if (x.ev === 'act' && x.street === 'preflop' && x.seat !== seat && (x.type === 'raise' || x.type === 'call' || x.type === 'allin')) opp[x.seat] = true; });
@@ -1336,10 +1354,15 @@
     var hs = String(hand || ''), pair = hs.length >= 2 && hs[0] === hs[1], suited = /s$/.test(hs), high = /^[AKQ]/.test(hs);
     var gap = pair ? 0 : Math.abs('23456789TJQKA'.indexOf(hs[0]) - '23456789TJQKA'.indexOf(hs[1]));
     var weak = !pair && !suited && !high && gap >= 2;
-    var r = Math.min(1.1, Math.max(0.6, (ip ? 0.95 : 0.82) + 0.4 * (po.have - 0.5)));
+    var r = Math.min(1.1, Math.max(0.6, (ip ? 0.95 : 0.82) + 0.4 * (have - 0.5)));
     if (weak) r -= 0.1; else if (!pair && !suited) r -= 0.04;
     r *= Math.pow(0.88, k - 1);
-    var share = r >= 0.9 ? 'nearly all' : r >= 0.7 ? 'about three quarters' : r >= 0.6 ? 'about two thirds' : r >= 0.45 ? 'about half' : 'less than half';
+    return { r: r, k: k, ip: ip, hs: hs, pair: pair, suited: suited, high: high, weak: weak };
+  }
+  function realWords(r) { return r >= 0.9 ? 'nearly all' : r >= 0.7 ? 'about three quarters' : r >= 0.6 ? 'about two thirds' : r >= 0.45 ? 'about half' : 'less than half'; }
+  function realizedText(h, seat, e, hand, po) {
+    var rs = realizedShare(h, seat, e, hand, po.have), r = rs.r, k = rs.k, ip = rs.ip, hs = rs.hs, pair = rs.pair, suited = rs.suited, high = rs.high, weak = rs.weak;
+    var share = realWords(r);
     var who = k === 1 ? 'one player' : k === 2 ? 'two players' : k + ' players';
     var out = ['Equity alone does not make the call good. What counts is realized equity, the part of it the hand wins once more bets come.'];
     if (!ip) out.push('You will be out of position after the flop. You act first on every street.');

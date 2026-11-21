@@ -39,18 +39,24 @@
     'BTN>HJ': { r: 'QQ+, AKs, AKo, JJ:0.4, AQs:0.4, AJs:0.2, A5s:0.6, A4s:0.5, A3s:0.3, KQs:0.4, KJs:0.3, QJs:0.2, AQo:0.3, 76s:0.2, 65s:0.2', c: 'JJ, TT, 99, 88, 77, 66:0.7, 55:0.5, AQs, AJs, ATs, A9s:0.5, A8s:0.3, KQs, KJs, KTs, K9s:0.3, QJs, QTs, JTs, J9s:0.4, T9s, 98s, 87s:0.6, 76s:0.4, AQo, AJo:0.4, KQo:0.6' },
     'BTN>CO': { r: 'TT+, AKs, AKo, 99:0.3, AQs:0.5, AJs:0.4, ATs:0.3, A5s:0.8, A4s:0.7, A3s:0.5, A2s:0.3, KQs:0.5, KJs:0.4, KTs:0.3, K9s:0.2, QJs:0.3, JTs:0.2, AQo:0.5, AJo:0.2, KQo:0.3, 76s:0.25, 65s:0.25, 54s:0.2',
       c: '99, 88, 77, 66, 55:0.7, 44:0.5, 33:0.3, AQs, AJs, ATs, A9s, A8s:0.5, A7s:0.3, KQs, KJs, KTs, K9s:0.5, QJs, QTs, Q9s:0.4, JTs, J9s:0.6, T9s, T8s:0.4, 98s, 87s, 76s:0.6, 65s:0.4, AQo, AJo:0.7, ATo:0.2, KQo:0.6, KJo:0.2' },
-    'SB>UTG': { r: 'TT+, AQs+, AJs:0.6, KQs:0.7, KJs:0.3, A5s:0.6, A4s:0.5, 99:0.5, AKo, AQo:0.4', c: '99:0.2, 88:0.2, AJs:0.2, KQs:0.2' },
-    'SB>HJ': { r: '99+, AJs+, ATs:0.5, KQs, KJs:0.5, QJs:0.3, A5s:0.8, A4s:0.6, A3s:0.3, 88:0.4, 76s:0.15, AKo, AQo:0.6, AJo:0.2', c: '88:0.3, 77:0.3, ATs:0.3, KJs:0.3, QJs:0.3, JTs:0.3' },
-    'SB>CO': { r: '88+, ATs+, A9s:0.4, KJs+, KTs:0.6, K9s:0.3, QJs, QTs:0.4, JTs:0.5, A5s, A4s, A3s:0.6, A2s:0.4, 77:0.5, 76s:0.3, 65s:0.3, AQo+, AJo:0.6, ATo:0.2, KQo:0.7', c: '77:0.3, 66:0.4, 55:0.3, A9s:0.3, KTs:0.2, QTs:0.3, JTs:0.4, T9s:0.4, 98s:0.3' },
+    'SB>UTG': { r: 'TT+, AQs+, AJs:0.6, ATs:0.3, KQs:0.7, KJs:0.4, KTs:0.15, QJs:0.2, A9s:0.15, A5s:0.7, A4s:0.6, A3s:0.3, 99:0.5, AKo, AQo:0.5, AJo:0.15, KQo:0.2, 76s:0.1, 65s:0.1',
+      c: '99:0.3, 88:0.4, 77:0.3, 66:0.2, AJs:0.3, ATs:0.3, KQs:0.3, KJs:0.3, KTs:0.3, QJs:0.3, QTs:0.2, JTs:0.3, T9s:0.15, AQo:0.3' },
+    'SB>HJ': { r: '99+, AJs+, ATs:0.5, KQs, KJs:0.5, QJs:0.3, A5s:0.8, A4s:0.6, A3s:0.3, 88:0.4, 76s:0.15, AKo, AQo:0.6, AJo:0.2',
+      c: '88:0.4, 77:0.4, 66:0.3, 55:0.3, A9s:0.3, A8s:0.2, K9s:0.2, AJo:0.3, ATs:0.4, KJs:0.4, KTs:0.3, QJs:0.4, QTs:0.3, JTs:0.4, T9s:0.2, 98s:0.2, AQo:0.3, KQo:0.3' },
+    'SB>CO': { r: '88+, ATs+, A9s:0.4, KJs+, KTs:0.6, K9s:0.3, QJs, QTs:0.4, JTs:0.5, A5s, A4s, A3s:0.6, A2s:0.4, 77:0.5, 76s:0.3, 65s:0.3, AQo+, AJo:0.6, ATo:0.2, KQo:0.7',
+      c: '77:0.4, 66:0.5, 55:0.4, 44:0.3, 33:0.2, A9s:0.4, A8s:0.3, KTs:0.3, QTs:0.4, Q9s:0.2, JTs:0.5, T9s:0.5, 98s:0.4, 87s:0.3, AJo:0.3, KQo:0.3' },
     'SB>BTN': { r: '77+, 66:0.6, 55:0.4, A8s+, A7s:0.6, A6s:0.5, A5s-A2s, K9s+, K8s:0.4, QTs+, Q9s:0.4, JTs, J9s:0.5, T9s:0.6, 98s:0.4, 87s:0.3, 76s:0.3, 65s:0.3, ATo+, A9o:0.4, KJo+, KTo:0.4, QJo:0.5',
-      c: '66:0.3, 55:0.4, 44:0.4, 33:0.3, 22:0.3, A7s:0.3, A6s:0.3, K8s:0.3, Q9s:0.3, J9s:0.3, T9s:0.4, 98s:0.4, 87s:0.4' },
-    'BB>UTG': { r: 'QQ+, AKs, AKo:0.7, JJ:0.3, AQs:0.3, A5s:0.4, A4s:0.3, KQs:0.2, 76s:0.1, 65s:0.1', c: '22+, A2s+, K6s+, Q8s+, J8s+, T8s+, 97s+, 86s+, 75s+, 64s+, 54s, ATo+, KJo+, QJo, KTo:0.4, JTo:0.4' },
-    'BB>HJ': { r: 'QQ+, AKs, AKo:0.8, JJ:0.4, AQs:0.4, AJs:0.2, A5s:0.5, A4s:0.4, A3s:0.2, KQs:0.3, KJs:0.2, 76s:0.15, 65s:0.15, 54s:0.1', c: '22+, A2s+, K4s+, Q7s+, J7s+, T7s+, 96s+, 85s+, 74s+, 64s+, 53s+, 43s:0.5, A9o+, A8o:0.4, KTo+, QTo+, JTo, T9o:0.4' },
-    'BB>CO': { r: 'JJ+, AQs+, AKo, TT:0.4, AJs:0.4, AQo:0.4, A5s:0.6, A4s:0.5, A3s:0.4, KQs:0.4, KJs:0.3, QJs:0.2, K9s:0.15, 76s:0.2, 65s:0.2, 54s:0.2, A9o:0.1', c: '22+, A2s+, K2s+, Q5s+, J6s+, T6s+, 95s+, 85s+, 74s+, 63s+, 53s+, 43s, A7o+, A5o:0.6, K9o+, Q9o+, J9o+, T9o, 98o:0.5, 87o:0.3' },
-    'BB>BTN': { r: 'TT+, AJs+, AKo, AQo, 99:0.4, ATs:0.5, A5s:0.7, A4s:0.6, A3s:0.5, A2s:0.4, KJs+, KTs:0.4, K9s:0.25, QJs:0.4, Q9s:0.2, JTs:0.3, J9s:0.2, 87s:0.25, 76s:0.25, 65s:0.25, 54s:0.25, AJo:0.4, KQo:0.4, K8o:0.15, Q8o:0.15',
-      c: '22+, A2s+, K2s+, Q2s+, J3s+, T5s+, 95s+, 84s+, 73s+, 62s+, 52s+, 42s+, 32s, A2o+, K5o+, Q7o+, J7o+, T7o+, 97o+, 86o+, 76o, 65o:0.5' },
+      c: '66:0.4, 55:0.5, 44:0.5, 33:0.4, 22:0.4, A7s:0.4, A6s:0.4, K8s:0.4, Q9s:0.4, J9s:0.4, J8s:0.3, T9s:0.4, T8s:0.3, 97s:0.3, 98s:0.5, 87s:0.5, 76s:0.4, 65s:0.3, 54s:0.3, A9o:0.3, KTo:0.2, K9o:0.2, QJo:0.2, QTo:0.2' },
+    'BB>UTG': { r: 'QQ+, AKs, AKo:0.85, JJ:0.5, TT:0.2, AQs:0.5, AJs:0.3, A5s:0.7, A4s:0.5, A3s:0.3, KQs:0.4, KJs:0.2, K9s:0.15, QJs:0.15, 76s:0.2, 65s:0.2, 54s:0.15, AQo:0.3',
+      c: '22+, A2s+, K2s+, Q4s+, J5s+, T5s+, 95s+, 85s+, 74s+, 63s+, 53s+, 43s:0.5, A7o+, A6o:0.4, A5o:0.6, A4o:0.4, K9o+, QTo+, Q9o:0.6, JTo, J9o:0.6, T9o:0.7, 98o:0.4' },
+    'BB>HJ': { r: 'QQ+, AKs, AKo:0.85, JJ:0.5, TT:0.25, AQs:0.5, AJs:0.4, ATs:0.2, A5s:0.6, A4s:0.5, A3s:0.4, KQs:0.4, KJs:0.25, KTs:0.15, K9s:0.15, QJs:0.2, 76s:0.2, 65s:0.2, 54s:0.2, AQo:0.4',
+      c: '22+, A2s+, K2s+, Q3s+, J5s+, T6s+, 95s+, 85s+, 74s+, 63s+, 52s+, 42s+, 32s:0.5, A5o+, A4o:0.5, A3o:0.4, K9o+, K8o:0.5, K7o:0.3, Q9o+, Q8o:0.4, J9o+, J8o:0.3, T9o, T8o:0.4, 98o:0.6, 97o:0.3, 87o:0.3' },
+    'BB>CO': { r: 'JJ+, AQs+, AKo, TT:0.5, 99:0.2, AJs:0.4, ATs:0.3, AQo:0.4, AJo:0.2, A5s:0.6, A4s:0.5, A3s:0.4, KQs:0.4, KJs:0.3, KTs:0.2, QJs:0.2, QTs:0.15, JTs:0.15, K9s:0.15, 76s:0.2, 65s:0.2, 54s:0.2, A9o:0.1, KQo:0.2',
+      c: '22+, A2s+, K2s+, Q2s+, J4s+, T5s+, 95s+, 84s+, 73s+, 63s+, 52s+, 42s+, 32s, A2o+, K8o+, K7o:0.5, K6o:0.3, Q8o+, J8o+, T8o+, 97o+, 87o, 86o:0.3, 76o:0.5' },
+    'BB>BTN': { r: 'TT+, AJs+, AKo, AQo, 99:0.4, 88:0.3, ATs:0.5, A5s:0.7, A4s:0.6, A3s:0.5, A2s:0.4, KJs+, KTs:0.4, K9s:0.25, QJs:0.4, QTs:0.25, Q9s:0.2, JTs:0.3, J9s:0.2, T9s:0.2, 98s:0.2, 87s:0.25, 76s:0.25, 65s:0.25, 54s:0.25, AJo:0.4, ATo:0.2, KQo:0.5, KJo:0.2, K8o:0.15, Q8o:0.15',
+      c: '22+, A2s+, K2s+, Q2s+, J2s+, T3s+, 94s+, 84s+, 73s+, 62s+, 52s+, 42s+, 32s, A2o+, K4o+, K3o:0.5, Q6o+, Q5o:0.5, J7o+, T7o+, 97o+, 86o+, 76o, 75o:0.5, 65o:0.6, 54o:0.4' },
     'BB>SB': { r: '88+, 77:0.5, A9s+, A5s-A2s, KTs+, K9s:0.4, QJs, Q9s:0.3, J9s:0.3, T8s:0.3, 97s:0.3, 86s:0.3, 75s:0.3, 64s:0.3, 53s:0.3, AJo+, KQo, A8o:0.3, K9o:0.3',
-      c: '22+, A2s+, K2s+, Q2s+, J4s+, T6s+, 96s+, 85s+, 74s+, 63s+, 53s+, 43s, A2o+, K5o+, Q8o+, J8o+, T8o+, 97o+, 87o, 76o:0.5' }
+      c: '22+, A2s+, K2s+, Q2s+, J2s+, T4s+, 95s+, 84s+, 73s+, 63s+, 52s+, 42s+, 32s, A2o+, K4o+, Q6o+, J7o+, T7o+, 97o+, 86o+, 76o, 65o:0.6, 75o:0.4, 54o:0.3' }
   };
   // opener facing a 3-bet; ip = the opener has position on the 3-bettor (a blind 3-bet), oop = the 3-bettor is behind
   var VS_3BET = {
@@ -152,17 +158,18 @@
   }
   function vsOpenAt(key, depth) {
     return memo('vo' + key + depth, function () {
-      var s = chart(VS_OPEN[key]), i;
+      var s = chart(VS_OPEN[key]), i, bbd = key.indexOf('BB>') === 0;
       if (depth >= 100) return s;
+      // the BB closes the action at a good price: its calls shrink less with depth, and 3-bets it drops become calls
       if (depth === 40) {
-        for (i = 0; i < 169; i++) { if (bluffy(i)) s.raise[i] *= 0.6; if (speculative(i)) s.call[i] *= 0.75; }
+        for (i = 0; i < 169; i++) { var r0 = s.raise[i]; if (bluffy(i)) s.raise[i] *= 0.6; if (speculative(i)) s.call[i] *= bbd ? 0.9 : 0.75; if (bbd) s.call[i] += r0 - s.raise[i]; }
         return refold(s);
       }
       // 25bb: the 3-bet is an all-in, solved against the opener's range
       var pq = key.split('>'), hero = pq[0], opener = pq[1], open = opener === 'SB' ? SIZES.openSB[25] : SIZES.open[25];
       var heroIn = hero === 'BB' ? 1 : hero === 'SB' ? 0.5 : 0, P0 = open + 1.5 - (opener === 'SB' ? 0.5 : 0);
       var J = solveJam(rfiAt(opener, 25).raise, 25, open, heroIn, P0, 5 - POS6.indexOf(hero), s.call, 0.3);
-      for (i = 0; i < 169; i++) { s.raise[i] = J.jam[i]; s.call[i] = Math.min(1 - J.jam[i], s.call[i] * (speculative(i) ? 0.5 : 0.8)); }
+      for (i = 0; i < 169; i++) { var c0 = bbd ? s.call[i] + s.raise[i] : s.call[i]; s.raise[i] = J.jam[i]; s.call[i] = Math.min(1 - J.jam[i], c0 * (speculative(i) ? (bbd ? 0.7 : 0.5) : (bbd ? 0.95 : 0.8))); }
       return refold(s);
     });
   }
@@ -293,10 +300,19 @@
       var heroIP = hero !== 'SB' && hero !== 'BB';
       rt = firstR.toBB * (heroIP ? SIZES.threeBetIP : SIZES.threeBetOOP) + callers * firstR.toBB * SIZES.squeezeAdd;
       kind = callers ? 'squeeze' : 'vsOpen'; label = hero + ' vs ' + firstR.pos + ' open' + (callers ? ' and ' + callers + ' caller' + (callers > 1 ? 's' : '') : '');
-      if (callers || limps.length) { s = clone(s); for (i = 0; i < 169; i++) { s.call[i] *= 0.6; if (bluffy(i)) s.raise[i] *= 0.6; } refold(s); approx = true; }
+      // callers or limpers in: players behind the hero squeeze or overcall tighter. The BB closes the action instead, so it
+      // keeps its calls (3-bet bluffs it drops become calls) and widens for the better price below.
+      var bbClose = hero === 'BB' && (callers > 0 || limps.length > 0);
+      if (callers || limps.length) { s = clone(s); for (i = 0; i < 169; i++) { var r1 = s.raise[i]; if (bluffy(i)) s.raise[i] *= 0.6; if (bbClose) s.call[i] += r1 - s.raise[i]; else s.call[i] *= 0.6; } refold(s); approx = true; }
       // the open's size: scale the defence by its MDF against the standard open's
       var oIn = firstR.pos === 'SB' ? 0.5 : firstR.pos === 'BB' ? 1 : 0, o0 = open(firstR.pos);
       sizeR = sizeScale(potD - firstR.toBB - callers * (firstR.toBB - o0), firstR.toBB - oIn, o0 - oIn);
+      // the BB's price with callers in: the square root of the heads-up price over the multiway one (more players
+      // cut realized equity, so the full price ratio would widen too far), at most 1.4x
+      if (bbClose && firstR.toBB > 1) {
+        var cBB = firstR.toBB - 1, potHU = (ante ? 1 : 0) + firstR.toBB + 1 + (firstR.pos === 'SB' ? 0 : 0.5);
+        sizeR *= clamp(Math.sqrt((cBB / (potHU + cBB)) / (cBB / (potD + cBB))), 1, 1.4);
+      }
       var basePos = VS_OPEN[key] ? key.split('>')[1] : firstR.pos;
       if (!RFI[basePos]) basePos = 'SB'; // the BB raising a limp has no open chart; the SB's wide open stands in
       s = resize(s, sizeR, rfiAt(basePos, depth).raise, key + depth + kind + callers + limps.length);
