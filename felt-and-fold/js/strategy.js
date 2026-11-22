@@ -966,6 +966,33 @@
     return { mix: mix, ev: ev, factors: factors, source: 'Estimate', spot: sp, cls: cls, evBasis: 'relative', info: info };
   }
 
+  // the decision's own mix leans toward a check, call or fold that its EV clearly prefers (by max(LEAN_GAP, LEAN_POT of
+  // the pot), in bb). The policy prices multiway calls on the equity against each player, which keeps the bots' ranges
+  // wide. The call's EV needs the hand to beat every player at once. The river and turn bluff fill also picks hands
+  // that check for more. The leaned action takes 30% at the line, up to LEAN_MAX at twice the line. LEAN_MAX leaves the
+  // policy's own play 15%, so it stays a Good play in review. An action the mix already takes LEAN_MIXED of the time
+  // is left alone: that spot is a real mix. Bets and raises are not leaned toward, and leaning away from one needs
+  // twice the gap: their EV rests on guessed fold rates. Bots and range reads use the policy itself (comboMix).
+  var LEAN_GAP = 0.3, LEAN_POT = 0.05, LEAN_MAX = 0.85, LEAN_MIXED = 0.4;
+  function leanMix(mix, ev, sp) {
+    var top = mix[0], tv = top ? ev[top.action] : null;
+    if (tv == null) return null;
+    var b = null, bv = null;
+    ['check', 'call', 'fold'].forEach(function (a) { if (a !== top.action && ev[a] != null && (bv == null || ev[a] > bv)) { b = a; bv = ev[a]; } });
+    var agg = top.action === 'bet' || top.action === 'raise' || top.action === 'allin';
+    var clear = Math.max(LEAN_GAP, LEAN_POT * (sp.pot - sp.toCall) / sp.bb) * (agg ? 2 : 1), gap = b ? bv - tv : 0;
+    if (!b || !(gap > clear)) return null;
+    var want = 0.3 + (LEAN_MAX - 0.3) * clamp((gap - clear) / clear, 0, 1), m = mix.filter(function (x) { return x.action === b; })[0];
+    if (m && (m.freq >= want || m.freq >= LEAN_MIXED)) return null;
+    if (!m) { m = { action: b, size: 0, to: 0, freq: 0 }; mix.push(m); }
+    var rest = 1 - m.freq;
+    mix.forEach(function (x) { if (x !== m) x.freq = rd(rest > 0 ? x.freq * (1 - want) / rest : 0, 3); });
+    m.freq = rd(want, 3);
+    for (var k = mix.length - 1; k >= 0; k--) if (mix[k].freq < 0.005) mix.splice(k, 1);
+    mix.sort(function (x, y) { return y.freq - x.freq; });
+    return { action: b, gap: rd(gap, 2) };
+  }
+
   // ---------------------------------------------------------------- public decision API
   // the baseline's view of the decision `seat` faces now (or at log index n in a finished hand)
   function evaluate(h, seat, opts) {
@@ -978,6 +1005,7 @@
       var tr = advance(tracker(h), n), ctx = nodeAt(tr, d), p = h.players[seat], i = C.comboIndex(p.hole[0], p.hole[1]);
       var cm = comboMix(ctx, i), e = opts.noEV ? { ev: {}, info: {} } : evs(ctx, i, opts.heroTo);
       res = { mix: cm.mix, ev: e.ev, factors: factorsFor(ctx, i), source: 'Estimate', ctx: ctx, combo: i, info: e.info, feat: features(ctx, i), evBasis: 'chips' };
+      if (!opts.noEV && !opts.noLean) { var ln = leanMix(res.mix, e.ev, ctx.spec); if (ln) res.lean = ln; }
     }
     res.ms = Date.now() - t0; res.decision = d;
     return res;

@@ -95,9 +95,11 @@
     if (c == null || c < 0) return '<div class="card back ' + (cls || '') + '"></div>';
     const r = c >> 2, s = c & 3, pip = UI.suitSvg(s);
     // face: corner index (rank over a small pip) and a big pip bottom-right; styled in css/cards.css.
-    // J, Q, K add a painted panel (art/courts/); if it fails to load, onerror drops .art and the plain court look returns.
+    // J, Q, K add a painted panel (art/courts/). A first load error hides it and retries once after 1.5s with a
+    // cache-busting query; a second error drops .art and the plain court look returns.
     const court = r >= 9 && r <= 11;
-    const art = court ? '<img class="cp" src="art/courts/' + 'jqk'[r - 9] + SUIT_CLS[s] + '.webp" alt="" draggable="false" onerror="this.parentNode.classList.remove(\'art\');this.remove()">' : '';
+    const art = court ? '<img class="cp" src="art/courts/' + 'jqk'[r - 9] + SUIT_CLS[s] + '.webp" alt="" draggable="false" onload="this.style.visibility=\'\'"'
+      + ' onerror="var i=this;if(i.dataset.r){if(i.parentNode)i.parentNode.classList.remove(\'art\');i.remove()}else{i.dataset.r=1;i.style.visibility=\'hidden\';setTimeout(function(){i.src=i.src.split(\'?\')[0]+\'?r=\'+Date.now()},1500)}">' : '';
     return '<div class="card s-' + SUIT_CLS[s] + (court ? ' court art' : r === 12 ? ' ace' : r === 8 ? ' ten' : '') + ' ' + (cls || '') + '" aria-label="' + UI.rankTxt(r) + SUIT_CLS[s] + '">' + art +
       '<span class="ci"><span class="ck">' + UI.rankTxt(r) + '</span>' + pip.replace('<svg', '<svg class="cq"') + '</span>' + pip.replace('<svg', '<svg class="cb"') + '</div>';
   };

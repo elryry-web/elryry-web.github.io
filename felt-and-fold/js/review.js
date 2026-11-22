@@ -629,10 +629,12 @@
       if (d.missedBluff && d.source === 'Estimate' && GRADES.indexOf(d.grade) > 1) { d.grade = 'Inaccuracy'; d.evLost = rd(Math.min(d.evLost, th.mistake - 0.05), 2); d.capped = 'bluff'; }
       else if (d.grade === 'Blunder' && !d.settled && !d.wasted) { d.grade = 'Mistake'; d.evLost = rd(Math.min(d.evLost, th.blunder - 0.05), 2); d.capped = 'estimate'; }
     }
-    // the frequency grades against the play while the EV sketch prefers it: the review says so first, and the grade stops at Inaccuracy
+    // the frequency grades against the play while the EV sketch prefers it: the two models disagree, so the play is
+    // not called an error. The grade is Good with no EV lost, and the review calls the spot close.
     var hv = evOf(d.ev, d.did.action), bv = bestAct ? evOf(d.ev, bestAct) : null;
     d.evSplit = d.grade !== 'Good' && d.freqFloor && hv != null && bv != null && hv - bv > 0.3 ? rd(hv - bv, 2) : 0;
-    if (d.evSplit && !d.wasted && GRADES.indexOf(d.grade) > 1) { d.grade = 'Inaccuracy'; d.evLost = rd(Math.min(d.evLost, thresholds(d).mistake - 0.05), 2); }
+    if (d.evSplit && d.wasted) d.evSplit = 0;
+    if (d.evSplit) { d.grade = 'Good'; d.evLost = 0; d.capped = null; d.settled = false; d.never = false; d.missedBluff = false; }
     // a preflop call off a chart (not a solve) whose realized equity clears the price by REAL_MARGIN is Good:
     // the chart is a rough guide, and the review will not call a priced call an error
     d.realizedOk = false;
@@ -1395,7 +1397,7 @@
         + (sf.who ? sizeVs(sf, d.exploit.who)
           : 'The baseline ' + (sf.action === 'allin' ? 'moves all in' : verb3(sf.noun) + ' ' + sizeAmt(sf, 'verb')) + ' here.')
         + (d.feat ? ' ' + handLine(d.feat) : '') + (sfw ? ' ' + sfw : '') + (why ? ' ' + why : '')
-      : d.evSplit ? d.grade + '. The baseline ' + verb3(top) + ' here ' + (d.mix[0].freq < 0.97 ? P('freq', d.mix[0].freq) + ' of the time' : 'almost always') + ', but its EV estimate rates ' + verbIng(did) + ' ' + (d.evSplit < 1 ? 'slightly' : 'about ' + B('split', d.evSplit)) + ' higher. This spot is unsettled.' + (why ? ' The case for ' + verbIng(top) + ': ' + why.charAt(0).toLowerCase() + why.slice(1) : '')
+      : d.evSplit ? d.grade + '. This spot is close. The baseline ' + verb3(top) + ' here ' + (d.mix[0].freq < 0.97 ? P('freq', d.mix[0].freq) + ' of the time' : 'almost always') + ', but its EV estimate rates ' + verbIng(did) + ' ' + (d.evSplit < 1 ? 'slightly' : 'about ' + B('split', d.evSplit)) + ' higher.' + (why ? ' The case for ' + verbIng(top) + ': ' + why.charAt(0).toLowerCase() + why.slice(1) : '')
       : d.grade !== 'Good' ? d.grade + '. ' + (why ? why + (dup ? '' : ' ') : '') + (dup ? '' : pref)
       : has('mixed') ? 'Good. ' + why + ' The mix is ' + mt + '.'
       // a size the baseline does not use: the size line below names the baseline's play

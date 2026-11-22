@@ -216,7 +216,8 @@
   // ---------------------------------------------------------------- the hint: the baseline the review grades against
   function hint(h, seat) {
     var q = S.quality(), res; S.setQuality(HINT_Q);
-    try { res = S.evaluate(h, seat, { noEV: true }); } finally { S.setQuality(q); }
+    // with EVs, so the postflop mix leans the same way as the review's (S.evaluate's lean)
+    try { res = S.evaluate(h, seat, {}); } finally { S.setQuality(q); }
     var L = E.legal(h, seat), bb = h.bb, src = 'estimate';
     if (h.street === 'preflop' && res.spot) { var sp = res.spot; src = sp.kind === 'push' || sp.kind === 'reshove' || (sp.kind === 'vsJam' && sp.depth <= 15) ? 'Nash' : 'chart'; }
     return hintFrom(res.mix, src, h, L);
