@@ -232,7 +232,7 @@
         m = fx('10% × pot × (top play\'s share − your share − 10%)', '{t} × {p} × ({a} − {b} − {t})', { t: [0.1, 'p'], p: [d.potBB, 'bb'], a: [d.mix[0].freq, 'p'], b: [d.heroFreq, 'p'] }, v, unit);
         if (m) m.note = 'The EV sketch calls the plays close. A play the baseline almost never makes still costs a little.';
       }
-      if (!m && d.capped) { m = direct(v, unit, 'the grade line, capped'); m.note = d.capped === 'bluff' ? 'A bluff\'s value rests on the fold rate. The cost stops just under the Mistake line.' : d.capped === 'tell' ? 'Against the opener\'s narrowed range the realized equity covers the price. The cost stops just under the Mistake line.' : 'Without a solve, the cost stops just under the Blunder line.'; }
+      if (!m && d.capped) { m = direct(v, unit, 'the grade line, capped'); m.note = d.capped === 'bluff' ? 'A bluff\'s value rests on the fold rate. The cost stops just under the Mistake line.' : d.capped === 'tell' ? 'Against the opener\'s narrowed range the realized equity covers the price. The cost stops just under the Mistake line.' : d.capped === 'shown' ? 'The baseline\'s mix still takes this play. The cost stops just under the Mistake line.' : 'Without a solve, the cost stops just under the Blunder line.'; }
       if (!m && d.callCap) { m = direct(v, unit, 'the call, capped'); m.note = 'A call loses at most what it puts in. You can fold on any later street.'; }
       if (!m && (d.limpSize || d.raiseSize) && d.sizeOff) { m = direct(v, unit, 'the size floor'); m.note = 'A raise size far from the chart costs at least 0.35bb or 10% of the pot. A tiny re-raise costs at least 1.2bb or 20%.'; }
       if (!m) m = direct(v, unit, 'from ' + srcName(d));
@@ -567,6 +567,13 @@
     var risk = d.did.addBB || 0, a = d.did.action;
     return a !== 'fold' && a !== 'check' && risk >= 5 && risk >= 0.1 * (d.stack || 0) && loss >= 0.75 * risk;
   }
+  // the whole percent the review's bar (mixPct) gives the play made; bets and raises count together
+  var SHOWN_PCT = 5;
+  function shownPct(d) {
+    var a = d.did.action, s = 0;
+    mixPct(d.mix || []).forEach(function (r) { if (r.m.action === a || (isAgg(a) && isAgg(r.m.action))) s += r.pct; });
+    return s;
+  }
   function gradeDecision(d) {
     d.wasted = false;
     d.missedBluff = false; d.capped = null; d.freqFloor = false; d.settled = false;
@@ -652,6 +659,12 @@
       } else if (rtv >= d.realEq.need && GRADES.indexOf(d.grade) > 1) {
         d.grade = 'Inaccuracy'; d.evLost = rd(Math.min(d.evLost, thresholds(d).mistake - 0.05), 2); d.capped = 'tell'; d.tellReal = true;
       } else if (rtv >= d.realEq.need) d.tellReal = true;
+    }
+    // the bar shows the play at SHOWN_PCT or more: the play is part of the mix, so it is not called an error. The grade
+    // stops at Inaccuracy, with the cost just under the Mistake line. A size far off the mix's sizes is still graded.
+    d.shownPct = shownPct(d);
+    if (!sizeOff && !d.forceGrade && d.shownPct >= SHOWN_PCT && GRADES.indexOf(d.grade) > 1) {
+      d.grade = 'Inaccuracy'; d.evLost = rd(Math.min(d.evLost, thresholds(d).mistake - 0.05), 2); d.capped = 'shown'; d.wasted = false; d.settled = false;
     }
     // the baseline grade, kept apart from any grade against a player's read: Stats, the Coach and the hand header count it
     d.baseGrade = d.grade; d.baseLoss = d.evLost;
@@ -1334,6 +1347,7 @@
   function trustNote(d) {
     if (d.capped === 'bluff') return 'This grade stops at Inaccuracy. A bluff\'s value rests on how often the opponent folds, the least certain number in the estimate.';
     if (d.capped === 'estimate') return 'The cost is a rough estimate. Without a solved spot, the grade stops at Mistake.';
+    if (d.capped === 'shown') return 'This grade stops at Inaccuracy. The baseline still makes this play ' + d.shownPct + '% of the time.';
     return '';
   }
 

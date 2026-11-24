@@ -992,6 +992,25 @@
     mix.sort(function (x, y) { return y.freq - x.freq; });
     return { action: b, gap: rd(gap, 2) };
   }
+  // after the lean, a minor action (under TRIM_FREQ) whose EV trails the mix's best action by more than the lean line
+  // gives its share to that best action. The policy's soft edges leave a few percent on plays that clearly lose, and a
+  // play the bar shows should never be graded an error. Twice the line when a bet or raise is on either side, as above.
+  var TRIM_FREQ = 0.15;
+  function trimMix(mix, ev, sp) {
+    var best = null, bv = null;
+    mix.forEach(function (m) { var v = ev[m.action]; if (v != null && (bv == null || v > bv)) { best = m; bv = v; } });
+    if (!best) return null;
+    var line = Math.max(LEAN_GAP, LEAN_POT * (sp.pot - sp.toCall) / sp.bb), agg = function (a) { return a === 'bet' || a === 'raise' || a === 'allin'; }, cut = [];
+    for (var k = mix.length - 1; k >= 0; k--) {
+      var m = mix[k], v = ev[m.action];
+      if (m === best || v == null || m.freq >= TRIM_FREQ || m.action === best.action) continue;
+      if (!(bv - v > line * (agg(m.action) || agg(best.action) ? 2 : 1))) continue;
+      best.freq = rd(best.freq + m.freq, 3); cut.push({ action: m.action, freq: m.freq, gap: rd(bv - v, 2) }); mix.splice(k, 1);
+    }
+    if (!cut.length) return null;
+    mix.sort(function (x, y) { return y.freq - x.freq; });
+    return { to: best.action, cut: cut };
+  }
 
   // ---------------------------------------------------------------- public decision API
   // the baseline's view of the decision `seat` faces now (or at log index n in a finished hand)
@@ -1005,7 +1024,10 @@
       var tr = advance(tracker(h), n), ctx = nodeAt(tr, d), p = h.players[seat], i = C.comboIndex(p.hole[0], p.hole[1]);
       var cm = comboMix(ctx, i), e = opts.noEV ? { ev: {}, info: {} } : evs(ctx, i, opts.heroTo);
       res = { mix: cm.mix, ev: e.ev, factors: factorsFor(ctx, i), source: 'Estimate', ctx: ctx, combo: i, info: e.info, feat: features(ctx, i), evBasis: 'chips' };
-      if (!opts.noEV && !opts.noLean) { var ln = leanMix(res.mix, e.ev, ctx.spec); if (ln) res.lean = ln; }
+      if (!opts.noEV && !opts.noLean) {
+        var ln = leanMix(res.mix, e.ev, ctx.spec); if (ln) res.lean = ln;
+        var tm = trimMix(res.mix, e.ev, ctx.spec); if (tm) res.trim = tm;
+      }
     }
     res.ms = Date.now() - t0; res.decision = d;
     return res;
