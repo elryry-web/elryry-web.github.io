@@ -4,9 +4,9 @@
    FF.Review.session(reviews) -> session stats and leaks.
    UMD: window.FF.Review in the browser, module.exports under node. */
 (function (root, factory) {
-  if (typeof module === 'object' && module.exports) module.exports = factory(require('./cards.js'), require('./engine.js'), require('./ranges.js'), require('./strategy.js'), require('./ai.js'), require('./prewhy.js'));
-  else { root.FF = root.FF || {}; root.FF.Review = factory(root.FF.Cards, root.FF.Engine, root.FF.Ranges, root.FF.Strategy, root.FF.AI, root.FF.PreWhy); }
-})(typeof self !== 'undefined' ? self : this, function (C, E, R, S, AI, W) {
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./cards.js'), require('./engine.js'), require('./ranges.js'), require('./strategy.js'), require('./ai.js'), require('./prewhy.js'), require('./coach.js'));
+  else { root.FF = root.FF || {}; root.FF.Review = factory(root.FF.Cards, root.FF.Engine, root.FF.Ranges, root.FF.Strategy, root.FF.AI, root.FF.PreWhy, root.FF.Coach); }
+})(typeof self !== 'undefined' ? self : this, function (C, E, R, S, AI, W, Co) {
   'use strict';
   var GRADES = ['Good', 'Inaccuracy', 'Mistake', 'Blunder'];
   var GOOD_FREQ = 0.15;
@@ -225,8 +225,8 @@
       t.meaning = 'The share of all starting hands that make this play here.';
     } else if (k === 'cost' || k === 'gain') {
       t.title = k === 'cost' ? 'Cost' : 'Gain';
-      if (xg && Math.abs((x.loss || 0) - v) < 0.06) m = fx('best EV − your EV against ' + x.name, '{a} − {b}', { a: [x.bestEV, 'bb'], b: [x.heroEV, 'bb'] }, v, unit);
-      if (!m && k === 'cost' && !xg) m = costSides(d, v);
+      if (xg && (k === 'gain' || !x.held) && Math.abs((x.loss || 0) - v) < 0.06) m = fx('best EV − your EV against ' + x.name, '{a} − {b}', { a: [x.bestEV, 'bb'], b: [x.heroEV, 'bb'] }, v, unit);
+      if (!m && k === 'cost' && (!xg || x.held)) m = costSides(d, v);
       if (!m && d.bestEV != null && d.heroEVUsed != null) m = fx('best play\'s EV − your play\'s EV', '{a} − {b}', { a: [d.bestEV, 'bb'], b: [d.heroEVUsed, 'bb'] }, v, unit);
       if (!m && d.freqFloor && d.mix && d.mix[0]) {
         m = fx('10% × pot × (top play\'s share − your share − 10%)', '{t} × {p} × ({a} − {b} − {t})', { t: [0.1, 'p'], p: [d.potBB, 'bb'], a: [d.mix[0].freq, 'p'], b: [d.heroFreq, 'p'] }, v, unit);
@@ -271,7 +271,7 @@
       t.title = 'Share of equity kept';
       m = fx('(' + (o.ip ? '0.95 in position' : '0.82 out of position') + ' + 0.4 × (equity − 0.5) − hand-type cut) × 0.88 for each extra player',
         '(' + (o.ip ? '0.95' : '0.82') + ' + 0.4 × ({e} − {h}) − {c}) × {k}', { e: [o.have, 'p'], h: [0.5, 'p'], c: [o.cut, 'p'], k: [Math.pow(0.88, o.k - 1), 'x'] }, v, unit);
-      if (m) m.note = 'The words round this share. Offsuit hands lose a little, more without a high card.';
+      if (m) m.note = 'The review above says this as a rough fraction, such as "about three quarters". The hand-type cut is small for offsuit hands and bigger when they have no high card.';
       t.source = 'The preflop model of realized equity, the same one the chart uses.';
       t.meaning = 'The part of its raw equity this hand wins once more bets come.';
     } else if (k === 'openTo') {
@@ -290,7 +290,7 @@
       t.title = k === 'width' ? 'Preflop range' : 'Range kept';
       if (k === 'width') m = fx('hands this player plays ÷ all 1326 hands', '{n} ÷ 1326', { n: [Math.round(v * 1326), 'x'] }, v, unit);
       else m = fx('share of hands left ÷ share before this action', '{a} ÷ {b}', { a: [o.after, 'p1'], b: [o.before, 'p1'] }, v, unit);
-      if (m) m.note = 'The words round this to a simple fraction. Hands are weighted: a hand played half the time counts as half.';
+      if (m) m.note = 'The review above says this as a rough fraction, such as "about a third". Hands are weighted: a hand played half the time counts as half.';
       else m = direct(v, unit, 'from the range model');
       t.source = 'The range model for this player.';
       m.note = (m.note ? m.note + ' ' : '') + 'The model starts from the player\'s preflop range and narrows it with each action.';
@@ -653,6 +653,8 @@
         d.grade = 'Inaccuracy'; d.evLost = rd(Math.min(d.evLost, thresholds(d).mistake - 0.05), 2); d.capped = 'tell'; d.tellReal = true;
       } else if (rtv >= d.realEq.need) d.tellReal = true;
     }
+    // the baseline grade, kept apart from any grade against a player's read: Stats, the Coach and the hand header count it
+    d.baseGrade = d.grade; d.baseLoss = d.evLost;
     return d;
   }
   // whole percentages for a mix that add up to 100: actions under 1% are dropped, the rest rounded by largest remainder
@@ -763,7 +765,7 @@
     if (e.street !== 'preflop' && opts._models) exploitView(h, seat, e, d, opts);
     applyExploit(d);
     setText(h, seat, e, d);
-    d.leak = leakOf(h, seat, e, d);
+    d.leak = d.baseLeak = leakOf(h, seat, e, d);
     return d;
   }
 
@@ -842,7 +844,10 @@
     var xb0 = x.info.bet, did0 = d.did.action;
     if (d.did.covers && isAgg(did0) && isAgg(x.best) && x.best !== did0 && xb0 && xb0.to > 0 && !realSmaller(d, xb0.to / (d.bbChips || 1) - (d.heroIn || 0))) { x.best = did0; x.bestEV = x.heroEV; x.loss = 0; }
     else if (d.did.covers && x.best === did0 && xb0 && xb0.to > 0 && !realSmaller(d, xb0.to / (d.bbChips || 1) - (d.heroIn || 0))) { x.bestEV = x.heroEV; x.loss = 0; }
+    x.held = false; x.edge = 0; x.grade = null;
     if (x.gradedBy !== 'exploit') return;
+    // the baseline's verdict, kept for when the exploit grade does not replace it
+    var keep = { grade: d.grade, evLost: d.evLost, cost: d.cost, capped: d.capped, evSplit: d.evSplit, freqFloor: d.freqFloor, missedBluff: d.missedBluff, wasted: d.wasted, bestAction: d.bestAction };
     d.grade = gradeFor(x.loss, Math.max(d.potBB, d.toCall || 0), false);
     d.wasted = d.grade !== 'Good' && wasted(d, x.loss);
     if (d.wasted) d.grade = 'Blunder';
@@ -850,6 +855,14 @@
     d.missedBluff = d.missedBluff && d.grade !== 'Good';
     if (d.grade === 'Blunder' && !d.wasted && d.source !== 'Solved' && d.source !== 'Library' && !settled(d)) { d.grade = 'Mistake'; d.evLost = rd(Math.min(d.evLost, thresholds(d).blunder - 0.05), 2); d.capped = 'estimate'; }
     d.bestAction = x.best;
+    x.grade = d.grade; x.baseBest = keep.bestAction; x.baseMissed = keep.missedBluff;
+    // the exploit grade only credits a play: when it marks the play down, the baseline's grade and loss stand.
+    // A play the baseline calls Good stays Good; the gap the read finds is the exploit edge, shown as a soft tag.
+    if (d.grade !== 'Good') {
+      x.held = true; x.lost = d.evLost;
+      if (keep.grade === 'Good') x.edge = rd(x.loss, 2);
+      for (var k in keep) d[k] = keep[k];
+    }
     // the bar shows the balanced mix; when the grade wants another kind of play, the panel adds this plan under it
     var top = d.mix && d.mix[0] ? d.mix[0].action : null;
     if (top && actKind(top) !== actKind(x.best)) {
@@ -937,11 +950,11 @@
         var risk = xb.to / (d.bbChips || 1) - (d.heroIn || 0), need = risk > 0 ? risk / (d.potBB + risk) : 0;
         out.push('Against ' + x.name + ', a bet of ' + bbs(risk) + ' gets folds about ' + P('fold', xb.fold) + ' of the time.' + (need > 0 && (d.reason || '').indexOf('needs folds about') < 0 ? ' A bluff this size needs about ' + P('be', need, { bet: risk, pot: d.potBB }) + '.' : ''));
       }
-      if (d.sizeFix) { /* the verdict already names the better size */ }
+      if (d.sizeFix || d.xSize) { /* the verdict already names the better size */ }
       else if (bothAgg && !sizeOk && x.loss > 0.05) out.push('Against ' + x.name + ', ' + verbIng(did) + ' is worth about ' + B('xev', x.heroEV, xo(d, did)) + '. Other sizes score about the same.');
       else if (sizeOk && x.best === did && xh) out.push('Against ' + x.name + ', a ' + (xb.to > xh.to ? 'bigger' : 'smaller') + ' ' + (did === 'raise' ? 'raise' : 'bet') + ' scores more: about ' + B('xev', x.bestEV, xo(d, x.best)) + ', against ' + B('xev', x.heroEV, xo(d, did)) + ' for yours.');
       else if (x.best !== did && x.loss > 0.05) out.push('Against ' + x.name + ', ' + verbIng(x.best) + ' is worth about ' + B('xev', x.bestEV, xo(d, x.best)) + ' and ' + verbIng(did) + ' about ' + B('xev', x.heroEV, xo(d, did)) + '.'
-        + (d.grade === 'Good' ? ' The gap is too small to count as an error.' : ''));
+        + (d.grade === 'Good' && !x.edge ? ' The gap is too small to count as an error.' : ''));
       else out.push('Against ' + x.name + ', ' + verbIng(did) + ' is the best play here, worth about ' + B('xev', x.heroEV, xo(d, did)) + '.');
       if (x.baseGrade !== d.grade && !d.sizeFix) out.push('Against a balanced opponent, this would be ' + (x.baseGrade === 'Good' ? 'fine' : (x.baseGrade === 'Inaccuracy' ? 'an ' : 'a ') + x.baseGrade.toLowerCase()) + '.'
         + (x.baseGrade !== 'Good' && x.baseLost > 0.05 ? ' It would cost about ' + B('cost', x.baseLost) + ' there.' : '') + ' The grade follows ' + (x.state === 'prior' ? 'how ' + x.name + ' plays' : x.name + '\'s real play') + '.');
@@ -954,15 +967,16 @@
     return out.join(' ');
   }
 
-  // a play the balanced baseline likes, marked down because of how this table plays. Three parts, in this order:
-  // the verdict against the table with its numbers, why the baseline still likes the play, then what to do here
+  // a play the balanced baseline likes that this player's read would play another way. It stays Good; the gap is the
+  // exploit edge. Three parts, in this order: Good by the baseline and the edge with its numbers, why the baseline
+  // likes the play, then what to do here
   function exploitFirst(d, dr) {
     var x = d.exploit, did = d.did.action, best = x.best, eq = x.eq, river = d.street === 'river';
     var xb = x.info.bet, xg = x.info.hero || xb, Name = cap(x.name), out = [];
     var base = function (a) { return { allin: 'move all in' }[a] || a; };
     var bluffing = isAgg(did) && eq < 0.45 && !valueHand(d), outs = dr && dr.outs >= 4 && !river;
     // 1. the verdict against the table type, with the numbers
-    out.push(d.grade + ' against ' + x.name + '.');
+    out.push(d.grade === 'Good' && x.edge > 0 ? 'Good by the baseline. Against ' + x.name + ', ' + verbIng(best) + ' earns about ' + B('gain', x.edge) + ' more.' : d.grade + ' against ' + x.name + '.');
     if (d.feat) out.push(handLine(d.feat) + ' ' + xEqLine(d));
     if (isAgg(did) && xg && xg.fold != null && bluffing) out.push(Name + ' folds to this bet only about ' + P('fold', xg.fold) + ' of the time.');
     else if (isAgg(did) && xg && xg.eqVsCall != null) out.push('When ' + x.name + ' calls, the hand wins ' + (xg.eqVsCall < 0.5 ? 'only ' : '') + 'about ' + P('eqc', xg.eqVsCall) + '.' + (xg.eqVsCall < 0.5 && valueHand(d) ? ' ' + Name + ' calls mostly with better hands.' : ''));
@@ -1389,7 +1403,8 @@
     var sf = d.sizeFix = sizeFix(d), sfw = sf ? sizingWhy(d, sf.frac, tex) : '';
     // graded against the table, not the baseline: the verdict and its numbers first, then the balanced view, then the plan
     var xf = d.exploit;
-    if (xf && xf.gradedBy === 'exploit' && d.grade !== 'Good' && !sf && !d.evSplit && xf.best !== did && xf.baseGrade !== d.grade && d.feat) {
+    // a play the baseline calls Good that the read would play another way: Good first, then the edge against the player
+    if (xf && xf.gradedBy === 'exploit' && xf.edge > 0 && d.grade === 'Good' && !sf && !d.evSplit && xf.best !== did && d.feat) {
       d.multiway = !!mw;
       return [exploitFirst(d, dr), mapNote(d), closestNote(d), trustNote(d)].filter(Boolean).join(' ').replace(/about (\uE000[^\uE001]*\uE001)?(over|under) /g, '$1$2 ');
     }
@@ -1410,6 +1425,12 @@
     // the hand and what it is here come right after the grade word
     var role = !sf && !d.evSplit && d.feat ? roleLine(h, seat, d, why, po, mw, best) : '';
     if (role) { head = head.replace(/^(Good|Inaccuracy|Mistake|Blunder)\. /, '$1. ' + role + ' '); uw += ' ' + unmark(role); }
+    // Good by the baseline, but the read wants another size: the edge comes first, with no mark-down
+    var xs = d.xSize = !sf && xf && xf.held && xf.edge > 0 && d.grade === 'Good' && xf.best === did ? sizeFix(d, true) : null;
+    if (xf && xf.held && xf.edge > 0 && d.grade === 'Good' && xf.best === did) {
+      head = head.replace(/^Good\. /, 'Good by the baseline. Against ' + xf.name + ', ' + (xs ? (xs.action === 'allin' ? 'moving all in' : verbIng(xs.noun) + ' ' + sizeAmt(xs, 'verb')) : verbIng(did) + ' another size')
+        + ' earns about ' + B('gain', xf.edge) + ' more. ');
+    }
     out.push(head);
     var back = []; // range, nut advantage and texture: last, after the deciding reasons
     var xt = exploitText(d, !!(sf && sf.who));
@@ -1472,17 +1493,18 @@
     if (d.reasonCtx) out.push(d.reasonCtx);
     back.forEach(function (x) { out.push(x); });
     if (d.evLost > 0 && d.grade !== 'Good' && sf) out.push(cap(verbIng(sf.noun)) + ' ' + sizeAmt(sf, 'mine') + ' instead of ' + (sf.action === 'allin' ? 'moving all in' : sizeAmt(sf, 'cost')) + ' cost about ' + B('cost', d.evLost) + ' against ' + (sf.who || 'the baseline') + '.');
-    else if (d.evLost > 0 && d.grade !== 'Good' && !d.evSplit) out.push(d.exploit && d.exploit.gradedBy === 'exploit' ?cap(verbIng(did)) + ' cost about ' + B('cost', d.evLost) + ' against ' + d.exploit.name + '.' : costLine(d));
+    else if (d.evLost > 0 && d.grade !== 'Good' && !d.evSplit) out.push(d.exploit && d.exploit.gradedBy === 'exploit' && !d.exploit.held ? cap(verbIng(did)) + ' cost about ' + B('cost', d.evLost) + ' against ' + d.exploit.name + '.' : costLine(d));
     if (trustNote(d)) out.push(trustNote(d));
     return out.join(' ').replace(/about (\uE000[^\uE001]*\uE001)?(over|under) /g, '$1$2 ');
   }
   // the hero bet or raised as the grade wants, at a size that cost enough to mark it down: the better size, and whose play
   // it is better against (null when the grade looks only at the baseline). Baseline grades count a size only past sizeOff's gap;
   // an exploit grade counts any size the player's real play punishes.
-  function sizeFix(d) {
+  // xs: a Good play whose size the read would change (the exploit edge), named but not marked down
+  function sizeFix(d, xs) {
     var did = d.did.action, x = d.exploit, bb = d.bbChips, m = null, who = null;
-    if (d.grade === 'Good' || d.street === 'preflop' || !isAgg(did) || !(d.did.to > 0) || !bb || d.evSplit) return null;
-    if (x && x.gradedBy === 'exploit') { if (!isAgg(x.best) || !(x.loss > 0) || !x.info.bet) return null; m = { action: x.best, to: x.info.bet.to }; who = x.name; }
+    if ((d.grade === 'Good' && !xs) || d.street === 'preflop' || !isAgg(did) || !(d.did.to > 0) || !bb || d.evSplit) return null;
+    if (x && x.gradedBy === 'exploit' && (!x.held || xs)) { if (!isAgg(x.best) || !(x.loss > 0) || !x.info.bet) return null; m = { action: x.best, to: x.info.bet.to }; who = x.name; }
     else { if (!d.sizeOff || !(d.heroFreq >= GOOD_FREQ) || !d.sizeRef) return null; m = d.sizeRef; }
     var add = m.to / bb - (d.heroIn || 0), mine = d.did.effAddBB || d.did.addBB;
     if (!(m.to > 0) || !(d.pot > 0) || Math.abs(add - mine) < 0.1) return null;
@@ -1699,16 +1721,13 @@
     missedCbet: 'Missing c-bets', missedBluff: 'Missing bluffs',
     xMissedValue: 'Missed value against loose players', xBluffStation: 'Bluffed calling stations', xPaidOff: 'Paid off players who don\'t bluff', icmCalls: 'Ignoring ICM pressure', sizing: 'Bet sizing', overaggressive: 'Betting or raising too often', other: 'Other'
   };
+  // the leak of the baseline grade (Stats and the Coach count the baseline only, never the grade against a read).
+  // The x* leaks are kept in LEAKS for saves from before 0.9.10.
   function leakOf(h, seat, e, d) {
-    if (d.grade === 'Good') return null;
-    var did = d.did.action, best = d.bestAction, f = d.factors, pos = h.pos[seat], dr = F(f, 'draw'), x = d.exploit;
-    if (x && x.gradedBy === 'exploit') {
-      var eq = d.feat ? d.feat.eq : 0.5;
-      if (x.traits.calls === 'loose' && !isAgg(did) && isAgg(best) && eq >= 0.45) return 'xMissedValue';
-      if (x.traits.calls === 'loose' && isAgg(did) && !isAgg(best) && eq < 0.45) return 'xBluffStation';
-      if (x.traits.bluffs === 'low' && did === 'call' && best === 'fold') return 'xPaidOff';
-      if (x.traits.calls === 'loose' && isAgg(did) && did === best && eq >= 0.45 && x.info.hero && x.info.bet && x.info.hero.to < x.info.bet.to) return 'xMissedValue';
-    }
+    var x = d.exploit, xg = x && x.gradedBy === 'exploit';
+    if ((d.baseGrade || d.grade) === 'Good') return null;
+    var did = d.did.action, best = xg && x.baseBest !== undefined ? x.baseBest : d.bestAction, f = d.factors, pos = h.pos[seat], dr = F(f, 'draw');
+    var missed = xg && x.baseMissed !== undefined ? x.baseMissed : d.missedBluff;
     if (d.sizeOff || d.jamOversize || d.sizeFix) return 'sizing';
     if (e.street === 'preflop') {
       if ((pos === 'SB' || pos === 'BB') && did === 'call') return 'callWideBlinds';
@@ -1721,7 +1740,7 @@
     if (isAgg(did) && !isAgg(best)) { var info = d.info || {}, hero = info.hero || info.bet || info.raise; if (d.feat && d.feat.eq < 0.4 && hero && hero.fold < 0.45) return 'bluffNoFE'; return 'overaggressive'; }
     if (!isAgg(did) && isAgg(best)) {
       if (dr && dr.outs >= 8 && e.street !== 'river') return 'passiveDraws';
-      if (d.missedBluff) return x && x.traits.calls === 'loose' ? null : 'missedBluff';
+      if (missed) return 'missedBluff';
       if (e.street === 'river' && d.feat && d.feat.eq >= 0.55) return 'missedRiverValue';
       if (e.street === 'flop' && /c-bet/.test(d.spot)) return 'missedCbet';
       return 'missedValue';
@@ -1976,10 +1995,10 @@
       });
       var rc = recap(h, seat, decisions, opts);
     } finally { S.setQuality(q); }
-    var p = h.players[seat], net = (p.stack - p.stackStart) / h.bb, lost = 0, worst = 'Good';
-    decisions.forEach(function (d) { lost += d.evLost; if (GRADES.indexOf(d.grade) > GRADES.indexOf(worst)) worst = d.grade; });
+    var p = h.players[seat], net = (p.stack - p.stackStart) / h.bb;
     var rv = { handId: h.id, mode: h.table ? h.table.mode : 'cash', bb: h.bb, heroSeat: seat, heroPos: h.pos[seat], heroCards: C.cardsStr(p.hole), board: C.cardsStr(h.board),
-      net: rd(net, 2), decisions: decisions, evLost: rd(lost, 2), worst: worst, clean: worst === 'Good', recap: rc, ms: Date.now() - t0, solved: 0 };
+      net: rd(net, 2), decisions: decisions, recap: rc, ms: Date.now() - t0, solved: 0 };
+    rollup(rv);
     rv.blind = blindOnly(h, seat, net);
     rv.upgrade = function (onChange) { return upgrade(h, seat, rv, onChange); };
     return rv;
@@ -2028,17 +2047,24 @@
           var e0 = evOf(est.ev, d.did.action); if (e0 != null) d.heroEV = rd(d.heroMap.nearV + est.heroEV - e0, 2);
         }
         refreshBet(h, seat, d);
-        gradeDecision(d); applyExploit(d); setText(h, seat, e, d); d.leak = leakOf(h, seat, e, d);
+        gradeDecision(d); applyExploit(d); setText(h, seat, e, d); d.leak = d.baseLeak = leakOf(h, seat, e, d);
         rv.solved++;
         if (onChange) try { onChange(k, d, rv); } catch (err) {}
         return d;
       });
     });
-    return Promise.all(jobs).then(function () {
-      var lost = 0, worst = 'Good'; rv.decisions.forEach(function (d) { lost += d.evLost; if (GRADES.indexOf(d.grade) > GRADES.indexOf(worst)) worst = d.grade; });
-      rv.evLost = rd(lost, 2); rv.worst = worst; rv.clean = worst === 'Good';
-      return rv;
+    return Promise.all(jobs).then(function () { rollup(rv); return rv; });
+  }
+  // the hand header: worst grade and EV lost by the baseline (as Stats and the Coach count them), and the exploit
+  // edge missed: what plays the baseline calls Good leave against the read (xEdge, a soft line, never EV lost)
+  function rollup(rv) {
+    var lost = 0, worst = 'Good', edge = 0;
+    rv.decisions.forEach(function (d) {
+      var b = Co.baseOf(d); lost += b.loss; if (GRADES.indexOf(b.grade) > GRADES.indexOf(worst)) worst = b.grade;
+      if (d.exploit && d.exploit.edge > 0) edge += d.exploit.edge;
     });
+    rv.evLost = rd(lost, 2); rv.worst = worst; rv.clean = worst === 'Good'; rv.xEdge = rd(edge, 2);
+    return rv;
   }
 
   // ---------------------------------------------------------------- session
@@ -2046,12 +2072,16 @@
     var excluded = reviews.filter(function (rv) { return rv.excluded; }).length; // hands the player took out of coaching
     reviews = reviews.filter(function (rv) { return !rv.excluded; });
     var s = { hands: reviews.length, excluded: excluded, net: 0, evLost: 0, decisions: 0, grades: { Good: 0, Inaccuracy: 0, Mistake: 0, Blunder: 0 }, clean: 0, leaks: [], exploitLeaks: [] }, L = {};
+    // the baseline grade and loss only (Co.baseOf): a grade against a player's read never counts here
     reviews.forEach(function (rv) {
-      s.net += rv.net; s.evLost += rv.evLost; if (rv.clean) s.clean++;
+      var clean = true;
+      s.net += rv.net;
       rv.decisions.forEach(function (d) {
-        s.decisions++; s.grades[d.grade]++;
-        if (d.leak) { var x = L[d.leak] || (L[d.leak] = { key: d.leak, label: LEAKS[d.leak], count: 0, evLost: 0, examples: [] }); x.count++; x.evLost += d.evLost; if (x.examples.length < 3) x.examples.push(rv.handId); }
+        var b = Co.baseOf(d);
+        s.decisions++; s.grades[b.grade]++; s.evLost += b.loss; if (b.grade !== 'Good') clean = false;
+        if (b.leak) { var x = L[b.leak] || (L[b.leak] = { key: b.leak, label: LEAKS[b.leak], count: 0, evLost: 0, examples: [] }); x.count++; x.evLost += b.loss; if (x.examples.length < 3) x.examples.push(rv.handId); }
       });
+      if (clean) s.clean++;
     });
     s.net = rd(s.net, 1); s.evLost = rd(s.evLost, 1);
     s.netPer100 = s.hands ? rd(100 * s.net / s.hands, 1) : 0; s.evLostPer100 = s.hands ? rd(100 * s.evLost / s.hands, 1) : 0;
@@ -2074,5 +2104,5 @@
     return out.join('\n');
   }
 
-  return { hand: hand, session: session, toText: toText, gradeFor: gradeFor, GRADES: GRADES, LEAKS: LEAKS, GOOD_FREQ: GOOD_FREQ, mixPct: mixPct, youLegend: youLegend, didLabel: didLabel, closestNote: closestNote, sizeText: sizeText, GLOSSARY: GLOSSARY, linkTerms: linkTerms, grade: gradeDecision, netLabel: netLabel, unmark: unmark, mathView: mathView };
+  return { hand: hand, session: session, baseOf: Co.baseOf, rollup: rollup, toText: toText, gradeFor: gradeFor, GRADES: GRADES, LEAKS: LEAKS, GOOD_FREQ: GOOD_FREQ, mixPct: mixPct, youLegend: youLegend, didLabel: didLabel, closestNote: closestNote, sizeText: sizeText, GLOSSARY: GLOSSARY, linkTerms: linkTerms, grade: gradeDecision, netLabel: netLabel, unmark: unmark, mathView: mathView };
 });

@@ -82,7 +82,7 @@
     await UI.sleep(20);
     let entry;
     try { entry = UI.Review.add(h, hs, { label: label, reads: reads, profiles: g.practice ? g.profiles : null }); } catch (e) { console.error('review failed', e); return; }
-    if (entry.rv.clean && UI.settings.autoSkip) { setBarMsg('Hand ' + entry.n + ' was clean.'); return; }
+    if (entry.rv.clean && !(entry.rv.xEdge > 0) && UI.settings.autoSkip) { setBarMsg('Hand ' + entry.n + ' was clean.'); return; }
     await UI.Review.open(entry, 'Next hand');
   }
   // once a newer read shows a different player, earlier decisions this session get one gentle note (never a grade)

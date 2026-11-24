@@ -296,6 +296,7 @@ table.results tr.me td { color: var(--gold2); font-weight: 700; }
 .lc-idle { color: var(--muted); }
 .lc-solving { color: var(--gold2); font-size: 12px; }
 .livecoach .termdef, .livecoach .mathpop { font-size: 12px; margin: 3px 0 4px; padding: 4px 7px; }
+.xedge { display: inline-block; padding: 0 7px; border-radius: 6px; font-size: 11px; font-weight: 700; color: var(--muted); border: 1px solid var(--line); }
 .hintused { display: inline-block; padding: 0 7px; border-radius: 6px; font-size: 11px; font-weight: 700; color: #f0cf6a; border: 1px dashed #b8963c; }
 .recap h4 { color: var(--gold2); margin-bottom: 6px; }
 .villain { padding: 8px 0; border-bottom: 1px solid #22392d; font-size: 14px; }

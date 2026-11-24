@@ -84,7 +84,7 @@
   // the pattern of one non-Good decision: { key, fam, street } (street null when the pattern spans streets)
   function patternOf(d, rv) {
     var a = d.did && d.did.action, st = d.street, pos = rv.heroPos, g = posGroup(pos);
-    if (d.leak === 'sizing') return st === 'preflop' ? { fam: 'sizePre', street: null } : { fam: 'sizePost', street: null };
+    if (baseOf(d).leak === 'sizing') return st === 'preflop' ? { fam: 'sizePre', street: null } : { fam: 'sizePost', street: null };
     if (st === 'preflop') {
       var sp = preSpot(d.spot), agg = isAgg(a);
       if (sp === 'short') return { fam: agg ? 'shortShove' : 'shortFold', street: null };
@@ -126,7 +126,21 @@
     var f = FAM[p.fam] || FAM.other;
     return { title: fill(f[0], p.street), why: fill(f[1], p.street), rule: fill(f[2], p.street) };
   }
-  var nonGood = function (d) { return d && d.grade && d.grade !== 'Good'; };
+  // ---------------------------------------------------------------- the baseline grade of a decision
+  // Stats, the Coach and the hand header count the baseline grade only, never the grade against a player's read.
+  // { grade, loss, leak, tagged }. Since 0.9.10 each decision stores baseGrade, baseLoss and baseLeak. Older saves fall
+  // back to exploit.baseGrade, then to the stored grade; their baseline loss is the stored loss (0 when the baseline is Good).
+  // tagged: false when the leak is unknown (an old save with no leak tag, or one whose stored grade was the exploit's Good).
+  var XLEAK = { xMissedValue: 'missedValue', xBluffStation: 'overaggressive', xPaidOff: 'callingDown' };
+  function baseOf(d) {
+    if (!d) return { grade: 'Good', loss: 0, leak: null, tagged: true };
+    if (d.baseGrade) return { grade: d.baseGrade, loss: d.baseGrade === 'Good' ? 0 : d.baseLoss || 0, leak: d.baseGrade === 'Good' ? null : 'baseLeak' in d ? d.baseLeak : XLEAK[d.leak] || d.leak || null, tagged: true };
+    var x = d.exploit, g = x && x.baseGrade ? x.baseGrade : d.grade || 'Good';
+    if (g === 'Good') return { grade: 'Good', loss: 0, leak: null, tagged: true };
+    var same = g === d.grade, tagged = 'leak' in d && d.grade !== 'Good';
+    return { grade: g, loss: same ? d.evLost || 0 : x.baseLost != null ? x.baseLost : d.evLost || 0, leak: tagged ? XLEAK[d.leak] || d.leak || null : null, tagged: tagged };
+  }
+  var nonGood = function (d) { return d && baseOf(d).grade !== 'Good'; };
 
   // ---------------------------------------------------------------- the leak finder
   function patterns(entries) {
@@ -137,8 +151,9 @@
         if (!nonGood(d)) return;
         var p = patternOf(d, rv), key = p.fam + (p.street ? '.' + p.street : '');
         var x = P[key] || (P[key] = { key: key, fam: p.fam, street: p.street, count: 0, evLost: 0, examples: [] });
-        x.count++; x.evLost += d.evLost || 0;
-        x.examples.push({ n: e.n, handId: rv.handId, heroPos: rv.heroPos, heroCards: rv.heroCards, street: d.street, spot: d.spot, grade: d.grade, evLost: d.evLost || 0 });
+        var b = baseOf(d);
+        x.count++; x.evLost += b.loss;
+        x.examples.push({ n: e.n, handId: rv.handId, heroPos: rv.heroPos, heroCards: rv.heroCards, street: d.street, spot: d.spot, grade: b.grade, evLost: b.loss });
       });
     });
     return Object.keys(P).map(function (k) {
@@ -165,11 +180,12 @@
     entries.forEach(function (e) {
       var rv = e.rv;
       (rv.decisions || []).forEach(function (d) {
-        if (!nonGood(d) || !(d.evLost > 0)) return;
-        var v = d.evLost;
+        var b = baseOf(d);
+        if (b.grade === 'Good' || !(b.loss > 0)) return;
+        var v = b.loss;
         pos[rv.heroPos] = (pos[rv.heroPos] || 0) + v;
         street[d.street] = (street[d.street] || 0) + v;
-        if (grade[d.grade] != null) grade[d.grade] += v;
+        if (grade[b.grade] != null) grade[b.grade] += v;
         act[actType(d.did && d.did.action)] += v;
       });
     });
@@ -267,7 +283,7 @@
     var last = entries.slice(-50), prev = entries.slice(Math.max(0, entries.length - 100), entries.length - 50);
     var sum = function (list) {
       var ev = 0, m = 0;
-      list.forEach(function (e) { (e.rv.decisions || []).forEach(function (d) { if (nonGood(d)) { m++; ev += d.evLost || 0; } }); });
+      list.forEach(function (e) { (e.rv.decisions || []).forEach(function (d) { var b = baseOf(d); if (b.grade !== 'Good') { m++; ev += b.loss; } }); });
       return { hands: list.length, evLost: rd(ev, 2), per100: rd(100 * ev / list.length, 1), mistakes: m, mistakesPer100: rd(100 * m / list.length, 0) };
     };
     var a = sum(last), b = sum(prev), diff = a.per100 - b.per100;
@@ -289,5 +305,5 @@
     };
   }
 
-  return { analyze: analyze, patterns: patterns, patternOf: patternOf, handClass: handClass, preSpot: preSpot, habits: habits, trend: trend, breakdown: breakdown, FAM: FAM, MIN: MIN, BANDS: BANDS };
+  return { baseOf: baseOf, analyze: analyze, patterns: patterns, patternOf: patternOf, handClass: handClass, preSpot: preSpot, habits: habits, trend: trend, breakdown: breakdown, FAM: FAM, MIN: MIN, BANDS: BANDS };
 });

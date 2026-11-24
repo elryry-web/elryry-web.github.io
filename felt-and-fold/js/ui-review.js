@@ -26,17 +26,17 @@
     return out;
   }
   function packDecision(d, math) {
-    return { street: d.street, boardStr: d.boardStr, grade: d.grade, evLost: d.evLost, source: d.source, spot: d.spot, pot: d.pot, toCall: d.toCall,
+    return { street: d.street, boardStr: d.boardStr, grade: d.grade, evLost: d.evLost, baseGrade: d.baseGrade, baseLoss: d.baseLoss, baseLeak: d.baseLeak, source: d.source, spot: d.spot, pot: d.pot, toCall: d.toCall,
       did: { action: d.did.action, toBB: d.did.toBB, addBB: d.did.addBB, canCall: d.did.canCall }, hand: d.hand, leak: d.leak, text: d.text, concepts: d.concepts || [],
       mix: d.mix.filter(m => m.freq >= 0.005).map(m => ({ action: m.action, sizeLabel: m.sizeLabel, freq: r2(m.freq), toBB: m.toBB })),
-      exploit: d.exploit ? { gradedBy: d.exploit.gradedBy, name: d.exploit.name, best: d.exploit.best, baseGrade: d.exploit.baseGrade, state: d.exploit.state, plan: d.exploit.plan || null } : null,
+      exploit: d.exploit ? { gradedBy: d.exploit.gradedBy, name: d.exploit.name, best: d.exploit.best, baseGrade: d.exploit.baseGrade, state: d.exploit.state, plan: d.exploit.plan || null, edge: d.exploit.edge || undefined } : null,
       sizeTell: d.sizeTell ? { kind: d.sizeTell.kind, toBB: d.sizeTell.toBB } : undefined,
       later: d.later || '', hint: d.hint || undefined, tm: math && d.tm ? d.tm : undefined, math: math && d.tm ? packMath(d.math) : undefined };
   }
   function pack(e, math) {
     const rv = e.rv, rc = rv.recap;
     return { n: e.n, at: e.at, label: e.meta.label || '', rv: { handId: rv.handId, mode: rv.mode, bb: rv.bb, seats: rv.seats || undefined, heroPos: rv.heroPos, heroCards: rv.heroCards, board: rv.board,
-      net: rv.net, blind: rv.blind || null, excluded: rv.excluded || undefined, worst: rv.worst, clean: rv.clean, evLost: rv.evLost, solved: rv.solved || 0,
+      net: rv.net, blind: rv.blind || null, excluded: rv.excluded || undefined, worst: rv.worst, clean: rv.clean, evLost: rv.evLost, xEdge: rv.xEdge || undefined, solved: rv.solved || 0,
       recap: rc ? { villains: rc.villains.map(v => ({ name: v.name, pos: v.pos, cards: v.cards, made: v.made, text: v.text, rangeText: v.rangeText, thinking: v.thinking,
         tm: math && v.tm ? v.tm : undefined, math: math && v.tm ? packMath(v.math) : undefined })) } : null,
       decisions: rv.decisions.map(d => packDecision(d, math)) } };
@@ -145,13 +145,22 @@
   }
   // "Bet half pot (6.5 bb)", "Raise to 3x (19.5 bb)", "All-in (48 bb)"; preflop "Raise to 4.7 bb" (see FF.Review.didLabel)
   function didText(d, u) { return FF.Review.didLabel(d, x => u ? u.amt(x) : UI.trim(x, 1) + 'bb'); }
+  // soft tags beside the grade: the edge a read finds over a baseline-Good play, and the baseline grade when the
+  // read credits a play the baseline marks down (the header, Stats and the Coach count that baseline grade)
+  function xTags(d, u) {
+    const x = d.exploit;
+    let t = '';
+    if (x && x.edge > 0 && d.grade === 'Good') t += '<span class="xedge" title="Good by the baseline. This is what the play leaves against ' + UI.esc(x.name || 'this player') + '.">Exploit +' + evAmt(x.edge, u) + '</span>';
+    if (d.baseGrade && d.baseGrade !== d.grade) t += '<span class="xedge" title="Stats, the Coach and the hand header count the baseline grade.">Baseline: ' + d.baseGrade + '</span>';
+    return t;
+  }
   function decisionHtml(d, entry) {
     const u = unitsOf(entry.rv), pending = entry.solving && d.source === 'Estimate' && d.street !== 'preflop';
     const board = d.boardStr ? '<span class="dboard">' + UI.cardsText(d.boardStr) + '</span>' : '';
     return '<div class="decision">' +
       '<div class="dhead"><span class="street">' + d.street.charAt(0).toUpperCase() + d.street.slice(1) + '</span>' + board +
       '<span class="grade ' + GRADE_CLS[d.grade] + '">' + d.grade + '</span>' +
-      (d.evLost > 0 ? '<span class="evlost">-' + evAmt(d.evLost, u) + '</span>' : '') +
+      (d.evLost > 0 ? '<span class="evlost">-' + evAmt(d.evLost, u) + '</span>' : '') + xTags(d, u) +
       '<span class="src src-' + d.source.toLowerCase() + '" title="' + UI.esc(SOURCE_TIP[d.source] || '') + '">' + d.source + '</span>' +
       (pending ? '<span class="solving">solving…</span>' : '') + (d.hint ? '<span class="hintused" title="You opened the live coach hint before this decision.">hint used</span>' : '') + '</div>' +
       '<div class="dspot">' + termsHtml(UI.esc(u.text(d.spot))) + '. Pot ' + u.amt(d.pot) + (d.toCall ? ', ' + u.amt(d.toCall) + ' to call' : '') + '.</div>' +
@@ -289,12 +298,13 @@
       netHtml(rv, true) + '</div>' +
       '<div class="rv-grade"><span class="grade ' + GRADE_CLS[rv.worst] + '">' + (rv.clean ? 'Clean hand' : 'Worst: ' + rv.worst) + '</span>' +
       (rv.evLost > 0 ? '<span class="evlost">EV lost ' + evAmt(rv.evLost, unitsOf(rv)) + '</span>' : '') +
+      (rv.xEdge > 0 ? '<span class="xedge" title="What baseline-Good plays left against this player. Not counted as EV lost.">Exploit edge missed: ' + evAmt(rv.xEdge, unitsOf(rv)) + '</span>' : '') +
       (entry.solving ? '<span class="solving">Checking with the solver…</span>' : rv.solved ? '<span class="muted">' + rv.solved + ' solver answer' + (rv.solved > 1 ? 's' : '') + '</span>' : '') +
       // a misclick hand can be left out of Stats and the Coach; the chips stay as they fell
       '<button class="btn rv-excl" id="rv-excl" aria-pressed="' + !!rv.excluded + '">' + (rv.excluded ? 'Include again' : 'Exclude') + '</button>' +
       (rv.excluded ? '<span class="muted small rv-exnote">Left out of Stats and the Coach.</span>' : '') + '</div>';
     let body;
-    if (rv.clean && !entry.expanded) {
+    if (rv.clean && !(rv.xEdge > 0) && !entry.expanded) {
       body = '<div class="clean-line">Every decision was fine. <button class="btn link" id="rv-more">Show the decisions</button></div>';
     } else {
       body = rv.decisions.map(d => decisionHtml(d, entry)).join('') + recapHtml(rv);
@@ -368,7 +378,7 @@
         netTxt = (chips > 0 ? '+' : '') + UI.amt(Math.round(chips), rvs[0].bb, rvs[0].mode, true);
       }
       // a saved hand from an old version may lack leak tags: the leak list leaves those decisions out and says so
-      const untagged = rvs.reduce((a, r) => a + r.decisions.filter(d => d.grade !== 'Good' && !('leak' in d)).length, 0);
+      const untagged = rvs.reduce((a, r) => a + r.decisions.filter(d => { const b = FF.Review.baseOf(d); return b.grade !== 'Good' && !b.tagged; }).length, 0);
       html += '<div class="stats-grid">' +
         '<div><b>' + s.hands + '</b><span>hands reviewed</span></div>' +
         '<div><b class="' + (s.net >= 0 ? 'pos-net' : 'neg-net') + '">' + netTxt + '</b><span>net</span></div>' +
