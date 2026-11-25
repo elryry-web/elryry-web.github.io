@@ -151,7 +151,9 @@
     const x = d.exploit;
     let t = '';
     if (x && x.edge > 0 && d.grade === 'Good') t += '<span class="xedge" title="Good by the baseline. This is what the play leaves against ' + UI.esc(x.name || 'this player') + '.">Exploit +' + evAmt(x.edge, u) + '</span>';
-    if (d.baseGrade && d.baseGrade !== d.grade) t += '<span class="xedge" title="Stats, the Coach and the hand header count the baseline grade.">Baseline: ' + d.baseGrade + '</span>';
+    // the tag's figure is the baseline loss the header sums; an old save without it shows the grade alone
+    const r = FF.Review.rowLoss(d);
+    if (r.tag) t += '<span class="xedge" title="Stats, the Coach and the hand header count the baseline grade and loss.">Baseline: ' + r.tag + (r.tagLoss != null ? ' -' + evAmt(r.tagLoss, u) : '') + '</span>';
     return t;
   }
   function decisionHtml(d, entry) {
@@ -160,7 +162,7 @@
     return '<div class="decision">' +
       '<div class="dhead"><span class="street">' + d.street.charAt(0).toUpperCase() + d.street.slice(1) + '</span>' + board +
       '<span class="grade ' + GRADE_CLS[d.grade] + '">' + d.grade + '</span>' +
-      (d.evLost > 0 ? '<span class="evlost">-' + evAmt(d.evLost, u) + '</span>' : '') + xTags(d, u) +
+      (FF.Review.rowLoss(d).red > 0 ? '<span class="evlost">-' + evAmt(FF.Review.rowLoss(d).red, u) + '</span>' : '') + xTags(d, u) +
       '<span class="src src-' + d.source.toLowerCase() + '" title="' + UI.esc(SOURCE_TIP[d.source] || '') + '">' + d.source + '</span>' +
       (pending ? '<span class="solving">solving…</span>' : '') + (d.hint ? '<span class="hintused" title="You opened the live coach hint before this decision.">hint used</span>' : '') + '</div>' +
       '<div class="dspot">' + termsHtml(UI.esc(u.text(d.spot))) + '. Pot ' + u.amt(d.pot) + (d.toCall ? ', ' + u.amt(d.toCall) + ' to call' : '') + '.</div>' +

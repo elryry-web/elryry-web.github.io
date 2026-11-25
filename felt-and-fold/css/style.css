@@ -487,7 +487,12 @@ body.art-markers .dealer { width: 32px; height: 32px; color: #3b2a12; font-famil
   .lc-body { height: 118px; }
   .lc-body p { margin: 1px 0 3px; line-height: 1.3; }
   .sizer { margin-bottom: 4px; }
-  .act { flex: 1 1 auto; min-height: 46px; font-size: 15px; padding: 6px 8px; min-width: 0; overflow: hidden; text-overflow: ellipsis; } /* labels stay on one line */
+  /* Firefox Android: when the URL bar slides away it moves the pinned table screen on the compositor, but not the
+     clip of an overflow:hidden box inside it. The text of Fold, Call and Raise moved out of their clip and vanished,
+     while the button colours stayed. So the action buttons never clip: a long label wraps to a second line instead.
+     tools/test-layout.js guards this. */
+  .act { flex: 1 1 auto; min-height: 46px; font-size: 15px; padding: 6px 8px; min-width: 0; white-space: normal; line-height: 1.1;
+    display: flex; align-items: center; justify-content: center; text-align: center; }
   .acts { gap: 8px; }
   .btn.preset { padding: 4px; min-height: 40px; } /* .btn.sm would hold it at 34px */
   .slider-row { gap: 8px; margin-top: 4px; }

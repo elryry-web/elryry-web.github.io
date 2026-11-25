@@ -2071,10 +2071,20 @@
   }
   // the hand header: worst grade and EV lost by the baseline (as Stats and the Coach count them), and the exploit
   // edge missed: what plays the baseline calls Good leave against the read (xEdge, a soft line, never EV lost)
+  // the loss a street row shows. red: the red figure beside the grade (none on a Good row: a gap under the Inaccuracy
+  // line is not an error, and the header does not count it). tag: the baseline grade on the soft tag, when it
+  // differs from the grade. tagLoss: the figure on that tag, the same baseline loss the header sums (null when the save
+  // does not hold it, or the baseline is Good). shown: what the row adds up to; the rows of a hand sum to rv.evLost.
+  function rowLoss(d) {
+    var b = Co.baseOf(d), red = d.grade !== 'Good' && d.evLost > 0 ? rd(d.evLost, 2) : 0, tag = b.grade !== d.grade ? b.grade : null;
+    var known = typeof d.baseLoss === 'number' || !!(d.exploit && d.exploit.baseLost != null);
+    var tagLoss = tag && b.grade !== 'Good' && known && b.loss > 0 ? rd(b.loss, 2) : null;
+    return { red: red, tag: tag, tagLoss: tagLoss, shown: tag ? tagLoss || 0 : red };
+  }
   function rollup(rv) {
     var lost = 0, worst = 'Good', edge = 0;
     rv.decisions.forEach(function (d) {
-      var b = Co.baseOf(d); lost += b.loss; if (GRADES.indexOf(b.grade) > GRADES.indexOf(worst)) worst = b.grade;
+      var b = Co.baseOf(d); lost += rd(b.loss, 2); if (GRADES.indexOf(b.grade) > GRADES.indexOf(worst)) worst = b.grade;
       if (d.exploit && d.exploit.edge > 0) edge += d.exploit.edge;
     });
     rv.evLost = rd(lost, 2); rv.worst = worst; rv.clean = worst === 'Good'; rv.xEdge = rd(edge, 2);
@@ -2118,5 +2128,5 @@
     return out.join('\n');
   }
 
-  return { hand: hand, session: session, baseOf: Co.baseOf, rollup: rollup, toText: toText, gradeFor: gradeFor, GRADES: GRADES, LEAKS: LEAKS, GOOD_FREQ: GOOD_FREQ, mixPct: mixPct, youLegend: youLegend, didLabel: didLabel, closestNote: closestNote, sizeText: sizeText, GLOSSARY: GLOSSARY, linkTerms: linkTerms, grade: gradeDecision, netLabel: netLabel, unmark: unmark, mathView: mathView };
+  return { hand: hand, session: session, baseOf: Co.baseOf, rowLoss: rowLoss, rollup: rollup, toText: toText, gradeFor: gradeFor, GRADES: GRADES, LEAKS: LEAKS, GOOD_FREQ: GOOD_FREQ, mixPct: mixPct, youLegend: youLegend, didLabel: didLabel, closestNote: closestNote, sizeText: sizeText, GLOSSARY: GLOSSARY, linkTerms: linkTerms, grade: gradeDecision, netLabel: netLabel, unmark: unmark, mathView: mathView };
 });
