@@ -1,6 +1,6 @@
 {
  "version": 1,
- "generated": "2026-11-25T15:00:01.785Z",
+ "generated": "2026-11-26T15:00:07.455Z",
  "format": "ffl",
  "sizes": [
   25,
@@ -14926,12 +14926,26 @@
    "ipCombos": 546.8,
    "hu": true,
    "flops": {
+    "5c3d3h": {
+     "file": "out/LMPHU25_BTNvBB/5c3d3h.ffl",
+     "bytes": 106158,
+     "iterations": 190,
+     "exploit": 0.4929,
+     "seconds": 91.6
+    },
     "5c4d2d": {
      "file": "out/LMPHU25_BTNvBB/5c4d2d.ffl",
      "bytes": 106056,
      "iterations": 230,
      "exploit": 0.4654,
      "seconds": 121.3
+    },
+    "5c4d2h": {
+     "file": "out/LMPHU25_BTNvBB/5c4d2h.ffl",
+     "bytes": 105902,
+     "iterations": 200,
+     "exploit": 0.4764,
+     "seconds": 150.8
     },
     "6c4d2h": {
      "file": "out/LMPHU25_BTNvBB/6c4d2h.ffl",
@@ -14947,12 +14961,33 @@
      "exploit": 0.4573,
      "seconds": 51.4
     },
+    "7c5c3d": {
+     "file": "out/LMPHU25_BTNvBB/7c5c3d.ffl",
+     "bytes": 104042,
+     "iterations": 190,
+     "exploit": 0.4639,
+     "seconds": 89.9
+    },
     "7c5d4c": {
      "file": "out/LMPHU25_BTNvBB/7c5d4c.ffl",
      "bytes": 103204,
      "iterations": 180,
      "exploit": 0.4914,
      "seconds": 84
+    },
+    "7c6d4h": {
+     "file": "out/LMPHU25_BTNvBB/7c6d4h.ffl",
+     "bytes": 103502,
+     "iterations": 170,
+     "exploit": 0.4882,
+     "seconds": 126.4
+    },
+    "7c7d5h": {
+     "file": "out/LMPHU25_BTNvBB/7c7d5h.ffl",
+     "bytes": 103620,
+     "iterations": 230,
+     "exploit": 0.4583,
+     "seconds": 107.4
     },
     "8c4c4d": {
      "file": "out/LMPHU25_BTNvBB/8c4c4d.ffl",
@@ -14981,6 +15016,20 @@
      "iterations": 220,
      "exploit": 0.4682,
      "seconds": 187.5
+    },
+    "8c6d2c": {
+     "file": "out/LMPHU25_BTNvBB/8c6d2c.ffl",
+     "bytes": 102724,
+     "iterations": 180,
+     "exploit": 0.4827,
+     "seconds": 85.8
+    },
+    "8c8d5c": {
+     "file": "out/LMPHU25_BTNvBB/8c8d5c.ffl",
+     "bytes": 104084,
+     "iterations": 170,
+     "exploit": 0.472,
+     "seconds": 78.5
     },
     "9c4d2d": {
      "file": "out/LMPHU25_BTNvBB/9c4d2d.ffl",
@@ -15031,6 +15080,13 @@
      "exploit": 0.4483,
      "seconds": 117.9
     },
+    "Ac8d4d": {
+     "file": "out/LMPHU25_BTNvBB/Ac8d4d.ffl",
+     "bytes": 103468,
+     "iterations": 160,
+     "exploit": 0.4379,
+     "seconds": 71.4
+    },
     "Ac9c5c": {
      "file": "out/LMPHU25_BTNvBB/Ac9c5c.ffl",
      "bytes": 105230,
@@ -15059,6 +15115,20 @@
      "exploit": 0.449,
      "seconds": 63.1
     },
+    "AcKdJh": {
+     "file": "out/LMPHU25_BTNvBB/AcKdJh.ffl",
+     "bytes": 103696,
+     "iterations": 150,
+     "exploit": 0.4581,
+     "seconds": 107.4
+    },
+    "AcQc3d": {
+     "file": "out/LMPHU25_BTNvBB/AcQc3d.ffl",
+     "bytes": 105826,
+     "iterations": 160,
+     "exploit": 0.4758,
+     "seconds": 76.2
+    },
     "AcQd3h": {
      "file": "out/LMPHU25_BTNvBB/AcQd3h.ffl",
      "bytes": 106106,
@@ -15072,6 +15142,13 @@
      "iterations": 250,
      "exploit": 0.4875,
      "seconds": 127.7
+    },
+    "AcQd8c": {
+     "file": "out/LMPHU25_BTNvBB/AcQd8c.ffl",
+     "bytes": 104634,
+     "iterations": 150,
+     "exploit": 0.4631,
+     "seconds": 69.8
     },
     "AcQdTd": {
      "file": "out/LMPHU25_BTNvBB/AcQdTd.ffl",
@@ -15087,6 +15164,13 @@
      "exploit": 0.4789,
      "seconds": 119.5
     },
+    "Jc4c4d": {
+     "file": "out/LMPHU25_BTNvBB/Jc4c4d.ffl",
+     "bytes": 106808,
+     "iterations": 240,
+     "exploit": 0.4883,
+     "seconds": 113.4
+    },
     "Jc5d2c": {
      "file": "out/LMPHU25_BTNvBB/Jc5d2c.ffl",
      "bytes": 105868,
@@ -15100,6 +15184,13 @@
      "iterations": 160,
      "exploit": 0.4859,
      "seconds": 119
+    },
+    "Jc9d7d": {
+     "file": "out/LMPHU25_BTNvBB/Jc9d7d.ffl",
+     "bytes": 104108,
+     "iterations": 150,
+     "exploit": 0.4724,
+     "seconds": 67.8
     },
     "Jc9d7h": {
      "file": "out/LMPHU25_BTNvBB/Jc9d7h.ffl",
@@ -15122,6 +15213,13 @@
      "exploit": 0.4703,
      "seconds": 94.9
     },
+    "JcTc3d": {
+     "file": "out/LMPHU25_BTNvBB/JcTc3d.ffl",
+     "bytes": 103856,
+     "iterations": 170,
+     "exploit": 0.4734,
+     "seconds": 81.6
+    },
     "JcTc8d": {
      "file": "out/LMPHU25_BTNvBB/JcTc8d.ffl",
      "bytes": 103508,
@@ -15135,6 +15233,13 @@
      "iterations": 240,
      "exploit": 0.4907,
      "seconds": 127.4
+    },
+    "Kc6c3c": {
+     "file": "out/LMPHU25_BTNvBB/Kc6c3c.ffl",
+     "bytes": 104402,
+     "iterations": 210,
+     "exploit": 0.4514,
+     "seconds": 48.4
     },
     "Kc6d3c": {
      "file": "out/LMPHU25_BTNvBB/Kc6d3c.ffl",
@@ -15156,6 +15261,27 @@
      "iterations": 200,
      "exploit": 0.4509,
      "seconds": 105.6
+    },
+    "Kc8d4h": {
+     "file": "out/LMPHU25_BTNvBB/Kc8d4h.ffl",
+     "bytes": 103856,
+     "iterations": 190,
+     "exploit": 0.4552,
+     "seconds": 144.1
+    },
+    "Kc9d7h": {
+     "file": "out/LMPHU25_BTNvBB/Kc9d7h.ffl",
+     "bytes": 101392,
+     "iterations": 150,
+     "exploit": 0.4382,
+     "seconds": 109.6
+    },
+    "KcJc9d": {
+     "file": "out/LMPHU25_BTNvBB/KcJc9d.ffl",
+     "bytes": 101942,
+     "iterations": 160,
+     "exploit": 0.4518,
+     "seconds": 74.5
     },
     "KcJd4c": {
      "file": "out/LMPHU25_BTNvBB/KcJd4c.ffl",
@@ -15199,6 +15325,34 @@
      "exploit": 0.4882,
      "seconds": 118.7
     },
+    "KcTc6d": {
+     "file": "out/LMPHU25_BTNvBB/KcTc6d.ffl",
+     "bytes": 102272,
+     "iterations": 150,
+     "exploit": 0.4579,
+     "seconds": 70.8
+    },
+    "Qc4c2d": {
+     "file": "out/LMPHU25_BTNvBB/Qc4c2d.ffl",
+     "bytes": 107042,
+     "iterations": 230,
+     "exploit": 0.4676,
+     "seconds": 109.8
+    },
+    "Qc4d2h": {
+     "file": "out/LMPHU25_BTNvBB/Qc4d2h.ffl",
+     "bytes": 106996,
+     "iterations": 240,
+     "exploit": 0.4831,
+     "seconds": 183.6
+    },
+    "Qc6d3d": {
+     "file": "out/LMPHU25_BTNvBB/Qc6d3d.ffl",
+     "bytes": 106064,
+     "iterations": 220,
+     "exploit": 0.4887,
+     "seconds": 105.2
+    },
     "Qc6d3h": {
      "file": "out/LMPHU25_BTNvBB/Qc6d3h.ffl",
      "bytes": 106242,
@@ -15212,6 +15366,13 @@
      "iterations": 200,
      "exploit": 0.4908,
      "seconds": 94.8
+    },
+    "Qc9c9d": {
+     "file": "out/LMPHU25_BTNvBB/Qc9c9d.ffl",
+     "bytes": 106000,
+     "iterations": 200,
+     "exploit": 0.4584,
+     "seconds": 92.2
     },
     "Qc9d5d": {
      "file": "out/LMPHU25_BTNvBB/Qc9d5d.ffl",
@@ -15240,6 +15401,13 @@
      "iterations": 160,
      "exploit": 0.4726,
      "seconds": 82.6
+    },
+    "QcJd9h": {
+     "file": "out/LMPHU25_BTNvBB/QcJd9h.ffl",
+     "bytes": 105230,
+     "iterations": 160,
+     "exploit": 0.4801,
+     "seconds": 117.2
     },
     "QcQd9h": {
      "file": "out/LMPHU25_BTNvBB/QcQd9h.ffl",
@@ -15283,12 +15451,26 @@
      "exploit": 0.4623,
      "seconds": 74.8
     },
+    "Tc8c7d": {
+     "file": "out/LMPHU25_BTNvBB/Tc8c7d.ffl",
+     "bytes": 99926,
+     "iterations": 160,
+     "exploit": 0.4798,
+     "seconds": 74.2
+    },
     "Tc8d4c": {
      "file": "out/LMPHU25_BTNvBB/Tc8d4c.ffl",
      "bytes": 101462,
      "iterations": 160,
      "exploit": 0.4626,
      "seconds": 83
+    },
+    "Tc8d4h": {
+     "file": "out/LMPHU25_BTNvBB/Tc8d4h.ffl",
+     "bytes": 101798,
+     "iterations": 160,
+     "exploit": 0.4821,
+     "seconds": 120.4
     }
    },
    "tree": {
@@ -15341,12 +15523,26 @@
    "ipCombos": 546.8,
    "hu": true,
    "flops": {
+    "5c3d3h": {
+     "file": "out/LMPHU20_BTNvBB/5c3d3h.ffl",
+     "bytes": 106060,
+     "iterations": 220,
+     "exploit": 0.4522,
+     "seconds": 106.3
+    },
     "5c4d2d": {
      "file": "out/LMPHU20_BTNvBB/5c4d2d.ffl",
      "bytes": 106098,
      "iterations": 200,
      "exploit": 0.4751,
      "seconds": 105.9
+    },
+    "5c4d2h": {
+     "file": "out/LMPHU20_BTNvBB/5c4d2h.ffl",
+     "bytes": 106140,
+     "iterations": 220,
+     "exploit": 0.4813,
+     "seconds": 167.4
     },
     "6c4d2h": {
      "file": "out/LMPHU20_BTNvBB/6c4d2h.ffl",
@@ -15362,12 +15558,33 @@
      "exploit": 0.4877,
      "seconds": 38.8
     },
+    "7c5c3d": {
+     "file": "out/LMPHU20_BTNvBB/7c5c3d.ffl",
+     "bytes": 104056,
+     "iterations": 180,
+     "exploit": 0.4874,
+     "seconds": 85.6
+    },
     "7c5d4c": {
      "file": "out/LMPHU20_BTNvBB/7c5d4c.ffl",
      "bytes": 103498,
      "iterations": 150,
      "exploit": 0.4654,
      "seconds": 70.3
+    },
+    "7c6d4h": {
+     "file": "out/LMPHU20_BTNvBB/7c6d4h.ffl",
+     "bytes": 103600,
+     "iterations": 150,
+     "exploit": 0.4639,
+     "seconds": 112.8
+    },
+    "7c7d5h": {
+     "file": "out/LMPHU20_BTNvBB/7c7d5h.ffl",
+     "bytes": 103368,
+     "iterations": 170,
+     "exploit": 0.4603,
+     "seconds": 79.8
     },
     "8c4c4d": {
      "file": "out/LMPHU20_BTNvBB/8c4c4d.ffl",
@@ -15396,6 +15613,20 @@
      "iterations": 190,
      "exploit": 0.4798,
      "seconds": 161.5
+    },
+    "8c6d2c": {
+     "file": "out/LMPHU20_BTNvBB/8c6d2c.ffl",
+     "bytes": 103228,
+     "iterations": 160,
+     "exploit": 0.449,
+     "seconds": 76.3
+    },
+    "8c8d5c": {
+     "file": "out/LMPHU20_BTNvBB/8c8d5c.ffl",
+     "bytes": 103006,
+     "iterations": 160,
+     "exploit": 0.4381,
+     "seconds": 73.8
     },
     "9c4d2d": {
      "file": "out/LMPHU20_BTNvBB/9c4d2d.ffl",
@@ -15446,6 +15677,13 @@
      "exploit": 0.4815,
      "seconds": 103.7
     },
+    "Ac8d4d": {
+     "file": "out/LMPHU20_BTNvBB/Ac8d4d.ffl",
+     "bytes": 102796,
+     "iterations": 140,
+     "exploit": 0.462,
+     "seconds": 64.6
+    },
     "Ac9c5c": {
      "file": "out/LMPHU20_BTNvBB/Ac9c5c.ffl",
      "bytes": 104264,
@@ -15474,6 +15712,20 @@
      "exploit": 0.4513,
      "seconds": 59.5
     },
+    "AcKdJh": {
+     "file": "out/LMPHU20_BTNvBB/AcKdJh.ffl",
+     "bytes": 101456,
+     "iterations": 140,
+     "exploit": 0.4541,
+     "seconds": 99.4
+    },
+    "AcQc3d": {
+     "file": "out/LMPHU20_BTNvBB/AcQc3d.ffl",
+     "bytes": 105742,
+     "iterations": 160,
+     "exploit": 0.4573,
+     "seconds": 76.4
+    },
     "AcQd3h": {
      "file": "out/LMPHU20_BTNvBB/AcQd3h.ffl",
      "bytes": 106890,
@@ -15487,6 +15739,13 @@
      "iterations": 140,
      "exploit": 0.4255,
      "seconds": 72.5
+    },
+    "AcQd8c": {
+     "file": "out/LMPHU20_BTNvBB/AcQd8c.ffl",
+     "bytes": 102520,
+     "iterations": 170,
+     "exploit": 0.442,
+     "seconds": 78.8
     },
     "AcQdTd": {
      "file": "out/LMPHU20_BTNvBB/AcQdTd.ffl",
@@ -15502,6 +15761,13 @@
      "exploit": 0.4848,
      "seconds": 113
     },
+    "Jc4c4d": {
+     "file": "out/LMPHU20_BTNvBB/Jc4c4d.ffl",
+     "bytes": 106808,
+     "iterations": 180,
+     "exploit": 0.4638,
+     "seconds": 85
+    },
     "Jc5d2c": {
      "file": "out/LMPHU20_BTNvBB/Jc5d2c.ffl",
      "bytes": 106078,
@@ -15515,6 +15781,13 @@
      "iterations": 150,
      "exploit": 0.4512,
      "seconds": 111.9
+    },
+    "Jc9d7d": {
+     "file": "out/LMPHU20_BTNvBB/Jc9d7d.ffl",
+     "bytes": 104472,
+     "iterations": 130,
+     "exploit": 0.4971,
+     "seconds": 58.9
     },
     "Jc9d7h": {
      "file": "out/LMPHU20_BTNvBB/Jc9d7h.ffl",
@@ -15537,6 +15810,13 @@
      "exploit": 0.4644,
      "seconds": 85.8
     },
+    "JcTc3d": {
+     "file": "out/LMPHU20_BTNvBB/JcTc3d.ffl",
+     "bytes": 104122,
+     "iterations": 160,
+     "exploit": 0.4431,
+     "seconds": 77.2
+    },
     "JcTc8d": {
      "file": "out/LMPHU20_BTNvBB/JcTc8d.ffl",
      "bytes": 104362,
@@ -15550,6 +15830,13 @@
      "iterations": 220,
      "exploit": 0.4587,
      "seconds": 117.2
+    },
+    "Kc6c3c": {
+     "file": "out/LMPHU20_BTNvBB/Kc6c3c.ffl",
+     "bytes": 103898,
+     "iterations": 210,
+     "exploit": 0.4534,
+     "seconds": 48.9
     },
     "Kc6d3c": {
      "file": "out/LMPHU20_BTNvBB/Kc6d3c.ffl",
@@ -15571,6 +15858,27 @@
      "iterations": 160,
      "exploit": 0.4899,
      "seconds": 84.2
+    },
+    "Kc8d4h": {
+     "file": "out/LMPHU20_BTNvBB/Kc8d4h.ffl",
+     "bytes": 104976,
+     "iterations": 160,
+     "exploit": 0.4573,
+     "seconds": 121.8
+    },
+    "Kc9d7h": {
+     "file": "out/LMPHU20_BTNvBB/Kc9d7h.ffl",
+     "bytes": 102932,
+     "iterations": 140,
+     "exploit": 0.4315,
+     "seconds": 102.3
+    },
+    "KcJc9d": {
+     "file": "out/LMPHU20_BTNvBB/KcJc9d.ffl",
+     "bytes": 104910,
+     "iterations": 140,
+     "exploit": 0.4306,
+     "seconds": 63.6
     },
     "KcJd4c": {
      "file": "out/LMPHU20_BTNvBB/KcJd4c.ffl",
@@ -15614,6 +15922,34 @@
      "exploit": 0.4568,
      "seconds": 91
     },
+    "KcTc6d": {
+     "file": "out/LMPHU20_BTNvBB/KcTc6d.ffl",
+     "bytes": 102398,
+     "iterations": 140,
+     "exploit": 0.4634,
+     "seconds": 65.8
+    },
+    "Qc4c2d": {
+     "file": "out/LMPHU20_BTNvBB/Qc4c2d.ffl",
+     "bytes": 107056,
+     "iterations": 200,
+     "exploit": 0.4516,
+     "seconds": 96
+    },
+    "Qc4d2h": {
+     "file": "out/LMPHU20_BTNvBB/Qc4d2h.ffl",
+     "bytes": 107038,
+     "iterations": 200,
+     "exploit": 0.4915,
+     "seconds": 154.1
+    },
+    "Qc6d3d": {
+     "file": "out/LMPHU20_BTNvBB/Qc6d3d.ffl",
+     "bytes": 105266,
+     "iterations": 200,
+     "exploit": 0.4664,
+     "seconds": 95.7
+    },
     "Qc6d3h": {
      "file": "out/LMPHU20_BTNvBB/Qc6d3h.ffl",
      "bytes": 105920,
@@ -15627,6 +15963,13 @@
      "iterations": 170,
      "exploit": 0.4709,
      "seconds": 81
+    },
+    "Qc9c9d": {
+     "file": "out/LMPHU20_BTNvBB/Qc9c9d.ffl",
+     "bytes": 104936,
+     "iterations": 190,
+     "exploit": 0.4747,
+     "seconds": 88.3
     },
     "Qc9d5d": {
      "file": "out/LMPHU20_BTNvBB/Qc9d5d.ffl",
@@ -15655,6 +15998,13 @@
      "iterations": 140,
      "exploit": 0.4645,
      "seconds": 73.3
+    },
+    "QcJd9h": {
+     "file": "out/LMPHU20_BTNvBB/QcJd9h.ffl",
+     "bytes": 104978,
+     "iterations": 140,
+     "exploit": 0.459,
+     "seconds": 102.9
     },
     "QcQd9h": {
      "file": "out/LMPHU20_BTNvBB/QcQd9h.ffl",
@@ -15698,12 +16048,26 @@
      "exploit": 0.4326,
      "seconds": 65.4
     },
+    "Tc8c7d": {
+     "file": "out/LMPHU20_BTNvBB/Tc8c7d.ffl",
+     "bytes": 103132,
+     "iterations": 140,
+     "exploit": 0.4722,
+     "seconds": 64.3
+    },
     "Tc8d4c": {
      "file": "out/LMPHU20_BTNvBB/Tc8d4c.ffl",
      "bytes": 102778,
      "iterations": 140,
      "exploit": 0.451,
      "seconds": 72.2
+    },
+    "Tc8d4h": {
+     "file": "out/LMPHU20_BTNvBB/Tc8d4h.ffl",
+     "bytes": 103576,
+     "iterations": 140,
+     "exploit": 0.4655,
+     "seconds": 105.9
     }
    },
    "tree": {
@@ -15756,12 +16120,26 @@
    "ipCombos": 580.8,
    "hu": true,
    "flops": {
+    "5c3d3h": {
+     "file": "out/LMPHU40_BTNvBB/5c3d3h.ffl",
+     "bytes": 105960,
+     "iterations": 330,
+     "exploit": 0.4813,
+     "seconds": 254.4
+    },
     "5c4d2d": {
      "file": "out/LMPHU40_BTNvBB/5c4d2d.ffl",
      "bytes": 105804,
      "iterations": 280,
      "exploit": 0.4895,
      "seconds": 236
+    },
+    "5c4d2h": {
+     "file": "out/LMPHU40_BTNvBB/5c4d2h.ffl",
+     "bytes": 105846,
+     "iterations": 280,
+     "exploit": 0.4721,
+     "seconds": 337.4
     },
     "6c4d2h": {
      "file": "out/LMPHU40_BTNvBB/6c4d2h.ffl",
@@ -15777,12 +16155,33 @@
      "exploit": 0.4805,
      "seconds": 108.9
     },
+    "7c5c3d": {
+     "file": "out/LMPHU40_BTNvBB/7c5c3d.ffl",
+     "bytes": 103174,
+     "iterations": 300,
+     "exploit": 0.4952,
+     "seconds": 225.3
+    },
     "7c5d4c": {
      "file": "out/LMPHU40_BTNvBB/7c5d4c.ffl",
      "bytes": 101146,
      "iterations": 270,
      "exploit": 0.4707,
      "seconds": 201.3
+    },
+    "7c6d4h": {
+     "file": "out/LMPHU40_BTNvBB/7c6d4h.ffl",
+     "bytes": 103740,
+     "iterations": 270,
+     "exploit": 0.4865,
+     "seconds": 322.1
+    },
+    "7c7d5h": {
+     "file": "out/LMPHU40_BTNvBB/7c7d5h.ffl",
+     "bytes": 103942,
+     "iterations": 310,
+     "exploit": 0.4964,
+     "seconds": 233.9
     },
     "8c4c4d": {
      "file": "out/LMPHU40_BTNvBB/8c4c4d.ffl",
@@ -15811,6 +16210,20 @@
      "iterations": 300,
      "exploit": 0.4797,
      "seconds": 401.4
+    },
+    "8c6d2c": {
+     "file": "out/LMPHU40_BTNvBB/8c6d2c.ffl",
+     "bytes": 102696,
+     "iterations": 260,
+     "exploit": 0.4886,
+     "seconds": 198.4
+    },
+    "8c8d5c": {
+     "file": "out/LMPHU40_BTNvBB/8c8d5c.ffl",
+     "bytes": 104504,
+     "iterations": 290,
+     "exploit": 0.4916,
+     "seconds": 215.7
     },
     "9c4d2d": {
      "file": "out/LMPHU40_BTNvBB/9c4d2d.ffl",
@@ -15861,6 +16274,13 @@
      "exploit": 0.4992,
      "seconds": 306.8
     },
+    "Ac8d4d": {
+     "file": "out/LMPHU40_BTNvBB/Ac8d4d.ffl",
+     "bytes": 103482,
+     "iterations": 230,
+     "exploit": 0.4807,
+     "seconds": 173.1
+    },
     "Ac9c5c": {
      "file": "out/LMPHU40_BTNvBB/Ac9c5c.ffl",
      "bytes": 104306,
@@ -15889,6 +16309,20 @@
      "exploit": 0.4809,
      "seconds": 136.2
     },
+    "AcKdJh": {
+     "file": "out/LMPHU40_BTNvBB/AcKdJh.ffl",
+     "bytes": 101750,
+     "iterations": 240,
+     "exploit": 0.48,
+     "seconds": 276.8
+    },
+    "AcQc3d": {
+     "file": "out/LMPHU40_BTNvBB/AcQc3d.ffl",
+     "bytes": 105616,
+     "iterations": 240,
+     "exploit": 0.4674,
+     "seconds": 180.9
+    },
     "AcQd3h": {
      "file": "out/LMPHU40_BTNvBB/AcQd3h.ffl",
      "bytes": 104804,
@@ -15902,6 +16336,13 @@
      "iterations": 200,
      "exploit": 0.4664,
      "seconds": 166
+    },
+    "AcQd8c": {
+     "file": "out/LMPHU40_BTNvBB/AcQd8c.ffl",
+     "bytes": 102828,
+     "iterations": 200,
+     "exploit": 0.4518,
+     "seconds": 148.8
     },
     "AcQdTd": {
      "file": "out/LMPHU40_BTNvBB/AcQdTd.ffl",
@@ -15917,6 +16358,13 @@
      "exploit": 0.472,
      "seconds": 287.3
     },
+    "Jc4c4d": {
+     "file": "out/LMPHU40_BTNvBB/Jc4c4d.ffl",
+     "bytes": 106808,
+     "iterations": 300,
+     "exploit": 0.4853,
+     "seconds": 224.9
+    },
     "Jc5d2c": {
      "file": "out/LMPHU40_BTNvBB/Jc5d2c.ffl",
      "bytes": 104916,
@@ -15930,6 +16378,13 @@
      "iterations": 230,
      "exploit": 0.4772,
      "seconds": 273.6
+    },
+    "Jc9d7d": {
+     "file": "out/LMPHU40_BTNvBB/Jc9d7d.ffl",
+     "bytes": 102330,
+     "iterations": 220,
+     "exploit": 0.4952,
+     "seconds": 163.3
     },
     "Jc9d7h": {
      "file": "out/LMPHU40_BTNvBB/Jc9d7h.ffl",
@@ -15952,6 +16407,13 @@
      "exploit": 0.4767,
      "seconds": 249.9
     },
+    "JcTc3d": {
+     "file": "out/LMPHU40_BTNvBB/JcTc3d.ffl",
+     "bytes": 103534,
+     "iterations": 250,
+     "exploit": 0.4899,
+     "seconds": 192.2
+    },
     "JcTc8d": {
      "file": "out/LMPHU40_BTNvBB/JcTc8d.ffl",
      "bytes": 101338,
@@ -15965,6 +16427,13 @@
      "iterations": 350,
      "exploit": 0.4783,
      "seconds": 294.3
+    },
+    "Kc6c3c": {
+     "file": "out/LMPHU40_BTNvBB/Kc6c3c.ffl",
+     "bytes": 105284,
+     "iterations": 290,
+     "exploit": 0.4929,
+     "seconds": 105.7
     },
     "Kc6d3c": {
      "file": "out/LMPHU40_BTNvBB/Kc6d3c.ffl",
@@ -15986,6 +16455,27 @@
      "iterations": 260,
      "exploit": 0.4758,
      "seconds": 214.3
+    },
+    "Kc8d4h": {
+     "file": "out/LMPHU40_BTNvBB/Kc8d4h.ffl",
+     "bytes": 104024,
+     "iterations": 250,
+     "exploit": 0.4821,
+     "seconds": 304.1
+    },
+    "Kc9d7h": {
+     "file": "out/LMPHU40_BTNvBB/Kc9d7h.ffl",
+     "bytes": 101798,
+     "iterations": 210,
+     "exploit": 0.4891,
+     "seconds": 241.1
+    },
+    "KcJc9d": {
+     "file": "out/LMPHU40_BTNvBB/KcJc9d.ffl",
+     "bytes": 102320,
+     "iterations": 220,
+     "exploit": 0.4883,
+     "seconds": 163.3
     },
     "KcJd4c": {
      "file": "out/LMPHU40_BTNvBB/KcJd4c.ffl",
@@ -16029,6 +16519,34 @@
      "exploit": 0.4676,
      "seconds": 256.4
     },
+    "KcTc6d": {
+     "file": "out/LMPHU40_BTNvBB/KcTc6d.ffl",
+     "bytes": 100970,
+     "iterations": 220,
+     "exploit": 0.451,
+     "seconds": 164.9
+    },
+    "Qc4c2d": {
+     "file": "out/LMPHU40_BTNvBB/Qc4c2d.ffl",
+     "bytes": 106776,
+     "iterations": 320,
+     "exploit": 0.4722,
+     "seconds": 245.8
+    },
+    "Qc4d2h": {
+     "file": "out/LMPHU40_BTNvBB/Qc4d2h.ffl",
+     "bytes": 107010,
+     "iterations": 340,
+     "exploit": 0.4997,
+     "seconds": 417.4
+    },
+    "Qc6d3d": {
+     "file": "out/LMPHU40_BTNvBB/Qc6d3d.ffl",
+     "bytes": 105938,
+     "iterations": 300,
+     "exploit": 0.483,
+     "seconds": 229.3
+    },
     "Qc6d3h": {
      "file": "out/LMPHU40_BTNvBB/Qc6d3h.ffl",
      "bytes": 105990,
@@ -16042,6 +16560,13 @@
      "iterations": 260,
      "exploit": 0.4768,
      "seconds": 197.5
+    },
+    "Qc9c9d": {
+     "file": "out/LMPHU40_BTNvBB/Qc9c9d.ffl",
+     "bytes": 103886,
+     "iterations": 280,
+     "exploit": 0.4784,
+     "seconds": 207.4
     },
     "Qc9d5d": {
      "file": "out/LMPHU40_BTNvBB/Qc9d5d.ffl",
@@ -16070,6 +16595,13 @@
      "iterations": 230,
      "exploit": 0.4681,
      "seconds": 187.4
+    },
+    "QcJd9h": {
+     "file": "out/LMPHU40_BTNvBB/QcJd9h.ffl",
+     "bytes": 102150,
+     "iterations": 220,
+     "exploit": 0.4546,
+     "seconds": 252.4
     },
     "QcQd9h": {
      "file": "out/LMPHU40_BTNvBB/QcQd9h.ffl",
@@ -16113,12 +16645,26 @@
      "exploit": 0.4601,
      "seconds": 185.2
     },
+    "Tc8c7d": {
+     "file": "out/LMPHU40_BTNvBB/Tc8c7d.ffl",
+     "bytes": 101256,
+     "iterations": 240,
+     "exploit": 0.4598,
+     "seconds": 175
+    },
     "Tc8d4c": {
      "file": "out/LMPHU40_BTNvBB/Tc8d4c.ffl",
      "bytes": 101658,
      "iterations": 240,
      "exploit": 0.4564,
      "seconds": 197.4
+    },
+    "Tc8d4h": {
+     "file": "out/LMPHU40_BTNvBB/Tc8d4h.ffl",
+     "bytes": 102428,
+     "iterations": 240,
+     "exploit": 0.4712,
+     "seconds": 287.7
     }
    },
    "tree": {
@@ -16170,12 +16716,26 @@
    "oopCombos": 546.8,
    "ipCombos": 1146.6,
    "flops": {
+    "5c3d3h": {
+     "file": "out/LMP25_SBvBB/5c3d3h.ffl",
+     "bytes": 93404,
+     "iterations": 150,
+     "exploit": 0.4991,
+     "seconds": 67.4
+    },
     "5c4d2d": {
      "file": "out/LMP25_SBvBB/5c4d2d.ffl",
      "bytes": 91188,
      "iterations": 160,
      "exploit": 0.4964,
      "seconds": 84.1
+    },
+    "5c4d2h": {
+     "file": "out/LMP25_SBvBB/5c4d2h.ffl",
+     "bytes": 90222,
+     "iterations": 160,
+     "exploit": 0.4715,
+     "seconds": 119.5
     },
     "6c4d2h": {
      "file": "out/LMP25_SBvBB/6c4d2h.ffl",
@@ -16191,12 +16751,33 @@
      "exploit": 0.4872,
      "seconds": 53.3
     },
+    "7c5c3d": {
+     "file": "out/LMP25_SBvBB/7c5c3d.ffl",
+     "bytes": 91834,
+     "iterations": 170,
+     "exploit": 0.4875,
+     "seconds": 79.9
+    },
     "7c5d4c": {
      "file": "out/LMP25_SBvBB/7c5d4c.ffl",
      "bytes": 91948,
      "iterations": 170,
      "exploit": 0.4917,
      "seconds": 79
+    },
+    "7c6d4h": {
+     "file": "out/LMP25_SBvBB/7c6d4h.ffl",
+     "bytes": 90902,
+     "iterations": 160,
+     "exploit": 0.4913,
+     "seconds": 118.6
+    },
+    "7c7d5h": {
+     "file": "out/LMP25_SBvBB/7c7d5h.ffl",
+     "bytes": 90768,
+     "iterations": 210,
+     "exploit": 0.4774,
+     "seconds": 97.9
     },
     "8c4c4d": {
      "file": "out/LMP25_SBvBB/8c4c4d.ffl",
@@ -16225,6 +16806,20 @@
      "iterations": 190,
      "exploit": 0.4599,
      "seconds": 156.6
+    },
+    "8c6d2c": {
+     "file": "out/LMP25_SBvBB/8c6d2c.ffl",
+     "bytes": 92070,
+     "iterations": 180,
+     "exploit": 0.4515,
+     "seconds": 85.1
+    },
+    "8c8d5c": {
+     "file": "out/LMP25_SBvBB/8c8d5c.ffl",
+     "bytes": 91568,
+     "iterations": 240,
+     "exploit": 0.4734,
+     "seconds": 110.2
     },
     "9c4d2d": {
      "file": "out/LMP25_SBvBB/9c4d2d.ffl",
@@ -16275,6 +16870,13 @@
      "exploit": 0.4641,
      "seconds": 154
     },
+    "Ac8d4d": {
+     "file": "out/LMP25_SBvBB/Ac8d4d.ffl",
+     "bytes": 93004,
+     "iterations": 190,
+     "exploit": 0.4621,
+     "seconds": 89.7
+    },
     "Ac9c5c": {
      "file": "out/LMP25_SBvBB/Ac9c5c.ffl",
      "bytes": 92840,
@@ -16303,6 +16905,20 @@
      "exploit": 0.4744,
      "seconds": 74.6
     },
+    "AcKdJh": {
+     "file": "out/LMP25_SBvBB/AcKdJh.ffl",
+     "bytes": 93630,
+     "iterations": 190,
+     "exploit": 0.479,
+     "seconds": 140.5
+    },
+    "AcQc3d": {
+     "file": "out/LMP25_SBvBB/AcQc3d.ffl",
+     "bytes": 94318,
+     "iterations": 200,
+     "exploit": 0.4684,
+     "seconds": 95.3
+    },
     "AcQd3h": {
      "file": "out/LMP25_SBvBB/AcQd3h.ffl",
      "bytes": 94318,
@@ -16316,6 +16932,13 @@
      "iterations": 170,
      "exploit": 0.4587,
      "seconds": 88
+    },
+    "AcQd8c": {
+     "file": "out/LMP25_SBvBB/AcQd8c.ffl",
+     "bytes": 92836,
+     "iterations": 160,
+     "exploit": 0.4729,
+     "seconds": 75.2
     },
     "AcQdTd": {
      "file": "out/LMP25_SBvBB/AcQdTd.ffl",
@@ -16345,6 +16968,13 @@
      "exploit": 0.48,
      "seconds": 148.2
     },
+    "Jc9d7d": {
+     "file": "out/LMP25_SBvBB/Jc9d7d.ffl",
+     "bytes": 92081,
+     "iterations": 170,
+     "exploit": 0.4735,
+     "seconds": 79
+    },
     "Jc9d7h": {
      "file": "out/LMP25_SBvBB/Jc9d7h.ffl",
      "bytes": 92189,
@@ -16366,6 +16996,13 @@
      "exploit": 0.4901,
      "seconds": 111.3
     },
+    "JcTc3d": {
+     "file": "out/LMP25_SBvBB/JcTc3d.ffl",
+     "bytes": 94084,
+     "iterations": 210,
+     "exploit": 0.4559,
+     "seconds": 100
+    },
     "JcTc8d": {
      "file": "out/LMP25_SBvBB/JcTc8d.ffl",
      "bytes": 92798,
@@ -16379,6 +17016,13 @@
      "iterations": 290,
      "exploit": 0.4637,
      "seconds": 152.1
+    },
+    "Kc6c3c": {
+     "file": "out/LMP25_SBvBB/Kc6c3c.ffl",
+     "bytes": 93692,
+     "iterations": 260,
+     "exploit": 0.4793,
+     "seconds": 59.3
     },
     "Kc6d3c": {
      "file": "out/LMP25_SBvBB/Kc6d3c.ffl",
@@ -16400,6 +17044,27 @@
      "iterations": 210,
      "exploit": 0.4851,
      "seconds": 110.3
+    },
+    "Kc8d4h": {
+     "file": "out/LMP25_SBvBB/Kc8d4h.ffl",
+     "bytes": 93174,
+     "iterations": 210,
+     "exploit": 0.484,
+     "seconds": 157.8
+    },
+    "Kc9d7h": {
+     "file": "out/LMP25_SBvBB/Kc9d7h.ffl",
+     "bytes": 91384,
+     "iterations": 190,
+     "exploit": 0.4848,
+     "seconds": 142.3
+    },
+    "KcJc9d": {
+     "file": "out/LMP25_SBvBB/KcJc9d.ffl",
+     "bytes": 93430,
+     "iterations": 220,
+     "exploit": 0.4835,
+     "seconds": 102.5
     },
     "KcJd4c": {
      "file": "out/LMP25_SBvBB/KcJd4c.ffl",
@@ -16443,6 +17108,34 @@
      "exploit": 0.4933,
      "seconds": 98.8
     },
+    "KcTc6d": {
+     "file": "out/LMP25_SBvBB/KcTc6d.ffl",
+     "bytes": 92700,
+     "iterations": 200,
+     "exploit": 0.4655,
+     "seconds": 94.1
+    },
+    "Qc4c2d": {
+     "file": "out/LMP25_SBvBB/Qc4c2d.ffl",
+     "bytes": 93616,
+     "iterations": 210,
+     "exploit": 0.4582,
+     "seconds": 100.5
+    },
+    "Qc4d2h": {
+     "file": "out/LMP25_SBvBB/Qc4d2h.ffl",
+     "bytes": 93570,
+     "iterations": 190,
+     "exploit": 0.4736,
+     "seconds": 143.8
+    },
+    "Qc6d3d": {
+     "file": "out/LMP25_SBvBB/Qc6d3d.ffl",
+     "bytes": 93366,
+     "iterations": 200,
+     "exploit": 0.4917,
+     "seconds": 95.3
+    },
     "Qc6d3h": {
      "file": "out/LMP25_SBvBB/Qc6d3h.ffl",
      "bytes": 93278,
@@ -16456,6 +17149,13 @@
      "iterations": 220,
      "exploit": 0.491,
      "seconds": 103.5
+    },
+    "Qc9c9d": {
+     "file": "out/LMP25_SBvBB/Qc9c9d.ffl",
+     "bytes": 92952,
+     "iterations": 210,
+     "exploit": 0.4958,
+     "seconds": 97.2
     },
     "Qc9d5d": {
      "file": "out/LMP25_SBvBB/Qc9d5d.ffl",
@@ -16484,6 +17184,13 @@
      "iterations": 200,
      "exploit": 0.4822,
      "seconds": 103.5
+    },
+    "QcJd9h": {
+     "file": "out/LMP25_SBvBB/QcJd9h.ffl",
+     "bytes": 93736,
+     "iterations": 210,
+     "exploit": 0.4582,
+     "seconds": 155.2
     },
     "QcQd9h": {
      "file": "out/LMP25_SBvBB/QcQd9h.ffl",
@@ -16527,12 +17234,26 @@
      "exploit": 0.481,
      "seconds": 98.6
     },
+    "Tc8c7d": {
+     "file": "out/LMP25_SBvBB/Tc8c7d.ffl",
+     "bytes": 91372,
+     "iterations": 220,
+     "exploit": 0.4662,
+     "seconds": 101.9
+    },
     "Tc8d4c": {
      "file": "out/LMP25_SBvBB/Tc8d4c.ffl",
      "bytes": 92740,
      "iterations": 200,
      "exploit": 0.4567,
      "seconds": 103.5
+    },
+    "Tc8d4h": {
+     "file": "out/LMP25_SBvBB/Tc8d4h.ffl",
+     "bytes": 92880,
+     "iterations": 200,
+     "exploit": 0.4816,
+     "seconds": 150.8
     }
    },
    "tree": {
@@ -16584,12 +17305,26 @@
    "oopCombos": 546.8,
    "ipCombos": 1146.6,
    "flops": {
+    "5c3d3h": {
+     "file": "out/LMP20_SBvBB/5c3d3h.ffl",
+     "bytes": 93320,
+     "iterations": 180,
+     "exploit": 0.4485,
+     "seconds": 81.2
+    },
     "5c4d2d": {
      "file": "out/LMP20_SBvBB/5c4d2d.ffl",
      "bytes": 91958,
      "iterations": 150,
      "exploit": 0.4437,
      "seconds": 79.8
+    },
+    "5c4d2h": {
+     "file": "out/LMP20_SBvBB/5c4d2h.ffl",
+     "bytes": 91048,
+     "iterations": 150,
+     "exploit": 0.4471,
+     "seconds": 113
     },
     "6c4d2h": {
      "file": "out/LMP20_SBvBB/6c4d2h.ffl",
@@ -16605,12 +17340,33 @@
      "exploit": 0.4963,
      "seconds": 46.2
     },
+    "7c5c3d": {
+     "file": "out/LMP20_SBvBB/7c5c3d.ffl",
+     "bytes": 91862,
+     "iterations": 150,
+     "exploit": 0.481,
+     "seconds": 70.9
+    },
     "7c5d4c": {
      "file": "out/LMP20_SBvBB/7c5d4c.ffl",
      "bytes": 92172,
      "iterations": 150,
      "exploit": 0.4738,
      "seconds": 69.9
+    },
+    "7c6d4h": {
+     "file": "out/LMP20_SBvBB/7c6d4h.ffl",
+     "bytes": 91056,
+     "iterations": 140,
+     "exploit": 0.4744,
+     "seconds": 104.5
+    },
+    "7c7d5h": {
+     "file": "out/LMP20_SBvBB/7c7d5h.ffl",
+     "bytes": 90852,
+     "iterations": 190,
+     "exploit": 0.4485,
+     "seconds": 88.6
     },
     "8c4c4d": {
      "file": "out/LMP20_SBvBB/8c4c4d.ffl",
@@ -16639,6 +17395,20 @@
      "iterations": 150,
      "exploit": 0.4824,
      "seconds": 124.4
+    },
+    "8c6d2c": {
+     "file": "out/LMP20_SBvBB/8c6d2c.ffl",
+     "bytes": 92406,
+     "iterations": 150,
+     "exploit": 0.4502,
+     "seconds": 72.3
+    },
+    "8c8d5c": {
+     "file": "out/LMP20_SBvBB/8c8d5c.ffl",
+     "bytes": 91568,
+     "iterations": 170,
+     "exploit": 0.4908,
+     "seconds": 78.4
     },
     "9c4d2d": {
      "file": "out/LMP20_SBvBB/9c4d2d.ffl",
@@ -16689,6 +17459,13 @@
      "exploit": 0.4678,
      "seconds": 130
     },
+    "Ac8d4d": {
+     "file": "out/LMP20_SBvBB/Ac8d4d.ffl",
+     "bytes": 92971,
+     "iterations": 160,
+     "exploit": 0.4981,
+     "seconds": 75.8
+    },
     "Ac9c5c": {
      "file": "out/LMP20_SBvBB/Ac9c5c.ffl",
      "bytes": 92840,
@@ -16717,6 +17494,20 @@
      "exploit": 0.4826,
      "seconds": 65.2
     },
+    "AcKdJh": {
+     "file": "out/LMP20_SBvBB/AcKdJh.ffl",
+     "bytes": 93630,
+     "iterations": 170,
+     "exploit": 0.4558,
+     "seconds": 126.5
+    },
+    "AcQc3d": {
+     "file": "out/LMP20_SBvBB/AcQc3d.ffl",
+     "bytes": 94318,
+     "iterations": 180,
+     "exploit": 0.4679,
+     "seconds": 85.4
+    },
     "AcQd3h": {
      "file": "out/LMP20_SBvBB/AcQd3h.ffl",
      "bytes": 94252,
@@ -16730,6 +17521,13 @@
      "iterations": 160,
      "exploit": 0.4812,
      "seconds": 83.5
+    },
+    "AcQd8c": {
+     "file": "out/LMP20_SBvBB/AcQd8c.ffl",
+     "bytes": 92902,
+     "iterations": 140,
+     "exploit": 0.4629,
+     "seconds": 66.1
     },
     "AcQdTd": {
      "file": "out/LMP20_SBvBB/AcQdTd.ffl",
@@ -16759,6 +17557,13 @@
      "exploit": 0.4847,
      "seconds": 126.9
     },
+    "Jc9d7d": {
+     "file": "out/LMP20_SBvBB/Jc9d7d.ffl",
+     "bytes": 92222,
+     "iterations": 150,
+     "exploit": 0.4524,
+     "seconds": 70
+    },
     "Jc9d7h": {
      "file": "out/LMP20_SBvBB/Jc9d7h.ffl",
      "bytes": 92189,
@@ -16780,6 +17585,13 @@
      "exploit": 0.4904,
      "seconds": 84
     },
+    "JcTc3d": {
+     "file": "out/LMP20_SBvBB/JcTc3d.ffl",
+     "bytes": 94182,
+     "iterations": 180,
+     "exploit": 0.4993,
+     "seconds": 86.4
+    },
     "JcTc8d": {
      "file": "out/LMP20_SBvBB/JcTc8d.ffl",
      "bytes": 92840,
@@ -16793,6 +17605,13 @@
      "iterations": 270,
      "exploit": 0.4817,
      "seconds": 142.4
+    },
+    "Kc6c3c": {
+     "file": "out/LMP20_SBvBB/Kc6c3c.ffl",
+     "bytes": 93650,
+     "iterations": 240,
+     "exploit": 0.4818,
+     "seconds": 54.9
     },
     "Kc6d3c": {
      "file": "out/LMP20_SBvBB/Kc6d3c.ffl",
@@ -16814,6 +17633,27 @@
      "iterations": 180,
      "exploit": 0.4593,
      "seconds": 94.7
+    },
+    "Kc8d4h": {
+     "file": "out/LMP20_SBvBB/Kc8d4h.ffl",
+     "bytes": 93174,
+     "iterations": 180,
+     "exploit": 0.4711,
+     "seconds": 135.3
+    },
+    "Kc9d7h": {
+     "file": "out/LMP20_SBvBB/Kc9d7h.ffl",
+     "bytes": 91384,
+     "iterations": 160,
+     "exploit": 0.4792,
+     "seconds": 119.8
+    },
+    "KcJc9d": {
+     "file": "out/LMP20_SBvBB/KcJc9d.ffl",
+     "bytes": 93430,
+     "iterations": 190,
+     "exploit": 0.4681,
+     "seconds": 89.2
     },
     "KcJd4c": {
      "file": "out/LMP20_SBvBB/KcJd4c.ffl",
@@ -16857,6 +17697,34 @@
      "exploit": 0.4756,
      "seconds": 99.1
     },
+    "KcTc6d": {
+     "file": "out/LMP20_SBvBB/KcTc6d.ffl",
+     "bytes": 92634,
+     "iterations": 160,
+     "exploit": 0.4679,
+     "seconds": 75.8
+    },
+    "Qc4c2d": {
+     "file": "out/LMP20_SBvBB/Qc4c2d.ffl",
+     "bytes": 93952,
+     "iterations": 190,
+     "exploit": 0.4812,
+     "seconds": 92.1
+    },
+    "Qc4d2h": {
+     "file": "out/LMP20_SBvBB/Qc4d2h.ffl",
+     "bytes": 94676,
+     "iterations": 190,
+     "exploit": 0.4548,
+     "seconds": 145
+    },
+    "Qc6d3d": {
+     "file": "out/LMP20_SBvBB/Qc6d3d.ffl",
+     "bytes": 93800,
+     "iterations": 230,
+     "exploit": 0.4852,
+     "seconds": 109.3
+    },
     "Qc6d3h": {
      "file": "out/LMP20_SBvBB/Qc6d3h.ffl",
      "bytes": 93208,
@@ -16870,6 +17738,13 @@
      "iterations": 200,
      "exploit": 0.4682,
      "seconds": 96
+    },
+    "Qc9c9d": {
+     "file": "out/LMP20_SBvBB/Qc9c9d.ffl",
+     "bytes": 92853,
+     "iterations": 200,
+     "exploit": 0.4632,
+     "seconds": 92.8
     },
     "Qc9d5d": {
      "file": "out/LMP20_SBvBB/Qc9d5d.ffl",
@@ -16898,6 +17773,13 @@
      "iterations": 170,
      "exploit": 0.4917,
      "seconds": 89.1
+    },
+    "QcJd9h": {
+     "file": "out/LMP20_SBvBB/QcJd9h.ffl",
+     "bytes": 93736,
+     "iterations": 180,
+     "exploit": 0.4976,
+     "seconds": 134.1
     },
     "QcQd9h": {
      "file": "out/LMP20_SBvBB/QcQd9h.ffl",
@@ -16941,12 +17823,26 @@
      "exploit": 0.4955,
      "seconds": 80.4
     },
+    "Tc8c7d": {
+     "file": "out/LMP20_SBvBB/Tc8c7d.ffl",
+     "bytes": 91306,
+     "iterations": 160,
+     "exploit": 0.4746,
+     "seconds": 74.7
+    },
     "Tc8d4c": {
      "file": "out/LMP20_SBvBB/Tc8d4c.ffl",
      "bytes": 92796,
      "iterations": 170,
      "exploit": 0.494,
      "seconds": 88
+    },
+    "Tc8d4h": {
+     "file": "out/LMP20_SBvBB/Tc8d4h.ffl",
+     "bytes": 92712,
+     "iterations": 180,
+     "exploit": 0.479,
+     "seconds": 136.6
     }
    },
    "tree": {
@@ -16998,12 +17894,26 @@
    "oopCombos": 580.8,
    "ipCombos": 1146.6,
    "flops": {
+    "5c3d3h": {
+     "file": "out/LMP40_SBvBB/5c3d3h.ffl",
+     "bytes": 94538,
+     "iterations": 280,
+     "exploit": 0.4903,
+     "seconds": 197
+    },
     "5c4d2d": {
      "file": "out/LMP40_SBvBB/5c4d2d.ffl",
      "bytes": 93148,
      "iterations": 260,
      "exploit": 0.4752,
      "seconds": 219.4
+    },
+    "5c4d2h": {
+     "file": "out/LMP40_SBvBB/5c4d2h.ffl",
+     "bytes": 94268,
+     "iterations": 270,
+     "exploit": 0.4744,
+     "seconds": 322.8
     },
     "6c4d2h": {
      "file": "out/LMP40_SBvBB/6c4d2h.ffl",
@@ -17019,12 +17929,33 @@
      "exploit": 0.4699,
      "seconds": 118.1
     },
+    "7c5c3d": {
+     "file": "out/LMP40_SBvBB/7c5c3d.ffl",
+     "bytes": 92520,
+     "iterations": 340,
+     "exploit": 0.4752,
+     "seconds": 255.5
+    },
     "7c5d4c": {
      "file": "out/LMP40_SBvBB/7c5d4c.ffl",
      "bytes": 92326,
      "iterations": 290,
      "exploit": 0.4856,
      "seconds": 214.5
+    },
+    "7c6d4h": {
+     "file": "out/LMP40_SBvBB/7c6d4h.ffl",
+     "bytes": 91532,
+     "iterations": 250,
+     "exploit": 0.4792,
+     "seconds": 295.8
+    },
+    "7c7d5h": {
+     "file": "out/LMP40_SBvBB/7c7d5h.ffl",
+     "bytes": 90894,
+     "iterations": 310,
+     "exploit": 0.4978,
+     "seconds": 231.5
     },
     "8c4c4d": {
      "file": "out/LMP40_SBvBB/8c4c4d.ffl",
@@ -17053,6 +17984,20 @@
      "iterations": 290,
      "exploit": 0.4883,
      "seconds": 422
+    },
+    "8c6d2c": {
+     "file": "out/LMP40_SBvBB/8c6d2c.ffl",
+     "bytes": 92630,
+     "iterations": 320,
+     "exploit": 0.4919,
+     "seconds": 241.8
+    },
+    "8c8d5c": {
+     "file": "out/LMP40_SBvBB/8c8d5c.ffl",
+     "bytes": 91568,
+     "iterations": 300,
+     "exploit": 0.4952,
+     "seconds": 221.5
     },
     "9c4d2d": {
      "file": "out/LMP40_SBvBB/9c4d2d.ffl",
@@ -17103,6 +18048,13 @@
      "exploit": 0.4654,
      "seconds": 353.4
     },
+    "Ac8d4d": {
+     "file": "out/LMP40_SBvBB/Ac8d4d.ffl",
+     "bytes": 93037,
+     "iterations": 260,
+     "exploit": 0.4949,
+     "seconds": 196.4
+    },
     "Ac9c5c": {
      "file": "out/LMP40_SBvBB/Ac9c5c.ffl",
      "bytes": 92840,
@@ -17131,6 +18083,20 @@
      "exploit": 0.4641,
      "seconds": 162.2
     },
+    "AcKdJh": {
+     "file": "out/LMP40_SBvBB/AcKdJh.ffl",
+     "bytes": 93630,
+     "iterations": 250,
+     "exploit": 0.4923,
+     "seconds": 298.1
+    },
+    "AcQc3d": {
+     "file": "out/LMP40_SBvBB/AcQc3d.ffl",
+     "bytes": 94318,
+     "iterations": 270,
+     "exploit": 0.4649,
+     "seconds": 206.1
+    },
     "AcQd3h": {
      "file": "out/LMP40_SBvBB/AcQd3h.ffl",
      "bytes": 94318,
@@ -17144,6 +18110,13 @@
      "iterations": 220,
      "exploit": 0.4867,
      "seconds": 182.6
+    },
+    "AcQd8c": {
+     "file": "out/LMP40_SBvBB/AcQd8c.ffl",
+     "bytes": 92902,
+     "iterations": 220,
+     "exploit": 0.4889,
+     "seconds": 165.7
     },
     "AcQdTd": {
      "file": "out/LMP40_SBvBB/AcQdTd.ffl",
@@ -17173,6 +18146,13 @@
      "exploit": 0.4936,
      "seconds": 320.9
     },
+    "Jc9d7d": {
+     "file": "out/LMP40_SBvBB/Jc9d7d.ffl",
+     "bytes": 92156,
+     "iterations": 270,
+     "exploit": 0.4753,
+     "seconds": 202.6
+    },
     "Jc9d7h": {
      "file": "out/LMP40_SBvBB/Jc9d7h.ffl",
      "bytes": 92222,
@@ -17194,6 +18174,13 @@
      "exploit": 0.4979,
      "seconds": 223.8
     },
+    "JcTc3d": {
+     "file": "out/LMP40_SBvBB/JcTc3d.ffl",
+     "bytes": 94182,
+     "iterations": 280,
+     "exploit": 0.4967,
+     "seconds": 213.9
+    },
     "JcTc8d": {
      "file": "out/LMP40_SBvBB/JcTc8d.ffl",
      "bytes": 92840,
@@ -17207,6 +18194,13 @@
      "iterations": 380,
      "exploit": 0.4979,
      "seconds": 312.3
+    },
+    "Kc6c3c": {
+     "file": "out/LMP40_SBvBB/Kc6c3c.ffl",
+     "bytes": 93776,
+     "iterations": 300,
+     "exploit": 0.4932,
+     "seconds": 108.8
     },
     "Kc6d3c": {
      "file": "out/LMP40_SBvBB/Kc6d3c.ffl",
@@ -17228,6 +18222,27 @@
      "iterations": 290,
      "exploit": 0.4869,
      "seconds": 243.8
+    },
+    "Kc8d4h": {
+     "file": "out/LMP40_SBvBB/Kc8d4h.ffl",
+     "bytes": 93174,
+     "iterations": 300,
+     "exploit": 0.4687,
+     "seconds": 363
+    },
+    "Kc9d7h": {
+     "file": "out/LMP40_SBvBB/Kc9d7h.ffl",
+     "bytes": 92011,
+     "iterations": 270,
+     "exploit": 0.4755,
+     "seconds": 324.9
+    },
+    "KcJc9d": {
+     "file": "out/LMP40_SBvBB/KcJc9d.ffl",
+     "bytes": 93402,
+     "iterations": 310,
+     "exploit": 0.475,
+     "seconds": 231.3
     },
     "KcJd4c": {
      "file": "out/LMP40_SBvBB/KcJd4c.ffl",
@@ -17271,6 +18286,34 @@
      "exploit": 0.4989,
      "seconds": 215.6
     },
+    "KcTc6d": {
+     "file": "out/LMP40_SBvBB/KcTc6d.ffl",
+     "bytes": 92766,
+     "iterations": 270,
+     "exploit": 0.4858,
+     "seconds": 203.8
+    },
+    "Qc4c2d": {
+     "file": "out/LMP40_SBvBB/Qc4c2d.ffl",
+     "bytes": 94848,
+     "iterations": 280,
+     "exploit": 0.4911,
+     "seconds": 215.2
+    },
+    "Qc4d2h": {
+     "file": "out/LMP40_SBvBB/Qc4d2h.ffl",
+     "bytes": 94760,
+     "iterations": 310,
+     "exploit": 0.4864,
+     "seconds": 380.3
+    },
+    "Qc6d3d": {
+     "file": "out/LMP40_SBvBB/Qc6d3d.ffl",
+     "bytes": 93772,
+     "iterations": 310,
+     "exploit": 0.4779,
+     "seconds": 236.3
+    },
     "Qc6d3h": {
      "file": "out/LMP40_SBvBB/Qc6d3h.ffl",
      "bytes": 93726,
@@ -17284,6 +18327,13 @@
      "iterations": 310,
      "exploit": 0.4862,
      "seconds": 234.1
+    },
+    "Qc9c9d": {
+     "file": "out/LMP40_SBvBB/Qc9c9d.ffl",
+     "bytes": 92952,
+     "iterations": 300,
+     "exploit": 0.4857,
+     "seconds": 220.8
     },
     "Qc9d5d": {
      "file": "out/LMP40_SBvBB/Qc9d5d.ffl",
@@ -17312,6 +18362,13 @@
      "iterations": 320,
      "exploit": 0.487,
      "seconds": 267.5
+    },
+    "QcJd9h": {
+     "file": "out/LMP40_SBvBB/QcJd9h.ffl",
+     "bytes": 93736,
+     "iterations": 290,
+     "exploit": 0.4706,
+     "seconds": 345
     },
     "QcQd9h": {
      "file": "out/LMP40_SBvBB/QcQd9h.ffl",
@@ -17355,12 +18412,26 @@
      "exploit": 0.4698,
      "seconds": 210.5
     },
+    "Tc8c7d": {
+     "file": "out/LMP40_SBvBB/Tc8c7d.ffl",
+     "bytes": 91358,
+     "iterations": 250,
+     "exploit": 0.4894,
+     "seconds": 185.3
+    },
     "Tc8d4c": {
      "file": "out/LMP40_SBvBB/Tc8d4c.ffl",
      "bytes": 92880,
      "iterations": 300,
      "exploit": 0.4906,
      "seconds": 248.8
+    },
+    "Tc8d4h": {
+     "file": "out/LMP40_SBvBB/Tc8d4h.ffl",
+     "bytes": 92866,
+     "iterations": 290,
+     "exploit": 0.4895,
+     "seconds": 351.3
     }
    },
    "tree": {
@@ -17413,12 +18484,26 @@
    "ipCombos": 162.4,
    "hu": true,
    "flops": {
+    "5c3d3h": {
+     "file": "out/SRPHU25_BTNvBB/5c3d3h.ffl",
+     "bytes": 56296,
+     "iterations": 80,
+     "exploit": 0.4809,
+     "seconds": 10.5
+    },
     "5c4d2d": {
      "file": "out/SRPHU25_BTNvBB/5c4d2d.ffl",
      "bytes": 55358,
      "iterations": 120,
      "exploit": 0.4249,
      "seconds": 17
+    },
+    "5c4d2h": {
+     "file": "out/SRPHU25_BTNvBB/5c4d2h.ffl",
+     "bytes": 55420,
+     "iterations": 110,
+     "exploit": 0.4758,
+     "seconds": 21.8
     },
     "6c4d2h": {
      "file": "out/SRPHU25_BTNvBB/6c4d2h.ffl",
@@ -17434,12 +18519,33 @@
      "exploit": 0.4931,
      "seconds": 8.6
     },
+    "7c5c3d": {
+     "file": "out/SRPHU25_BTNvBB/7c5c3d.ffl",
+     "bytes": 54798,
+     "iterations": 90,
+     "exploit": 0.4123,
+     "seconds": 10.9
+    },
     "7c5d4c": {
      "file": "out/SRPHU25_BTNvBB/7c5d4c.ffl",
      "bytes": 54289,
      "iterations": 90,
      "exploit": 0.4483,
      "seconds": 11
+    },
+    "7c6d4h": {
+     "file": "out/SRPHU25_BTNvBB/7c6d4h.ffl",
+     "bytes": 53962,
+     "iterations": 100,
+     "exploit": 0.4448,
+     "seconds": 19.5
+    },
+    "7c7d5h": {
+     "file": "out/SRPHU25_BTNvBB/7c7d5h.ffl",
+     "bytes": 53884,
+     "iterations": 120,
+     "exploit": 0.4838,
+     "seconds": 15.3
     },
     "8c4c4d": {
      "file": "out/SRPHU25_BTNvBB/8c4c4d.ffl",
@@ -17468,6 +18574,20 @@
      "iterations": 90,
      "exploit": 0.4974,
      "seconds": 19.9
+    },
+    "8c6d2c": {
+     "file": "out/SRPHU25_BTNvBB/8c6d2c.ffl",
+     "bytes": 54395,
+     "iterations": 100,
+     "exploit": 0.3991,
+     "seconds": 12.5
+    },
+    "8c8d5c": {
+     "file": "out/SRPHU25_BTNvBB/8c8d5c.ffl",
+     "bytes": 53672,
+     "iterations": 110,
+     "exploit": 0.4473,
+     "seconds": 13.5
     },
     "9c4d2d": {
      "file": "out/SRPHU25_BTNvBB/9c4d2d.ffl",
@@ -17518,6 +18638,13 @@
      "exploit": 0.4159,
      "seconds": 23.2
     },
+    "Ac8d4d": {
+     "file": "out/SRPHU25_BTNvBB/Ac8d4d.ffl",
+     "bytes": 52564,
+     "iterations": 120,
+     "exploit": 0.4743,
+     "seconds": 13.6
+    },
     "Ac9c5c": {
      "file": "out/SRPHU25_BTNvBB/Ac9c5c.ffl",
      "bytes": 52038,
@@ -17546,6 +18673,20 @@
      "exploit": 0.496,
      "seconds": 10
     },
+    "AcKdJh": {
+     "file": "out/SRPHU25_BTNvBB/AcKdJh.ffl",
+     "bytes": 51281,
+     "iterations": 90,
+     "exploit": 0.4399,
+     "seconds": 16.2
+    },
+    "AcQc3d": {
+     "file": "out/SRPHU25_BTNvBB/AcQc3d.ffl",
+     "bytes": 51999,
+     "iterations": 120,
+     "exploit": 0.419,
+     "seconds": 13.1
+    },
     "AcQd3h": {
      "file": "out/SRPHU25_BTNvBB/AcQd3h.ffl",
      "bytes": 52629,
@@ -17559,6 +18700,13 @@
      "iterations": 100,
      "exploit": 0.4723,
      "seconds": 12.8
+    },
+    "AcQd8c": {
+     "file": "out/SRPHU25_BTNvBB/AcQd8c.ffl",
+     "bytes": 51209,
+     "iterations": 90,
+     "exploit": 0.3822,
+     "seconds": 9.8
     },
     "AcQdTd": {
      "file": "out/SRPHU25_BTNvBB/AcQdTd.ffl",
@@ -17588,6 +18736,13 @@
      "exploit": 0.4922,
      "seconds": 16.7
     },
+    "Jc9d7d": {
+     "file": "out/SRPHU25_BTNvBB/Jc9d7d.ffl",
+     "bytes": 52319,
+     "iterations": 90,
+     "exploit": 0.4642,
+     "seconds": 10.4
+    },
     "Jc9d7h": {
      "file": "out/SRPHU25_BTNvBB/Jc9d7h.ffl",
      "bytes": 52899,
@@ -17609,6 +18764,13 @@
      "exploit": 0.4379,
      "seconds": 14.7
     },
+    "JcTc3d": {
+     "file": "out/SRPHU25_BTNvBB/JcTc3d.ffl",
+     "bytes": 54221,
+     "iterations": 90,
+     "exploit": 0.4533,
+     "seconds": 10.2
+    },
     "JcTc8d": {
      "file": "out/SRPHU25_BTNvBB/JcTc8d.ffl",
      "bytes": 52688,
@@ -17622,6 +18784,13 @@
      "iterations": 150,
      "exploit": 0.4398,
      "seconds": 20.8
+    },
+    "Kc6c3c": {
+     "file": "out/SRPHU25_BTNvBB/Kc6c3c.ffl",
+     "bytes": 54110,
+     "iterations": 120,
+     "exploit": 0.4581,
+     "seconds": 7.1
     },
     "Kc6d3c": {
      "file": "out/SRPHU25_BTNvBB/Kc6d3c.ffl",
@@ -17643,6 +18812,27 @@
      "iterations": 100,
      "exploit": 0.4298,
      "seconds": 13.2
+    },
+    "Kc8d4h": {
+     "file": "out/SRPHU25_BTNvBB/Kc8d4h.ffl",
+     "bytes": 53418,
+     "iterations": 100,
+     "exploit": 0.4635,
+     "seconds": 18.7
+    },
+    "Kc9d7h": {
+     "file": "out/SRPHU25_BTNvBB/Kc9d7h.ffl",
+     "bytes": 52079,
+     "iterations": 110,
+     "exploit": 0.4193,
+     "seconds": 19.2
+    },
+    "KcJc9d": {
+     "file": "out/SRPHU25_BTNvBB/KcJc9d.ffl",
+     "bytes": 52150,
+     "iterations": 110,
+     "exploit": 0.4631,
+     "seconds": 12.4
     },
     "KcJd4c": {
      "file": "out/SRPHU25_BTNvBB/KcJd4c.ffl",
@@ -17686,6 +18876,34 @@
      "exploit": 0.4793,
      "seconds": 18.2
     },
+    "KcTc6d": {
+     "file": "out/SRPHU25_BTNvBB/KcTc6d.ffl",
+     "bytes": 52496,
+     "iterations": 90,
+     "exploit": 0.4752,
+     "seconds": 10
+    },
+    "Qc4c2d": {
+     "file": "out/SRPHU25_BTNvBB/Qc4c2d.ffl",
+     "bytes": 54743,
+     "iterations": 90,
+     "exploit": 0.4658,
+     "seconds": 11.1
+    },
+    "Qc4d2h": {
+     "file": "out/SRPHU25_BTNvBB/Qc4d2h.ffl",
+     "bytes": 54798,
+     "iterations": 100,
+     "exploit": 0.452,
+     "seconds": 18.9
+    },
+    "Qc6d3d": {
+     "file": "out/SRPHU25_BTNvBB/Qc6d3d.ffl",
+     "bytes": 53951,
+     "iterations": 110,
+     "exploit": 0.4751,
+     "seconds": 13.3
+    },
     "Qc6d3h": {
      "file": "out/SRPHU25_BTNvBB/Qc6d3h.ffl",
      "bytes": 54194,
@@ -17699,6 +18917,13 @@
      "iterations": 100,
      "exploit": 0.4131,
      "seconds": 11.3
+    },
+    "Qc9c9d": {
+     "file": "out/SRPHU25_BTNvBB/Qc9c9d.ffl",
+     "bytes": 52817,
+     "iterations": 140,
+     "exploit": 0.4567,
+     "seconds": 16.6
     },
     "Qc9d5d": {
      "file": "out/SRPHU25_BTNvBB/Qc9d5d.ffl",
@@ -17727,6 +18952,13 @@
      "iterations": 110,
      "exploit": 0.4725,
      "seconds": 14.8
+    },
+    "QcJd9h": {
+     "file": "out/SRPHU25_BTNvBB/QcJd9h.ffl",
+     "bytes": 52797,
+     "iterations": 110,
+     "exploit": 0.4918,
+     "seconds": 20.1
     },
     "QcQd9h": {
      "file": "out/SRPHU25_BTNvBB/QcQd9h.ffl",
@@ -17770,12 +19002,26 @@
      "exploit": 0.4593,
      "seconds": 11.1
     },
+    "Tc8c7d": {
+     "file": "out/SRPHU25_BTNvBB/Tc8c7d.ffl",
+     "bytes": 53271,
+     "iterations": 90,
+     "exploit": 0.4457,
+     "seconds": 11
+    },
     "Tc8d4c": {
      "file": "out/SRPHU25_BTNvBB/Tc8d4c.ffl",
      "bytes": 54075,
      "iterations": 90,
      "exploit": 0.4123,
      "seconds": 11.9
+    },
+    "Tc8d4h": {
+     "file": "out/SRPHU25_BTNvBB/Tc8d4h.ffl",
+     "bytes": 54305,
+     "iterations": 100,
+     "exploit": 0.4454,
+     "seconds": 19.4
     }
    },
    "tree": {
@@ -17828,12 +19074,26 @@
    "ipCombos": 162.4,
    "hu": true,
    "flops": {
+    "5c3d3h": {
+     "file": "out/SRPHU20_BTNvBB/5c3d3h.ffl",
+     "bytes": 55820,
+     "iterations": 70,
+     "exploit": 0.4953,
+     "seconds": 9.3
+    },
     "5c4d2d": {
      "file": "out/SRPHU20_BTNvBB/5c4d2d.ffl",
      "bytes": 55190,
      "iterations": 70,
      "exploit": 0.4732,
      "seconds": 10.1
+    },
+    "5c4d2h": {
+     "file": "out/SRPHU20_BTNvBB/5c4d2h.ffl",
+     "bytes": 54636,
+     "iterations": 100,
+     "exploit": 0.4467,
+     "seconds": 19.9
     },
     "6c4d2h": {
      "file": "out/SRPHU20_BTNvBB/6c4d2h.ffl",
@@ -17849,12 +19109,33 @@
      "exploit": 0.4349,
      "seconds": 7.9
     },
+    "7c5c3d": {
+     "file": "out/SRPHU20_BTNvBB/7c5c3d.ffl",
+     "bytes": 54756,
+     "iterations": 80,
+     "exploit": 0.4609,
+     "seconds": 10
+    },
     "7c5d4c": {
      "file": "out/SRPHU20_BTNvBB/7c5d4c.ffl",
      "bytes": 54513,
      "iterations": 80,
      "exploit": 0.4395,
      "seconds": 9.7
+    },
+    "7c6d4h": {
+     "file": "out/SRPHU20_BTNvBB/7c6d4h.ffl",
+     "bytes": 54361,
+     "iterations": 90,
+     "exploit": 0.4563,
+     "seconds": 17.6
+    },
+    "7c7d5h": {
+     "file": "out/SRPHU20_BTNvBB/7c7d5h.ffl",
+     "bytes": 53793,
+     "iterations": 80,
+     "exploit": 0.4768,
+     "seconds": 10.1
     },
     "8c4c4d": {
      "file": "out/SRPHU20_BTNvBB/8c4c4d.ffl",
@@ -17883,6 +19164,20 @@
      "iterations": 100,
      "exploit": 0.4158,
      "seconds": 21.9
+    },
+    "8c6d2c": {
+     "file": "out/SRPHU20_BTNvBB/8c6d2c.ffl",
+     "bytes": 54626,
+     "iterations": 80,
+     "exploit": 0.4942,
+     "seconds": 10.1
+    },
+    "8c8d5c": {
+     "file": "out/SRPHU20_BTNvBB/8c8d5c.ffl",
+     "bytes": 53742,
+     "iterations": 110,
+     "exploit": 0.4997,
+     "seconds": 13.7
     },
     "9c4d2d": {
      "file": "out/SRPHU20_BTNvBB/9c4d2d.ffl",
@@ -17933,6 +19228,13 @@
      "exploit": 0.424,
      "seconds": 18.3
     },
+    "Ac8d4d": {
+     "file": "out/SRPHU20_BTNvBB/Ac8d4d.ffl",
+     "bytes": 52697,
+     "iterations": 90,
+     "exploit": 0.484,
+     "seconds": 10.5
+    },
     "Ac9c5c": {
      "file": "out/SRPHU20_BTNvBB/Ac9c5c.ffl",
      "bytes": 52017,
@@ -17961,6 +19263,20 @@
      "exploit": 0.4732,
      "seconds": 8.7
     },
+    "AcKdJh": {
+     "file": "out/SRPHU20_BTNvBB/AcKdJh.ffl",
+     "bytes": 51288,
+     "iterations": 80,
+     "exploit": 0.462,
+     "seconds": 14.2
+    },
+    "AcQc3d": {
+     "file": "out/SRPHU20_BTNvBB/AcQc3d.ffl",
+     "bytes": 52391,
+     "iterations": 90,
+     "exploit": 0.4008,
+     "seconds": 10.2
+    },
     "AcQd3h": {
      "file": "out/SRPHU20_BTNvBB/AcQd3h.ffl",
      "bytes": 52664,
@@ -17974,6 +19290,13 @@
      "iterations": 100,
      "exploit": 0.4457,
      "seconds": 12.2
+    },
+    "AcQd8c": {
+     "file": "out/SRPHU20_BTNvBB/AcQd8c.ffl",
+     "bytes": 51111,
+     "iterations": 80,
+     "exploit": 0.4588,
+     "seconds": 8.7
     },
     "AcQdTd": {
      "file": "out/SRPHU20_BTNvBB/AcQdTd.ffl",
@@ -18003,6 +19326,13 @@
      "exploit": 0.4015,
      "seconds": 16.7
     },
+    "Jc9d7d": {
+     "file": "out/SRPHU20_BTNvBB/Jc9d7d.ffl",
+     "bytes": 52956,
+     "iterations": 70,
+     "exploit": 0.4208,
+     "seconds": 8.5
+    },
     "Jc9d7h": {
      "file": "out/SRPHU20_BTNvBB/Jc9d7h.ffl",
      "bytes": 53207,
@@ -18024,6 +19354,13 @@
      "exploit": 0.4713,
      "seconds": 11.2
     },
+    "JcTc3d": {
+     "file": "out/SRPHU20_BTNvBB/JcTc3d.ffl",
+     "bytes": 53850,
+     "iterations": 80,
+     "exploit": 0.4459,
+     "seconds": 9.1
+    },
     "JcTc8d": {
      "file": "out/SRPHU20_BTNvBB/JcTc8d.ffl",
      "bytes": 52219,
@@ -18037,6 +19374,13 @@
      "iterations": 130,
      "exploit": 0.4202,
      "seconds": 18
+    },
+    "Kc6c3c": {
+     "file": "out/SRPHU20_BTNvBB/Kc6c3c.ffl",
+     "bytes": 52213,
+     "iterations": 110,
+     "exploit": 0.4515,
+     "seconds": 6.8
     },
     "Kc6d3c": {
      "file": "out/SRPHU20_BTNvBB/Kc6d3c.ffl",
@@ -18058,6 +19402,27 @@
      "iterations": 90,
      "exploit": 0.411,
      "seconds": 12.5
+    },
+    "Kc8d4h": {
+     "file": "out/SRPHU20_BTNvBB/Kc8d4h.ffl",
+     "bytes": 53551,
+     "iterations": 90,
+     "exploit": 0.4755,
+     "seconds": 17.2
+    },
+    "Kc9d7h": {
+     "file": "out/SRPHU20_BTNvBB/Kc9d7h.ffl",
+     "bytes": 52247,
+     "iterations": 100,
+     "exploit": 0.4283,
+     "seconds": 18
+    },
+    "KcJc9d": {
+     "file": "out/SRPHU20_BTNvBB/KcJc9d.ffl",
+     "bytes": 52227,
+     "iterations": 80,
+     "exploit": 0.4376,
+     "seconds": 9.4
     },
     "KcJd4c": {
      "file": "out/SRPHU20_BTNvBB/KcJd4c.ffl",
@@ -18101,6 +19466,34 @@
      "exploit": 0.4283,
      "seconds": 18.1
     },
+    "KcTc6d": {
+     "file": "out/SRPHU20_BTNvBB/KcTc6d.ffl",
+     "bytes": 52853,
+     "iterations": 120,
+     "exploit": 0.4474,
+     "seconds": 14.1
+    },
+    "Qc4c2d": {
+     "file": "out/SRPHU20_BTNvBB/Qc4c2d.ffl",
+     "bytes": 53644,
+     "iterations": 110,
+     "exploit": 0.3873,
+     "seconds": 13.5
+    },
+    "Qc4d2h": {
+     "file": "out/SRPHU20_BTNvBB/Qc4d2h.ffl",
+     "bytes": 54833,
+     "iterations": 90,
+     "exploit": 0.4558,
+     "seconds": 17.6
+    },
+    "Qc6d3d": {
+     "file": "out/SRPHU20_BTNvBB/Qc6d3d.ffl",
+     "bytes": 54238,
+     "iterations": 90,
+     "exploit": 0.3884,
+     "seconds": 11.1
+    },
     "Qc6d3h": {
      "file": "out/SRPHU20_BTNvBB/Qc6d3h.ffl",
      "bytes": 54012,
@@ -18114,6 +19507,13 @@
      "iterations": 80,
      "exploit": 0.3999,
      "seconds": 9.3
+    },
+    "Qc9c9d": {
+     "file": "out/SRPHU20_BTNvBB/Qc9c9d.ffl",
+     "bytes": 52481,
+     "iterations": 100,
+     "exploit": 0.4822,
+     "seconds": 12
     },
     "Qc9d5d": {
      "file": "out/SRPHU20_BTNvBB/Qc9d5d.ffl",
@@ -18142,6 +19542,13 @@
      "iterations": 100,
      "exploit": 0.3982,
      "seconds": 13.6
+    },
+    "QcJd9h": {
+     "file": "out/SRPHU20_BTNvBB/QcJd9h.ffl",
+     "bytes": 52825,
+     "iterations": 100,
+     "exploit": 0.4335,
+     "seconds": 18.5
     },
     "QcQd9h": {
      "file": "out/SRPHU20_BTNvBB/QcQd9h.ffl",
@@ -18185,12 +19592,26 @@
      "exploit": 0.4648,
      "seconds": 10.6
     },
+    "Tc8c7d": {
+     "file": "out/SRPHU20_BTNvBB/Tc8c7d.ffl",
+     "bytes": 53334,
+     "iterations": 80,
+     "exploit": 0.4795,
+     "seconds": 10.1
+    },
     "Tc8d4c": {
      "file": "out/SRPHU20_BTNvBB/Tc8d4c.ffl",
      "bytes": 54271,
      "iterations": 90,
      "exploit": 0.3827,
      "seconds": 12.2
+    },
+    "Tc8d4h": {
+     "file": "out/SRPHU20_BTNvBB/Tc8d4h.ffl",
+     "bytes": 54550,
+     "iterations": 80,
+     "exploit": 0.4456,
+     "seconds": 15.7
     }
    },
    "tree": {
@@ -18243,12 +19664,26 @@
    "ipCombos": 164.8,
    "hu": true,
    "flops": {
+    "5c3d3h": {
+     "file": "out/SRPHU40_BTNvBB/5c3d3h.ffl",
+     "bytes": 63718,
+     "iterations": 90,
+     "exploit": 0.4001,
+     "seconds": 18.5
+    },
     "5c4d2d": {
      "file": "out/SRPHU40_BTNvBB/5c4d2d.ffl",
      "bytes": 60666,
      "iterations": 130,
      "exploit": 0.4707,
      "seconds": 28.9
+    },
+    "5c4d2h": {
+     "file": "out/SRPHU40_BTNvBB/5c4d2h.ffl",
+     "bytes": 62188,
+     "iterations": 130,
+     "exploit": 0.475,
+     "seconds": 41.1
     },
     "6c4d2h": {
      "file": "out/SRPHU40_BTNvBB/6c4d2h.ffl",
@@ -18264,12 +19699,33 @@
      "exploit": 0.4855,
      "seconds": 17
     },
+    "7c5c3d": {
+     "file": "out/SRPHU40_BTNvBB/7c5c3d.ffl",
+     "bytes": 61744,
+     "iterations": 130,
+     "exploit": 0.4611,
+     "seconds": 25.5
+    },
     "7c5d4c": {
      "file": "out/SRPHU40_BTNvBB/7c5d4c.ffl",
      "bytes": 60688,
      "iterations": 160,
      "exploit": 0.4739,
      "seconds": 32
+    },
+    "7c6d4h": {
+     "file": "out/SRPHU40_BTNvBB/7c6d4h.ffl",
+     "bytes": 61032,
+     "iterations": 160,
+     "exploit": 0.4384,
+     "seconds": 50
+    },
+    "7c7d5h": {
+     "file": "out/SRPHU40_BTNvBB/7c7d5h.ffl",
+     "bytes": 61196,
+     "iterations": 160,
+     "exploit": 0.4431,
+     "seconds": 32.5
     },
     "8c4c4d": {
      "file": "out/SRPHU40_BTNvBB/8c4c4d.ffl",
@@ -18298,6 +19754,20 @@
      "iterations": 100,
      "exploit": 0.4689,
      "seconds": 33.6
+    },
+    "8c6d2c": {
+     "file": "out/SRPHU40_BTNvBB/8c6d2c.ffl",
+     "bytes": 61882,
+     "iterations": 100,
+     "exploit": 0.4878,
+     "seconds": 19.3
+    },
+    "8c8d5c": {
+     "file": "out/SRPHU40_BTNvBB/8c8d5c.ffl",
+     "bytes": 61412,
+     "iterations": 190,
+     "exploit": 0.4665,
+     "seconds": 38
     },
     "9c4d2d": {
      "file": "out/SRPHU40_BTNvBB/9c4d2d.ffl",
@@ -18348,6 +19818,13 @@
      "exploit": 0.4606,
      "seconds": 40.3
     },
+    "Ac8d4d": {
+     "file": "out/SRPHU40_BTNvBB/Ac8d4d.ffl",
+     "bytes": 58702,
+     "iterations": 110,
+     "exploit": 0.4832,
+     "seconds": 21.3
+    },
     "Ac9c5c": {
      "file": "out/SRPHU40_BTNvBB/Ac9c5c.ffl",
      "bytes": 59552,
@@ -18376,6 +19853,20 @@
      "exploit": 0.4205,
      "seconds": 17.6
     },
+    "AcKdJh": {
+     "file": "out/SRPHU40_BTNvBB/AcKdJh.ffl",
+     "bytes": 58106,
+     "iterations": 90,
+     "exploit": 0.4151,
+     "seconds": 24.2
+    },
+    "AcQc3d": {
+     "file": "out/SRPHU40_BTNvBB/AcQc3d.ffl",
+     "bytes": 58794,
+     "iterations": 110,
+     "exploit": 0.4227,
+     "seconds": 19.4
+    },
     "AcQd3h": {
      "file": "out/SRPHU40_BTNvBB/AcQd3h.ffl",
      "bytes": 59508,
@@ -18389,6 +19880,13 @@
      "iterations": 100,
      "exploit": 0.4962,
      "seconds": 20
+    },
+    "AcQd8c": {
+     "file": "out/SRPHU40_BTNvBB/AcQd8c.ffl",
+     "bytes": 57188,
+     "iterations": 90,
+     "exploit": 0.4987,
+     "seconds": 16.1
     },
     "AcQdTd": {
      "file": "out/SRPHU40_BTNvBB/AcQdTd.ffl",
@@ -18418,6 +19916,13 @@
      "exploit": 0.4401,
      "seconds": 31.7
     },
+    "Jc9d7d": {
+     "file": "out/SRPHU40_BTNvBB/Jc9d7d.ffl",
+     "bytes": 60424,
+     "iterations": 90,
+     "exploit": 0.4576,
+     "seconds": 16.9
+    },
     "Jc9d7h": {
      "file": "out/SRPHU40_BTNvBB/Jc9d7h.ffl",
      "bytes": 60588,
@@ -18439,6 +19944,13 @@
      "exploit": 0.4261,
      "seconds": 27.8
     },
+    "JcTc3d": {
+     "file": "out/SRPHU40_BTNvBB/JcTc3d.ffl",
+     "bytes": 60374,
+     "iterations": 100,
+     "exploit": 0.4865,
+     "seconds": 18.5
+    },
     "JcTc8d": {
      "file": "out/SRPHU40_BTNvBB/JcTc8d.ffl",
      "bytes": 56412,
@@ -18452,6 +19964,13 @@
      "iterations": 150,
      "exploit": 0.4736,
      "seconds": 34
+    },
+    "Kc6c3c": {
+     "file": "out/SRPHU40_BTNvBB/Kc6c3c.ffl",
+     "bytes": 61106,
+     "iterations": 150,
+     "exploit": 0.4487,
+     "seconds": 15
     },
     "Kc6d3c": {
      "file": "out/SRPHU40_BTNvBB/Kc6d3c.ffl",
@@ -18473,6 +19992,27 @@
      "iterations": 120,
      "exploit": 0.4333,
      "seconds": 25.1
+    },
+    "Kc8d4h": {
+     "file": "out/SRPHU40_BTNvBB/Kc8d4h.ffl",
+     "bytes": 60466,
+     "iterations": 100,
+     "exploit": 0.4731,
+     "seconds": 30
+    },
+    "Kc9d7h": {
+     "file": "out/SRPHU40_BTNvBB/Kc9d7h.ffl",
+     "bytes": 59016,
+     "iterations": 110,
+     "exploit": 0.4504,
+     "seconds": 31.7
+    },
+    "KcJc9d": {
+     "file": "out/SRPHU40_BTNvBB/KcJc9d.ffl",
+     "bytes": 59006,
+     "iterations": 100,
+     "exploit": 0.4147,
+     "seconds": 17.8
     },
     "KcJd4c": {
      "file": "out/SRPHU40_BTNvBB/KcJd4c.ffl",
@@ -18516,6 +20056,34 @@
      "exploit": 0.4838,
      "seconds": 25.3
     },
+    "KcTc6d": {
+     "file": "out/SRPHU40_BTNvBB/KcTc6d.ffl",
+     "bytes": 58430,
+     "iterations": 100,
+     "exploit": 0.4639,
+     "seconds": 17.9
+    },
+    "Qc4c2d": {
+     "file": "out/SRPHU40_BTNvBB/Qc4c2d.ffl",
+     "bytes": 61594,
+     "iterations": 100,
+     "exploit": 0.4821,
+     "seconds": 19
+    },
+    "Qc4d2h": {
+     "file": "out/SRPHU40_BTNvBB/Qc4d2h.ffl",
+     "bytes": 62416,
+     "iterations": 90,
+     "exploit": 0.4646,
+     "seconds": 27.3
+    },
+    "Qc6d3d": {
+     "file": "out/SRPHU40_BTNvBB/Qc6d3d.ffl",
+     "bytes": 60750,
+     "iterations": 110,
+     "exploit": 0.4105,
+     "seconds": 20.8
+    },
     "Qc6d3h": {
      "file": "out/SRPHU40_BTNvBB/Qc6d3h.ffl",
      "bytes": 61568,
@@ -18529,6 +20097,13 @@
      "iterations": 100,
      "exploit": 0.4272,
      "seconds": 18.4
+    },
+    "Qc9c9d": {
+     "file": "out/SRPHU40_BTNvBB/Qc9c9d.ffl",
+     "bytes": 59938,
+     "iterations": 150,
+     "exploit": 0.4653,
+     "seconds": 29.4
     },
     "Qc9d5d": {
      "file": "out/SRPHU40_BTNvBB/Qc9d5d.ffl",
@@ -18557,6 +20132,13 @@
      "iterations": 120,
      "exploit": 0.4457,
      "seconds": 26.3
+    },
+    "QcJd9h": {
+     "file": "out/SRPHU40_BTNvBB/QcJd9h.ffl",
+     "bytes": 58276,
+     "iterations": 120,
+     "exploit": 0.4855,
+     "seconds": 37
     },
     "QcQd9h": {
      "file": "out/SRPHU40_BTNvBB/QcQd9h.ffl",
@@ -18600,12 +20182,26 @@
      "exploit": 0.4653,
      "seconds": 24.9
     },
+    "Tc8c7d": {
+     "file": "out/SRPHU40_BTNvBB/Tc8c7d.ffl",
+     "bytes": 60536,
+     "iterations": 120,
+     "exploit": 0.4435,
+     "seconds": 23.9
+    },
     "Tc8d4c": {
      "file": "out/SRPHU40_BTNvBB/Tc8d4c.ffl",
      "bytes": 60574,
      "iterations": 140,
      "exploit": 0.4801,
      "seconds": 29.3
+    },
+    "Tc8d4h": {
+     "file": "out/SRPHU40_BTNvBB/Tc8d4h.ffl",
+     "bytes": 61074,
+     "iterations": 120,
+     "exploit": 0.4267,
+     "seconds": 36.2
     }
    },
    "tree": {
@@ -18657,12 +20253,26 @@
    "oopCombos": 583.3,
    "ipCombos": 535.8,
    "flops": {
+    "5c3d3h": {
+     "file": "out/SRP20_BTNvBB/5c3d3h.ffl",
+     "bytes": 68775,
+     "iterations": 110,
+     "exploit": 0.4927,
+     "seconds": 18.7
+    },
     "5c4d2d": {
      "file": "out/SRP20_BTNvBB/5c4d2d.ffl",
      "bytes": 68468,
      "iterations": 90,
      "exploit": 0.4568,
      "seconds": 16.8
+    },
+    "5c4d2h": {
+     "file": "out/SRP20_BTNvBB/5c4d2h.ffl",
+     "bytes": 68383,
+     "iterations": 100,
+     "exploit": 0.412,
+     "seconds": 26.3
     },
     "6c4d2h": {
      "file": "out/SRP20_BTNvBB/6c4d2h.ffl",
@@ -18678,12 +20288,33 @@
      "exploit": 0.418,
      "seconds": 9
     },
+    "7c5c3d": {
+     "file": "out/SRP20_BTNvBB/7c5c3d.ffl",
+     "bytes": 67278,
+     "iterations": 80,
+     "exploit": 0.4695,
+     "seconds": 13.2
+    },
     "7c5d4c": {
      "file": "out/SRP20_BTNvBB/7c5d4c.ffl",
      "bytes": 67072,
      "iterations": 90,
      "exploit": 0.4115,
      "seconds": 14.7
+    },
+    "7c6d4h": {
+     "file": "out/SRP20_BTNvBB/7c6d4h.ffl",
+     "bytes": 66777,
+     "iterations": 80,
+     "exploit": 0.4902,
+     "seconds": 20.6
+    },
+    "7c7d5h": {
+     "file": "out/SRP20_BTNvBB/7c7d5h.ffl",
+     "bytes": 65824,
+     "iterations": 100,
+     "exploit": 0.4441,
+     "seconds": 16.3
     },
     "8c4c4d": {
      "file": "out/SRP20_BTNvBB/8c4c4d.ffl",
@@ -18712,6 +20343,20 @@
      "iterations": 80,
      "exploit": 0.4942,
      "seconds": 23.5
+    },
+    "8c6d2c": {
+     "file": "out/SRP20_BTNvBB/8c6d2c.ffl",
+     "bytes": 67141,
+     "iterations": 90,
+     "exploit": 0.4315,
+     "seconds": 14.7
+    },
+    "8c8d5c": {
+     "file": "out/SRP20_BTNvBB/8c8d5c.ffl",
+     "bytes": 65771,
+     "iterations": 100,
+     "exploit": 0.4044,
+     "seconds": 15.8
     },
     "9c4d2d": {
      "file": "out/SRP20_BTNvBB/9c4d2d.ffl",
@@ -18762,6 +20407,13 @@
      "exploit": 0.4395,
      "seconds": 20
     },
+    "Ac8d4d": {
+     "file": "out/SRP20_BTNvBB/Ac8d4d.ffl",
+     "bytes": 65842,
+     "iterations": 80,
+     "exploit": 0.4615,
+     "seconds": 12.2
+    },
     "Ac9c5c": {
      "file": "out/SRP20_BTNvBB/Ac9c5c.ffl",
      "bytes": 64675,
@@ -18790,6 +20442,20 @@
      "exploit": 0.4807,
      "seconds": 9.9
     },
+    "AcKdJh": {
+     "file": "out/SRP20_BTNvBB/AcKdJh.ffl",
+     "bytes": 63819,
+     "iterations": 80,
+     "exploit": 0.459,
+     "seconds": 18.8
+    },
+    "AcQc3d": {
+     "file": "out/SRP20_BTNvBB/AcQc3d.ffl",
+     "bytes": 65403,
+     "iterations": 80,
+     "exploit": 0.4728,
+     "seconds": 12
+    },
     "AcQd3h": {
      "file": "out/SRP20_BTNvBB/AcQd3h.ffl",
      "bytes": 65788,
@@ -18803,6 +20469,13 @@
      "iterations": 80,
      "exploit": 0.4829,
      "seconds": 12.8
+    },
+    "AcQd8c": {
+     "file": "out/SRP20_BTNvBB/AcQd8c.ffl",
+     "bytes": 63758,
+     "iterations": 80,
+     "exploit": 0.4191,
+     "seconds": 11.1
     },
     "AcQdTd": {
      "file": "out/SRP20_BTNvBB/AcQdTd.ffl",
@@ -18832,6 +20505,13 @@
      "exploit": 0.4197,
      "seconds": 25.1
     },
+    "Jc9d7d": {
+     "file": "out/SRP20_BTNvBB/Jc9d7d.ffl",
+     "bytes": 65274,
+     "iterations": 90,
+     "exploit": 0.4311,
+     "seconds": 14.4
+    },
     "Jc9d7h": {
      "file": "out/SRP20_BTNvBB/Jc9d7h.ffl",
      "bytes": 65301,
@@ -18853,6 +20533,13 @@
      "exploit": 0.4841,
      "seconds": 15.8
     },
+    "JcTc3d": {
+     "file": "out/SRP20_BTNvBB/JcTc3d.ffl",
+     "bytes": 66637,
+     "iterations": 90,
+     "exploit": 0.4255,
+     "seconds": 14.6
+    },
     "JcTc8d": {
      "file": "out/SRP20_BTNvBB/JcTc8d.ffl",
      "bytes": 65406,
@@ -18866,6 +20553,13 @@
      "iterations": 140,
      "exploit": 0.4568,
      "seconds": 23.7
+    },
+    "Kc6c3c": {
+     "file": "out/SRP20_BTNvBB/Kc6c3c.ffl",
+     "bytes": 66170,
+     "iterations": 120,
+     "exploit": 0.492,
+     "seconds": 9.5
     },
     "Kc6d3c": {
      "file": "out/SRP20_BTNvBB/Kc6d3c.ffl",
@@ -18887,6 +20581,27 @@
      "iterations": 160,
      "exploit": 0.495,
      "seconds": 28.4
+    },
+    "Kc8d4h": {
+     "file": "out/SRP20_BTNvBB/Kc8d4h.ffl",
+     "bytes": 65694,
+     "iterations": 180,
+     "exploit": 0.4448,
+     "seconds": 44.4
+    },
+    "Kc9d7h": {
+     "file": "out/SRP20_BTNvBB/Kc9d7h.ffl",
+     "bytes": 64589,
+     "iterations": 100,
+     "exploit": 0.4325,
+     "seconds": 24.6
+    },
+    "KcJc9d": {
+     "file": "out/SRP20_BTNvBB/KcJc9d.ffl",
+     "bytes": 64533,
+     "iterations": 90,
+     "exploit": 0.4576,
+     "seconds": 14
     },
     "KcJd4c": {
      "file": "out/SRP20_BTNvBB/KcJd4c.ffl",
@@ -18930,6 +20645,34 @@
      "exploit": 0.4913,
      "seconds": 18.5
     },
+    "KcTc6d": {
+     "file": "out/SRP20_BTNvBB/KcTc6d.ffl",
+     "bytes": 64610,
+     "iterations": 90,
+     "exploit": 0.4344,
+     "seconds": 14.2
+    },
+    "Qc4c2d": {
+     "file": "out/SRP20_BTNvBB/Qc4c2d.ffl",
+     "bytes": 67859,
+     "iterations": 100,
+     "exploit": 0.4122,
+     "seconds": 16.4
+    },
+    "Qc4d2h": {
+     "file": "out/SRP20_BTNvBB/Qc4d2h.ffl",
+     "bytes": 67892,
+     "iterations": 110,
+     "exploit": 0.4282,
+     "seconds": 28.2
+    },
+    "Qc6d3d": {
+     "file": "out/SRP20_BTNvBB/Qc6d3d.ffl",
+     "bytes": 66668,
+     "iterations": 100,
+     "exploit": 0.4201,
+     "seconds": 16.1
+    },
     "Qc6d3h": {
      "file": "out/SRP20_BTNvBB/Qc6d3h.ffl",
      "bytes": 66765,
@@ -18943,6 +20686,13 @@
      "iterations": 90,
      "exploit": 0.4729,
      "seconds": 14.4
+    },
+    "Qc9c9d": {
+     "file": "out/SRP20_BTNvBB/Qc9c9d.ffl",
+     "bytes": 65257,
+     "iterations": 120,
+     "exploit": 0.4359,
+     "seconds": 18.8
     },
     "Qc9d5d": {
      "file": "out/SRP20_BTNvBB/Qc9d5d.ffl",
@@ -18971,6 +20721,13 @@
      "iterations": 90,
      "exploit": 0.4921,
      "seconds": 15.7
+    },
+    "QcJd9h": {
+     "file": "out/SRP20_BTNvBB/QcJd9h.ffl",
+     "bytes": 65217,
+     "iterations": 100,
+     "exploit": 0.4836,
+     "seconds": 24.6
     },
     "QcQd9h": {
      "file": "out/SRP20_BTNvBB/QcQd9h.ffl",
@@ -19014,12 +20771,26 @@
      "exploit": 0.4393,
      "seconds": 14.5
     },
+    "Tc8c7d": {
+     "file": "out/SRP20_BTNvBB/Tc8c7d.ffl",
+     "bytes": 64944,
+     "iterations": 90,
+     "exploit": 0.4132,
+     "seconds": 14.5
+    },
     "Tc8d4c": {
      "file": "out/SRP20_BTNvBB/Tc8d4c.ffl",
      "bytes": 66617,
      "iterations": 80,
      "exploit": 0.4923,
      "seconds": 14.2
+    },
+    "Tc8d4h": {
+     "file": "out/SRP20_BTNvBB/Tc8d4h.ffl",
+     "bytes": 66651,
+     "iterations": 90,
+     "exploit": 0.4841,
+     "seconds": 23.2
     }
    },
    "tree": {
@@ -19071,12 +20842,26 @@
    "oopCombos": 510.661,
    "ipCombos": 359.4,
    "flops": {
+    "5c3d3h": {
+     "file": "out/SRP20_COvBB/5c3d3h.ffl",
+     "bytes": 56539,
+     "iterations": 80,
+     "exploit": 0.4273,
+     "seconds": 11
+    },
     "5c4d2d": {
      "file": "out/SRP20_COvBB/5c4d2d.ffl",
      "bytes": 56185,
      "iterations": 90,
      "exploit": 0.497,
      "seconds": 13.9
+    },
+    "5c4d2h": {
+     "file": "out/SRP20_COvBB/5c4d2h.ffl",
+     "bytes": 56331,
+     "iterations": 100,
+     "exploit": 0.4548,
+     "seconds": 21.4
     },
     "6c4d2h": {
      "file": "out/SRP20_COvBB/6c4d2h.ffl",
@@ -19092,11 +20877,32 @@
      "exploit": 0.4755,
      "seconds": 6.6
     },
+    "7c5c3d": {
+     "file": "out/SRP20_COvBB/7c5c3d.ffl",
+     "bytes": 55629,
+     "iterations": 90,
+     "exploit": 0.4161,
+     "seconds": 12.2
+    },
     "7c5d4c": {
      "file": "out/SRP20_COvBB/7c5d4c.ffl",
      "bytes": 55287,
      "iterations": 90,
      "exploit": 0.4421,
+     "seconds": 12.1
+    },
+    "7c6d4h": {
+     "file": "out/SRP20_COvBB/7c6d4h.ffl",
+     "bytes": 55221,
+     "iterations": 80,
+     "exploit": 0.4825,
+     "seconds": 16.8
+    },
+    "7c7d5h": {
+     "file": "out/SRP20_COvBB/7c7d5h.ffl",
+     "bytes": 54263,
+     "iterations": 90,
+     "exploit": 0.4865,
      "seconds": 12.1
     },
     "8c4c4d": {
@@ -19126,6 +20932,20 @@
      "iterations": 80,
      "exploit": 0.4915,
      "seconds": 18.8
+    },
+    "8c6d2c": {
+     "file": "out/SRP20_COvBB/8c6d2c.ffl",
+     "bytes": 54946,
+     "iterations": 90,
+     "exploit": 0.4792,
+     "seconds": 12.1
+    },
+    "8c8d5c": {
+     "file": "out/SRP20_COvBB/8c8d5c.ffl",
+     "bytes": 53448,
+     "iterations": 100,
+     "exploit": 0.4427,
+     "seconds": 12.9
     },
     "9c4d2d": {
      "file": "out/SRP20_COvBB/9c4d2d.ffl",
@@ -19176,6 +20996,13 @@
      "exploit": 0.4444,
      "seconds": 22.3
     },
+    "Ac8d4d": {
+     "file": "out/SRP20_COvBB/Ac8d4d.ffl",
+     "bytes": 52337,
+     "iterations": 130,
+     "exploit": 0.4293,
+     "seconds": 16.1
+    },
     "Ac9c5c": {
      "file": "out/SRP20_COvBB/Ac9c5c.ffl",
      "bytes": 52199,
@@ -19204,6 +21031,20 @@
      "exploit": 0.4384,
      "seconds": 10.2
     },
+    "AcKdJh": {
+     "file": "out/SRP20_COvBB/AcKdJh.ffl",
+     "bytes": 51212,
+     "iterations": 80,
+     "exploit": 0.4531,
+     "seconds": 15
+    },
+    "AcQc3d": {
+     "file": "out/SRP20_COvBB/AcQc3d.ffl",
+     "bytes": 53048,
+     "iterations": 90,
+     "exploit": 0.4738,
+     "seconds": 11.2
+    },
     "AcQd3h": {
      "file": "out/SRP20_COvBB/AcQd3h.ffl",
      "bytes": 53104,
@@ -19217,6 +21058,13 @@
      "iterations": 90,
      "exploit": 0.3986,
      "seconds": 11.4
+    },
+    "AcQd8c": {
+     "file": "out/SRP20_COvBB/AcQd8c.ffl",
+     "bytes": 51277,
+     "iterations": 80,
+     "exploit": 0.4291,
+     "seconds": 9.3
     },
     "AcQdTd": {
      "file": "out/SRP20_COvBB/AcQdTd.ffl",
@@ -19246,6 +21094,13 @@
      "exploit": 0.4135,
      "seconds": 16
     },
+    "Jc9d7d": {
+     "file": "out/SRP20_COvBB/Jc9d7d.ffl",
+     "bytes": 52453,
+     "iterations": 80,
+     "exploit": 0.477,
+     "seconds": 10.4
+    },
     "Jc9d7h": {
      "file": "out/SRP20_COvBB/Jc9d7h.ffl",
      "bytes": 53019,
@@ -19267,6 +21122,13 @@
      "exploit": 0.4245,
      "seconds": 14.2
     },
+    "JcTc3d": {
+     "file": "out/SRP20_COvBB/JcTc3d.ffl",
+     "bytes": 53963,
+     "iterations": 70,
+     "exploit": 0.4853,
+     "seconds": 8.6
+    },
     "JcTc8d": {
      "file": "out/SRP20_COvBB/JcTc8d.ffl",
      "bytes": 52696,
@@ -19280,6 +21142,13 @@
      "iterations": 130,
      "exploit": 0.4609,
      "seconds": 17.5
+    },
+    "Kc6c3c": {
+     "file": "out/SRP20_COvBB/Kc6c3c.ffl",
+     "bytes": 54383,
+     "iterations": 110,
+     "exploit": 0.456,
+     "seconds": 7.1
     },
     "Kc6d3c": {
      "file": "out/SRP20_COvBB/Kc6d3c.ffl",
@@ -19301,6 +21170,27 @@
      "iterations": 110,
      "exploit": 0.4199,
      "seconds": 16.1
+    },
+    "Kc8d4h": {
+     "file": "out/SRP20_COvBB/Kc8d4h.ffl",
+     "bytes": 53350,
+     "iterations": 100,
+     "exploit": 0.4984,
+     "seconds": 20
+    },
+    "Kc9d7h": {
+     "file": "out/SRP20_COvBB/Kc9d7h.ffl",
+     "bytes": 52650,
+     "iterations": 120,
+     "exploit": 0.4331,
+     "seconds": 24
+    },
+    "KcJc9d": {
+     "file": "out/SRP20_COvBB/KcJc9d.ffl",
+     "bytes": 52127,
+     "iterations": 90,
+     "exploit": 0.4442,
+     "seconds": 11.3
     },
     "KcJd4c": {
      "file": "out/SRP20_COvBB/KcJd4c.ffl",
@@ -19344,6 +21234,34 @@
      "exploit": 0.4133,
      "seconds": 14.9
     },
+    "KcTc6d": {
+     "file": "out/SRP20_COvBB/KcTc6d.ffl",
+     "bytes": 52593,
+     "iterations": 90,
+     "exploit": 0.4675,
+     "seconds": 11
+    },
+    "Qc4c2d": {
+     "file": "out/SRP20_COvBB/Qc4c2d.ffl",
+     "bytes": 55571,
+     "iterations": 90,
+     "exploit": 0.4455,
+     "seconds": 12.1
+    },
+    "Qc4d2h": {
+     "file": "out/SRP20_COvBB/Qc4d2h.ffl",
+     "bytes": 55738,
+     "iterations": 90,
+     "exploit": 0.4551,
+     "seconds": 18.6
+    },
+    "Qc6d3d": {
+     "file": "out/SRP20_COvBB/Qc6d3d.ffl",
+     "bytes": 55099,
+     "iterations": 90,
+     "exploit": 0.4301,
+     "seconds": 12
+    },
     "Qc6d3h": {
      "file": "out/SRP20_COvBB/Qc6d3h.ffl",
      "bytes": 55126,
@@ -19357,6 +21275,13 @@
      "iterations": 90,
      "exploit": 0.3856,
      "seconds": 11.6
+    },
+    "Qc9c9d": {
+     "file": "out/SRP20_COvBB/Qc9c9d.ffl",
+     "bytes": 52750,
+     "iterations": 110,
+     "exploit": 0.495,
+     "seconds": 13.8
     },
     "Qc9d5d": {
      "file": "out/SRP20_COvBB/Qc9d5d.ffl",
@@ -19385,6 +21310,13 @@
      "iterations": 110,
      "exploit": 0.4122,
      "seconds": 15.7
+    },
+    "QcJd9h": {
+     "file": "out/SRP20_COvBB/QcJd9h.ffl",
+     "bytes": 52957,
+     "iterations": 110,
+     "exploit": 0.4674,
+     "seconds": 21.7
     },
     "QcQd9h": {
      "file": "out/SRP20_COvBB/QcQd9h.ffl",
@@ -19428,12 +21360,26 @@
      "exploit": 0.4025,
      "seconds": 10.1
     },
+    "Tc8c7d": {
+     "file": "out/SRP20_COvBB/Tc8c7d.ffl",
+     "bytes": 52589,
+     "iterations": 90,
+     "exploit": 0.3989,
+     "seconds": 11.7
+    },
     "Tc8d4c": {
      "file": "out/SRP20_COvBB/Tc8d4c.ffl",
      "bytes": 53191,
      "iterations": 80,
      "exploit": 0.3877,
      "seconds": 10.8
+    },
+    "Tc8d4h": {
+     "file": "out/SRP20_COvBB/Tc8d4h.ffl",
+     "bytes": 53681,
+     "iterations": 80,
+     "exploit": 0.4369,
+     "seconds": 15.6
     }
    },
    "tree": {
@@ -19485,12 +21431,26 @@
    "oopCombos": 510.661,
    "ipCombos": 359.4,
    "flops": {
+    "5c3d3h": {
+     "file": "out/SRP25_COvBB/5c3d3h.ffl",
+     "bytes": 63164,
+     "iterations": 100,
+     "exploit": 0.4585,
+     "seconds": 22.7
+    },
     "5c4d2d": {
      "file": "out/SRP25_COvBB/5c4d2d.ffl",
      "bytes": 63050,
      "iterations": 120,
      "exploit": 0.4697,
      "seconds": 30
+    },
+    "5c4d2h": {
+     "file": "out/SRP25_COvBB/5c4d2h.ffl",
+     "bytes": 63396,
+     "iterations": 120,
+     "exploit": 0.4699,
+     "seconds": 41.9
     },
     "6c4d2h": {
      "file": "out/SRP25_COvBB/6c4d2h.ffl",
@@ -19506,12 +21466,33 @@
      "exploit": 0.4432,
      "seconds": 21.5
     },
+    "7c5c3d": {
+     "file": "out/SRP25_COvBB/7c5c3d.ffl",
+     "bytes": 62310,
+     "iterations": 110,
+     "exploit": 0.497,
+     "seconds": 23.7
+    },
     "7c5d4c": {
      "file": "out/SRP25_COvBB/7c5d4c.ffl",
      "bytes": 61936,
      "iterations": 110,
      "exploit": 0.4979,
      "seconds": 23.5
+    },
+    "7c6d4h": {
+     "file": "out/SRP25_COvBB/7c6d4h.ffl",
+     "bytes": 61770,
+     "iterations": 120,
+     "exploit": 0.442,
+     "seconds": 41.2
+    },
+    "7c7d5h": {
+     "file": "out/SRP25_COvBB/7c7d5h.ffl",
+     "bytes": 61536,
+     "iterations": 120,
+     "exploit": 0.4611,
+     "seconds": 26.4
     },
     "8c4c4d": {
      "file": "out/SRP25_COvBB/8c4c4d.ffl",
@@ -19540,6 +21521,20 @@
      "iterations": 140,
      "exploit": 0.4819,
      "seconds": 53.8
+    },
+    "8c6d2c": {
+     "file": "out/SRP25_COvBB/8c6d2c.ffl",
+     "bytes": 61580,
+     "iterations": 130,
+     "exploit": 0.4555,
+     "seconds": 28.1
+    },
+    "8c8d5c": {
+     "file": "out/SRP25_COvBB/8c8d5c.ffl",
+     "bytes": 60334,
+     "iterations": 130,
+     "exploit": 0.4592,
+     "seconds": 26.7
     },
     "9c4d2d": {
      "file": "out/SRP25_COvBB/9c4d2d.ffl",
@@ -19590,6 +21585,13 @@
      "exploit": 0.4807,
      "seconds": 34.6
     },
+    "Ac8d4d": {
+     "file": "out/SRP25_COvBB/Ac8d4d.ffl",
+     "bytes": 59306,
+     "iterations": 100,
+     "exploit": 0.4522,
+     "seconds": 19.9
+    },
     "Ac9c5c": {
      "file": "out/SRP25_COvBB/Ac9c5c.ffl",
      "bytes": 59286,
@@ -19618,6 +21620,20 @@
      "exploit": 0.4765,
      "seconds": 16.4
     },
+    "AcKdJh": {
+     "file": "out/SRP25_COvBB/AcKdJh.ffl",
+     "bytes": 56878,
+     "iterations": 80,
+     "exploit": 0.4565,
+     "seconds": 22.8
+    },
+    "AcQc3d": {
+     "file": "out/SRP25_COvBB/AcQc3d.ffl",
+     "bytes": 59784,
+     "iterations": 110,
+     "exploit": 0.4435,
+     "seconds": 22.1
+    },
     "AcQd3h": {
      "file": "out/SRP25_COvBB/AcQd3h.ffl",
      "bytes": 59798,
@@ -19631,6 +21647,13 @@
      "iterations": 90,
      "exploit": 0.4849,
      "seconds": 19
+    },
+    "AcQd8c": {
+     "file": "out/SRP25_COvBB/AcQd8c.ffl",
+     "bytes": 57516,
+     "iterations": 90,
+     "exploit": 0.4141,
+     "seconds": 16.4
     },
     "AcQdTd": {
      "file": "out/SRP25_COvBB/AcQdTd.ffl",
@@ -19660,6 +21683,13 @@
      "exploit": 0.47,
      "seconds": 31.8
     },
+    "Jc9d7d": {
+     "file": "out/SRP25_COvBB/Jc9d7d.ffl",
+     "bytes": 59364,
+     "iterations": 100,
+     "exploit": 0.4818,
+     "seconds": 21.4
+    },
     "Jc9d7h": {
      "file": "out/SRP25_COvBB/Jc9d7h.ffl",
      "bytes": 59360,
@@ -19681,6 +21711,13 @@
      "exploit": 0.4199,
      "seconds": 24.7
     },
+    "JcTc3d": {
+     "file": "out/SRP25_COvBB/JcTc3d.ffl",
+     "bytes": 60588,
+     "iterations": 90,
+     "exploit": 0.4672,
+     "seconds": 17.7
+    },
     "JcTc8d": {
      "file": "out/SRP25_COvBB/JcTc8d.ffl",
      "bytes": 59090,
@@ -19694,6 +21731,13 @@
      "iterations": 130,
      "exploit": 0.4908,
      "seconds": 27.6
+    },
+    "Kc6c3c": {
+     "file": "out/SRP25_COvBB/Kc6c3c.ffl",
+     "bytes": 61302,
+     "iterations": 150,
+     "exploit": 0.4475,
+     "seconds": 15.8
     },
     "Kc6d3c": {
      "file": "out/SRP25_COvBB/Kc6d3c.ffl",
@@ -19715,6 +21759,27 @@
      "iterations": 120,
      "exploit": 0.4815,
      "seconds": 28.3
+    },
+    "Kc8d4h": {
+     "file": "out/SRP25_COvBB/Kc8d4h.ffl",
+     "bytes": 59956,
+     "iterations": 120,
+     "exploit": 0.4761,
+     "seconds": 39.6
+    },
+    "Kc9d7h": {
+     "file": "out/SRP25_COvBB/Kc9d7h.ffl",
+     "bytes": 59004,
+     "iterations": 140,
+     "exploit": 0.4648,
+     "seconds": 43.8
+    },
+    "KcJc9d": {
+     "file": "out/SRP25_COvBB/KcJc9d.ffl",
+     "bytes": 58746,
+     "iterations": 100,
+     "exploit": 0.4486,
+     "seconds": 20.5
     },
     "KcJd4c": {
      "file": "out/SRP25_COvBB/KcJd4c.ffl",
@@ -19758,6 +21823,34 @@
      "exploit": 0.4176,
      "seconds": 28.4
     },
+    "KcTc6d": {
+     "file": "out/SRP25_COvBB/KcTc6d.ffl",
+     "bytes": 59000,
+     "iterations": 100,
+     "exploit": 0.4518,
+     "seconds": 19.5
+    },
+    "Qc4c2d": {
+     "file": "out/SRP25_COvBB/Qc4c2d.ffl",
+     "bytes": 62792,
+     "iterations": 110,
+     "exploit": 0.4663,
+     "seconds": 24
+    },
+    "Qc4d2h": {
+     "file": "out/SRP25_COvBB/Qc4d2h.ffl",
+     "bytes": 62886,
+     "iterations": 110,
+     "exploit": 0.472,
+     "seconds": 37.7
+    },
+    "Qc6d3d": {
+     "file": "out/SRP25_COvBB/Qc6d3d.ffl",
+     "bytes": 61548,
+     "iterations": 110,
+     "exploit": 0.4303,
+     "seconds": 23.9
+    },
     "Qc6d3h": {
      "file": "out/SRP25_COvBB/Qc6d3h.ffl",
      "bytes": 61684,
@@ -19771,6 +21864,13 @@
      "iterations": 110,
      "exploit": 0.4373,
      "seconds": 22.5
+    },
+    "Qc9c9d": {
+     "file": "out/SRP25_COvBB/Qc9c9d.ffl",
+     "bytes": 59278,
+     "iterations": 140,
+     "exploit": 0.45,
+     "seconds": 28.3
     },
     "Qc9d5d": {
      "file": "out/SRP25_COvBB/Qc9d5d.ffl",
@@ -19799,6 +21899,13 @@
      "iterations": 110,
      "exploit": 0.4483,
      "seconds": 25.9
+    },
+    "QcJd9h": {
+     "file": "out/SRP25_COvBB/QcJd9h.ffl",
+     "bytes": 59868,
+     "iterations": 110,
+     "exploit": 0.4981,
+     "seconds": 36.1
     },
     "QcQd9h": {
      "file": "out/SRP25_COvBB/QcQd9h.ffl",
@@ -19842,12 +21949,26 @@
      "exploit": 0.4396,
      "seconds": 19.8
     },
+    "Tc8c7d": {
+     "file": "out/SRP25_COvBB/Tc8c7d.ffl",
+     "bytes": 59474,
+     "iterations": 110,
+     "exploit": 0.4503,
+     "seconds": 23.3
+    },
     "Tc8d4c": {
      "file": "out/SRP25_COvBB/Tc8d4c.ffl",
      "bytes": 59726,
      "iterations": 100,
      "exploit": 0.4531,
      "seconds": 22
+    },
+    "Tc8d4h": {
+     "file": "out/SRP25_COvBB/Tc8d4h.ffl",
+     "bytes": 59880,
+     "iterations": 100,
+     "exploit": 0.4989,
+     "seconds": 31.7
     }
    },
    "tree": {
@@ -19899,12 +22020,26 @@
    "oopCombos": 617.32,
    "ipCombos": 376.2,
    "flops": {
+    "5c3d3h": {
+     "file": "out/SRP40_COvBB/5c3d3h.ffl",
+     "bytes": 68426,
+     "iterations": 160,
+     "exploit": 0.4473,
+     "seconds": 52.4
+    },
     "5c4d2d": {
      "file": "out/SRP40_COvBB/5c4d2d.ffl",
      "bytes": 67598,
      "iterations": 180,
      "exploit": 0.4814,
      "seconds": 65.7
+    },
+    "5c4d2h": {
+     "file": "out/SRP40_COvBB/5c4d2h.ffl",
+     "bytes": 68714,
+     "iterations": 180,
+     "exploit": 0.4952,
+     "seconds": 92.5
     },
     "6c4d2h": {
      "file": "out/SRP40_COvBB/6c4d2h.ffl",
@@ -19920,12 +22055,33 @@
      "exploit": 0.4881,
      "seconds": 27.8
     },
+    "7c5c3d": {
+     "file": "out/SRP40_COvBB/7c5c3d.ffl",
+     "bytes": 66720,
+     "iterations": 140,
+     "exploit": 0.4535,
+     "seconds": 44.6
+    },
     "7c5d4c": {
      "file": "out/SRP40_COvBB/7c5d4c.ffl",
      "bytes": 66556,
      "iterations": 150,
      "exploit": 0.4648,
      "seconds": 47
+    },
+    "7c6d4h": {
+     "file": "out/SRP40_COvBB/7c6d4h.ffl",
+     "bytes": 66126,
+     "iterations": 160,
+     "exploit": 0.4662,
+     "seconds": 80.2
+    },
+    "7c7d5h": {
+     "file": "out/SRP40_COvBB/7c7d5h.ffl",
+     "bytes": 66050,
+     "iterations": 170,
+     "exploit": 0.4706,
+     "seconds": 53.8
     },
     "8c4c4d": {
      "file": "out/SRP40_COvBB/8c4c4d.ffl",
@@ -19954,6 +22110,20 @@
      "iterations": 150,
      "exploit": 0.4485,
      "seconds": 82.2
+    },
+    "8c6d2c": {
+     "file": "out/SRP40_COvBB/8c6d2c.ffl",
+     "bytes": 65726,
+     "iterations": 160,
+     "exploit": 0.4367,
+     "seconds": 50.1
+    },
+    "8c8d5c": {
+     "file": "out/SRP40_COvBB/8c8d5c.ffl",
+     "bytes": 64680,
+     "iterations": 160,
+     "exploit": 0.4877,
+     "seconds": 48.5
     },
     "9c4d2d": {
      "file": "out/SRP40_COvBB/9c4d2d.ffl",
@@ -20004,6 +22174,13 @@
      "exploit": 0.4511,
      "seconds": 72.6
     },
+    "Ac8d4d": {
+     "file": "out/SRP40_COvBB/Ac8d4d.ffl",
+     "bytes": 63124,
+     "iterations": 160,
+     "exploit": 0.4656,
+     "seconds": 48.6
+    },
     "Ac9c5c": {
      "file": "out/SRP40_COvBB/Ac9c5c.ffl",
      "bytes": 62684,
@@ -20032,6 +22209,20 @@
      "exploit": 0.4716,
      "seconds": 39.6
     },
+    "AcKdJh": {
+     "file": "out/SRP40_COvBB/AcKdJh.ffl",
+     "bytes": 59362,
+     "iterations": 140,
+     "exploit": 0.439,
+     "seconds": 58.9
+    },
+    "AcQc3d": {
+     "file": "out/SRP40_COvBB/AcQc3d.ffl",
+     "bytes": 63346,
+     "iterations": 130,
+     "exploit": 0.4916,
+     "seconds": 38.6
+    },
     "AcQd3h": {
      "file": "out/SRP40_COvBB/AcQd3h.ffl",
      "bytes": 62622,
@@ -20045,6 +22236,13 @@
      "iterations": 130,
      "exploit": 0.4288,
      "seconds": 41.8
+    },
+    "AcQd8c": {
+     "file": "out/SRP40_COvBB/AcQd8c.ffl",
+     "bytes": 59852,
+     "iterations": 130,
+     "exploit": 0.4541,
+     "seconds": 36.7
     },
     "AcQdTd": {
      "file": "out/SRP40_COvBB/AcQdTd.ffl",
@@ -20074,6 +22272,13 @@
      "exploit": 0.4558,
      "seconds": 56.2
     },
+    "Jc9d7d": {
+     "file": "out/SRP40_COvBB/Jc9d7d.ffl",
+     "bytes": 63410,
+     "iterations": 130,
+     "exploit": 0.451,
+     "seconds": 40.3
+    },
     "Jc9d7h": {
      "file": "out/SRP40_COvBB/Jc9d7h.ffl",
      "bytes": 64050,
@@ -20095,6 +22300,13 @@
      "exploit": 0.4585,
      "seconds": 48.9
     },
+    "JcTc3d": {
+     "file": "out/SRP40_COvBB/JcTc3d.ffl",
+     "bytes": 63872,
+     "iterations": 130,
+     "exploit": 0.4582,
+     "seconds": 36.8
+    },
     "JcTc8d": {
      "file": "out/SRP40_COvBB/JcTc8d.ffl",
      "bytes": 63062,
@@ -20108,6 +22320,13 @@
      "iterations": 150,
      "exploit": 0.4355,
      "seconds": 51.9
+    },
+    "Kc6c3c": {
+     "file": "out/SRP40_COvBB/Kc6c3c.ffl",
+     "bytes": 65092,
+     "iterations": 160,
+     "exploit": 0.4833,
+     "seconds": 24.3
     },
     "Kc6d3c": {
      "file": "out/SRP40_COvBB/Kc6d3c.ffl",
@@ -20129,6 +22348,27 @@
      "iterations": 130,
      "exploit": 0.4968,
      "seconds": 44.5
+    },
+    "Kc8d4h": {
+     "file": "out/SRP40_COvBB/Kc8d4h.ffl",
+     "bytes": 64096,
+     "iterations": 140,
+     "exploit": 0.4863,
+     "seconds": 66.2
+    },
+    "Kc9d7h": {
+     "file": "out/SRP40_COvBB/Kc9d7h.ffl",
+     "bytes": 62306,
+     "iterations": 120,
+     "exploit": 0.4854,
+     "seconds": 56.5
+    },
+    "KcJc9d": {
+     "file": "out/SRP40_COvBB/KcJc9d.ffl",
+     "bytes": 61638,
+     "iterations": 130,
+     "exploit": 0.4803,
+     "seconds": 38.3
     },
     "KcJd4c": {
      "file": "out/SRP40_COvBB/KcJd4c.ffl",
@@ -20172,6 +22412,34 @@
      "exploit": 0.4975,
      "seconds": 44.4
     },
+    "KcTc6d": {
+     "file": "out/SRP40_COvBB/KcTc6d.ffl",
+     "bytes": 62256,
+     "iterations": 120,
+     "exploit": 0.4633,
+     "seconds": 33.6
+    },
+    "Qc4c2d": {
+     "file": "out/SRP40_COvBB/Qc4c2d.ffl",
+     "bytes": 65658,
+     "iterations": 140,
+     "exploit": 0.4846,
+     "seconds": 43.2
+    },
+    "Qc4d2h": {
+     "file": "out/SRP40_COvBB/Qc4d2h.ffl",
+     "bytes": 66298,
+     "iterations": 140,
+     "exploit": 0.4666,
+     "seconds": 69.7
+    },
+    "Qc6d3d": {
+     "file": "out/SRP40_COvBB/Qc6d3d.ffl",
+     "bytes": 65326,
+     "iterations": 140,
+     "exploit": 0.471,
+     "seconds": 43.5
+    },
     "Qc6d3h": {
      "file": "out/SRP40_COvBB/Qc6d3h.ffl",
      "bytes": 65882,
@@ -20185,6 +22453,13 @@
      "iterations": 130,
      "exploit": 0.4473,
      "seconds": 39.5
+    },
+    "Qc9c9d": {
+     "file": "out/SRP40_COvBB/Qc9c9d.ffl",
+     "bytes": 63146,
+     "iterations": 180,
+     "exploit": 0.4668,
+     "seconds": 53.5
     },
     "Qc9d5d": {
      "file": "out/SRP40_COvBB/Qc9d5d.ffl",
@@ -20213,6 +22488,20 @@
      "iterations": 160,
      "exploit": 0.455,
      "seconds": 54.2
+    },
+    "QcJd9h": {
+     "file": "out/SRP40_COvBB/QcJd9h.ffl",
+     "bytes": 63294,
+     "iterations": 140,
+     "exploit": 0.4803,
+     "seconds": 66.1
+    },
+    "QcQd9h": {
+     "file": "out/SRP40_COvBB/QcQd9h.ffl",
+     "bytes": 63100,
+     "iterations": 180,
+     "exploit": 0.4389,
+     "seconds": 54.6
     },
     "Tc4d2h": {
      "file": "out/SRP40_COvBB/Tc4d2h.ffl",
@@ -20249,12 +22538,26 @@
      "exploit": 0.4918,
      "seconds": 35.5
     },
+    "Tc8c7d": {
+     "file": "out/SRP40_COvBB/Tc8c7d.ffl",
+     "bytes": 63576,
+     "iterations": 130,
+     "exploit": 0.4727,
+     "seconds": 39.8
+    },
     "Tc8d4c": {
      "file": "out/SRP40_COvBB/Tc8d4c.ffl",
      "bytes": 63448,
      "iterations": 120,
      "exploit": 0.4576,
      "seconds": 39.1
+    },
+    "Tc8d4h": {
+     "file": "out/SRP40_COvBB/Tc8d4h.ffl",
+     "bytes": 63994,
+     "iterations": 120,
+     "exploit": 0.4936,
+     "seconds": 56.8
     }
    },
    "tree": {
@@ -20306,12 +22609,26 @@
    "oopCombos": 162.4,
    "ipCombos": 640.62,
    "flops": {
+    "5c3d3h": {
+     "file": "out/SRP20_SBvBB/5c3d3h.ffl",
+     "bytes": 46066,
+     "iterations": 70,
+     "exploit": 0.3847,
+     "seconds": 9
+    },
     "5c4d2d": {
      "file": "out/SRP20_SBvBB/5c4d2d.ffl",
      "bytes": 46032,
      "iterations": 70,
      "exploit": 0.4592,
      "seconds": 10.2
+    },
+    "5c4d2h": {
+     "file": "out/SRP20_SBvBB/5c4d2h.ffl",
+     "bytes": 45772,
+     "iterations": 80,
+     "exploit": 0.3978,
+     "seconds": 16
     },
     "6c4d2h": {
      "file": "out/SRP20_SBvBB/6c4d2h.ffl",
@@ -20327,12 +22644,33 @@
      "exploit": 0.4597,
      "seconds": 4.9
     },
+    "7c5c3d": {
+     "file": "out/SRP20_SBvBB/7c5c3d.ffl",
+     "bytes": 45501,
+     "iterations": 90,
+     "exploit": 0.3893,
+     "seconds": 11.4
+    },
     "7c5d4c": {
      "file": "out/SRP20_SBvBB/7c5d4c.ffl",
      "bytes": 45378,
      "iterations": 80,
      "exploit": 0.3843,
      "seconds": 10.1
+    },
+    "7c6d4h": {
+     "file": "out/SRP20_SBvBB/7c6d4h.ffl",
+     "bytes": 45142,
+     "iterations": 80,
+     "exploit": 0.4894,
+     "seconds": 15.7
+    },
+    "7c7d5h": {
+     "file": "out/SRP20_SBvBB/7c7d5h.ffl",
+     "bytes": 44235,
+     "iterations": 80,
+     "exploit": 0.4168,
+     "seconds": 10
     },
     "8c4c4d": {
      "file": "out/SRP20_SBvBB/8c4c4d.ffl",
@@ -20361,6 +22699,20 @@
      "iterations": 80,
      "exploit": 0.4173,
      "seconds": 17.6
+    },
+    "8c6d2c": {
+     "file": "out/SRP20_SBvBB/8c6d2c.ffl",
+     "bytes": 45281,
+     "iterations": 80,
+     "exploit": 0.4108,
+     "seconds": 10.1
+    },
+    "8c8d5c": {
+     "file": "out/SRP20_SBvBB/8c8d5c.ffl",
+     "bytes": 43885,
+     "iterations": 80,
+     "exploit": 0.436,
+     "seconds": 9.9
     },
     "9c4d2d": {
      "file": "out/SRP20_SBvBB/9c4d2d.ffl",
@@ -20411,6 +22763,13 @@
      "exploit": 0.4204,
      "seconds": 16.5
     },
+    "Ac8d4d": {
+     "file": "out/SRP20_SBvBB/Ac8d4d.ffl",
+     "bytes": 43250,
+     "iterations": 70,
+     "exploit": 0.4763,
+     "seconds": 8.5
+    },
     "Ac9c5c": {
      "file": "out/SRP20_SBvBB/Ac9c5c.ffl",
      "bytes": 42654,
@@ -20439,6 +22798,20 @@
      "exploit": 0.406,
      "seconds": 8.3
     },
+    "AcKdJh": {
+     "file": "out/SRP20_SBvBB/AcKdJh.ffl",
+     "bytes": 41642,
+     "iterations": 70,
+     "exploit": 0.408,
+     "seconds": 12.6
+    },
+    "AcQc3d": {
+     "file": "out/SRP20_SBvBB/AcQc3d.ffl",
+     "bytes": 42948,
+     "iterations": 80,
+     "exploit": 0.4001,
+     "seconds": 9.5
+    },
     "AcQd3h": {
      "file": "out/SRP20_SBvBB/AcQd3h.ffl",
      "bytes": 42858,
@@ -20452,6 +22825,13 @@
      "iterations": 70,
      "exploit": 0.3984,
      "seconds": 9.2
+    },
+    "AcQd8c": {
+     "file": "out/SRP20_SBvBB/AcQd8c.ffl",
+     "bytes": 41983,
+     "iterations": 60,
+     "exploit": 0.4839,
+     "seconds": 7.1
     },
     "AcQdTd": {
      "file": "out/SRP20_SBvBB/AcQdTd.ffl",
@@ -20481,6 +22861,13 @@
      "exploit": 0.4166,
      "seconds": 13.5
     },
+    "Jc9d7d": {
+     "file": "out/SRP20_SBvBB/Jc9d7d.ffl",
+     "bytes": 43994,
+     "iterations": 80,
+     "exploit": 0.4185,
+     "seconds": 9.9
+    },
     "Jc9d7h": {
      "file": "out/SRP20_SBvBB/Jc9d7h.ffl",
      "bytes": 43780,
@@ -20502,6 +22889,13 @@
      "exploit": 0.4752,
      "seconds": 8.6
     },
+    "JcTc3d": {
+     "file": "out/SRP20_SBvBB/JcTc3d.ffl",
+     "bytes": 44964,
+     "iterations": 60,
+     "exploit": 0.4309,
+     "seconds": 7.7
+    },
     "JcTc8d": {
      "file": "out/SRP20_SBvBB/JcTc8d.ffl",
      "bytes": 44117,
@@ -20515,6 +22909,13 @@
      "iterations": 80,
      "exploit": 0.4875,
      "seconds": 11
+    },
+    "Kc6c3c": {
+     "file": "out/SRP20_SBvBB/Kc6c3c.ffl",
+     "bytes": 44702,
+     "iterations": 80,
+     "exploit": 0.3841,
+     "seconds": 4.9
     },
     "Kc6d3c": {
      "file": "out/SRP20_SBvBB/Kc6d3c.ffl",
@@ -20535,6 +22936,27 @@
      "bytes": 44409,
      "iterations": 70,
      "exploit": 0.4713,
+     "seconds": 9.7
+    },
+    "Kc8d4h": {
+     "file": "out/SRP20_SBvBB/Kc8d4h.ffl",
+     "bytes": 43831,
+     "iterations": 80,
+     "exploit": 0.4226,
+     "seconds": 15.2
+    },
+    "Kc9d7h": {
+     "file": "out/SRP20_SBvBB/Kc9d7h.ffl",
+     "bytes": 43245,
+     "iterations": 80,
+     "exploit": 0.3934,
+     "seconds": 15.1
+    },
+    "KcJc9d": {
+     "file": "out/SRP20_SBvBB/KcJc9d.ffl",
+     "bytes": 43176,
+     "iterations": 80,
+     "exploit": 0.4174,
      "seconds": 9.7
     },
     "KcJd4c": {
@@ -20579,6 +23001,34 @@
      "exploit": 0.4227,
      "seconds": 12.8
     },
+    "KcTc6d": {
+     "file": "out/SRP20_SBvBB/KcTc6d.ffl",
+     "bytes": 43823,
+     "iterations": 70,
+     "exploit": 0.4734,
+     "seconds": 8.6
+    },
+    "Qc4c2d": {
+     "file": "out/SRP20_SBvBB/Qc4c2d.ffl",
+     "bytes": 44934,
+     "iterations": 60,
+     "exploit": 0.4999,
+     "seconds": 7.9
+    },
+    "Qc4d2h": {
+     "file": "out/SRP20_SBvBB/Qc4d2h.ffl",
+     "bytes": 44681,
+     "iterations": 80,
+     "exploit": 0.4185,
+     "seconds": 15.7
+    },
+    "Qc6d3d": {
+     "file": "out/SRP20_SBvBB/Qc6d3d.ffl",
+     "bytes": 44562,
+     "iterations": 70,
+     "exploit": 0.3914,
+     "seconds": 8.8
+    },
     "Qc6d3h": {
      "file": "out/SRP20_SBvBB/Qc6d3h.ffl",
      "bytes": 44252,
@@ -20592,6 +23042,13 @@
      "iterations": 60,
      "exploit": 0.4825,
      "seconds": 7.4
+    },
+    "Qc9c9d": {
+     "file": "out/SRP20_SBvBB/Qc9c9d.ffl",
+     "bytes": 42547,
+     "iterations": 80,
+     "exploit": 0.4269,
+     "seconds": 9.6
     },
     "Qc9d5d": {
      "file": "out/SRP20_SBvBB/Qc9d5d.ffl",
@@ -20620,6 +23077,20 @@
      "iterations": 80,
      "exploit": 0.4142,
      "seconds": 11
+    },
+    "QcJd9h": {
+     "file": "out/SRP20_SBvBB/QcJd9h.ffl",
+     "bytes": 43213,
+     "iterations": 80,
+     "exploit": 0.4692,
+     "seconds": 15.2
+    },
+    "QcQd9h": {
+     "file": "out/SRP20_SBvBB/QcQd9h.ffl",
+     "bytes": 42775,
+     "iterations": 100,
+     "exploit": 0.4851,
+     "seconds": 12.1
     },
     "Tc4d2h": {
      "file": "out/SRP20_SBvBB/Tc4d2h.ffl",
@@ -20656,12 +23127,26 @@
      "exploit": 0.4237,
      "seconds": 10.1
     },
+    "Tc8c7d": {
+     "file": "out/SRP20_SBvBB/Tc8c7d.ffl",
+     "bytes": 44507,
+     "iterations": 80,
+     "exploit": 0.4477,
+     "seconds": 9.9
+    },
     "Tc8d4c": {
      "file": "out/SRP20_SBvBB/Tc8d4c.ffl",
      "bytes": 45108,
      "iterations": 80,
      "exploit": 0.403,
      "seconds": 11
+    },
+    "Tc8d4h": {
+     "file": "out/SRP20_SBvBB/Tc8d4h.ffl",
+     "bytes": 45086,
+     "iterations": 80,
+     "exploit": 0.4616,
+     "seconds": 15.8
     }
    },
    "tree": {
@@ -20713,12 +23198,26 @@
    "oopCombos": 164.8,
    "ipCombos": 681.16,
    "flops": {
+    "5c3d3h": {
+     "file": "out/SRP40_SBvBB/5c3d3h.ffl",
+     "bytes": 48128,
+     "iterations": 80,
+     "exploit": 0.4788,
+     "seconds": 16.8
+    },
     "5c4d2d": {
      "file": "out/SRP40_SBvBB/5c4d2d.ffl",
      "bytes": 50824,
      "iterations": 130,
      "exploit": 0.4721,
      "seconds": 30.7
+    },
+    "5c4d2h": {
+     "file": "out/SRP40_SBvBB/5c4d2h.ffl",
+     "bytes": 50792,
+     "iterations": 150,
+     "exploit": 0.4409,
+     "seconds": 48.4
     },
     "6c4d2h": {
      "file": "out/SRP40_SBvBB/6c4d2h.ffl",
@@ -20734,12 +23233,33 @@
      "exploit": 0.4434,
      "seconds": 16.7
     },
+    "7c5c3d": {
+     "file": "out/SRP40_SBvBB/7c5c3d.ffl",
+     "bytes": 50152,
+     "iterations": 120,
+     "exploit": 0.4496,
+     "seconds": 24.9
+    },
     "7c5d4c": {
      "file": "out/SRP40_SBvBB/7c5d4c.ffl",
      "bytes": 49670,
      "iterations": 140,
      "exploit": 0.4985,
      "seconds": 28.5
+    },
+    "7c6d4h": {
+     "file": "out/SRP40_SBvBB/7c6d4h.ffl",
+     "bytes": 49552,
+     "iterations": 120,
+     "exploit": 0.4579,
+     "seconds": 38
+    },
+    "7c7d5h": {
+     "file": "out/SRP40_SBvBB/7c7d5h.ffl",
+     "bytes": 48679,
+     "iterations": 120,
+     "exploit": 0.4499,
+     "seconds": 24.8
     },
     "8c4c4d": {
      "file": "out/SRP40_SBvBB/8c4c4d.ffl",
@@ -20768,6 +23288,20 @@
      "iterations": 160,
      "exploit": 0.445,
      "seconds": 57.5
+    },
+    "8c6d2c": {
+     "file": "out/SRP40_SBvBB/8c6d2c.ffl",
+     "bytes": 49730,
+     "iterations": 160,
+     "exploit": 0.4575,
+     "seconds": 33.5
+    },
+    "8c8d5c": {
+     "file": "out/SRP40_SBvBB/8c8d5c.ffl",
+     "bytes": 48965,
+     "iterations": 130,
+     "exploit": 0.4429,
+     "seconds": 26.2
     },
     "9c4d2d": {
      "file": "out/SRP40_SBvBB/9c4d2d.ffl",
@@ -20818,6 +23352,13 @@
      "exploit": 0.4575,
      "seconds": 37.5
     },
+    "Ac8d4d": {
+     "file": "out/SRP40_SBvBB/Ac8d4d.ffl",
+     "bytes": 47370,
+     "iterations": 100,
+     "exploit": 0.412,
+     "seconds": 19.7
+    },
     "Ac9c5c": {
      "file": "out/SRP40_SBvBB/Ac9c5c.ffl",
      "bytes": 47078,
@@ -20846,6 +23387,20 @@
      "exploit": 0.4756,
      "seconds": 19.3
     },
+    "AcKdJh": {
+     "file": "out/SRP40_SBvBB/AcKdJh.ffl",
+     "bytes": 45420,
+     "iterations": 120,
+     "exploit": 0.4846,
+     "seconds": 34.8
+    },
+    "AcQc3d": {
+     "file": "out/SRP40_SBvBB/AcQc3d.ffl",
+     "bytes": 47043,
+     "iterations": 120,
+     "exploit": 0.4668,
+     "seconds": 23.4
+    },
     "AcQd3h": {
      "file": "out/SRP40_SBvBB/AcQd3h.ffl",
      "bytes": 46944,
@@ -20859,6 +23414,13 @@
      "iterations": 110,
      "exploit": 0.4557,
      "seconds": 23.6
+    },
+    "AcQd8c": {
+     "file": "out/SRP40_SBvBB/AcQd8c.ffl",
+     "bytes": 45620,
+     "iterations": 90,
+     "exploit": 0.4399,
+     "seconds": 17.4
     },
     "AcQdTd": {
      "file": "out/SRP40_SBvBB/AcQdTd.ffl",
@@ -20888,6 +23450,13 @@
      "exploit": 0.4402,
      "seconds": 34.8
     },
+    "Jc9d7d": {
+     "file": "out/SRP40_SBvBB/Jc9d7d.ffl",
+     "bytes": 47621,
+     "iterations": 130,
+     "exploit": 0.4998,
+     "seconds": 26.2
+    },
     "Jc9d7h": {
      "file": "out/SRP40_SBvBB/Jc9d7h.ffl",
      "bytes": 48037,
@@ -20909,6 +23478,13 @@
      "exploit": 0.4955,
      "seconds": 31.6
     },
+    "JcTc3d": {
+     "file": "out/SRP40_SBvBB/JcTc3d.ffl",
+     "bytes": 49041,
+     "iterations": 90,
+     "exploit": 0.4255,
+     "seconds": 18.8
+    },
     "JcTc8d": {
      "file": "out/SRP40_SBvBB/JcTc8d.ffl",
      "bytes": 48454,
@@ -20922,6 +23498,13 @@
      "iterations": 160,
      "exploit": 0.4706,
      "seconds": 36
+    },
+    "Kc6c3c": {
+     "file": "out/SRP40_SBvBB/Kc6c3c.ffl",
+     "bytes": 49052,
+     "iterations": 170,
+     "exploit": 0.4485,
+     "seconds": 17
     },
     "Kc6d3c": {
      "file": "out/SRP40_SBvBB/Kc6d3c.ffl",
@@ -20943,6 +23526,27 @@
      "iterations": 100,
      "exploit": 0.4396,
      "seconds": 22.5
+    },
+    "Kc8d4h": {
+     "file": "out/SRP40_SBvBB/Kc8d4h.ffl",
+     "bytes": 47837,
+     "iterations": 100,
+     "exploit": 0.4866,
+     "seconds": 31
+    },
+    "Kc9d7h": {
+     "file": "out/SRP40_SBvBB/Kc9d7h.ffl",
+     "bytes": 47042,
+     "iterations": 130,
+     "exploit": 0.4517,
+     "seconds": 40.1
+    },
+    "KcJc9d": {
+     "file": "out/SRP40_SBvBB/KcJc9d.ffl",
+     "bytes": 47113,
+     "iterations": 100,
+     "exploit": 0.4411,
+     "seconds": 19.8
     },
     "KcJd4c": {
      "file": "out/SRP40_SBvBB/KcJd4c.ffl",
@@ -20986,6 +23590,34 @@
      "exploit": 0.4734,
      "seconds": 33.3
     },
+    "KcTc6d": {
+     "file": "out/SRP40_SBvBB/KcTc6d.ffl",
+     "bytes": 47815,
+     "iterations": 100,
+     "exploit": 0.4865,
+     "seconds": 20.1
+    },
+    "Qc4c2d": {
+     "file": "out/SRP40_SBvBB/Qc4c2d.ffl",
+     "bytes": 49403,
+     "iterations": 100,
+     "exploit": 0.4759,
+     "seconds": 20.6
+    },
+    "Qc4d2h": {
+     "file": "out/SRP40_SBvBB/Qc4d2h.ffl",
+     "bytes": 49291,
+     "iterations": 100,
+     "exploit": 0.4713,
+     "seconds": 31.9
+    },
+    "Qc6d3d": {
+     "file": "out/SRP40_SBvBB/Qc6d3d.ffl",
+     "bytes": 49106,
+     "iterations": 120,
+     "exploit": 0.4213,
+     "seconds": 24.3
+    },
     "Qc6d3h": {
      "file": "out/SRP40_SBvBB/Qc6d3h.ffl",
      "bytes": 48788,
@@ -20999,6 +23631,13 @@
      "iterations": 120,
      "exploit": 0.4558,
      "seconds": 24
+    },
+    "Qc9c9d": {
+     "file": "out/SRP40_SBvBB/Qc9c9d.ffl",
+     "bytes": 47421,
+     "iterations": 140,
+     "exploit": 0.4943,
+     "seconds": 26.7
     },
     "Qc9d5d": {
      "file": "out/SRP40_SBvBB/Qc9d5d.ffl",
@@ -21027,6 +23666,20 @@
      "iterations": 110,
      "exploit": 0.4193,
      "seconds": 24.5
+    },
+    "QcJd9h": {
+     "file": "out/SRP40_SBvBB/QcJd9h.ffl",
+     "bytes": 47510,
+     "iterations": 120,
+     "exploit": 0.4444,
+     "seconds": 37.2
+    },
+    "QcQd9h": {
+     "file": "out/SRP40_SBvBB/QcQd9h.ffl",
+     "bytes": 46902,
+     "iterations": 130,
+     "exploit": 0.4777,
+     "seconds": 25.7
     },
     "Tc4d2h": {
      "file": "out/SRP40_SBvBB/Tc4d2h.ffl",
@@ -21063,12 +23716,26 @@
      "exploit": 0.4823,
      "seconds": 28.7
     },
+    "Tc8c7d": {
+     "file": "out/SRP40_SBvBB/Tc8c7d.ffl",
+     "bytes": 48728,
+     "iterations": 150,
+     "exploit": 0.4622,
+     "seconds": 30.5
+    },
     "Tc8d4c": {
      "file": "out/SRP40_SBvBB/Tc8d4c.ffl",
      "bytes": 49598,
      "iterations": 140,
      "exploit": 0.4545,
      "seconds": 31.6
+    },
+    "Tc8d4h": {
+     "file": "out/SRP40_SBvBB/Tc8d4h.ffl",
+     "bytes": 49519,
+     "iterations": 150,
+     "exploit": 0.4508,
+     "seconds": 48.4
     }
    },
    "tree": {
@@ -21120,12 +23787,26 @@
    "oopCombos": 112.68,
    "ipCombos": 197.488,
    "flops": {
+    "5c3d3h": {
+     "file": "out/3BP40_BBvBTN/5c3d3h.ffl",
+     "bytes": 26572,
+     "iterations": 40,
+     "exploit": 0.4102,
+     "seconds": 1.9
+    },
     "5c4d2d": {
      "file": "out/3BP40_BBvBTN/5c4d2d.ffl",
      "bytes": 26191,
      "iterations": 40,
      "exploit": 0.2637,
      "seconds": 2.1
+    },
+    "5c4d2h": {
+     "file": "out/3BP40_BBvBTN/5c4d2h.ffl",
+     "bytes": 26452,
+     "iterations": 40,
+     "exploit": 0.3006,
+     "seconds": 2.9
     },
     "6c4d2h": {
      "file": "out/3BP40_BBvBTN/6c4d2h.ffl",
@@ -21141,12 +23822,33 @@
      "exploit": 0.3912,
      "seconds": 1.3
     },
+    "7c5c3d": {
+     "file": "out/3BP40_BBvBTN/7c5c3d.ffl",
+     "bytes": 25917,
+     "iterations": 40,
+     "exploit": 0.367,
+     "seconds": 1.9
+    },
     "7c5d4c": {
      "file": "out/3BP40_BBvBTN/7c5d4c.ffl",
      "bytes": 25687,
      "iterations": 40,
      "exploit": 0.3303,
      "seconds": 1.9
+    },
+    "7c6d4h": {
+     "file": "out/3BP40_BBvBTN/7c6d4h.ffl",
+     "bytes": 25928,
+     "iterations": 40,
+     "exploit": 0.3788,
+     "seconds": 2.9
+    },
+    "7c7d5h": {
+     "file": "out/3BP40_BBvBTN/7c7d5h.ffl",
+     "bytes": 25916,
+     "iterations": 50,
+     "exploit": 0.2481,
+     "seconds": 2.2
     },
     "8c4c4d": {
      "file": "out/3BP40_BBvBTN/8c4c4d.ffl",
@@ -21175,6 +23877,20 @@
      "iterations": 40,
      "exploit": 0.4664,
      "seconds": 3.2
+    },
+    "8c6d2c": {
+     "file": "out/3BP40_BBvBTN/8c6d2c.ffl",
+     "bytes": 25567,
+     "iterations": 40,
+     "exploit": 0.4542,
+     "seconds": 1.9
+    },
+    "8c8d5c": {
+     "file": "out/3BP40_BBvBTN/8c8d5c.ffl",
+     "bytes": 24851,
+     "iterations": 40,
+     "exploit": 0.4007,
+     "seconds": 1.8
     },
     "9c4d2d": {
      "file": "out/3BP40_BBvBTN/9c4d2d.ffl",
@@ -21225,6 +23941,13 @@
      "exploit": 0.3813,
      "seconds": 4.6
     },
+    "Ac8d4d": {
+     "file": "out/3BP40_BBvBTN/Ac8d4d.ffl",
+     "bytes": 23792,
+     "iterations": 50,
+     "exploit": 0.4878,
+     "seconds": 2.2
+    },
     "Ac9c5c": {
      "file": "out/3BP40_BBvBTN/Ac9c5c.ffl",
      "bytes": 23811,
@@ -21253,6 +23976,20 @@
      "exploit": 0.3604,
      "seconds": 2.6
     },
+    "AcKdJh": {
+     "file": "out/3BP40_BBvBTN/AcKdJh.ffl",
+     "bytes": 22020,
+     "iterations": 50,
+     "exploit": 0.4179,
+     "seconds": 3.1
+    },
+    "AcQc3d": {
+     "file": "out/3BP40_BBvBTN/AcQc3d.ffl",
+     "bytes": 23307,
+     "iterations": 50,
+     "exploit": 0.4118,
+     "seconds": 2.1
+    },
     "AcQd3h": {
      "file": "out/3BP40_BBvBTN/AcQd3h.ffl",
      "bytes": 23327,
@@ -21266,6 +24003,13 @@
      "iterations": 50,
      "exploit": 0.4928,
      "seconds": 2.4
+    },
+    "AcQd8c": {
+     "file": "out/3BP40_BBvBTN/AcQd8c.ffl",
+     "bytes": 22432,
+     "iterations": 50,
+     "exploit": 0.3488,
+     "seconds": 2.1
     },
     "AcQdTd": {
      "file": "out/3BP40_BBvBTN/AcQdTd.ffl",
@@ -21295,6 +24039,13 @@
      "exploit": 0.4657,
      "seconds": 3.4
     },
+    "Jc9d7d": {
+     "file": "out/3BP40_BBvBTN/Jc9d7d.ffl",
+     "bytes": 24176,
+     "iterations": 50,
+     "exploit": 0.401,
+     "seconds": 2.3
+    },
     "Jc9d7h": {
      "file": "out/3BP40_BBvBTN/Jc9d7h.ffl",
      "bytes": 24323,
@@ -21316,6 +24067,13 @@
      "exploit": 0.4826,
      "seconds": 2.7
     },
+    "JcTc3d": {
+     "file": "out/3BP40_BBvBTN/JcTc3d.ffl",
+     "bytes": 24082,
+     "iterations": 40,
+     "exploit": 0.4179,
+     "seconds": 1.8
+    },
     "JcTc8d": {
      "file": "out/3BP40_BBvBTN/JcTc8d.ffl",
      "bytes": 23299,
@@ -21329,6 +24087,13 @@
      "iterations": 60,
      "exploit": 0.4478,
      "seconds": 2.9
+    },
+    "Kc6c3c": {
+     "file": "out/3BP40_BBvBTN/Kc6c3c.ffl",
+     "bytes": 24993,
+     "iterations": 50,
+     "exploit": 0.4632,
+     "seconds": 1.2
     },
     "Kc6d3c": {
      "file": "out/3BP40_BBvBTN/Kc6d3c.ffl",
@@ -21350,6 +24115,27 @@
      "iterations": 40,
      "exploit": 0.4919,
      "seconds": 2
+    },
+    "Kc8d4h": {
+     "file": "out/3BP40_BBvBTN/Kc8d4h.ffl",
+     "bytes": 24328,
+     "iterations": 60,
+     "exploit": 0.3741,
+     "seconds": 3.9
+    },
+    "Kc9d7h": {
+     "file": "out/3BP40_BBvBTN/Kc9d7h.ffl",
+     "bytes": 23979,
+     "iterations": 50,
+     "exploit": 0.3235,
+     "seconds": 3.4
+    },
+    "KcJc9d": {
+     "file": "out/3BP40_BBvBTN/KcJc9d.ffl",
+     "bytes": 23054,
+     "iterations": 40,
+     "exploit": 0.4723,
+     "seconds": 1.7
     },
     "KcJd4c": {
      "file": "out/3BP40_BBvBTN/KcJd4c.ffl",
@@ -21393,6 +24179,34 @@
      "exploit": 0.342,
      "seconds": 2.3
     },
+    "KcTc6d": {
+     "file": "out/3BP40_BBvBTN/KcTc6d.ffl",
+     "bytes": 23663,
+     "iterations": 40,
+     "exploit": 0.3297,
+     "seconds": 1.8
+    },
+    "Qc4c2d": {
+     "file": "out/3BP40_BBvBTN/Qc4c2d.ffl",
+     "bytes": 25007,
+     "iterations": 40,
+     "exploit": 0.4211,
+     "seconds": 1.8
+    },
+    "Qc4d2h": {
+     "file": "out/3BP40_BBvBTN/Qc4d2h.ffl",
+     "bytes": 25249,
+     "iterations": 60,
+     "exploit": 0.3971,
+     "seconds": 4
+    },
+    "Qc6d3d": {
+     "file": "out/3BP40_BBvBTN/Qc6d3d.ffl",
+     "bytes": 24845,
+     "iterations": 50,
+     "exploit": 0.3316,
+     "seconds": 2.3
+    },
     "Qc6d3h": {
      "file": "out/3BP40_BBvBTN/Qc6d3h.ffl",
      "bytes": 25176,
@@ -21406,6 +24220,13 @@
      "iterations": 40,
      "exploit": 0.4297,
      "seconds": 1.8
+    },
+    "Qc9c9d": {
+     "file": "out/3BP40_BBvBTN/Qc9c9d.ffl",
+     "bytes": 23952,
+     "iterations": 50,
+     "exploit": 0.3996,
+     "seconds": 2.2
     },
     "Qc9d5d": {
      "file": "out/3BP40_BBvBTN/Qc9d5d.ffl",
@@ -21434,6 +24255,20 @@
      "iterations": 50,
      "exploit": 0.3514,
      "seconds": 2.4
+    },
+    "QcJd9h": {
+     "file": "out/3BP40_BBvBTN/QcJd9h.ffl",
+     "bytes": 23235,
+     "iterations": 50,
+     "exploit": 0.4529,
+     "seconds": 3.3
+    },
+    "QcQd9h": {
+     "file": "out/3BP40_BBvBTN/QcQd9h.ffl",
+     "bytes": 23134,
+     "iterations": 50,
+     "exploit": 0.4535,
+     "seconds": 2.2
     },
     "Tc4d2h": {
      "file": "out/3BP40_BBvBTN/Tc4d2h.ffl",
@@ -21470,12 +24305,26 @@
      "exploit": 0.3766,
      "seconds": 2.3
     },
+    "Tc8c7d": {
+     "file": "out/3BP40_BBvBTN/Tc8c7d.ffl",
+     "bytes": 24331,
+     "iterations": 50,
+     "exploit": 0.4087,
+     "seconds": 2.3
+    },
     "Tc8d4c": {
      "file": "out/3BP40_BBvBTN/Tc8d4c.ffl",
      "bytes": 24458,
      "iterations": 50,
      "exploit": 0.4148,
      "seconds": 2.5
+    },
+    "Tc8d4h": {
+     "file": "out/3BP40_BBvBTN/Tc8d4h.ffl",
+     "bytes": 24542,
+     "iterations": 50,
+     "exploit": 0.4087,
+     "seconds": 3.5
     }
    },
    "tree": {
@@ -21527,12 +24376,26 @@
    "oopCombos": 199.36,
    "ipCombos": 197.488,
    "flops": {
+    "5c3d3h": {
+     "file": "out/3BP40_SBvBTN/5c3d3h.ffl",
+     "bytes": 28794,
+     "iterations": 50,
+     "exploit": 0.3406,
+     "seconds": 2.5
+    },
     "5c4d2d": {
      "file": "out/3BP40_SBvBTN/5c4d2d.ffl",
      "bytes": 28547,
      "iterations": 40,
      "exploit": 0.4454,
      "seconds": 2.2
+    },
+    "5c4d2h": {
+     "file": "out/3BP40_SBvBTN/5c4d2h.ffl",
+     "bytes": 28798,
+     "iterations": 40,
+     "exploit": 0.4223,
+     "seconds": 3.1
     },
     "6c4d2h": {
      "file": "out/3BP40_SBvBTN/6c4d2h.ffl",
@@ -21548,12 +24411,33 @@
      "exploit": 0.4943,
      "seconds": 1.3
     },
+    "7c5c3d": {
+     "file": "out/3BP40_SBvBTN/7c5c3d.ffl",
+     "bytes": 28261,
+     "iterations": 40,
+     "exploit": 0.473,
+     "seconds": 1.9
+    },
     "7c5d4c": {
      "file": "out/3BP40_SBvBTN/7c5d4c.ffl",
      "bytes": 28174,
      "iterations": 40,
      "exploit": 0.4628,
      "seconds": 2
+    },
+    "7c6d4h": {
+     "file": "out/3BP40_SBvBTN/7c6d4h.ffl",
+     "bytes": 28358,
+     "iterations": 50,
+     "exploit": 0.327,
+     "seconds": 3.8
+    },
+    "7c7d5h": {
+     "file": "out/3BP40_SBvBTN/7c7d5h.ffl",
+     "bytes": 27993,
+     "iterations": 50,
+     "exploit": 0.3696,
+     "seconds": 2.5
     },
     "8c4c4d": {
      "file": "out/3BP40_SBvBTN/8c4c4d.ffl",
@@ -21582,6 +24466,20 @@
      "iterations": 50,
      "exploit": 0.3468,
      "seconds": 4.3
+    },
+    "8c6d2c": {
+     "file": "out/3BP40_SBvBTN/8c6d2c.ffl",
+     "bytes": 28096,
+     "iterations": 50,
+     "exploit": 0.3346,
+     "seconds": 2.4
+    },
+    "8c8d5c": {
+     "file": "out/3BP40_SBvBTN/8c8d5c.ffl",
+     "bytes": 27759,
+     "iterations": 40,
+     "exploit": 0.4916,
+     "seconds": 1.9
     },
     "9c4d2d": {
      "file": "out/3BP40_SBvBTN/9c4d2d.ffl",
@@ -21632,6 +24530,13 @@
      "exploit": 0.3899,
      "seconds": 4.7
     },
+    "Ac8d4d": {
+     "file": "out/3BP40_SBvBTN/Ac8d4d.ffl",
+     "bytes": 26126,
+     "iterations": 60,
+     "exploit": 0.3505,
+     "seconds": 2.8
+    },
     "Ac9c5c": {
      "file": "out/3BP40_SBvBTN/Ac9c5c.ffl",
      "bytes": 25668,
@@ -21660,6 +24565,20 @@
      "exploit": 0.4126,
      "seconds": 2.3
     },
+    "AcKdJh": {
+     "file": "out/3BP40_SBvBTN/AcKdJh.ffl",
+     "bytes": 23861,
+     "iterations": 60,
+     "exploit": 0.3527,
+     "seconds": 4
+    },
+    "AcQc3d": {
+     "file": "out/3BP40_SBvBTN/AcQc3d.ffl",
+     "bytes": 25440,
+     "iterations": 50,
+     "exploit": 0.4968,
+     "seconds": 2.3
+    },
     "AcQd3h": {
      "file": "out/3BP40_SBvBTN/AcQd3h.ffl",
      "bytes": 25398,
@@ -21673,6 +24592,13 @@
      "iterations": 50,
      "exploit": 0.4155,
      "seconds": 2.6
+    },
+    "AcQd8c": {
+     "file": "out/3BP40_SBvBTN/AcQd8c.ffl",
+     "bytes": 24861,
+     "iterations": 50,
+     "exploit": 0.3719,
+     "seconds": 2.3
     },
     "AcQdTd": {
      "file": "out/3BP40_SBvBTN/AcQdTd.ffl",
@@ -21702,6 +24628,13 @@
      "exploit": 0.42,
      "seconds": 3.6
     },
+    "Jc9d7d": {
+     "file": "out/3BP40_SBvBTN/Jc9d7d.ffl",
+     "bytes": 25967,
+     "iterations": 50,
+     "exploit": 0.3567,
+     "seconds": 2.4
+    },
     "Jc9d7h": {
      "file": "out/3BP40_SBvBTN/Jc9d7h.ffl",
      "bytes": 26122,
@@ -21723,6 +24656,13 @@
      "exploit": 0.4109,
      "seconds": 2.4
     },
+    "JcTc3d": {
+     "file": "out/3BP40_SBvBTN/JcTc3d.ffl",
+     "bytes": 26153,
+     "iterations": 50,
+     "exploit": 0.3312,
+     "seconds": 2.3
+    },
     "JcTc8d": {
      "file": "out/3BP40_SBvBTN/JcTc8d.ffl",
      "bytes": 25556,
@@ -21736,6 +24676,13 @@
      "iterations": 50,
      "exploit": 0.4327,
      "seconds": 2.7
+    },
+    "Kc6c3c": {
+     "file": "out/3BP40_SBvBTN/Kc6c3c.ffl",
+     "bytes": 27207,
+     "iterations": 60,
+     "exploit": 0.382,
+     "seconds": 1.4
     },
     "Kc6d3c": {
      "file": "out/3BP40_SBvBTN/Kc6d3c.ffl",
@@ -21757,6 +24704,27 @@
      "iterations": 40,
      "exploit": 0.4796,
      "seconds": 2.1
+    },
+    "Kc8d4h": {
+     "file": "out/3BP40_SBvBTN/Kc8d4h.ffl",
+     "bytes": 26974,
+     "iterations": 50,
+     "exploit": 0.3796,
+     "seconds": 3.7
+    },
+    "Kc9d7h": {
+     "file": "out/3BP40_SBvBTN/Kc9d7h.ffl",
+     "bytes": 26187,
+     "iterations": 50,
+     "exploit": 0.3816,
+     "seconds": 3.7
+    },
+    "KcJc9d": {
+     "file": "out/3BP40_SBvBTN/KcJc9d.ffl",
+     "bytes": 25158,
+     "iterations": 50,
+     "exploit": 0.399,
+     "seconds": 2.3
     },
     "KcJd4c": {
      "file": "out/3BP40_SBvBTN/KcJd4c.ffl",
@@ -21800,6 +24768,34 @@
      "exploit": 0.453,
      "seconds": 2.5
     },
+    "KcTc6d": {
+     "file": "out/3BP40_SBvBTN/KcTc6d.ffl",
+     "bytes": 25828,
+     "iterations": 50,
+     "exploit": 0.3448,
+     "seconds": 2.3
+    },
+    "Qc4c2d": {
+     "file": "out/3BP40_SBvBTN/Qc4c2d.ffl",
+     "bytes": 27556,
+     "iterations": 50,
+     "exploit": 0.405,
+     "seconds": 2.3
+    },
+    "Qc4d2h": {
+     "file": "out/3BP40_SBvBTN/Qc4d2h.ffl",
+     "bytes": 27752,
+     "iterations": 50,
+     "exploit": 0.4111,
+     "seconds": 3.7
+    },
+    "Qc6d3d": {
+     "file": "out/3BP40_SBvBTN/Qc6d3d.ffl",
+     "bytes": 27290,
+     "iterations": 50,
+     "exploit": 0.4294,
+     "seconds": 2.3
+    },
     "Qc6d3h": {
      "file": "out/3BP40_SBvBTN/Qc6d3h.ffl",
      "bytes": 27409,
@@ -21812,6 +24808,13 @@
      "bytes": 27055,
      "iterations": 50,
      "exploit": 0.402,
+     "seconds": 2.3
+    },
+    "Qc9c9d": {
+     "file": "out/3BP40_SBvBTN/Qc9c9d.ffl",
+     "bytes": 26093,
+     "iterations": 50,
+     "exploit": 0.4776,
      "seconds": 2.3
     },
     "Qc9d5d": {
@@ -21841,6 +24844,20 @@
      "iterations": 50,
      "exploit": 0.408,
      "seconds": 2.6
+    },
+    "QcJd9h": {
+     "file": "out/3BP40_SBvBTN/QcJd9h.ffl",
+     "bytes": 25332,
+     "iterations": 50,
+     "exploit": 0.414,
+     "seconds": 3.5
+    },
+    "QcQd9h": {
+     "file": "out/3BP40_SBvBTN/QcQd9h.ffl",
+     "bytes": 25426,
+     "iterations": 60,
+     "exploit": 0.3584,
+     "seconds": 2.9
     },
     "Tc4d2h": {
      "file": "out/3BP40_SBvBTN/Tc4d2h.ffl",
@@ -21877,12 +24894,26 @@
      "exploit": 0.3624,
      "seconds": 2.4
     },
+    "Tc8c7d": {
+     "file": "out/3BP40_SBvBTN/Tc8c7d.ffl",
+     "bytes": 26772,
+     "iterations": 40,
+     "exploit": 0.4983,
+     "seconds": 1.9
+    },
     "Tc8d4c": {
      "file": "out/3BP40_SBvBTN/Tc8d4c.ffl",
      "bytes": 27134,
      "iterations": 50,
      "exploit": 0.3564,
      "seconds": 2.6
+    },
+    "Tc8d4h": {
+     "file": "out/3BP40_SBvBTN/Tc8d4h.ffl",
+     "bytes": 27183,
+     "iterations": 50,
+     "exploit": 0.3803,
+     "seconds": 3.6
     }
    },
    "tree": {
@@ -21934,12 +24965,26 @@
    "oopCombos": 39.96,
    "ipCombos": 37.8,
    "flops": {
+    "5c3d3h": {
+     "file": "out/4BP100_BBvBTN/5c3d3h.ffl",
+     "bytes": 7957,
+     "iterations": 60,
+     "exploit": 0.4079,
+     "seconds": 1
+    },
     "5c4d2d": {
      "file": "out/4BP100_BBvBTN/5c4d2d.ffl",
      "bytes": 7822,
      "iterations": 40,
      "exploit": 0.352,
      "seconds": 0.8
+    },
+    "5c4d2h": {
+     "file": "out/4BP100_BBvBTN/5c4d2h.ffl",
+     "bytes": 7864,
+     "iterations": 40,
+     "exploit": 0.3887,
+     "seconds": 0.9
     },
     "6c4d2h": {
      "file": "out/4BP100_BBvBTN/6c4d2h.ffl",
@@ -21955,12 +25000,33 @@
      "exploit": 0.4456,
      "seconds": 0.6
     },
+    "7c5c3d": {
+     "file": "out/4BP100_BBvBTN/7c5c3d.ffl",
+     "bytes": 7992,
+     "iterations": 40,
+     "exploit": 0.4151,
+     "seconds": 0.7
+    },
     "7c5d4c": {
      "file": "out/4BP100_BBvBTN/7c5d4c.ffl",
      "bytes": 7971,
      "iterations": 40,
      "exploit": 0.3372,
      "seconds": 0.7
+    },
+    "7c6d4h": {
+     "file": "out/4BP100_BBvBTN/7c6d4h.ffl",
+     "bytes": 8006,
+     "iterations": 60,
+     "exploit": 0.3387,
+     "seconds": 1.5
+    },
+    "7c7d5h": {
+     "file": "out/4BP100_BBvBTN/7c7d5h.ffl",
+     "bytes": 8097,
+     "iterations": 60,
+     "exploit": 0.3499,
+     "seconds": 1
     },
     "8c4c4d": {
      "file": "out/4BP100_BBvBTN/8c4c4d.ffl",
@@ -21989,6 +25055,20 @@
      "iterations": 60,
      "exploit": 0.3774,
      "seconds": 1.7
+    },
+    "8c6d2c": {
+     "file": "out/4BP100_BBvBTN/8c6d2c.ffl",
+     "bytes": 7926,
+     "iterations": 60,
+     "exploit": 0.3648,
+     "seconds": 1
+    },
+    "8c8d5c": {
+     "file": "out/4BP100_BBvBTN/8c8d5c.ffl",
+     "bytes": 7743,
+     "iterations": 60,
+     "exploit": 0.3936,
+     "seconds": 1
     },
     "9c4d2d": {
      "file": "out/4BP100_BBvBTN/9c4d2d.ffl",
@@ -22039,6 +25119,13 @@
      "exploit": 0.4363,
      "seconds": 1.8
     },
+    "Ac8d4d": {
+     "file": "out/4BP100_BBvBTN/Ac8d4d.ffl",
+     "bytes": 7185,
+     "iterations": 70,
+     "exploit": 0.4457,
+     "seconds": 1.3
+    },
     "Ac9c5c": {
      "file": "out/4BP100_BBvBTN/Ac9c5c.ffl",
      "bytes": 7178,
@@ -22067,6 +25154,20 @@
      "exploit": 0.4447,
      "seconds": 1.2
     },
+    "AcKdJh": {
+     "file": "out/4BP100_BBvBTN/AcKdJh.ffl",
+     "bytes": 6492,
+     "iterations": 70,
+     "exploit": 0.3628,
+     "seconds": 1.6
+    },
+    "AcQc3d": {
+     "file": "out/4BP100_BBvBTN/AcQc3d.ffl",
+     "bytes": 6952,
+     "iterations": 70,
+     "exploit": 0.4495,
+     "seconds": 1.1
+    },
     "AcQd3h": {
      "file": "out/4BP100_BBvBTN/AcQd3h.ffl",
      "bytes": 6952,
@@ -22080,6 +25181,13 @@
      "iterations": 70,
      "exploit": 0.4315,
      "seconds": 1.4
+    },
+    "AcQd8c": {
+     "file": "out/4BP100_BBvBTN/AcQd8c.ffl",
+     "bytes": 6790,
+     "iterations": 70,
+     "exploit": 0.437,
+     "seconds": 1.2
     },
     "AcQdTd": {
      "file": "out/4BP100_BBvBTN/AcQdTd.ffl",
@@ -22109,6 +25217,13 @@
      "exploit": 0.3919,
      "seconds": 1.4
     },
+    "Jc9d7d": {
+     "file": "out/4BP100_BBvBTN/Jc9d7d.ffl",
+     "bytes": 7644,
+     "iterations": 60,
+     "exploit": 0.4545,
+     "seconds": 1
+    },
     "Jc9d7h": {
      "file": "out/4BP100_BBvBTN/Jc9d7h.ffl",
      "bytes": 7623,
@@ -22130,6 +25245,13 @@
      "exploit": 0.3593,
      "seconds": 1.2
     },
+    "JcTc3d": {
+     "file": "out/4BP100_BBvBTN/JcTc3d.ffl",
+     "bytes": 7817,
+     "iterations": 70,
+     "exploit": 0.4337,
+     "seconds": 1.3
+    },
     "JcTc8d": {
      "file": "out/4BP100_BBvBTN/JcTc8d.ffl",
      "bytes": 7662,
@@ -22143,6 +25265,13 @@
      "iterations": 50,
      "exploit": 0.3519,
      "seconds": 0.9
+    },
+    "Kc6c3c": {
+     "file": "out/4BP100_BBvBTN/Kc6c3c.ffl",
+     "bytes": 7437,
+     "iterations": 60,
+     "exploit": 0.3893,
+     "seconds": 0.6
     },
     "Kc6d3c": {
      "file": "out/4BP100_BBvBTN/Kc6d3c.ffl",
@@ -22164,6 +25293,27 @@
      "iterations": 50,
      "exploit": 0.4024,
      "seconds": 1
+    },
+    "Kc8d4h": {
+     "file": "out/4BP100_BBvBTN/Kc8d4h.ffl",
+     "bytes": 7259,
+     "iterations": 50,
+     "exploit": 0.399,
+     "seconds": 1.2
+    },
+    "Kc9d7h": {
+     "file": "out/4BP100_BBvBTN/Kc9d7h.ffl",
+     "bytes": 7224,
+     "iterations": 50,
+     "exploit": 0.4384,
+     "seconds": 1.2
+    },
+    "KcJc9d": {
+     "file": "out/4BP100_BBvBTN/KcJc9d.ffl",
+     "bytes": 7138,
+     "iterations": 50,
+     "exploit": 0.4267,
+     "seconds": 0.8
     },
     "KcJd4c": {
      "file": "out/4BP100_BBvBTN/KcJd4c.ffl",
@@ -22207,6 +25357,34 @@
      "exploit": 0.399,
      "seconds": 1.2
     },
+    "KcTc6d": {
+     "file": "out/4BP100_BBvBTN/KcTc6d.ffl",
+     "bytes": 7378,
+     "iterations": 50,
+     "exploit": 0.4432,
+     "seconds": 0.9
+    },
+    "Qc4c2d": {
+     "file": "out/4BP100_BBvBTN/Qc4c2d.ffl",
+     "bytes": 7700,
+     "iterations": 70,
+     "exploit": 0.3825,
+     "seconds": 1.2
+    },
+    "Qc4d2h": {
+     "file": "out/4BP100_BBvBTN/Qc4d2h.ffl",
+     "bytes": 7742,
+     "iterations": 70,
+     "exploit": 0.4429,
+     "seconds": 1.7
+    },
+    "Qc6d3d": {
+     "file": "out/4BP100_BBvBTN/Qc6d3d.ffl",
+     "bytes": 7599,
+     "iterations": 70,
+     "exploit": 0.4543,
+     "seconds": 1.2
+    },
     "Qc6d3h": {
      "file": "out/4BP100_BBvBTN/Qc6d3h.ffl",
      "bytes": 7662,
@@ -22220,6 +25398,13 @@
      "iterations": 80,
      "exploit": 0.4586,
      "seconds": 1.4
+    },
+    "Qc9c9d": {
+     "file": "out/4BP100_BBvBTN/Qc9c9d.ffl",
+     "bytes": 7362,
+     "iterations": 70,
+     "exploit": 0.4611,
+     "seconds": 1.2
     },
     "Qc9d5d": {
      "file": "out/4BP100_BBvBTN/Qc9d5d.ffl",
@@ -22247,6 +25432,20 @@
      "bytes": 7286,
      "iterations": 70,
      "exploit": 0.3874,
+     "seconds": 1.4
+    },
+    "QcJd9h": {
+     "file": "out/4BP100_BBvBTN/QcJd9h.ffl",
+     "bytes": 7286,
+     "iterations": 70,
+     "exploit": 0.4303,
+     "seconds": 1.7
+    },
+    "QcQd9h": {
+     "file": "out/4BP100_BBvBTN/QcQd9h.ffl",
+     "bytes": 7080,
+     "iterations": 80,
+     "exploit": 0.4413,
      "seconds": 1.4
     },
     "Tc4d2h": {
@@ -22284,12 +25483,26 @@
      "exploit": 0.3839,
      "seconds": 1.1
     },
+    "Tc8c7d": {
+     "file": "out/4BP100_BBvBTN/Tc8c7d.ffl",
+     "bytes": 7811,
+     "iterations": 60,
+     "exploit": 0.3864,
+     "seconds": 1.1
+    },
     "Tc8d4c": {
      "file": "out/4BP100_BBvBTN/Tc8d4c.ffl",
      "bytes": 7902,
      "iterations": 60,
      "exploit": 0.4176,
      "seconds": 1.2
+    },
+    "Tc8d4h": {
+     "file": "out/4BP100_BBvBTN/Tc8d4h.ffl",
+     "bytes": 7790,
+     "iterations": 70,
+     "exploit": 0.3802,
+     "seconds": 1.8
     }
    },
    "tree": {
@@ -22335,6 +25548,6 @@
    "reason": "the game maps no BTN-open, SB-call pot to the library (SB flat is 1.58% of combos)"
   }
  ],
- "files": 2954,
- "bytes": 157884598
+ "files": 3413,
+ "bytes": 187253431
 }

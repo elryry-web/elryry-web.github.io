@@ -473,6 +473,17 @@
     return (top === 'AA' ? 'AA is the best hand.' : top + ' loses only to ' + PAIRS.slice(0, k).split('').map(function (r) { return r + r; }).join(' and ') + ' here.')
       + ' The jam folds the worse hands that would pay you off after a smaller raise. Only a few, like ' + next + ', call.';
   }
+  // a deep jam with AK, QQ or JJ: the hands that call it tie, flip or are few. The cost is the worse hands it folds out.
+  var JAM_CALLS = { AKs: 'AK ties it and QQ is about a coin flip. Only KK and AA are well ahead.', AKo: 'AK ties it and QQ is about a coin flip. Only KK and AA are well ahead.',
+    QQ: 'AK is about a coin flip. Only KK and AA are well ahead.', JJ: 'AK is about a coin flip. QQ, KK and AA are well ahead.' };
+  function valueJam(d, po) {
+    var why = JAM_CALLS[d.hand];
+    if (!why || !d.jamOversize || topPair(d, po)) return '';
+    var nm = { vsOpen: ['3-bet', 'opens'], vs3bet: ['4-bet', '3-bets'], squeeze: ['3-bet', 'raises'] }[d.chartKind] || ['raise', 'hands'];
+    var call = d.mix.some(function (m) { return m.action === 'call' && m.freq >= GOOD_FREQ; });
+    return 'Moving all in for ' + bbs(d.did.effToBB || d.did.toBB) + ' folds out the hands ' + d.hand + ' beats. Only AK, QQ and better call. ' + why
+      + ' ' + (call ? 'A call or a ' : 'A ') + nm[0] + ' to ' + bbs(d.jamOversize.toBB) + ' keeps the weaker ' + nm[1] + ' in. They can pay you off later in the hand.';
+  }
   // one short reason the baseline's size suits this hand better (only called when the size is off)
   function sizingWhy(d, ref, tex) {
     var eq = d.feat ? d.feat.eq : 0.5, river = d.street === 'river', wet = tex && tex.wet > 0.55, dry = tex && tex.wet < 0.3, mine = d.did.size;
@@ -1593,6 +1604,7 @@
       var realizedNext = !!(po && did === 'call' && !d.realizedOk && po.have >= po.need && ch && ch.chart !== 'vsJam' && po.toCall < 0.5 * d.stack && !(icm && icm.premium > 0.01));
       var pw = preWhy(h, seat, e, d, { realized: realizedNext });
       pw.concepts.forEach(function (x) { if (!has(x)) K.push(x); });
+      if (valueJam(d, po)) pw.text = ''; // the jam line below gives the reason
       out.push(d.grade + '. ' + (why ? why + ' ' : '') + 'You ' + verbPast(did) + ' ' + hand + '.' + (d.saidAct && !mixed ? '' : ' ' + who + ' ' + (mixed ? 'mixes it: ' + mt : chartVerb(d.mix[0]) + ' it' + (d.mix[0].freq < 0.97 ? ' ' + P('freq', d.mix[0].freq) + ' of the time' : '')) + '.') + (pw.text ? ' ' + pw.text : '') + approx);
     }
     if (ls && !lsRight) out.push(limpSizeText(d, true));
@@ -1600,7 +1612,7 @@
     if (d.sizeTell) out.push(sizeTellText(d));
     if (d.priced) out.push(pricedText(d));
     if (d.never) out.push('The chart never ' + ({ call: 'calls with', raise: 'raises', allin: 'moves all in with', fold: 'folds', check: 'checks' }[did] || 'plays') + ' ' + hand + ' here. The cost is small, but the play is still an error.');
-    if (d.jamOversize) out.push('Moving all in risks ' + bbs(d.stack) + ' where the chart raises to ' + bbs(d.jamOversize.toBB) + '. ' + jamWhy(d, po));
+    if (d.jamOversize) out.push(valueJam(d, po) || 'Moving all in risks ' + bbs(d.stack) + ' where the chart raises to ' + bbs(d.jamOversize.toBB) + '. ' + jamWhy(d, po));
     if (po && !isAgg(did) && !d.realizedOk && (ch.chart === 'vsJam' || po.toCall >= 0.25 * d.stack || d.grade !== 'Good' || d.heroFreq < GOOD_FREQ)) {
       out.push('The call was ' + bbs(po.toCall) + ' into ' + bbs(d.potBB + po.toCall) + '.' + (has('potOdds') ? '' : ' A call needed ' + P('need', po.need) + ' equity.'));
       if (!has('potOdds')) out.push(hand + ' has about ' + P('have', po.have) + ' against the raiser\'s range.');

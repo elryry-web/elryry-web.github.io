@@ -932,8 +932,16 @@
         var M2 = preflopModel(h, seat, n, d, cls, Math.min(hTo, d.maxTo || hTo), hTo >= d.maxTo, sp);
         var aggF = mix.filter(function (q) { return q.action === aggKey; }).reduce(function (t, q) { return t + q.freq; }, 0);
         // when the chart raises, the other size is judged against the chart's own raise
-        var hv;
+        var hv, deepJam = hTo >= d.maxTo && !jam && d.stack / bb > 40 && aggF > 0.004;
         if (aggF >= pMax - 0.15) hv = (ev[aggKey] || 0) + Math.min(0, M2.raise - M.raise);
+        else if (deepJam) {
+          // a deep all in where the chart raises small but mostly calls or folds. The chip model prices the jam itself:
+          // each opponent folds or calls against a tight jamming range. The cost is the gap to the best play the chart
+          // makes 15%+ of the time. The relative floor would charge for the whole stack the jam risks, as if it lost it.
+          var refV = null;
+          mix.forEach(function (q) { if (q.freq < 0.15 && q !== mix[0]) return; var v = mv(q.action); if (v != null && (refV == null || v > refV)) refV = v; });
+          hv = -Math.max(0, (refV || 0) - M2.raise);
+        }
         else {
           // the relative floor for the hero's own size: it risks what that raise puts in, not the chart's raise. Facing a
           // raise far under the chart's size (sp.priced) the chart is a guess: the floor is halved, and cut by 30% more
@@ -944,7 +952,7 @@
           hv = costOf(aggKey, M2.raise);
         }
         // a deep all in where the chart raises small folds out the worse hands, whatever the model says
-        if (aggF >= pMax - 0.15 && hTo >= d.maxTo && !jam && d.stack / bb > 40) hv = Math.min(hv, -Math.min(2, 0.015 * d.stack / bb));
+        if (deepJam) hv = Math.min(hv, -Math.min(2, 0.015 * d.stack / bb));
         info = { hero: { evBB: rd(hv, 2), modelEV: rd(M2.raise, 2), foldEq: rd(M2.foldEq, 3) } };
       }
       factors.push({ kind: 'preflopModel', fold: 0, call: M.call != null ? rd(M.call, 2) : null, check: M.check != null ? rd(M.check, 2) : null, raise: M.raise != null ? rd(M.raise, 2) : null,
