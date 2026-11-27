@@ -230,7 +230,13 @@
     } else if (kind === 'vs3bet') {
       var by = o.vill ? 'the ' + o.vill : 'the 3-bettor';
       // a premium hand (AK, QQ) is not beaten by most of what continues against a 4-bet. It ties or flips with much of it.
-      if (did === 'raise' && top === 'call') { out.push('Against a 4-bet, ' + by + (c === 'premium' ? ' folds its weaker 3-bets. Those are the hands ' + n + ' beats. A call keeps them in the pot.' : ' keeps only its best hands, which beat ' + n + '. A call keeps its weaker 3-bets in the pot.')); k('fourBet'); }
+      // JJ and smaller pairs lose to the bigger pairs but flip with AK, so "its best hands beat JJ" would be wrong for them.
+      if (did === 'raise' && top === 'call') {
+        out.push('Against a 4-bet, ' + by + (c === 'premium' ? ' folds its weaker 3-bets. Those are the hands ' + n + ' beats. A call keeps them in the pot.'
+          : n.length === 2 ? ' keeps its bigger pairs and AK. The bigger pairs beat ' + n + ' and AK is about a coin flip. A call keeps its weaker 3-bets in the pot.'
+          : ' keeps only its best hands, which beat ' + n + '. A call keeps its weaker 3-bets in the pot.'));
+        k('fourBet');
+      }
       else if (did === 'raise' && top === 'fold') { out.push('Against a 4-bet, ' + by + ' keeps only hands that beat ' + n + '.'); k('fourBet'); }
       else if (did === 'call' && top === 'raise') {
         if (isValue(c)) out.push(n + ' is ahead of most of a 3-bet range. A 4-bet wins more from the worse hands that call it.');

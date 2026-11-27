@@ -1589,8 +1589,10 @@
     d.reason = why;
     var cm = isAgg(did) && d.mix[0] && d.mix[0].action === 'call' ? F(f, 'committed') : null;
     var ls = d.limpSize, lsRight = !!(ls && d.grade !== 'Good' && d.sizeOff), rs = d.raiseSize, rsRight = !!(rs && d.grade !== 'Good' && d.sizeOff);
-    if (lsRight) out.push(d.grade + '. Raising was right. The size was too ' + (ls.small ? 'small' : 'big') + '. ' + limpSizeText(d, false) + (why ? ' ' + why : '') + approx);
-    else if (rsRight) out.push(d.grade + '. Raising was right. The size was too ' + (rs.small ? 'small' : 'big') + '. ' + raiseSizeText(d, false) + (why ? ' ' + why : '') + approx);
+    // "right" only when raising is the chart's top play. In a call-or-raise mix led by the call, raising is one option.
+    var rRight = d.mix[0] && d.mix[0].action === 'raise' ? 'Raising was right.' : 'Raising is one of the chart\'s plays.';
+    if (lsRight) out.push(d.grade + '. ' + rRight + ' The size was too ' + (ls.small ? 'small' : 'big') + '. ' + limpSizeText(d, false) + (why ? ' ' + why : '') + approx);
+    else if (rsRight) out.push(d.grade + '. ' + rRight + ' The size was too ' + (rs.small ? 'small' : 'big') + '. ' + raiseSizeText(d, false) + (why ? ' ' + why : '') + approx);
     else if (d.realizedOk && d.mix[0]) out.push('Good. Calling ' + hand + ' is close here. ' + who + ' ' + chartVerb(d.mix[0]) + ' it' + (d.mix[0].freq < 0.97 ? ' ' + P('freq', d.mix[0].freq) + ' of the time' : '') + '. The price is good enough for its realized equity. '
       + hand + ' keeps ' + tok(realWords(reQ.r), mathOf('realize', reQ.r, 'pct', reQ.o)) + ' of its ' + (d.realEq.byTell ? P('eqTell', reQ.have) + ' equity against ' + d.sizeTell.name + '\'s range' : P('have', reQ.have) + ' equity') + '. That is more than the ' + P('need', d.realEq.need) + ' the call needs.' + (approx || ' The chart is a rough guide, not a solve.'));
     else if (cm && d.grade === 'Good' && isAgg(did) && d.mix[0]) out.push('Good. ' + (why ? why + ' ' : '') + who + ' ' + chartVerb(d.mix[0]) + ' ' + hand + '. '

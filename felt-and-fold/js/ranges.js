@@ -202,10 +202,21 @@
       // 40bb, the SB against the BB's 3-bet: the 4-bet is an all-in, and the pairs and best broadways that call at 100bb jam
       // half the time instead. Out of position with little behind, a call plays badly and a jam gets the BB's bluffs to fold.
       var J40 = depth === 40 && opener === 'SB' ? C.parseRange('JJ-22, AQs, AJs, KQs, AQo') : null;
+      // At 40bb and 25bb every 4-bet is an all-in. Some of the strong hands that call at 100bb jam instead. Without this
+      // the jam range was only the 100bb value 4-bets, and AK folded to it (0.9.14, hand 808). The shares were tuned
+      // against tools/chart-audit.js. At 25bb QQ+ and AK always jam, and JJ, TT and AQs mostly jam. At 40bb the CO, BTN
+      // and SB jam QQ+ and AK. The BTN and SB jam JJ, TT and AQs 60% of the time and the CO 35%. The BTN also jams 99,
+      // AJs, KJs, KQs and AQo some of the time. The UTG and HJ face tighter 3-bets. They jam KK+ and flat most QQ and AK.
+      var wide = opener === 'BTN' || opener === 'SB', early = opener === 'UTG' || opener === 'HJ', d25 = depth === 25;
+      var TOP = C.parseRange('QQ+, AKs, AKo'), KKP = C.parseRange('KK+'), MID = C.parseRange('JJ, TT, AQs');
+      var LOW = C.parseRange(opener === 'BTN' ? '99, AJs, KJs, KQs, AQo' : '99, AJs, KQs, AQo');
       if (depth < 100) for (var i = 0; i < 169; i++) {
-        if (bluffy(i)) s.raise[i] *= depth === 40 ? 0.3 : 0;
+        if (bluffy(i)) s.raise[i] *= depth === 40 ? 0.5 : 0.3;
         if (speculative(i)) s.call[i] *= depth === 40 ? 0.6 : 0.4;
         if (J40 && J40[i]) { var mv = s.call[i] * 0.5; s.call[i] -= mv; s.raise[i] += mv; }
+        var share = TOP[i] ? (early && !d25 && !KKP[i] ? 0.2 : 1) : MID[i] ? (wide ? 0.6 : early ? 0 : 0.35) + (d25 ? 0.4 : 0) :
+          LOW[i] ? (opener === 'BTN' ? 0.4 : 0) + (d25 ? 0.3 : 0) : 0;
+        if (share) { var mv2 = s.call[i] * share; s.call[i] -= mv2; s.raise[i] += mv2; }
       }
       return refold(s);
     });
@@ -424,11 +435,12 @@
     var f = Float64Array.from(sp.raise), any = 0; for (var i = 0; i < 169; i++) any += f[i];
     if (!any) return C.parseRange('TT+, AQs+, AKo');
     // a deep all-in far above the chart's raise size (a 4-bet jam instead of a 2.2x 4-bet). Real players jam their strong
-    // hands here, not only the chart's small 4-bet value set: add the strong calls at half weight and halve the small bluffs.
+    // hands here, not only the chart's small 4-bet value set. QQ+ and AK jam whenever the chart plays them. JJ, TT and AQs
+    // come in at half weight or more. The small bluffs are halved.
     if (jr.allIn && sp.raiseToBB && !sp.jam && jr.toBB > 1.8 * sp.raiseToBB && jr.toBB > 25) {
-      var strong = C.parseRange('TT+, AQs+, AKo');
+      var strong = C.parseRange('TT+, AQs+, AKo'), top = C.parseRange('QQ+, AKs, AKo');
       for (i = 0; i < 169; i++) {
-        if (strong[i]) f[i] = Math.max(f[i], 0.5 * Math.min(1, sp.raise[i] + sp.call[i]), 0.5);
+        if (strong[i]) f[i] = Math.max(f[i], (top[i] ? 1 : 0.5) * Math.min(1, sp.raise[i] + sp.call[i]), 0.5);
         else if (bluffy(i)) f[i] *= 0.5;
       }
     }
