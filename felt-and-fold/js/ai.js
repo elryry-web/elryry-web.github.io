@@ -514,11 +514,12 @@
     // a slip names the action and the hand; the recap says which way it went
     if (slip) return { fold: 'Folded', check: 'Checked', call: 'Called with', bet: 'Bet with', raise: 'Raised with', allin: 'Moved all in with' }[t] + ' ' + hand + '.';
     if (t === 'fold') return 'Folded ' + hand + '. The price was ' + pct(need) + ' and the hand had about ' + pct(f.eq) + '.';
-    if (t === 'call') return f.draw.outs >= 8 && f.eq < 0.5 ? 'Called with a ' + f.draw.label + ' (' + f.draw.outs + ' outs).' : 'Called with ' + hand + '. The price was ' + pct(need) + ' and the hand had about ' + pct(f.eq) + '.';
+    var aDraw = (/^[aeiou]/.test(f.draw.label || '') ? 'an ' : 'a ') + f.draw.label;
+    if (t === 'call') return f.draw.outs >= 8 && f.eq < 0.5 ? 'Called with ' + aDraw + ' ('+ f.draw.outs + ' outs).' : 'Called with ' + hand + '. The price was ' + pct(need) + ' and the hand had about ' + pct(f.eq) + '.';
     if (t === 'check') return f.eq > 0.75 ? 'Checked ' + hand + ' to keep weaker hands in.' : 'Checked ' + hand + '.';
     var verb = t === 'allin' ? 'Moved all in' : t === 'raise' ? 'Raised' : 'Bet';
     if (f.eq > 0.7) return verb + ' for value with ' + hand + '.';
-    if (f.draw.outs >= 8) return verb + ' as a semi-bluff with a ' + f.draw.label + '.';
+    if (f.draw.outs >= 8) return verb + ' as a semi-bluff with ' + aDraw + '.';
     if (f.eq < 0.35) return verb + ' as a bluff with ' + hand + '.';
     return verb + ' with ' + hand + ' for thin value and protection.';
   }

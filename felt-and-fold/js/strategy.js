@@ -1003,6 +1003,7 @@
   // after the lean, a minor action (under TRIM_FREQ) whose EV trails the mix's best action by more than the lean line
   // gives its share to that best action. The policy's soft edges leave a few percent on plays that clearly lose, and a
   // play the bar shows should never be graded an error. Twice the line when a bet or raise is on either side, as above.
+  // It runs on preflop chart mixes too, and the review runs it again on every mix it grades (Solved and Library too).
   var TRIM_FREQ = 0.15;
   function trimMix(mix, ev, sp) {
     var best = null, bv = null;
@@ -1027,8 +1028,11 @@
     var n = opts.n != null ? opts.n : h.log.length, d = opts.decision;
     if (!d) d = opts.n != null ? decisionFromEntry(h.log[n]) : decisionFromLegal(h, E.legal(h, seat));
     var street = d.street, t0 = Date.now(), res;
-    if (street === 'preflop') res = preflopEval(h, seat, n, d, opts);
-    else {
+    if (street === 'preflop') {
+      res = preflopEval(h, seat, n, d, opts);
+      // the chart's slivers whose EV clearly trails its best play come off the bar too, by the same line as postflop
+      if (!opts.noEV && !opts.noLean) { var tp = trimMix(res.mix, res.ev, { pot: d.pot, toCall: d.toCall, bb: h.bb }); if (tp) res.trim = tp; }
+    } else {
       var tr = advance(tracker(h), n), ctx = nodeAt(tr, d), p = h.players[seat], i = C.comboIndex(p.hole[0], p.hole[1]);
       var cm = comboMix(ctx, i), e = opts.noEV ? { ev: {}, info: {} } : evs(ctx, i, opts.heroTo);
       res = { mix: cm.mix, ev: e.ev, factors: factorsFor(ctx, i), source: 'Estimate', ctx: ctx, combo: i, info: e.info, feat: features(ctx, i), evBasis: 'chips' };
@@ -1070,7 +1074,7 @@
     comboMix: comboMix, features: features, factorsFor: factorsFor, evs: evs, actionProb: actionProb, BASE: BASE,
     tracker: tracker, advance: advance, rangeOf: rangeOf, preflopRange: preflopRange, specFor: specFor, nodeAt: nodeAt,
     decisionFromEntry: decisionFromEntry, decisionFromLegal: decisionFromLegal, activeSeats: activeSeats,
-    preflopEval: preflopEval, evaluate: evaluate, tourneyCtx: tourneyCtx, icmPremium: icmPremium, icmFor: icmFor,
+    preflopEval: preflopEval, evaluate: evaluate, trimMix: trimMix, tourneyCtx: tourneyCtx, icmPremium: icmPremium, icmFor: icmFor,
     exploitEvs: exploitEvs, trackerX: trackerX,
     setSolverProvider: setSolverProvider, hasSolver: hasSolver, spotDesc: spotDesc, askSolver: askSolver, clearCache: function () { eqCache.clear(); ctxCache.clear(); } };
 });

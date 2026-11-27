@@ -120,7 +120,7 @@
       var board = tr.board, ds = S.describe(a, b, board), dr = st === 'river' ? null : S.draws(a, b, board);
       var e = ctx.eq[i]; if (!(e === e)) e = 0.5;
       o.eq = e; o.kind = ds.kind; o.draw = dr && dr.label && dr.outs > 0 ? dr : null;
-      var drawTxt = o.draw ? 'a ' + o.draw.label + ' (' + o.draw.outs + ' outs: cards that complete it)' : '';
+      var drawTxt = o.draw ? (/^[aeiou]/.test(o.draw.label) ? 'an ' : 'a ') + o.draw.label + ' (' + o.draw.outs + ' outs: cards that complete it)' : '';
       var made = ds.kind === 'air' ? (o.draw ? drawTxt + ', with ' + ds.label + ' for now' : 'nothing yet (' + ds.label + ')') : ds.label + (o.draw ? ' plus ' + drawTxt : '');
       vs = ctx.nOpp > 1 ? (ctx.nOpp === 2 ? 'both players\' likely ranges at once' : 'all ' + NUM[ctx.nOpp] + ' players\' likely ranges at once') : first(h.players[v].name) + '\'s likely range';
       o.short = (ds.kind === 'air' ? (o.draw ? '' : ds.label) : ds.label) + (o.draw ? (ds.kind === 'air' ? '' : ' + ') + o.draw.label : '');
